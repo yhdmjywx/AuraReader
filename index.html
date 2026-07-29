@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <!-- JSZip & Stylesheet -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body class="theme-light">
     <!-- Top Navigation Bar -->
@@ -90,6 +90,15 @@
                     <button id="btn-font-dec" class="btn btn-icon-sm" title="减小字号">A-</button>
                     <span id="font-size-label" class="font-size-text">18px</span>
                     <button id="btn-font-inc" class="btn btn-icon-sm" title="增大字号">A+</button>
+
+                    <span class="divider"></span>
+
+                    <!-- First Line Indent Selector -->
+                    <select id="indent-select" class="select-sm" title="首行缩进模式">
+                        <option value="0em">缩进: 无</option>
+                        <option value="2em" selected>缩进: 2字(标准)</option>
+                        <option value="3em">缩进: 3字(大)</option>
+                    </select>
 
                     <span class="divider"></span>
 
@@ -305,6 +314,6 @@
     <div class="toast" id="toast-msg"></div>
 
     <!-- JS Scripts -->
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>

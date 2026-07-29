@@ -14,6 +14,7 @@
         currentBook: 'crisis-era',
         fontSize: 18,
         fontFamily: "'Inter', sans-serif",
+        textIndent: localStorage.getItem('aura_text_indent') || '2em',
         paperTheme: 'white',
         appTheme: 'light',
         currentPage: 1,
@@ -134,6 +135,7 @@
         btnPrevPage: document.getElementById('btn-prev-page'),
         btnNextPage: document.getElementById('btn-next-page'),
         fontFamilySelect: document.getElementById('font-family-select'),
+        indentSelect: document.getElementById('indent-select'),
         fontSizeLabel: document.getElementById('font-size-label'),
         btnFontDec: document.getElementById('btn-font-dec'),
         btnFontInc: document.getElementById('btn-font-inc'),
@@ -283,7 +285,9 @@
         // Safety render
         try {
             elements.bookPaper.innerHTML = htmlContent;
+            elements.bookPaper.style.setProperty('--book-text-indent', state.textIndent || '2em');
             applyHighlightsToPaper();
+            interceptInTextLinks();
         } catch (e) {
             console.error("页面渲染高亮出现异常:", e);
             elements.bookPaper.innerHTML = htmlContent;
@@ -292,6 +296,46 @@
         // Scroll to top of viewport
         const viewport = document.getElementById('reader-viewport');
         if (viewport) viewport.scrollTop = 0;
+    }
+
+    function interceptInTextLinks() {
+        elements.bookPaper.querySelectorAll('a[href]').forEach(a => {
+            const href = a.getAttribute('href');
+            if (!href) return;
+            
+            // 拦截电子书内部相对链接与锚点
+            if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('mailto:')) {
+                a.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const [srcPath, anchor] = href.split('#');
+                    const cleanPath = srcPath.replace(/^\/+/, '');
+                    const currentBookObj = demoBooks[state.currentBook];
+                    
+                    let targetPage = state.currentPage;
+                    if (currentBookObj && currentBookObj.hrefToPageMap && cleanPath) {
+                        targetPage = currentBookObj.hrefToPageMap[cleanPath] 
+                            || currentBookObj.hrefToPageMap[cleanPath.split('/').pop()] 
+                            || state.currentPage;
+                    }
+                    
+                    renderPage(targetPage);
+                    showToast(`书内关联跳转至 P.${targetPage}`);
+                    
+                    if (anchor) {
+                        setTimeout(() => {
+                            let targetEl = elements.bookPaper.querySelector(`#${CSS.escape(anchor)}`) 
+                                || elements.bookPaper.querySelector(`[name="${anchor}"]`)
+                                || elements.bookPaper.querySelector(`[id*="${anchor}"]`);
+                            if (targetEl) {
+                                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }, 120);
+                    }
+                });
+            }
+        });
     }
 
     function renderTOC(tocItems) {
@@ -723,6 +767,17 @@
             }
         });
 
+        // First Line Indent Select
+        if (elements.indentSelect) {
+            elements.indentSelect.value = state.textIndent || '2em';
+            elements.indentSelect.addEventListener('change', function () {
+                state.textIndent = this.value;
+                localStorage.setItem('aura_text_indent', this.value);
+                elements.bookPaper.style.setProperty('--book-text-indent', this.value);
+                showToast(`已切换首行缩进：${this.options[this.selectedIndex].text}`);
+            });
+        }
+
         // Paper Theme Switch
         elements.paperBtns.forEach(btn => {
             btn.addEventListener('click', function () {
@@ -798,14 +853,14 @@
     }
 
     async function processChapterImages(zip, chapterPath, chapDoc) {
-        const images = chapDoc.querySelectorAll("img");
+        const images = chapDoc.querySelectorAll("img, image, [*|href]");
         if (images.length === 0) return;
         
         const chapDir = chapterPath.includes('/') ? chapterPath.substring(0, chapterPath.lastIndexOf('/') + 1) : '';
         
         for (const img of images) {
-            const rawSrc = img.getAttribute("src");
-            if (!rawSrc || rawSrc.startsWith('data:')) continue;
+            const rawSrc = img.getAttribute("src") || img.getAttribute("xlink:href") || img.getAttribute("href");
+            if (!rawSrc || rawSrc.startsWith('data:') || rawSrc.startsWith('http')) continue;
             
             let imgPath = chapDir + rawSrc;
             const parts = imgPath.split('/');
@@ -822,7 +877,11 @@
                     const base64 = await imgFile.async("base64");
                     const ext = rawSrc.split('.').pop().toLowerCase();
                     const mime = (ext === 'png') ? 'image/png' : (ext === 'gif') ? 'image/gif' : (ext === 'svg') ? 'image/svg+xml' : 'image/jpeg';
-                    img.setAttribute("src", `data:${mime};base64,${base64}`);
+                    const dataUrl = `data:${mime};base64,${base64}`;
+                    
+                    if (img.hasAttribute("src")) img.setAttribute("src", dataUrl);
+                    if (img.hasAttribute("xlink:href")) img.setAttribute("xlink:href", dataUrl);
+                    if (img.hasAttribute("href")) img.setAttribute("href", dataUrl);
                 } catch (e) {
                     console.warn("未成功转换图片:", rawSrc, e);
                 }
