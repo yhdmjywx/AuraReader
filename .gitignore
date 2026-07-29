@@ -1,4 +1,5 @@
 node_modules/
 inspect.js
 test_ncx.js
+deep_test.js
 *.log
