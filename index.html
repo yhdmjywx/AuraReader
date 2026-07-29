@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <!-- JSZip & Stylesheet -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body class="theme-light">
     <!-- Top Navigation Bar -->
@@ -32,10 +32,17 @@
         </div>
 
         <div class="header-actions">
+            <!-- My Shelf Drawer Button -->
+            <button id="btn-shelf" class="btn btn-outline" title="查看本地 IndexedDB 离线书库">
+                <i class="ri-book-shelf-line"></i>
+                <span>我的书库</span>
+                <span class="badge-count" id="shelf-book-count">0</span>
+            </button>
+
             <!-- Open File -->
-            <label for="file-input" class="btn btn-outline" title="打开本地 EPUB / PDF">
+            <label for="file-input" class="btn btn-primary" title="打开本地 EPUB / PDF">
                 <i class="ri-folder-open-line"></i>
-                <span>打开书籍</span>
+                <span>导入书籍</span>
             </label>
             <input type="file" id="file-input" accept=".epub,.pdf,.txt" style="display: none;">
 
@@ -310,10 +317,26 @@
         </div>
     </div>
 
+    <!-- Shelf Drawer Modal -->
+    <div class="shelf-overlay" id="shelf-overlay">
+        <aside class="shelf-drawer">
+            <div class="shelf-header">
+                <h3><i class="ri-book-shelf-line"></i> 我的本地书库 (IndexedDB 永久离线存储)</h3>
+                <button id="btn-close-shelf" class="btn btn-icon-sm"><i class="ri-close-line"></i></button>
+            </div>
+            <div class="shelf-body">
+                <p class="shelf-hint"><i class="ri-shield-flash-line"></i> 所有已导入的书籍与其划线笔记均保存在您浏览器的 IndexedDB 数据库中，免联网、无限容量、全自动持久化。</p>
+                <div class="shelf-grid" id="shelf-grid">
+                    <!-- Dynamic Book Cards -->
+                </div>
+            </div>
+        </aside>
+    </div>
+
     <!-- Notification Toast -->
     <div class="toast" id="toast-msg"></div>
 
     <!-- JS Scripts -->
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>

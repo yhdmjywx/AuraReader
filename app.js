@@ -185,7 +185,12 @@
         inputApiKey: document.getElementById('input-api-key'),
         btnSaveSettings: document.getElementById('btn-save-settings'),
         
-        // Modal & Toast
+        // Modal, Shelf & Toast
+        btnShelf: document.getElementById('btn-shelf'),
+        shelfOverlay: document.getElementById('shelf-overlay'),
+        btnCloseShelf: document.getElementById('btn-close-shelf'),
+        shelfGrid: document.getElementById('shelf-grid'),
+        shelfBookCount: document.getElementById('shelf-book-count'),
         noteModal: document.getElementById('note-modal'),
         modalQuotePreview: document.getElementById('modal-quote-preview'),
         modalNoteTextarea: document.getElementById('modal-note-textarea'),
@@ -194,6 +199,132 @@
         btnConfirmModal: document.getElementById('btn-confirm-modal'),
         toastMsg: document.getElementById('toast-msg')
     };
+
+    // --------------------------------------------------------------------------
+    // 2.5 IndexedDB Storage Engine Architecture
+    // --------------------------------------------------------------------------
+    let db = null;
+
+    function initDB() {
+        return new Promise((resolve) => {
+            if (!window.indexedDB) {
+                console.warn("当前浏览器不支持 IndexedDB");
+                resolve(null);
+                return;
+            }
+            const request = window.indexedDB.open("AuraReaderDB", 1);
+            
+            request.onupgradeneeded = function (e) {
+                const dbInstance = e.target.result;
+                if (!dbInstance.objectStoreNames.contains("books")) {
+                    dbInstance.createObjectStore("books", { keyPath: "id" });
+                }
+                if (!dbInstance.objectStoreNames.contains("notes")) {
+                    const notesStore = dbInstance.createObjectStore("notes", { keyPath: "id" });
+                    notesStore.createIndex("bookId", "bookId", { unique: false });
+                }
+            };
+
+            request.onsuccess = function (e) {
+                db = e.target.result;
+                console.log("IndexedDB 数据库初始化完成");
+                refreshShelfUI();
+                resolve(db);
+            };
+
+            request.onerror = function (e) {
+                console.error("IndexedDB 打开失败:", e);
+                resolve(null);
+            };
+        });
+    }
+
+    function saveBookToDB(bookObj) {
+        if (!db) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(["books"], "readwrite");
+            const store = tx.objectStore("books");
+            store.put(bookObj);
+            tx.oncomplete = () => {
+                refreshShelfUI();
+                resolve();
+            };
+            tx.onerror = (e) => reject(e);
+        });
+    }
+
+    function loadBookFromDB(bookId) {
+        if (!db) return Promise.resolve(null);
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(["books"], "readonly");
+            const store = tx.objectStore("books");
+            const req = store.get(bookId);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = (e) => reject(e);
+        });
+    }
+
+    function getAllBooksFromDB() {
+        if (!db) return Promise.resolve([]);
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(["books"], "readonly");
+            const store = tx.objectStore("books");
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = (e) => reject(e);
+        });
+    }
+
+    function deleteBookFromDB(bookId) {
+        if (!db) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(["books", "notes"], "readwrite");
+            tx.objectStore("books").delete(bookId);
+            
+            // 删除关联笔记
+            const notesStore = tx.objectStore("notes");
+            const index = notesStore.index("bookId");
+            const req = index.getAllKeys(bookId);
+            req.onsuccess = () => {
+                const keys = req.result || [];
+                keys.forEach(k => notesStore.delete(k));
+            };
+
+            tx.oncomplete = () => {
+                refreshShelfUI();
+                resolve();
+            };
+        });
+    }
+
+    function saveNoteToDB(noteObj) {
+        if (!db) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(["notes"], "readwrite");
+            tx.objectStore("notes").put(noteObj);
+            tx.oncomplete = () => resolve();
+        });
+    }
+
+    function deleteNoteFromDB(noteId) {
+        if (!db) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(["notes"], "readwrite");
+            tx.objectStore("notes").delete(noteId);
+            tx.oncomplete = () => resolve();
+        });
+    }
+
+    function loadNotesFromDB(bookId) {
+        if (!db) return Promise.resolve([]);
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(["notes"], "readonly");
+            const index = tx.objectStore("notes").index("bookId");
+            const req = index.getAll(bookId);
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = (e) => reject(e);
+        });
+    }
 
     // --------------------------------------------------------------------------
     // 3. Resizer (75:25 Flexible Split Divider)
@@ -248,13 +379,20 @@
     // --------------------------------------------------------------------------
     // 4. Reader Engine & Book Rendering
     // --------------------------------------------------------------------------
-    function loadBook(bookKey) {
+    async function loadBook(bookKey) {
         state.currentBook = bookKey;
+        
+        // 若内存无此书，自动从 IndexedDB 数据库中检索
+        if (!demoBooks[bookKey]) {
+            const dbBook = await loadBookFromDB(bookKey);
+            if (dbBook) demoBooks[bookKey] = dbBook;
+        }
+
         const book = demoBooks[bookKey];
         if (!book) return;
 
         state.currentPage = 1;
-        state.totalPages = book.pages.length || 1;
+        state.totalPages = book.pages ? (book.pages.length || 1) : 1;
 
         // Update header & toolbar
         elements.currentBookTitle.textContent = book.title;
@@ -263,12 +401,23 @@
         
         renderTOC(book.toc || []);
         
-        // Reset notes for demo vs custom book
-        if (bookKey === 'custom') {
-            state.notes = [];
+        // 优先从 IndexedDB 异步读取笔记
+        const dbNotes = await loadNotesFromDB(bookKey);
+        if (dbNotes && dbNotes.length > 0) {
+            state.notes = dbNotes;
         } else {
-            state.notes = [...seedNotes];
+            const savedNotesJson = localStorage.getItem('aura_notes_' + bookKey);
+            if (savedNotesJson) {
+                try {
+                    state.notes = JSON.parse(savedNotesJson);
+                } catch (e) {
+                    state.notes = bookKey.startsWith('custom') ? [] : [...seedNotes];
+                }
+            } else {
+                state.notes = bookKey.startsWith('custom') ? [] : [...seedNotes];
+            }
         }
+        
         renderNotesList();
         renderPage(1);
     }
@@ -476,10 +625,21 @@
     // --------------------------------------------------------------------------
     // 6. Notes List & Bidirectional Navigation
     // --------------------------------------------------------------------------
+    function persistNotes() {
+        if (!state.currentBook) return;
+        try {
+            localStorage.setItem('aura_notes_' + state.currentBook, JSON.stringify(state.notes));
+        } catch (e) {
+            console.warn("保存笔记至 LocalStorage 失败:", e);
+        }
+    }
+
     function renderNotesList() {
         elements.notesList.innerHTML = '';
         elements.countHighlights.textContent = state.notes.length;
         elements.notesTotalCount.textContent = state.notes.length;
+
+        persistNotes();
 
         if (state.notes.length === 0) {
             elements.emptyNotesState.style.display = 'block';
@@ -1046,15 +1206,22 @@
                     });
                 }
 
-                demoBooks['custom'] = {
+                // 生成基于文件名的唯一 Book ID
+                const bookId = 'book_' + encodeURIComponent(file.name);
+                const customBookObj = {
+                    id: bookId,
                     title: file.name.replace(/\.(epub|equb)$/i, ''),
                     format: 'EPUB',
                     toc: toc,
-                    pages: pages
+                    pages: pages,
+                    hrefToPageMap: hrefToPageMap,
+                    updatedAt: new Date().toISOString()
                 };
 
-                loadBook('custom');
-                showToast(`成功导入并呈现 EPUB 共 ${pages.length} 章节、${toc.length} 条目录！`);
+                demoBooks[bookId] = customBookObj;
+                await saveBookToDB(customBookObj);
+                await loadBook(bookId);
+                showToast(`成功解析并入库《${customBookObj.title}》(共 ${pages.length} 章节、${toc.length} 条规范目录)！`);
             } catch (err) {
                 console.error("EPUB 解析错误:", err);
                 showToast(`EPUB 解析失败: ${err.message}`);
@@ -1065,22 +1232,41 @@
 
     function parseTxtContent(file, previewText) {
         const reader = new FileReader();
-        reader.onload = function (event) {
+        reader.onload = async function (event) {
             const text = event.target.result;
             // 按段落切分排版
             const paragraphs = text.split(/\r?\n/).filter(line => line.trim().length > 0);
             const formattedHtml = `<h1>${escapeHtml(file.name)}</h1>` + paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('');
             
-            demoBooks['custom'] = {
+            const bookId = 'book_' + encodeURIComponent(file.name);
+            const customBookObj = {
+                id: bookId,
                 title: file.name,
                 format: file.name.split('.').pop().toUpperCase(),
                 toc: [{ title: '正文', page: 1 }],
-                pages: [formattedHtml]
+                pages: [formattedHtml],
+                updatedAt: new Date().toISOString()
             };
-            loadBook('custom');
-            showToast(`成功加载文件：${file.name}`);
+
+            demoBooks[bookId] = customBookObj;
+            await saveBookToDB(customBookObj);
+            await loadBook(bookId);
+            showToast(`成功导入并入库文件：《${file.name}》`);
         };
         reader.readAsText(file);
+        // My Shelf Drawer Handlers
+        if (elements.btnShelf) {
+            elements.btnShelf.addEventListener('click', () => {
+                refreshShelfUI();
+                elements.shelfOverlay.classList.add('active');
+            });
+        }
+        if (elements.btnCloseShelf) {
+            elements.btnCloseShelf.addEventListener('click', () => {
+                elements.shelfOverlay.classList.remove('active');
+            });
+        }
+
         // AI Triggers
         elements.btnTriggerAiBatch.addEventListener('click', triggerAiBatchProcessing);
         elements.btnReGenerateAi.addEventListener('click', triggerAiBatchProcessing);
@@ -1124,6 +1310,74 @@
         showToast('高亮及随笔已成功保存');
     }
 
+    async function refreshShelfUI() {
+        if (!elements.shelfGrid) return;
+        const books = await getAllBooksFromDB();
+        if (elements.shelfBookCount) elements.shelfBookCount.textContent = books.length;
+        
+        elements.shelfGrid.innerHTML = '';
+        if (books.length === 0) {
+            elements.shelfGrid.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 40px 0; color: var(--text-muted);">
+                    <i class="ri-book-shelf-line" style="font-size: 42px; color: var(--border-color);"></i>
+                    <p style="margin-top: 10px; font-weight: 500;">本地 IndexedDB 书库暂无离线图书</p>
+                    <small>点击顶部“导入书籍”选取的 EPUB/TXT 将自动永久保存在此处</small>
+                </div>
+            `;
+            return;
+        }
+
+        books.forEach(b => {
+            const card = document.createElement('div');
+            card.className = 'shelf-card';
+            card.innerHTML = `
+                <div class="shelf-card-title">
+                    <i class="ri-book-2-line" style="color: var(--primary);"></i>
+                    <span>${escapeHtml(b.title)}</span>
+                </div>
+                <div class="shelf-card-info">
+                    <span class="book-format-tag">${b.format || 'EPUB'}</span>
+                    <span>${b.pages ? b.pages.length : 1} 章节</span>
+                </div>
+                <div class="shelf-card-footer">
+                    <button class="btn btn-outline-sm btn-open-shelf-book" data-id="${b.id}">
+                        <i class="ri-book-open-line"></i> 打开阅读
+                    </button>
+                    <button class="btn btn-ghost-sm btn-del-shelf-book" data-id="${b.id}" title="从书库移除">
+                        <i class="ri-delete-bin-line"></i>
+                    </button>
+                </div>
+            `;
+
+            card.querySelector('.btn-open-shelf-book').addEventListener('click', async function (e) {
+                e.stopPropagation();
+                if (elements.shelfOverlay) elements.shelfOverlay.classList.remove('active');
+                await openBookFromShelf(b.id);
+            });
+
+            card.querySelector('.btn-del-shelf-book').addEventListener('click', async function (e) {
+                e.stopPropagation();
+                if (confirm(`确定要从本地 IndexedDB 书库移除《${b.title}》及其划线笔记吗？`)) {
+                    await deleteBookFromDB(b.id);
+                    showToast(`已从书库移除：《${b.title}》`);
+                }
+            });
+
+            elements.shelfGrid.appendChild(card);
+        });
+    }
+
+    async function openBookFromShelf(bookId) {
+        const bookObj = await loadBookFromDB(bookId);
+        if (!bookObj) {
+            showToast("未能载入图书，请重新导入");
+            return;
+        }
+        demoBooks[bookId] = bookObj;
+        await loadBook(bookId);
+        showToast(`已从 IndexedDB 书库加载：《${bookObj.title}》`);
+    }
+
     function showToast(msg) {
         elements.toastMsg.textContent = msg;
         elements.toastMsg.classList.add('show');
@@ -1137,11 +1391,12 @@
     // --------------------------------------------------------------------------
     // 10. Bootstrap Application
     // --------------------------------------------------------------------------
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', async function () {
         initResizer();
         initTextSelection();
         initUIControls();
-        loadBook('crisis-era');
+        await initDB();
+        await loadBook('crisis-era');
     });
 
 })();
