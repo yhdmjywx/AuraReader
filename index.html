@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraReader Workstation | 智能阅读与 AI 笔记工作台</title>
+    <!-- Remix Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- JSZip & Stylesheet -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body class="theme-light">
+    <!-- Top Navigation Bar -->
+    <header class="app-header">
+        <div class="brand">
+            <i class="ri-book-open-fill brand-icon"></i>
+            <span class="brand-name">AuraReader</span>
+            <span class="badge">AI Workstation</span>
+        </div>
+
+        <div class="header-center">
+            <div class="book-info">
+                <i class="ri-book-2-line"></i>
+                <span id="current-book-title">危机时代（罗杰斯·思考与洞察）</span>
+                <span class="book-format-tag" id="current-book-tag">EPUB</span>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <!-- Open File -->
+            <label for="file-input" class="btn btn-outline" title="打开本地 EPUB / PDF">
+                <i class="ri-folder-open-line"></i>
+                <span>打开书籍</span>
+            </label>
+            <input type="file" id="file-input" accept=".epub,.pdf,.txt" style="display: none;">
+
+            <!-- Switch Demo Book -->
+            <button id="btn-switch-demo" class="btn btn-ghost" title="切换示例图书">
+                <i class="ri-swap-line"></i> 示例图书
+            </button>
+
+            <!-- Theme Toggle -->
+            <button id="btn-theme-toggle" class="btn btn-icon" title="切换主题">
+                <i class="ri-sun-line"></i>
+            </button>
+
+            <!-- Fullscreen -->
+            <button id="btn-fullscreen" class="btn btn-icon" title="全屏阅读器">
+                <i class="ri-fullscreen-line"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace (75:25 Split Layout) -->
+    <main class="workspace-container" id="workspace-container">
+        <!-- Left Panel: Reader (75%) -->
+        <section class="reader-panel" id="reader-panel">
+            <!-- Reader Controls Toolbar -->
+            <div class="reader-toolbar">
+                <div class="toolbar-group">
+                    <button id="btn-toc" class="btn btn-icon-sm" title="目录导航">
+                        <i class="ri-menu-2-line"></i> 目录
+                    </button>
+                    <span class="divider"></span>
+                    <button id="btn-prev-page" class="btn btn-icon-sm" title="上一页 (←)">
+                        <i class="ri-arrow-left-s-line"></i>
+                    </button>
+                    <span class="page-indicator">
+                        第 <span id="current-page">1</span> / <span id="total-pages">24</span> 页
+                    </span>
+                    <button id="btn-next-page" class="btn btn-icon-sm" title="下一页 (→)">
+                        <i class="ri-arrow-right-s-line"></i>
+                    </button>
+                </div>
+
+                <div class="toolbar-group">
+                    <!-- Font Family Switcher -->
+                    <select id="font-family-select" class="select-sm" title="字体切换">
+                        <option value="'Noto Serif SC', serif">宋体/衬线 (Serif)</option>
+                        <option value="'Inter', sans-serif" selected>黑体/无衬线 (Sans)</option>
+                        <option value="system-ui">系统默认</option>
+                    </select>
+
+                    <!-- Font Size Adjust -->
+                    <button id="btn-font-dec" class="btn btn-icon-sm" title="减小字号">A-</button>
+                    <span id="font-size-label" class="font-size-text">18px</span>
+                    <button id="btn-font-inc" class="btn btn-icon-sm" title="增大字号">A+</button>
+
+                    <span class="divider"></span>
+
+                    <!-- Reader Paper Themes -->
+                    <div class="paper-themes">
+                        <button class="paper-btn paper-white active" data-paper="white" title="纯白"></button>
+                        <button class="paper-btn paper-sepia" data-paper="sepia" title="护眼羊皮纸"></button>
+                        <button class="paper-btn paper-dark" data-paper="dark" title="夜间墨黑"></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table of Contents Drawer (Collapsible) -->
+            <aside class="toc-drawer" id="toc-drawer">
+                <div class="toc-header">
+                    <h4><i class="ri-list-check"></i> 书籍目录</h4>
+                    <button id="btn-close-toc" class="btn btn-icon-sm"><i class="ri-close-line"></i></button>
+                </div>
+                <ul class="toc-list" id="toc-list">
+                    <!-- Dynamic Toc Items -->
+                </ul>
+            </aside>
+
+            <!-- Book Content Viewport -->
+            <div class="reader-viewport" id="reader-viewport">
+                <!-- Book Page Paper Canvas -->
+                <article class="book-paper" id="book-paper">
+                    <!-- Content populated dynamically by JS -->
+                </article>
+            </div>
+
+            <!-- Floating Selection Toolbar (Highlight / Add Note / Ask AI) -->
+            <div class="selection-tooltip" id="selection-tooltip">
+                <button class="tooltip-btn hl-yellow" data-color="yellow" title="高亮标记"><i class="ri-mark-pen-line"></i> 高亮</button>
+                <button class="tooltip-btn hl-green" data-color="green" title="绿色彩笔"><i class="ri-brush-line"></i> 重点</button>
+                <button class="tooltip-btn" id="btn-add-note" title="添加随笔"><i class="ri-sticky-note-line"></i> 笔记</button>
+                <span class="tooltip-divider"></span>
+                <button class="tooltip-btn btn-ai-sparkle" id="btn-ask-ai-selection"><i class="ri-sparkles-line"></i> AI 归纳</button>
+            </div>
+        </section>
+
+        <!-- Resizer Handle -->
+        <div class="resizer-handle" id="resizer-handle" title="按住拖拽调整 75:25 比例，双击折叠/展开笔记栏">
+            <div class="resizer-line"></div>
+        </div>
+
+        <!-- Right Panel: Notes & AI Workbench (25%) -->
+        <section class="notes-panel" id="notes-panel">
+            <!-- Tabs Header -->
+            <div class="tabs-header">
+                <button class="tab-btn active" data-tab="tab-highlights">
+                    <i class="ri-quill-pen-line"></i>
+                    <span>划线与笔记</span>
+                    <span class="badge-count" id="count-highlights">0</span>
+                </button>
+                <button class="tab-btn" data-tab="tab-ai-summary">
+                    <i class="ri-sparkles-fill icon-ai"></i>
+                    <span>AI 结构化总结</span>
+                </button>
+                <button class="tab-btn" data-tab="tab-settings">
+                    <i class="ri-settings-3-line"></i>
+                    <span>设置与导出</span>
+                </button>
+            </div>
+
+            <!-- Tab Content 1: Highlights & User Notes -->
+            <div class="tab-content active" id="tab-highlights">
+                <div class="notes-toolbar">
+                    <span class="notes-count-text">包含 <strong id="notes-total-count">0</strong> 条笔记选区</span>
+                    <div class="notes-actions">
+                        <button id="btn-trigger-ai-batch" class="btn btn-primary-sm">
+                            <i class="ri-sparkles-line"></i> AI 一键整理
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input box for adding standalone note -->
+                <div class="quick-note-box">
+                    <textarea id="quick-note-input" placeholder="写下您的读书感悟或思考..." rows="2"></textarea>
+                    <div class="quick-note-footer">
+                        <span class="hint-text">支持 Markdown 语法</span>
+                        <button id="btn-save-quick-note" class="btn btn-outline-sm"><i class="ri-add-line"></i> 保存笔记</button>
+                    </div>
+                </div>
+
+                <!-- Notes Feed List -->
+                <div class="notes-list" id="notes-list">
+                    <div class="empty-state" id="empty-notes-state">
+                        <i class="ri-draft-line"></i>
+                        <p>暂无划线或笔记</p>
+                        <small>在左侧图书中选中文本即可高亮或添加笔记</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content 2: AI Structured Summary -->
+            <div class="tab-content" id="tab-ai-summary">
+                <div class="ai-header">
+                    <div class="ai-title">
+                        <i class="ri-robot-line icon-sparkle"></i>
+                        <h3>AI 智能萃取洞察</h3>
+                    </div>
+                    <button id="btn-re-generate-ai" class="btn btn-ghost-sm" title="重新生成">
+                        <i class="ri-refresh-line"></i> 重新分析
+                    </button>
+                </div>
+
+                <div class="ai-status-banner" id="ai-status-banner">
+                    <i class="ri-sparkles-line"></i> 点击“AI 一键整理”即可将划线与随笔凝练为提纲
+                </div>
+
+                <!-- AI Output Stream View -->
+                <div class="ai-output-container" id="ai-output-container">
+                    <!-- Core Insights Card -->
+                    <div class="ai-card">
+                        <div class="ai-card-title"><i class="ri-lightbulb-flash-line"></i> 核心观点摘要</div>
+                        <div class="ai-card-body" id="ai-core-ideas">
+                            <em>等待生成...</em>
+                        </div>
+                    </div>
+
+                    <!-- Key Bullet Points Card -->
+                    <div class="ai-card">
+                        <div class="ai-card-title"><i class="ri-file-list-3-line"></i> 关键要点归纳</div>
+                        <div class="ai-card-body" id="ai-key-bullets">
+                            <em>等待生成...</em>
+                        </div>
+                    </div>
+
+                    <!-- Knowledge Tags -->
+                    <div class="ai-card">
+                        <div class="ai-card-title"><i class="ri-price-tag-3-line"></i> 智能概念标签</div>
+                        <div class="tags-cloud" id="ai-tags-cloud">
+                            <span class="tag-skeleton">点击整理生成标签</span>
+                        </div>
+                    </div>
+
+                    <!-- Actionable Insights Card -->
+                    <div class="ai-card">
+                        <div class="ai-card-title"><i class="ri-compass-3-line"></i> 延伸思考与实践</div>
+                        <div class="ai-card-body" id="ai-actionables">
+                            <em>等待生成...</em>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content 3: Settings & Export -->
+            <div class="tab-content" id="tab-settings">
+                <div class="settings-section">
+                    <h4><i class="ri-download-cloud-2-line"></i> 笔记导出</h4>
+                    <p class="section-desc">将书中的所有划线、高亮、用户笔记及 AI 智能总结一键打包导出。</p>
+                    <div class="export-buttons">
+                        <button id="btn-export-markdown" class="btn btn-primary btn-block">
+                            <i class="ri-markdown-line"></i> 导出为 Markdown (.md)
+                        </button>
+                        <button id="btn-export-json" class="btn btn-outline btn-block">
+                            <i class="ri-code-s-slash-line"></i> 导出为 JSON 数据
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4><i class="ri-key-2-line"></i> AI 服务 API 设置</h4>
+                    <p class="section-desc">默认开启内置演示 AI 引擎。如需体验真实的云端 LLM，请在下方配置 API Key：</p>
+                    
+                    <div class="form-group">
+                        <label for="ai-provider">AI 服务商：</label>
+                        <select id="ai-provider" class="select-full">
+                            <option value="demo" selected>内置智能演示 AI 引擎 (免费/无需 Key)</option>
+                            <option value="deepseek">DeepSeek API (R1 / V3)</option>
+                            <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+                            <option value="gemini">Google Gemini (Gemini 1.5 Pro/Flash)</option>
+                            <option value="ollama">Ollama (本地私有模型 http://localhost:11434)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="group-api-key" style="display: none;">
+                        <label for="input-api-key">API Key：</label>
+                        <input type="password" id="input-api-key" placeholder="sk-..." class="input-full">
+                        <small class="hint-text"><i class="ri-shield-check-line"></i> 密钥仅储存在您的浏览器本地 LocalStorage 中，决不上传中转服务器。</small>
+                    </div>
+
+                    <button id="btn-save-settings" class="btn btn-outline btn-block" style="margin-top: 12px;">
+                        <i class="ri-save-line"></i> 保存配置
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: Add Note Dialog -->
+    <div class="modal-overlay" id="note-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="ri-sticky-note-add-line"></i> 添加随笔</h3>
+                <button class="btn btn-icon-sm" id="btn-close-modal"><i class="ri-close-line"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="quote-preview" id="modal-quote-preview">
+                    <!-- Highlighted Text Quote -->
+                </div>
+                <textarea id="modal-note-textarea" placeholder="记录关于这段内容的联想、疑问或心得..." rows="4"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="btn-cancel-modal">取消</button>
+                <button class="btn btn-primary" id="btn-confirm-modal">保存划线笔记</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="toast-msg"></div>
+
+    <!-- JS Scripts -->
+    <script src="app.js?v=3"></script>
+</body>
+</html>
