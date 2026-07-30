@@ -1184,6 +1184,38 @@
             showToast(`已切换图书：《${demoBooks[nextBookKey].title}》`);
         });
 
+        // My Shelf Drawer Handlers
+        if (elements.btnShelf) {
+            elements.btnShelf.addEventListener('click', () => {
+                refreshShelfUI();
+                elements.shelfOverlay.classList.add('active');
+            });
+        }
+        if (elements.btnCloseShelf) {
+            elements.btnCloseShelf.addEventListener('click', () => {
+                elements.shelfOverlay.classList.remove('active');
+            });
+        }
+
+        // AI Triggers
+        if (elements.btnTriggerAiBatch) {
+            elements.btnTriggerAiBatch.addEventListener('click', triggerAiBatchProcessing);
+        }
+        if (elements.btnReGenerateAi) {
+            elements.btnReGenerateAi.addEventListener('click', triggerAiBatchProcessing);
+        }
+
+        // Note Modal Handlers
+        if (elements.btnCloseModal) {
+            elements.btnCloseModal.addEventListener('click', closeNoteModal);
+        }
+        if (elements.btnCancelModal) {
+            elements.btnCancelModal.addEventListener('click', closeNoteModal);
+        }
+        if (elements.btnConfirmModal) {
+            elements.btnConfirmModal.addEventListener('click', saveModalNote);
+        }
+
         // Local File Input (.txt / .epub / .equb / .pdf)
         elements.fileInput.addEventListener('change', function (e) {
             const file = e.target.files[0];
@@ -1470,27 +1502,6 @@
             showToast(`成功导入并入库文件：《${file.name}》`);
         };
         reader.readAsText(file);
-        // My Shelf Drawer Handlers
-        if (elements.btnShelf) {
-            elements.btnShelf.addEventListener('click', () => {
-                refreshShelfUI();
-                elements.shelfOverlay.classList.add('active');
-            });
-        }
-        if (elements.btnCloseShelf) {
-            elements.btnCloseShelf.addEventListener('click', () => {
-                elements.shelfOverlay.classList.remove('active');
-            });
-        }
-
-        // AI Triggers
-        elements.btnTriggerAiBatch.addEventListener('click', triggerAiBatchProcessing);
-        elements.btnReGenerateAi.addEventListener('click', triggerAiBatchProcessing);
-
-        // Modal Handlers
-        elements.btnCloseModal.addEventListener('click', closeNoteModal);
-        elements.btnCancelModal.addEventListener('click', closeNoteModal);
-        elements.btnConfirmModal.addEventListener('click', saveModalNote);
     }
 
     function openNoteModal(quote) {
