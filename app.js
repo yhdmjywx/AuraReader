@@ -936,9 +936,14 @@
             let chapMd = `# ${chapTitle}\n\n`;
             chapMd += `> 页码：P.${pageNum} | 本章划线数：${pageNotes.length}\n\n---\n\n`;
             
-            const paragraphs = tempDiv.querySelectorAll('p, h1, h2, h3, blockquote');
+            const paragraphs = tempDiv.querySelectorAll('p, h1, h2, h3, blockquote, div');
+            const processedNoteIds = new Set();
+
             if (paragraphs.length > 0) {
                 paragraphs.forEach(p => {
+                    // 仅处理最深层包含文本的段落，避免外层 div 元素重复处理
+                    if (p.children.length > 0 && p.querySelector('p, h1, h2, h3, blockquote')) return;
+
                     let text = p.innerText.trim();
                     if (!text) return;
                     
@@ -947,33 +952,59 @@
                     } else if (p.tagName === 'BLOCKQUOTE') {
                         chapMd += `> ${text}\n\n`;
                     } else {
-                        // 在段落正文中嵌入 ==高亮文字== 标记
+                        // 在段落正文中精准无失真插入 ==高亮文字== 标记
                         let paragraphText = text;
-                        const matchedNotesWithComment = [];
+                        const matchedComments = [];
 
                         pageNotes.forEach(note => {
-                            if (note.quote && paragraphText.includes(note.quote.trim())) {
-                                const rawQuote = note.quote.trim();
-                                if (!paragraphText.includes(`==${rawQuote}==`)) {
-                                    paragraphText = paragraphText.replace(rawQuote, `==${rawQuote}==`);
+                            if (!note.quote) return;
+                            const cleanQuote = note.quote.trim();
+                            
+                            // 模糊忽略换行与空格进行匹配
+                            const normP = paragraphText.replace(/[\s\u00a0]+/g, ' ');
+                            const normQ = cleanQuote.replace(/[\s\u00a0]+/g, ' ');
+                            
+                            if (paragraphText.includes(cleanQuote) || normP.includes(normQ)) {
+                                processedNoteIds.add(note.id);
+                                if (!paragraphText.includes(`==${cleanQuote}==`)) {
+                                    if (paragraphText.includes(cleanQuote)) {
+                                        paragraphText = paragraphText.replace(cleanQuote, `==${cleanQuote}==`);
+                                    } else {
+                                        // 解决空格换行微差异下的包裹
+                                        const firstWords = cleanQuote.slice(0, Math.min(8, cleanQuote.length));
+                                        const lastWords = cleanQuote.slice(Math.max(0, cleanQuote.length - 8));
+                                        const startIdx = paragraphText.indexOf(firstWords);
+                                        const endIdx = paragraphText.indexOf(lastWords);
+                                        if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
+                                            const matchedSegment = paragraphText.substring(startIdx, endIdx + lastWords.length);
+                                            paragraphText = paragraphText.replace(matchedSegment, `==${matchedSegment}==`);
+                                        }
+                                    }
                                 }
-                                if (note.comment) {
-                                    matchedNotesWithComment.push(note);
+                                if (note.comment && !matchedComments.includes(note.comment)) {
+                                    matchedComments.push(note.comment);
                                 }
                             }
                         });
 
                         chapMd += `${paragraphText}\n\n`;
                         
-                        // 仅当存在随笔感悟时，在段落下方追加纯感悟引用块（不重复引文原文）
-                        matchedNotesWithComment.forEach(note => {
-                            chapMd += `> 💭 **[随笔思考 | P.${pageNum}]**：${note.comment}\n\n`;
+                        // 仅当存在随笔感悟时，在段落下方追加纯思考引用块（绝不重复引文原文）
+                        matchedComments.forEach(comment => {
+                            chapMd += `> 💭 **[随笔思考 | P.${pageNum}]**：${comment}\n\n`;
                         });
                     }
                 });
             } else {
                 chapMd += tempDiv.innerText.trim() + '\n\n';
             }
+
+            // 处理可能未在正文段落中匹配上的独立随笔感悟（不重复原文）
+            pageNotes.forEach(note => {
+                if (!processedNoteIds.has(note.id) && note.comment) {
+                    chapMd += `> 💭 **[随笔思考 | P.${pageNum}]**：${note.comment}\n\n`;
+                }
+            });
 
             const fileName = `${String(pageNum).padStart(2, '0')}_${chapTitle}.md`;
             folder.file(fileName, chapMd);
