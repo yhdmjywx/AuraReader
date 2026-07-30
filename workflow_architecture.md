@@ -97,3 +97,21 @@ flowchart TD
 2. **案例 2：划线随笔 Modal 弹窗无响应**
    - *Phase 2*：Agent 在开发自检中发现点击“保存划线笔记”无响应，排查发现监听器误放在 `parseTxtContent` 局部作用域内。
    - *Phase 2*：属于开发活性期的 Bug，Agent 自行将其提升至 `initUIControls()` 全局作用域，自修完成并提交 Git `f204985`。
+
+---
+
+## 4. ⚙️ Antigravity Skills 动态调用与调度指南
+
+Google Antigravity 拥有强强大的技能扩展生态（Skills），Agent 能够根据当前阶段任务自动匹配并触发对应 Skills，赋能全流程安全与自动化：
+
+### 4.1 数据安全与防误删保障 (`accidental-data-loss-prevention`)
+- **触发场景**：涉及代码覆盖、数据库重置或文件批量删除操作前。
+- **运行规则**：Agent 自动评估破坏性风险，若涉及危险操作（如清除用户 IndexedDB 或覆盖未备份代码），触发二次确认，杜绝生产数据意外丢失。
+
+### 4.2 环境与依赖自动化校验 (`managing-python-dependencies` / `uv`)
+- **触发场景**：测试环境初始化或安装依赖时。
+- **运行规则**：Agent 自动感知当前测试虚拟环境（`uv` / `node`），避免全局污染与依赖冲突，确保测试套件在一个安全沙箱中自主运行。
+
+### 4.3 自自我诊断与技能修复 (`antigravity-guide` / `skill-repair`)
+- **触发场景**：当 Agent 在执行特定指令发现工具损坏或需要调取 Antigravity 标准参考时。
+- **运行规则**：Agent 自动调用 `skill-repair` 修复坏损的技能配置，或参考 `antigravity-guide` 引导人类使用 `/grill-me` 互动对齐需求、使用 `/goal` 进行长周期任务追踪。
