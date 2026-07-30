@@ -102,7 +102,7 @@ flowchart TD
 
 ## 4. ⚙️ Antigravity Skills 动态调用与调度指南
 
-Google Antigravity 拥有强强大的技能扩展生态（Skills），Agent 能够根据当前阶段任务自动匹配并触发对应 Skills，赋能全流程安全与自动化：
+Google Antigravity 拥有强大的技能扩展生态（Skills），Agent 能够根据当前阶段任务自动匹配并触发对应 Skills，赋能全流程安全与自动化：
 
 ### 4.1 数据安全与防误删保障 (`accidental-data-loss-prevention`)
 - **触发场景**：涉及代码覆盖、数据库重置或文件批量删除操作前。
@@ -115,3 +115,23 @@ Google Antigravity 拥有强强大的技能扩展生态（Skills），Agent 能�
 ### 4.3 自自我诊断与技能修复 (`antigravity-guide` / `skill-repair`)
 - **触发场景**：当 Agent 在执行特定指令发现工具损坏或需要调取 Antigravity 标准参考时。
 - **运行规则**：Agent 自动调用 `skill-repair` 修复坏损的技能配置，或参考 `antigravity-guide` 引导人类使用 `/grill-me` 互动对齐需求、使用 `/goal` 进行长周期任务追踪。
+
+---
+
+## 5. 💡 Antigravity 原生命令模式与工作流的共生促进架构 (Synergistic Command Modes Integration)
+
+Antigravity 原生的斜杠命令与操作模式（Slash Commands）与本 5 阶段工作流架构并非冲突关系，而是**完美共生、深度互相促进**的关系。
+
+- **工作流架构（Workflow Architecture）**：提供了**软件工程的完整生命周期与安全边界**（解决“在什么阶段做些什么”）。
+- **命令模式（Slash Commands & Modes）**：提供了**人机在特定环节下的即时交互增强工具**（解决“如何在这个阶段高效交互”）。
+
+### 5.1 映射与共生矩阵 (Synergy Mapping Matrix)
+
+| 原生命令 / 模式 | 最优嵌入工作流阶段 | 深度促进与协同机制 |
+| --- | --- | --- |
+| **`/grill-me` (专访对齐模式)** | **阶段 1：需求对齐与规划** | 在撰写 PRD 或 `implementation_plan.md` 前启动专访，通过 1~3 个针对性选项消除歧义（例如本次关于高亮排版与 PRD 选型），确保规划 100% 准确。 |
+| **`/btw` (顺带旁白模式)** | **阶段 2：活性开发与自治** | 在 Agent 处于阶段 2 连续编写代码或自修细小 Bug 时，人类通过 `/btw` 插入不打断主开发流程的补充想法或澄清，实现无阻塞旁白交流。 |
+| **`/goal` (无人值守目标追踪)** | **阶段 3 与 阶段 5** | 当需要 Agent 自主跑完大规模测试套件、重构多模块或长周期监控时启动，赋予 Agent 持续自我驱动力，直达目标完成。 |
+| **`/learn` (知识偏好沉淀)** | **阶段 4 与 阶段 5** | 当人类在阶段 4 选定某项排版或代码风格裁决后，使用 `/learn` 将其持久化记入 Agent 行为规范，后续开发全自动遵循。 |
+| **`/schedule` (定时巡检提醒)** | **阶段 3 与 阶段 5** | 设定一针或定时 Cron 任务，定期巡检本地 Daemon 服务（`http://localhost:8095`）或日志状态，确保长效运维。 |
+| **`/browser` (浏览器增强调试)** | **阶段 3：自动化自检** | 在阶段 3 进行 UI 或视觉验证时，调用 Web 浏览器调试工具直接读取 DOM 与渲染画面，提升自检精准度。 |
