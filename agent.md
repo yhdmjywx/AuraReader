@@ -11,7 +11,20 @@
 
 ---
 
-## 2. 技术栈规范 (Technology Stack)
+## 2. 人机协同与自治修复契约 (Refined Collaboration Protocol)
+
+在开发与测试协同中，严格执行以下**分级自治与呈报契约**：
+
+1. **开发过程中的细小 Bug ➔ Agent 自行自治处理 (Autonomous Minor Fixes)**：
+   - 在功能开发进行中，遭遇的语法拼写失误、局部变量未定义、DOM 事件解绑、CSS 样式微调等细微 Bug，由 Agent 自查自修、快速迭代，不打扰人类。
+2. **工作被迫中断 ➔ 立即交由人类协助决策 (Interruption Handover)**：
+   - 当遇到环境故障、权限拒绝、第三方 API 崩溃或需求冲突导致开发被迫中断时，Agent 必须立即整理现场信息并交由人类决策。
+3. **阶段里程碑完成后的测试校验问题 ➔ 整理方案交由人类裁决 (Post-Milestone Handover)**：
+   - 在完成整块功能开发并运行测试套件自检时，若发现排版差异、功能偏离或校验项失败，Agent 必须整理**根因诊断 + 方案选项**呈报人类，由人类决策授权后执行修复。
+
+---
+
+## 3. 技术栈规范 (Technology Stack)
 
 - **UI 结构**：HTML5 语义化标签 (`<header>`, `<aside>`, `<article>`, `<main>`)
 - **设计系统与 CSS**：Vanilla CSS 变量与设计 Token（双重主题：App 浅色/深色主题；纸张主题：纯白/羊皮纸/夜间墨黑）
@@ -27,7 +40,7 @@
 
 ---
 
-## 3. 项目目录结构 (Directory Structure)
+## 4. 项目目录结构 (Directory Structure)
 
 ```text
 e:\dp\reader_workstation\
@@ -41,9 +54,9 @@ e:\dp\reader_workstation\
 
 ---
 
-## 4. Agent 开发与维护法则 (Operating Guidelines)
+## 5. Agent 开发与维护法则 (Operating Guidelines)
 
-1. **语法校验优先**：每次修改 `app.js` 后，必须执行 `node -c app.js` 验证 0 语法错误。
+1. **语法自检**：开发过程中每次修改 `app.js` 后，执行 `node -c app.js` 自行修正小语法错漏。
 2. **拒绝代码重复与文本粘连**：导出 Markdown 时必须严格遵守 `==高亮==` 嵌入规范，绝对禁止生成 `💡 [划线随笔] 原文：“...”` 格式的重复文本。
 3. **保持根目录干净**：所有临时测试脚本在验证完成后必须及时清理，勿将其提交入 Git 仓库。
 4. **强缓存控制 (Cache Busting)**：修改 JS / CSS 时需同步更新 `index.html` 中的引用版本参数（如 `app.js?v=9`）。
