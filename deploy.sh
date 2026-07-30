@@ -29,7 +29,7 @@ docker compose up --build -d
 # 4. 部署成功提示
 echo "=============================================================================="
 echo "🎉 AuraReader Workstation 已成功成功部署并在后台运行！"
-echo "🌐 访问地址: http://$(curl -s ifconfig.me):80 (或 http://$(curl -s ifconfig.me):8095)"
+echo "🌐 访问地址: http://$(curl -s ifconfig.me):8095"
 echo "📄 容器状态: $(docker ps --filter "name=aurareader-workstation" --format "{{.Status}}")"
 echo "=============================================================================="
 echo "💡 若需配置 HTTPS / SSL 证书，请参阅部署指南: deploy_vps.md"
