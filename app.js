@@ -180,6 +180,8 @@
         // Settings Tab
         btnExportMarkdown: document.getElementById('btn-export-markdown'),
         btnExportJson: document.getElementById('btn-export-json'),
+        btnExportChapterZip: document.getElementById('btn-export-chapter-zip'),
+        btnExportStandaloneHtml: document.getElementById('btn-export-standalone-html'),
         aiProviderSelect: document.getElementById('ai-provider'),
         groupApiKey: document.getElementById('group-api-key'),
         inputApiKey: document.getElementById('input-api-key'),
@@ -884,8 +886,222 @@
         showToast('已导出 JSON 结构化数据');
     });
 
-    function downloadFile(filename, text, type) {
-        const blob = new Blob([text], { type: type });
+    // 📦 Export Chapter-by-Chapter Zip Package
+    if (elements.btnExportChapterZip) {
+        elements.btnExportChapterZip.addEventListener('click', exportChapterZip);
+    }
+
+    // 🌐 Export Standalone Dual-Column HTML Book
+    if (elements.btnExportStandaloneHtml) {
+        elements.btnExportStandaloneHtml.addEventListener('click', exportStandaloneHtml);
+    }
+
+    async function exportChapterZip() {
+        if (typeof JSZip === 'undefined') {
+            showToast('JSZip 尚未就绪，请检查网络连接');
+            return;
+        }
+        const currentBookObj = demoBooks[state.currentBook];
+        if (!currentBookObj || !currentBookObj.pages) {
+            showToast('当前图书无可导出内容');
+            return;
+        }
+
+        const zip = new JSZip();
+        const folderName = `${currentBookObj.title}_分章节笔记包`;
+        const folder = zip.folder(folderName);
+        
+        let indexMd = `# 《${currentBookObj.title}》 导读书册与笔记全览\n\n`;
+        indexMd += `- 格式：${currentBookObj.format}\n`;
+        indexMd += `- 总章节数：${currentBookObj.pages.length}\n`;
+        indexMd += `- 划线随笔数：${state.notes.length}\n`;
+        indexMd += `- 导出时间：${new Date().toLocaleString()}\n\n`;
+        indexMd += `## 目录结构\n`;
+
+        currentBookObj.pages.forEach((pageHtml, idx) => {
+            const pageNum = idx + 1;
+            const pageNotes = state.notes.filter(n => n.page === pageNum);
+            
+            let chapTitle = `第${pageNum}章`;
+            if (currentBookObj.toc && currentBookObj.toc[idx]) {
+                chapTitle = currentBookObj.toc[idx].title || chapTitle;
+            }
+            chapTitle = chapTitle.replace(/[\\/:*?"<>|]/g, '_');
+            
+            indexMd += `${pageNum}. [${chapTitle}](./${String(pageNum).padStart(2, '0')}_${chapTitle}.md)\n`;
+
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = pageHtml;
+            
+            let chapMd = `# ${chapTitle}\n\n`;
+            chapMd += `> 页码：P.${pageNum} | 本章随笔数：${pageNotes.length}\n\n---\n\n`;
+            
+            const paragraphs = tempDiv.querySelectorAll('p, h1, h2, h3, blockquote');
+            if (paragraphs.length > 0) {
+                paragraphs.forEach(p => {
+                    let text = p.innerText.trim();
+                    if (!text) return;
+                    
+                    if (p.tagName.startsWith('H')) {
+                        chapMd += `## ${text}\n\n`;
+                    } else if (p.tagName === 'BLOCKQUOTE') {
+                        chapMd += `> ${text}\n\n`;
+                    } else {
+                        chapMd += `${text}\n\n`;
+                        
+                        pageNotes.forEach(note => {
+                            if (note.quote && text.includes(note.quote.trim())) {
+                                chapMd += `> 💡 **[划线随笔 | P.${pageNum}]**\n`;
+                                chapMd += `> 原文：“${note.quote}”\n`;
+                                if (note.comment) chapMd += `> 💭 思考：${note.comment}\n`;
+                                chapMd += `\n`;
+                            }
+                        });
+                    }
+                });
+            } else {
+                chapMd += tempDiv.innerText.trim() + '\n\n';
+            }
+
+            if (pageNotes.length > 0) {
+                chapMd += `\n---\n### 📌 本章划线与思考汇总\n\n`;
+                pageNotes.forEach((n, nIdx) => {
+                    chapMd += `#### 笔记 ${nIdx + 1}\n`;
+                    if (n.quote) chapMd += `> “${n.quote}”\n\n`;
+                    if (n.comment) chapMd += `**思考笔记**：${n.comment}\n\n`;
+                });
+            }
+
+            const fileName = `${String(pageNum).padStart(2, '0')}_${chapTitle}.md`;
+            folder.file(fileName, chapMd);
+        });
+
+        folder.file('00_目录概览.md', indexMd);
+
+        showToast('正在生成分章节 Zip 压缩包...');
+        const blob = await zip.generateAsync({ type: 'blob' });
+        downloadFile(`${currentBookObj.title}_分章节笔记包.zip`, blob, 'application/zip');
+        showToast('已成功导出分章节 Zip 压缩包！');
+    }
+
+    function exportStandaloneHtml() {
+        const currentBookObj = demoBooks[state.currentBook];
+        if (!currentBookObj || !currentBookObj.pages) {
+            showToast('当前图书无可导出内容');
+            return;
+        }
+
+        const bookTitle = currentBookObj.title;
+        const allPages = currentBookObj.pages;
+        const allNotes = state.notes;
+        const allToc = currentBookObj.toc || [];
+
+        const standaloneHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>《${escapeHtml(bookTitle)}》 - 离线双栏带标注电子书</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --bg: #f8fafc;
+            --paper-bg: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+        }
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 280px;
+            background: #ffffff;
+            border-right: 1px solid var(--border);
+            padding: 16px;
+            overflow-y: auto;
+        }
+        .sidebar h2 { font-size: 16px; margin-top: 0; color: var(--primary); }
+        .toc-item { padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 6px; }
+        .toc-item:hover { background: #f1f5f9; color: var(--primary); }
+        .main-workspace {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        .reader-col {
+            flex: 3;
+            padding: 32px 48px;
+            overflow-y: auto;
+            background: var(--paper-bg);
+            line-height: 1.85;
+            font-size: 18px;
+        }
+        .notes-col {
+            flex: 1;
+            min-width: 300px;
+            background: #f8fafc;
+            border-left: 1px solid var(--border);
+            padding: 20px;
+            overflow-y: auto;
+        }
+        mark.hl { background-color: #fef08a; padding: 2px 4px; border-radius: 3px; }
+        .note-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            font-size: 13px;
+        }
+        .note-quote { color: #64748b; font-style: italic; margin-bottom: 6px; }
+        .note-comment { font-weight: 600; color: #0f172a; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>《${escapeHtml(bookTitle)}》</h2>
+        <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">全书共有 ${allPages.length} 章节 | 标注 ${allNotes.length} 条</div>
+        <div id="toc-list">
+            ${allToc.map((t, idx) => `<div class="toc-item" onclick="jumpPage(${t.page || idx+1})">${idx+1}. ${escapeHtml(t.title)}</div>`).join('')}
+        </div>
+    </div>
+    <div class="main-workspace">
+        <div class="reader-col" id="reader-canvas">
+            ${allPages.map((p, idx) => `<div id="page-${idx+1}" style="margin-bottom: 60px;">${p}</div>`).join('')}
+        </div>
+        <div class="notes-col">
+            <h3 style="font-size: 15px; margin-top: 0; color: var(--primary);">随笔标注卡片 (${allNotes.length})</h3>
+            ${allNotes.map(n => `
+                <div class="note-card">
+                    <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">P.${n.page} | ${escapeHtml(n.chapter || '')}</div>
+                    ${n.quote ? `<div class="note-quote">“${escapeHtml(n.quote)}”</div>` : ''}
+                    ${n.comment ? `<div class="note-comment">💭 ${escapeHtml(n.comment)}</div>` : ''}
+                </div>
+            `).join('')}
+        </div>
+    </div>
+    <script>
+        function jumpPage(p) {
+            const el = document.getElementById('page-' + p);
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>`;
+
+        const blob = new Blob([standaloneHtml], { type: 'text/html;charset=utf-8' });
+        downloadFile(`${bookTitle}_带标注电子书.html`, blob, 'text/html');
+        showToast('已成功导出双栏带标注独立 HTML 电子书！');
+    }
+
+    function downloadFile(filename, data, type) {
+        const blob = (data instanceof Blob) ? data : new Blob([data], { type: type });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = filename;

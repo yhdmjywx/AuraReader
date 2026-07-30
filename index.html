@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <!-- JSZip & Stylesheet -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=5">
+    <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body class="theme-light">
     <!-- Top Navigation Bar -->
@@ -260,10 +260,16 @@
                     <p class="section-desc">将书中的所有划线、高亮、用户笔记及 AI 智能总结一键打包导出。</p>
                     <div class="export-buttons">
                         <button id="btn-export-markdown" class="btn btn-primary btn-block">
-                            <i class="ri-markdown-line"></i> 导出为 Markdown (.md)
+                            <i class="ri-markdown-line"></i> 导出笔记摘要为 Markdown (.md)
                         </button>
                         <button id="btn-export-json" class="btn btn-outline btn-block">
-                            <i class="ri-code-s-slash-line"></i> 导出为 JSON 数据
+                            <i class="ri-code-s-slash-line"></i> 导出笔记为 JSON 数据
+                        </button>
+                        <button id="btn-export-chapter-zip" class="btn btn-outline btn-block" style="border-color: var(--primary); color: var(--primary);">
+                            <i class="ri-file-zip-line"></i> 📦 导出原版+笔记分章节 Zip (.zip)
+                        </button>
+                        <button id="btn-export-standalone-html" class="btn btn-primary btn-block" style="background: linear-gradient(135deg, #3b82f6, #6366f1); border: none;">
+                            <i class="ri-html5-line"></i> 🌐 导出双栏带标注 HTML 电子书 (.html)
                         </button>
                     </div>
                 </div>
@@ -337,6 +343,6 @@
     <div class="toast" id="toast-msg"></div>
 
     <!-- JS Scripts -->
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
 </body>
 </html>
