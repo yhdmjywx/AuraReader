@@ -22,18 +22,27 @@
 
 项目采用纯前端技术栈打造（HTML5 + Vanilla CSS3 + Modern ES6+ JS），无需复杂的 Node Build 构建依赖，即开即用！
 
-### 本地运行方式：
+### 1. 本地预览运行：
 
 ```bash
-# 1. 克隆或进入项目目录
+# 进入项目目录
 cd e:/dp/reader_workstation
 
-# 2. 使用任意静态 HTTP 服务器启动（例如 http-server）
+# 使用任意静态 HTTP 服务器启动（例如 http-server）
 npx -y http-server -p 8095
 
-# 3. 浏览器访问
+# 浏览器访问
 http://localhost:8095
 ```
+
+### 2. VPS 生产环境 1 键 Docker 部署：
+
+```bash
+# 赋予脚本执行权限并一键部署
+chmod +x deploy.sh && ./deploy.sh
+```
+
+👉 **详细 VPS 部署、域名绑定与 HTTPS 证书配置指南见：[deploy_vps.md](file:///e:/dp/reader_workstation/deploy_vps.md)**
 
 ---
 
