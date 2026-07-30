@@ -1,5 +1,24 @@
+# 依赖包 (Dependencies)
 node_modules/
-inspect.js
-test_ncx.js
-deep_test.js
+
+# 日志与系统临时文件 (Logs & OS Junk)
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 环境变量与密钥 (Env & Secrets)
+.env
+.env.local
+.env.*.local
+
+# 临时开发测试脚本与沙盒目录 (Scratch & Test Scripts)
+test_*.js
+inspect.js
+deep_test.js
+test_ncx.js
+scratch/
+*.tmp
