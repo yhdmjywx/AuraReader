@@ -856,23 +856,23 @@
     // Export to Markdown
     elements.btnExportMarkdown.addEventListener('click', function () {
         const bookTitle = demoBooks[state.currentBook].title;
-        let md = `# 读书笔记与 AI 总结：《${bookTitle}》\n\n`;
+        let md = `# 划线笔记与 AI 萃取：《${bookTitle}》\n\n`;
         md += `> 导出时间：${new Date().toLocaleString()}\n\n`;
         
-        md += `## 一、 划线与随笔摘要 (${state.notes.length} 条)\n\n`;
+        md += `## 一、 划线与随笔精选 (${state.notes.length} 条)\n\n`;
         state.notes.forEach((n, idx) => {
-            md += `### ${idx + 1}. P.${n.page} ${n.chapter}\n`;
-            if (n.quote) md += `> ${n.quote}\n\n`;
-            if (n.comment) md += `**随笔思考**：${n.comment}\n\n`;
-            md += `---\n`;
+            md += `### ${idx + 1}. P.${n.page} ${n.chapter || ''}\n`;
+            if (n.quote) md += `==${n.quote}==\n\n`;
+            if (n.comment) md += `> 💭 **随笔思考**：${n.comment}\n\n`;
+            md += `---\n\n`;
         });
 
-        md += `\n## 二、 AI 萃取核心洞察\n\n`;
+        md += `## 二、 AI 萃取核心洞察\n\n`;
         md += `### 核心观点\n${elements.aiCoreIdeas.innerText}\n\n`;
         md += `### 关键要点\n${elements.aiKeyBullets.innerText}\n\n`;
 
-        downloadFile(`${bookTitle}_读书笔记.md`, md, 'text/markdown');
-        showToast('已导出 Markdown 笔记文件');
+        downloadFile(`${bookTitle}_划线随笔.md`, md, 'text/markdown');
+        showToast('已导出高亮与随笔 Markdown 文件');
     });
 
     // Export to JSON
@@ -934,7 +934,7 @@
             tempDiv.innerHTML = pageHtml;
             
             let chapMd = `# ${chapTitle}\n\n`;
-            chapMd += `> 页码：P.${pageNum} | 本章随笔数：${pageNotes.length}\n\n---\n\n`;
+            chapMd += `> 页码：P.${pageNum} | 本章划线数：${pageNotes.length}\n\n---\n\n`;
             
             const paragraphs = tempDiv.querySelectorAll('p, h1, h2, h3, blockquote');
             if (paragraphs.length > 0) {
@@ -947,29 +947,32 @@
                     } else if (p.tagName === 'BLOCKQUOTE') {
                         chapMd += `> ${text}\n\n`;
                     } else {
-                        chapMd += `${text}\n\n`;
-                        
+                        // 在段落正文中嵌入 ==高亮文字== 标记
+                        let paragraphText = text;
+                        const matchedNotesWithComment = [];
+
                         pageNotes.forEach(note => {
-                            if (note.quote && text.includes(note.quote.trim())) {
-                                chapMd += `> 💡 **[划线随笔 | P.${pageNum}]**\n`;
-                                chapMd += `> 原文：“${note.quote}”\n`;
-                                if (note.comment) chapMd += `> 💭 思考：${note.comment}\n`;
-                                chapMd += `\n`;
+                            if (note.quote && paragraphText.includes(note.quote.trim())) {
+                                const rawQuote = note.quote.trim();
+                                if (!paragraphText.includes(`==${rawQuote}==`)) {
+                                    paragraphText = paragraphText.replace(rawQuote, `==${rawQuote}==`);
+                                }
+                                if (note.comment) {
+                                    matchedNotesWithComment.push(note);
+                                }
                             }
+                        });
+
+                        chapMd += `${paragraphText}\n\n`;
+                        
+                        // 仅当存在随笔感悟时，在段落下方追加纯感悟引用块（不重复引文原文）
+                        matchedNotesWithComment.forEach(note => {
+                            chapMd += `> 💭 **[随笔思考 | P.${pageNum}]**：${note.comment}\n\n`;
                         });
                     }
                 });
             } else {
                 chapMd += tempDiv.innerText.trim() + '\n\n';
-            }
-
-            if (pageNotes.length > 0) {
-                chapMd += `\n---\n### 📌 本章划线与思考汇总\n\n`;
-                pageNotes.forEach((n, nIdx) => {
-                    chapMd += `#### 笔记 ${nIdx + 1}\n`;
-                    if (n.quote) chapMd += `> “${n.quote}”\n\n`;
-                    if (n.comment) chapMd += `**思考笔记**：${n.comment}\n\n`;
-                });
             }
 
             const fileName = `${String(pageNum).padStart(2, '0')}_${chapTitle}.md`;
