@@ -13,7 +13,7 @@ services:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:80/ > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
       retries: 3
