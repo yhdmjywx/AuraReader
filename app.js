@@ -631,6 +631,7 @@
 
         const newNote = {
             id: 'note-' + Date.now(),
+            bookId: state.currentBook,
             quote: quote,
             comment: '',
             color: color,
@@ -640,6 +641,7 @@
         };
 
         state.notes.unshift(newNote);
+        saveNoteToDB(newNote);
         renderNotesList();
         renderPage(state.currentPage, true);
         hideSelectionTooltip();
@@ -1097,16 +1099,29 @@
 
                 // 恢复所有划线随笔至当前内存、LocalStorage 及 IndexedDB 数据库
                 if (Array.isArray(data.notes) && data.notes.length > 0) {
-                    const localMap = new Map(state.notes.map(n => [n.id, n]));
+                    const firstBookId = (data.books && data.books[0]) ? (data.books[0].id || data.books[0].title) : state.currentBook;
+                    const allImportedNotes = [];
+                    
                     for (const n of data.notes) {
                         if (n && n.id) {
-                            n.bookId = n.bookId || state.currentBook;
-                            localMap.set(n.id, n);
+                            n.bookId = n.bookId || firstBookId || state.currentBook;
+                            allImportedNotes.push(n);
                             await saveNoteToDB(n);
                         }
                     }
-                    state.notes = Array.from(localMap.values());
-                    importedNotesCount = data.notes.length;
+
+                    // 如果恢复了电子书，自动切换并载入第一本恢复的电子书
+                    if (data.books && data.books.length > 0 && data.books[0].id) {
+                        const targetBookId = data.books[0].id;
+                        demoBooks[targetBookId] = data.books[0];
+                        await loadBook(targetBookId);
+                    }
+
+                    // 合并现有与导入的笔记
+                    const noteMap = new Map(state.notes.map(n => [n.id, n]));
+                    allImportedNotes.forEach(n => noteMap.set(n.id, n));
+                    state.notes = Array.from(noteMap.values());
+                    importedNotesCount = allImportedNotes.length;
                     
                     persistNotes();
                     renderNotesList();
@@ -1793,6 +1808,7 @@
 
         const newNote = {
             id: 'note-' + Date.now(),
+            bookId: state.currentBook,
             quote: quote,
             comment: comment,
             color: 'yellow',
@@ -1802,6 +1818,7 @@
         };
 
         state.notes.unshift(newNote);
+        saveNoteToDB(newNote);
         renderNotesList();
         renderPage(state.currentPage, true);
         closeNoteModal();
