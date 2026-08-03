@@ -188,6 +188,15 @@
         btnExportFullBackup: document.getElementById('btn-export-full-backup'),
         btnImportFullBackup: document.getElementById('btn-import-full-backup'),
         backupFileInput: document.getElementById('backup-file-input'),
+        backupSelectModal: document.getElementById('backup-select-modal'),
+        btnCloseBackupModal: document.getElementById('btn-close-backup-modal'),
+        btnCancelBackupModal: document.getElementById('btn-cancel-backup-modal'),
+        btnConfirmExportBackup: document.getElementById('btn-confirm-export-backup'),
+        btnSelectAllBackup: document.getElementById('btn-select-all-backup'),
+        btnDeselectAllBackup: document.getElementById('btn-deselect-all-backup'),
+        backupBookCheckboxList: document.getElementById('backup-book-checkbox-list'),
+        chkBackupIncludeNotes: document.getElementById('chk-backup-include-notes'),
+        chkBackupIncludeSettings: document.getElementById('chk-backup-include-settings'),
         syncSecretInput: document.getElementById('sync-secret-input'),
         syncStatusBadge: document.getElementById('sync-status-badge'),
         syncLastTime: document.getElementById('sync-last-time'),
@@ -912,9 +921,11 @@
         elements.btnExportStandaloneHtml.addEventListener('click', exportStandaloneHtml);
     }
 
-    // 📦 Export & Import Full Backup (.aurabackup)
+    // 📦 Selective Book Backup (.aurabackup)
+    let availableBackupBooks = [];
+
     if (elements.btnExportFullBackup) {
-        elements.btnExportFullBackup.addEventListener('click', exportFullBackup);
+        elements.btnExportFullBackup.addEventListener('click', openBackupSelectModal);
     }
     if (elements.btnImportFullBackup) {
         elements.btnImportFullBackup.addEventListener('click', () => {
@@ -929,45 +940,132 @@
         });
     }
 
-    async function exportFullBackup() {
-        showToast('正在打包全量图书与划线笔记...');
+    if (elements.btnCloseBackupModal) {
+        elements.btnCloseBackupModal.addEventListener('click', closeBackupSelectModal);
+    }
+    if (elements.btnCancelBackupModal) {
+        elements.btnCancelBackupModal.addEventListener('click', closeBackupSelectModal);
+    }
+    if (elements.btnSelectAllBackup) {
+        elements.btnSelectAllBackup.addEventListener('click', () => toggleAllBackupCheckboxes(true));
+    }
+    if (elements.btnDeselectAllBackup) {
+        elements.btnDeselectAllBackup.addEventListener('click', () => toggleAllBackupCheckboxes(false));
+    }
+    if (elements.btnConfirmExportBackup) {
+        elements.btnConfirmExportBackup.addEventListener('click', executeSelectiveBackupExport);
+    }
 
-        try {
-            const booksFromDB = await getAllBooksFromDB();
-            
-            const backupPayload = {
-                version: "1.0",
-                type: "aurareader_full_backup",
-                exportedAt: new Date().toISOString(),
-                notes: state.notes,
-                settings: {
-                    textIndent: state.textIndent,
-                    fontSize: state.fontSize,
-                    paperTheme: state.paperTheme,
-                    appTheme: state.appTheme
-                },
-                books: booksFromDB || []
-            };
+    function closeBackupSelectModal() {
+        if (elements.backupSelectModal) elements.backupSelectModal.classList.remove('active');
+    }
 
-            const jsonStr = JSON.stringify(backupPayload, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    function toggleAllBackupCheckboxes(checked) {
+        if (!elements.backupBookCheckboxList) return;
+        elements.backupBookCheckboxList.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+            chk.checked = checked;
+        });
+    }
 
-            const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-            const fileName = `AuraReader_Backup_${yyyymmdd}.aurabackup`;
-
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
-
-            showToast(`🎉 成功导出全量备份包: ${fileName}`);
-        } catch (e) {
-            console.error("全量备份导出失败:", e);
-            showToast("全量备份导出异常: " + e.message);
+    async function openBackupSelectModal() {
+        const booksFromDB = await getAllBooksFromDB();
+        
+        const map = new Map();
+        if (booksFromDB && booksFromDB.length > 0) {
+            booksFromDB.forEach(b => map.set(b.id || b.title, b));
         }
+        Object.keys(demoBooks).forEach(key => {
+            const b = demoBooks[key];
+            if (b && !map.has(b.id || key)) {
+                map.set(b.id || key, Object.assign({ id: key }, b));
+            }
+        });
+
+        availableBackupBooks = Array.from(map.values());
+
+        if (availableBackupBooks.length === 0) {
+            showToast('本地暂无可用于备份的图书');
+            return;
+        }
+
+        // Render Checkbox List
+        elements.backupBookCheckboxList.innerHTML = '';
+        availableBackupBooks.forEach((book, idx) => {
+            const item = document.createElement('div');
+            item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.04);';
+            
+            const noteCount = state.notes.filter(n => (n.chapter && n.chapter.includes(book.title)) || n.bookId === book.id).length;
+
+            item.innerHTML = `
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; font-weight: 500; font-size: 0.88rem;">
+                    <input type="checkbox" class="chk-backup-book" data-id="${book.id || idx}" checked>
+                    <span>${escapeHtml(book.title)}</span>
+                </label>
+                <small style="color: var(--text-sub); font-size: 0.78rem;">${book.format || 'EPUB'} · ${pageOrChapCount(book)} · ${noteCount} 条划线</small>
+            `;
+            elements.backupBookCheckboxList.appendChild(item);
+        });
+
+        if (elements.backupSelectModal) elements.backupSelectModal.classList.add('active');
+    }
+
+    function pageOrChapCount(b) {
+        return b.pages ? `${b.pages.length} 章节` : (b.toc ? `${b.toc.length} 目录` : '1 章节');
+    }
+
+    async function executeSelectiveBackupExport() {
+        const selectedCheckboxes = elements.backupBookCheckboxList.querySelectorAll('.chk-backup-book:checked');
+        if (selectedCheckboxes.length === 0) {
+            showToast('请至少勾选一本要备份的图书');
+            return;
+        }
+
+        const selectedIds = new Set(Array.from(selectedCheckboxes).map(chk => chk.getAttribute('data-id')));
+        const selectedBooks = availableBackupBooks.filter((b, idx) => selectedIds.has(b.id || String(idx)));
+        const selectedTitles = new Set(selectedBooks.map(b => b.title));
+
+        const includeNotes = elements.chkBackupIncludeNotes ? elements.chkBackupIncludeNotes.checked : true;
+        const includeSettings = elements.chkBackupIncludeSettings ? elements.chkBackupIncludeSettings.checked : true;
+
+        let notesToExport = [];
+        if (includeNotes) {
+            notesToExport = state.notes.filter(n => {
+                if (n.bookId && selectedIds.has(n.bookId)) return true;
+                if (n.chapter && Array.from(selectedTitles).some(t => n.chapter.includes(t))) return true;
+                return selectedBooks.length === availableBackupBooks.length;
+            });
+        }
+
+        const backupPayload = {
+            version: "1.0",
+            type: "aurareader_full_backup",
+            exportedAt: new Date().toISOString(),
+            notes: notesToExport,
+            settings: includeSettings ? {
+                textIndent: state.textIndent,
+                fontSize: state.fontSize,
+                paperTheme: state.paperTheme,
+                appTheme: state.appTheme
+            } : {},
+            books: selectedBooks
+        };
+
+        const jsonStr = JSON.stringify(backupPayload, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+
+        const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const fileName = `AuraReader_Backup_${selectedBooks.length}本_${yyyymmdd}.aurabackup`;
+
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+
+        closeBackupSelectModal();
+        showToast(`🎉 成功导出选中的 ${selectedBooks.length} 本图书与 ${notesToExport.length} 条划线备份包！`);
     }
 
     function importFullBackup(file) {

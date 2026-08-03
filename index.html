@@ -361,6 +361,44 @@
         </div>
     </div>
 
+    <!-- Modal: Selective Book Backup Dialog -->
+    <div class="modal-overlay" id="backup-select-modal">
+        <div class="modal-card" style="max-width: 540px;">
+            <div class="modal-header">
+                <h3><i class="ri-checkbox-multiple-line" style="color: #10b981;"></i> 选择需要打包备份的图书</h3>
+                <button class="btn btn-icon-sm" id="btn-close-backup-modal"><i class="ri-close-line"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <span style="font-size: 0.88rem; color: var(--text-sub);">请勾选要打包进备份包的图书：</span>
+                    <div>
+                        <button class="btn btn-ghost-sm" id="btn-select-all-backup">全选</button>
+                        <button class="btn btn-ghost-sm" id="btn-deselect-all-backup">取消全选</button>
+                    </div>
+                </div>
+                <div id="backup-book-checkbox-list" style="max-height: 240px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px;">
+                    <!-- Dynamic Book Checkboxes -->
+                </div>
+                <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 0.85rem;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="chk-backup-include-notes" checked>
+                        <span>包含所选图书的划线与随笔笔记</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px;">
+                        <input type="checkbox" id="chk-backup-include-settings" checked>
+                        <span>包含阅读器排版偏好设置 (首行缩进/字体)</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="btn-cancel-backup-modal">取消</button>
+                <button class="btn btn-primary" id="btn-confirm-export-backup" style="background: #10b981; border: none;">
+                    <i class="ri-download-2-line"></i> 导出选中图书备份 (.aurabackup)
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Shelf Drawer Modal -->
     <div class="shelf-overlay" id="shelf-overlay">
         <aside class="shelf-drawer">
@@ -381,6 +419,6 @@
     <div class="toast" id="toast-msg"></div>
 
     <!-- JS Scripts -->
-    <script src="app.js?v=11"></script>
+    <script src="app.js?v=12"></script>
 </body>
 </html>
