@@ -1095,12 +1095,16 @@
                     }
                 }
 
-                // 恢复所有划线随笔至当前内存与 LocalStorage
+                // 恢复所有划线随笔至当前内存、LocalStorage 及 IndexedDB 数据库
                 if (Array.isArray(data.notes) && data.notes.length > 0) {
                     const localMap = new Map(state.notes.map(n => [n.id, n]));
-                    data.notes.forEach(n => {
-                        if (n && n.id) localMap.set(n.id, n);
-                    });
+                    for (const n of data.notes) {
+                        if (n && n.id) {
+                            n.bookId = n.bookId || state.currentBook;
+                            localMap.set(n.id, n);
+                            await saveNoteToDB(n);
+                        }
+                    }
                     state.notes = Array.from(localMap.values());
                     importedNotesCount = data.notes.length;
                     
@@ -1116,8 +1120,9 @@
                     }
                 }
 
-                // 刷新界面与书房 UI
+                // 刷新界面与书房 UI 及划线随笔数量徽章
                 await refreshShelfUI();
+                renderNotesList();
                 renderPage(state.currentPage, true);
 
                 showToast(`🎉 成功从备份恢复！包含 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
