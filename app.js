@@ -185,6 +185,9 @@
         btnExportJson: document.getElementById('btn-export-json'),
         btnExportChapterZip: document.getElementById('btn-export-chapter-zip'),
         btnExportStandaloneHtml: document.getElementById('btn-export-standalone-html'),
+        btnExportFullBackup: document.getElementById('btn-export-full-backup'),
+        btnImportFullBackup: document.getElementById('btn-import-full-backup'),
+        backupFileInput: document.getElementById('backup-file-input'),
         syncSecretInput: document.getElementById('sync-secret-input'),
         syncStatusBadge: document.getElementById('sync-status-badge'),
         syncLastTime: document.getElementById('sync-last-time'),
@@ -907,6 +910,125 @@
     // 🌐 Export Standalone Dual-Column HTML Book
     if (elements.btnExportStandaloneHtml) {
         elements.btnExportStandaloneHtml.addEventListener('click', exportStandaloneHtml);
+    }
+
+    // 📦 Export & Import Full Backup (.aurabackup)
+    if (elements.btnExportFullBackup) {
+        elements.btnExportFullBackup.addEventListener('click', exportFullBackup);
+    }
+    if (elements.btnImportFullBackup) {
+        elements.btnImportFullBackup.addEventListener('click', () => {
+            if (elements.backupFileInput) elements.backupFileInput.click();
+        });
+    }
+    if (elements.backupFileInput) {
+        elements.backupFileInput.addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (file) importFullBackup(file);
+            this.value = '';
+        });
+    }
+
+    async function exportFullBackup() {
+        showToast('正在打包全量图书与划线笔记...');
+
+        try {
+            const booksFromDB = await getAllBooksFromDB();
+            
+            const backupPayload = {
+                version: "1.0",
+                type: "aurareader_full_backup",
+                exportedAt: new Date().toISOString(),
+                notes: state.notes,
+                settings: {
+                    textIndent: state.textIndent,
+                    fontSize: state.fontSize,
+                    paperTheme: state.paperTheme,
+                    appTheme: state.appTheme
+                },
+                books: booksFromDB || []
+            };
+
+            const jsonStr = JSON.stringify(backupPayload, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+
+            const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const fileName = `AuraReader_Backup_${yyyymmdd}.aurabackup`;
+
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+
+            showToast(`🎉 成功导出全量备份包: ${fileName}`);
+        } catch (e) {
+            console.error("全量备份导出失败:", e);
+            showToast("全量备份导出异常: " + e.message);
+        }
+    }
+
+    function importFullBackup(file) {
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async function (e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                if (!data || (data.type !== 'aurareader_full_backup' && !Array.isArray(data.notes) && !Array.isArray(data.books))) {
+                    showToast('未识别的备份包格式');
+                    return;
+                }
+
+                let importedBooksCount = 0;
+                let importedNotesCount = 0;
+
+                // 恢复所有包含原件的图书至 IndexedDB
+                if (Array.isArray(data.books) && data.books.length > 0) {
+                    for (const b of data.books) {
+                        if (b && b.id) {
+                            demoBooks[b.id] = b;
+                            await saveBookToDB(b);
+                            importedBooksCount++;
+                        }
+                    }
+                }
+
+                // 恢复所有划线随笔至当前内存与 LocalStorage
+                if (Array.isArray(data.notes) && data.notes.length > 0) {
+                    const localMap = new Map(state.notes.map(n => [n.id, n]));
+                    data.notes.forEach(n => {
+                        if (n && n.id) localMap.set(n.id, n);
+                    });
+                    state.notes = Array.from(localMap.values());
+                    importedNotesCount = data.notes.length;
+                    
+                    persistNotes();
+                    renderNotesList();
+                }
+
+                // 恢复界面设置
+                if (data.settings) {
+                    if (data.settings.textIndent) {
+                        state.textIndent = data.settings.textIndent;
+                        localStorage.setItem('aura_text_indent', state.textIndent);
+                    }
+                }
+
+                // 刷新界面与书房 UI
+                await refreshShelfUI();
+                renderPage(state.currentPage, true);
+
+                showToast(`🎉 成功从备份恢复！包含 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
+            } catch (err) {
+                console.error("备份解析失败:", err);
+                showToast("备份恢复失败: " + err.message);
+            }
+        };
+        reader.readAsText(file);
     }
 
     async function exportChapterZip() {

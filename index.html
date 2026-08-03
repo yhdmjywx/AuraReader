@@ -269,8 +269,22 @@
                         </button>
                         <button id="btn-export-standalone-html" class="btn btn-primary btn-block" style="background: linear-gradient(135deg, #3b82f6, #6366f1); border: none;">
                             <i class="ri-html5-line"></i> 🌐 导出双栏带标注 HTML 电子书 (.html)
+                    </div>
+                </div>
+
+                <div class="settings-section" style="border: 1px solid #10b981; background: rgba(16, 185, 129, 0.04); border-radius: 8px;">
+                    <h4><i class="ri-save-3-line" style="color: #10b981;"></i> 📦 100% 本地迁移与全量备份包</h4>
+                    <p class="section-desc">一键打包导出全部图书文件、划线与随笔笔记（换电脑/浏览器时可 1 秒全量恢复）：</p>
+                    
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <button id="btn-export-full-backup" class="btn btn-primary btn-sm" style="flex: 1; background: #10b981; border: none;">
+                            <i class="ri-download-2-line"></i> 📥 导出全量备份包 (.aurabackup)
+                        </button>
+                        <button id="btn-import-full-backup" class="btn btn-outline-sm" style="flex: 1; border-color: #10b981; color: #059669;">
+                            <i class="ri-upload-2-line"></i> 📤 导入恢复备份包
                         </button>
                     </div>
+                    <input type="file" id="backup-file-input" accept=".aurabackup,.json" style="display: none;">
                 </div>
 
                 <div class="settings-section" style="border: 1px solid var(--primary-light); background: rgba(99, 102, 241, 0.03);">
@@ -367,6 +381,6 @@
     <div class="toast" id="toast-msg"></div>
 
     <!-- JS Scripts -->
-    <script src="app.js?v=10"></script>
+    <script src="app.js?v=11"></script>
 </body>
 </html>
