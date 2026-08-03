@@ -681,10 +681,15 @@
             card.className = `note-card ${note.color === 'green' ? 'hl-green-card' : ''}`;
             card.id = `card-${note.id}`;
 
+            const chapterLabel = note.chapter ? escapeHtml(note.chapter) : '章节选区';
+
             card.innerHTML = `
                 <div class="note-card-header">
-                    <span class="note-loc-tag"><i class="ri-bookmark-3-line"></i> P.${note.page}</span>
-                    <span>${note.timestamp}</span>
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <span class="note-loc-tag" style="background: rgba(16,185,129,0.1); color: var(--accent-color); font-weight: 500;"><i class="ri-book-open-line"></i> ${chapterLabel}</span>
+                        <span class="note-loc-tag"><i class="ri-bookmark-3-line"></i> P.${note.page}</span>
+                    </div>
+                    <span style="font-size: 0.76rem; color: var(--text-sub);">${note.timestamp}</span>
                 </div>
                 ${note.quote ? `<div class="note-quote-text">“${escapeHtml(note.quote)}”</div>` : ''}
                 ${note.comment ? `<div class="note-comment-text">${escapeHtml(note.comment)}</div>` : ''}
@@ -1140,7 +1145,8 @@
                 renderNotesList();
                 renderPage(state.currentPage, true);
 
-                showToast(`🎉 成功从备份恢复！包含 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
+                const activeTitle = demoBooks[state.currentBook] ? demoBooks[state.currentBook].title : '恢复图书';
+                showToast(`🎉 成功从备份恢复！已为您自动打开《${activeTitle}》，加载 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
             } catch (err) {
                 console.error("备份解析失败:", err);
                 showToast("备份恢复失败: " + err.message);
