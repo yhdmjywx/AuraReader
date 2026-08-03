@@ -1,16 +1,19 @@
 {
-  "name": "reader_workstation",
+  "name": "aurareader-workstation",
   "version": "1.0.0",
-  "description": "",
-  "main": "app.js",
+  "description": "AuraReader Workstation - Smart Reading & AI Notes Workstation with Cloud Sync",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "jszip": "^3.10.1"
-  }
+  "keywords": [
+    "reader",
+    "epub",
+    "notes",
+    "ai",
+    "cloud-sync"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
 }

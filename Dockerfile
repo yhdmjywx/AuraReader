@@ -1,20 +1,19 @@
-# 使用轻量级 Nginx Alpine 镜像
-FROM nginx:1.25-alpine
+# 使用超轻量级 Node.js 20 Alpine 镜像 (~40MB)
+FROM node:20-alpine
 
-# 删除默认 Nginx 配置
-RUN rm -rf /etc/nginx/conf.d/default.conf
+# 设置工作目录
+WORKDIR /app
 
-# 复制自定义 Nginx 配置文件
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# 复制项目核心文件与代码
+COPY package.json ./
+COPY index.html styles.css app.js server.js ./
+COPY README.md prd_v0_5.md workflow_architecture.md agent.md status.md ./
 
-# 复制前端代码至 Nginx 默认工作目录
-COPY index.html /usr/share/nginx/html/index.html
-COPY styles.css /usr/share/nginx/html/styles.css
-COPY app.js /usr/share/nginx/html/app.js
-COPY README.md /usr/share/nginx/html/README.md
+# 创建数据库持久化目录
+RUN mkdir -p /app/data
 
-# 开放 80, 443 及 8095 端口
-EXPOSE 80 443 8095
+# 暴露工作台服务端口
+EXPOSE 8095
 
-# 启动 Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# 启动 Node.js 一体化 Web 与 Cloud Sync API 服务
+CMD ["node", "server.js"]

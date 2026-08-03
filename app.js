@@ -30,6 +30,9 @@
         aiProvider: 'demo',
         apiKey: localStorage.getItem('aura_api_key') || '',
         
+        // Cloud Sync Settings
+        syncSecret: localStorage.getItem('aura_sync_secret') || '',
+
         // Selection cache
         pendingSelection: null
     };
@@ -182,6 +185,11 @@
         btnExportJson: document.getElementById('btn-export-json'),
         btnExportChapterZip: document.getElementById('btn-export-chapter-zip'),
         btnExportStandaloneHtml: document.getElementById('btn-export-standalone-html'),
+        syncSecretInput: document.getElementById('sync-secret-input'),
+        syncStatusBadge: document.getElementById('sync-status-badge'),
+        syncLastTime: document.getElementById('sync-last-time'),
+        btnPullSync: document.getElementById('btn-pull-sync'),
+        btnPushSync: document.getElementById('btn-push-sync'),
         aiProviderSelect: document.getElementById('ai-provider'),
         groupApiKey: document.getElementById('group-api-key'),
         inputApiKey: document.getElementById('input-api-key'),
@@ -638,6 +646,7 @@
         } catch (e) {
             console.warn("保存笔记至 LocalStorage 失败:", e);
         }
+        triggerDebouncedCloudPush();
     }
 
     function renderNotesList() {
@@ -1654,12 +1663,159 @@
     }
 
     // --------------------------------------------------------------------------
+    // 9. SQLite Cloud Sync Engine
+    // --------------------------------------------------------------------------
+    let syncDebounceTimer = null;
+
+    function initCloudSync() {
+        if (elements.syncSecretInput) {
+            elements.syncSecretInput.value = state.syncSecret;
+            elements.syncSecretInput.addEventListener('change', function () {
+                state.syncSecret = this.value.trim();
+                localStorage.setItem('aura_sync_secret', state.syncSecret);
+                updateSyncStatusUI();
+                if (state.syncSecret) {
+                    pullFromCloudSync(true);
+                }
+            });
+        }
+
+        if (elements.btnPullSync) {
+            elements.btnPullSync.addEventListener('click', function () {
+                pullFromCloudSync(true);
+            });
+        }
+
+        if (elements.btnPushSync) {
+            elements.btnPushSync.addEventListener('click', function () {
+                pushToCloudSync(true);
+            });
+        }
+
+        updateSyncStatusUI();
+
+        // Auto pull on startup if secret exists
+        if (state.syncSecret) {
+            setTimeout(() => pullFromCloudSync(false), 600);
+        }
+    }
+
+    function updateSyncStatusUI(statusText, isError = false) {
+        if (!elements.syncStatusBadge) return;
+        if (!state.syncSecret) {
+            elements.syncStatusBadge.style.color = '#64748b';
+            elements.syncStatusBadge.textContent = '⚪ 未设置密钥';
+            if (elements.syncLastTime) elements.syncLastTime.textContent = '尚未同步';
+            return;
+        }
+
+        if (statusText) {
+            elements.syncStatusBadge.style.color = isError ? '#ef4444' : '#3b82f6';
+            elements.syncStatusBadge.textContent = statusText;
+        } else {
+            const lastTime = localStorage.getItem('aura_sync_last_time');
+            elements.syncStatusBadge.style.color = '#22c55e';
+            elements.syncStatusBadge.textContent = '🟢 密钥已配置';
+            if (elements.syncLastTime) elements.syncLastTime.textContent = lastTime ? `更新于 ${lastTime}` : '随时可同步';
+        }
+    }
+
+    function triggerDebouncedCloudPush() {
+        if (!state.syncSecret) return;
+        clearTimeout(syncDebounceTimer);
+        syncDebounceTimer = setTimeout(() => {
+            pushToCloudSync(false);
+        }, 1200);
+    }
+
+    async function pushToCloudSync(showToastOnSuccess = false) {
+        if (!state.syncSecret) {
+            if (showToastOnSuccess) showToast('请先在设置中填写专属同步密钥');
+            return;
+        }
+
+        updateSyncStatusUI('🟡 正在推送云端...', false);
+
+        try {
+            const response = await fetch('/api/sync/push', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Sync-Secret': state.syncSecret
+                },
+                body: JSON.stringify({
+                    notes: state.notes,
+                    booksMeta: {
+                        currentBook: state.currentBook,
+                        currentPage: state.currentPage
+                    }
+                })
+            });
+
+            const resData = await response.json();
+            if (resData.success) {
+                const nowStr = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+                localStorage.setItem('aura_sync_last_time', nowStr);
+                updateSyncStatusUI('🟢 已成功同步至云端', false);
+                if (showToastOnSuccess) showToast('☁️ 划线与随笔已成功同步至云端数据库');
+            } else {
+                updateSyncStatusUI(`🔴 同步失败: ${resData.error || '未知错误'}`, true);
+                if (showToastOnSuccess) showToast(`同步失败: ${resData.error}`);
+            }
+        } catch (e) {
+            console.error("Cloud Push error:", e);
+            updateSyncStatusUI('🔴 同步异常 (网络/服务端未响应)', true);
+            if (showToastOnSuccess) showToast('云同步连接超时或网络异常');
+        }
+    }
+
+    async function pullFromCloudSync(showToastOnSuccess = false) {
+        if (!state.syncSecret) {
+            if (showToastOnSuccess) showToast('请先在设置中填写专属同步密钥');
+            return;
+        }
+
+        updateSyncStatusUI('🟡 正在拉取云端...', false);
+
+        try {
+            const response = await fetch(`/api/sync/pull?secret=${encodeURIComponent(state.syncSecret)}`);
+            const resData = await response.json();
+
+            if (resData.success) {
+                if (Array.isArray(resData.notes) && resData.notes.length > 0) {
+                    // Merge cloud notes into local notes deduplicated by id
+                    const localMap = new Map(state.notes.map(n => [n.id, n]));
+                    resData.notes.forEach(cloudNote => {
+                        localMap.set(cloudNote.id, cloudNote);
+                    });
+                    state.notes = Array.from(localMap.values());
+
+                    // Re-render UI
+                    renderNotesList();
+                    renderPage(state.currentPage, true);
+                }
+
+                const nowStr = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+                localStorage.setItem('aura_sync_last_time', nowStr);
+                updateSyncStatusUI('🟢 已由云端同步拉取最新', false);
+                if (showToastOnSuccess) showToast(`☁️ 成功从云端拉取并合并 ${resData.notes.length} 条划线笔记`);
+            } else {
+                updateSyncStatusUI(`🔴 拉取失败: ${resData.error}`, true);
+            }
+        } catch (e) {
+            console.error("Cloud Pull error:", e);
+            updateSyncStatusUI('🔴 拉取失败 (网络/服务端未响应)', true);
+        }
+    }
+
+    // --------------------------------------------------------------------------
     // 10. Bootstrap Application
     // --------------------------------------------------------------------------
     document.addEventListener('DOMContentLoaded', async function () {
         initResizer();
         initTextSelection();
         initUIControls();
+        initCloudSync();
         await initDB();
         await loadBook('crisis-era');
     });
