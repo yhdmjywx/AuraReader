@@ -433,9 +433,11 @@
                 try {
                     state.notes = JSON.parse(savedNotesJson);
                 } catch (e) {
-                    state.notes = bookKey.startsWith('custom') ? [] : [...seedNotes];
+                    if (!state.notes || state.notes.length === 0) {
+                        state.notes = bookKey.startsWith('custom') ? [] : [...seedNotes];
+                    }
                 }
-            } else {
+            } else if (!state.notes || state.notes.length === 0) {
                 state.notes = bookKey.startsWith('custom') ? [] : [...seedNotes];
             }
         }
@@ -1091,22 +1093,24 @@
                 let importedBooksCount = 0;
                 let importedNotesCount = 0;
 
-                // 恢复所有包含原件的图书至 IndexedDB
+                // 1. 恢复所有图书至 demoBooks 与 IndexedDB
                 if (Array.isArray(data.books) && data.books.length > 0) {
                     for (const b of data.books) {
-                        if (b && b.id) {
-                            demoBooks[b.id] = b;
+                        if (b && (b.id || b.title)) {
+                            const bId = b.id || ('custom_' + Date.now());
+                            b.id = bId;
+                            demoBooks[bId] = b;
                             await saveBookToDB(b);
                             importedBooksCount++;
                         }
                     }
                 }
 
-                // 恢复所有划线随笔至当前内存、LocalStorage 及 IndexedDB 数据库
+                // 2. 恢复所有划线随笔至 IndexedDB 与 state.notes
+                const firstBookId = (data.books && data.books[0]) ? data.books[0].id : state.currentBook;
+                const allImportedNotes = [];
+                
                 if (Array.isArray(data.notes) && data.notes.length > 0) {
-                    const firstBookId = (data.books && data.books[0]) ? (data.books[0].id || data.books[0].title) : state.currentBook;
-                    const allImportedNotes = [];
-                    
                     for (const n of data.notes) {
                         if (n && n.id) {
                             n.bookId = n.bookId || firstBookId || state.currentBook;
@@ -1114,25 +1118,28 @@
                             await saveNoteToDB(n);
                         }
                     }
-
-                    // 如果恢复了电子书，自动切换并载入第一本恢复的电子书
-                    if (data.books && data.books.length > 0 && data.books[0].id) {
-                        const targetBookId = data.books[0].id;
-                        demoBooks[targetBookId] = data.books[0];
-                        await loadBook(targetBookId);
-                    }
-
-                    // 合并现有与导入的笔记
-                    const noteMap = new Map(state.notes.map(n => [n.id, n]));
-                    allImportedNotes.forEach(n => noteMap.set(n.id, n));
-                    state.notes = Array.from(noteMap.values());
-                    importedNotesCount = allImportedNotes.length;
-                    
-                    persistNotes();
-                    renderNotesList();
                 }
 
-                // 恢复界面设置
+                // 3. 预载入笔记至 state.notes，防止被空覆盖
+                const noteMap = new Map(state.notes.map(n => [n.id, n]));
+                allImportedNotes.forEach(n => noteMap.set(n.id, n));
+                state.notes = Array.from(noteMap.values());
+                importedNotesCount = allImportedNotes.length;
+
+                // 4. 自动激活并装载恢复的第 1 本图书
+                if (data.books && data.books.length > 0 && data.books[0].id) {
+                    const targetBookId = data.books[0].id;
+                    await loadBook(targetBookId);
+                    
+                    // 保障笔记列表包含恢复的笔记
+                    if (allImportedNotes.length > 0) {
+                        const mergedNotes = new Map(state.notes.map(n => [n.id, n]));
+                        allImportedNotes.forEach(n => mergedNotes.set(n.id, n));
+                        state.notes = Array.from(mergedNotes.values());
+                    }
+                }
+
+                // 5. 恢复界面偏好设置
                 if (data.settings) {
                     if (data.settings.textIndent) {
                         state.textIndent = data.settings.textIndent;
@@ -1140,8 +1147,9 @@
                     }
                 }
 
-                // 刷新界面与书房 UI 及划线随笔数量徽章
+                // 6. 强制刷新界面、划线高亮与右侧列表
                 await refreshShelfUI();
+                persistNotes();
                 renderNotesList();
                 renderPage(state.currentPage, true);
 
