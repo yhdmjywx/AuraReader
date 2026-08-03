@@ -424,7 +424,10 @@
         renderPage(1);
     }
 
-    function renderPage(pageNum) {
+    function renderPage(pageNum, preserveScroll = false) {
+        const viewport = document.getElementById('reader-viewport');
+        const savedScrollTop = (viewport && preserveScroll) ? viewport.scrollTop : 0;
+
         state.currentPage = pageNum;
         elements.currentPageSpan.textContent = pageNum;
         
@@ -444,9 +447,10 @@
             elements.bookPaper.innerHTML = htmlContent;
         }
         
-        // Scroll to top of viewport
-        const viewport = document.getElementById('reader-viewport');
-        if (viewport) viewport.scrollTop = 0;
+        // Restore saved scroll position or reset to top
+        if (viewport) {
+            viewport.scrollTop = savedScrollTop;
+        }
     }
 
     function interceptInTextLinks() {
@@ -617,7 +621,7 @@
 
         state.notes.unshift(newNote);
         renderNotesList();
-        renderPage(state.currentPage);
+        renderPage(state.currentPage, true);
         hideSelectionTooltip();
         window.getSelection().removeAllRanges();
 
@@ -715,7 +719,7 @@
     function deleteNote(id) {
         state.notes = state.notes.filter(n => n.id !== id);
         renderNotesList();
-        renderPage(state.currentPage);
+        renderPage(state.currentPage, true);
         showToast('已删除笔记');
     }
 
@@ -1565,7 +1569,7 @@
 
         state.notes.unshift(newNote);
         renderNotesList();
-        renderPage(state.currentPage);
+        renderPage(state.currentPage, true);
         closeNoteModal();
         window.getSelection().removeAllRanges();
         showToast('高亮及随笔已成功保存');
