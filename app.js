@@ -34,7 +34,8 @@
         syncSecret: localStorage.getItem('aura_sync_secret') || '',
 
         // Selection cache
-        pendingSelection: null
+        pendingSelection: null,
+        editingNoteId: null
     };
 
     // Demo Books Content Database
@@ -590,12 +591,16 @@
             }
         });
         
-        // Add click listener to inline marks for jumping to note
+        // Add click listener to inline marks for jumping to note & in-place editing
         elements.bookPaper.querySelectorAll('mark').forEach(mark => {
             mark.addEventListener('click', function (e) {
                 e.stopPropagation();
                 const noteId = this.getAttribute('data-id');
                 highlightNoteCard(noteId);
+                const note = state.notes.find(n => n.id === noteId);
+                if (note) {
+                    openNoteModal(note.quote, noteId);
+                }
             });
         });
     }
@@ -666,25 +671,33 @@
         const currentBookObj = demoBooks[state.currentBook];
         const chapter = currentBookObj.toc[0]?.title || '当前章节';
 
-        const newNote = {
-            id: 'note-' + Date.now(),
-            bookId: state.currentBook,
-            quote: quote,
-            comment: '',
-            color: color,
-            page: state.currentPage,
-            chapter: chapter,
-            timestamp: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
-        };
+        // 检查是否存在同页重叠的高亮/随笔节点，若存在则就地更新颜色，不重复生成卡片
+        const existingNote = state.notes.find(n => n.page === state.currentPage && n.quote === quote);
+        if (existingNote) {
+            existingNote.color = color;
+            saveNoteToDB(existingNote);
+            showToast('已更新该段落高亮颜色');
+        } else {
+            const newNote = {
+                id: 'note-' + Date.now(),
+                bookId: state.currentBook,
+                quote: quote,
+                comment: '',
+                color: color,
+                page: state.currentPage,
+                chapter: chapter,
+                timestamp: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
+            };
 
-        state.notes.unshift(newNote);
-        saveNoteToDB(newNote);
+            state.notes.unshift(newNote);
+            saveNoteToDB(newNote);
+            showToast('已成功高亮选中文本');
+        }
+
         renderNotesList();
         renderPage(state.currentPage, true);
         hideSelectionTooltip();
         window.getSelection().removeAllRanges();
-
-        showToast('已成功高亮选中文本');
     }
 
     // --------------------------------------------------------------------------
@@ -731,6 +744,9 @@
                 ${note.quote ? `<div class="note-quote-text">“${escapeHtml(note.quote)}”</div>` : ''}
                 ${note.comment ? `<div class="note-comment-text">${escapeHtml(note.comment)}</div>` : ''}
                 <div class="note-card-actions">
+                    <button class="btn btn-ghost-sm btn-edit-note" data-id="${note.id}" title="编辑随笔感悟">
+                        <i class="ri-edit-line"></i>
+                    </button>
                     <button class="btn btn-ghost-sm btn-delete-note" data-id="${note.id}" title="删除笔记">
                         <i class="ri-delete-bin-line"></i>
                     </button>
@@ -739,8 +755,14 @@
 
             // Bidirectional Jump on Card Click
             card.addEventListener('click', function (e) {
-                if (e.target.closest('.btn-delete-note')) return;
+                if (e.target.closest('.btn-delete-note') || e.target.closest('.btn-edit-note')) return;
                 jumpToNoteLocation(note);
+            });
+
+            // Edit Note button
+            card.querySelector('.btn-edit-note').addEventListener('click', function (e) {
+                e.stopPropagation();
+                openNoteModal(note.quote, note.id);
             });
 
             // Delete Note button
@@ -1840,39 +1862,89 @@
         reader.readAsText(file);
     }
 
-    function openNoteModal(quote) {
-        elements.modalQuotePreview.textContent = `“${quote}”`;
-        elements.modalNoteTextarea.value = '';
+    function openNoteModal(quote, existingNoteId = null) {
+        state.editingNoteId = existingNoteId;
+        
+        const modalTitle = elements.noteModal.querySelector('h3');
+        const confirmBtn = elements.btnConfirmModal;
+
+        if (existingNoteId) {
+            const existingNote = state.notes.find(n => n.id === existingNoteId);
+            if (existingNote) {
+                elements.modalQuotePreview.textContent = `“${existingNote.quote || quote}”`;
+                elements.modalNoteTextarea.value = existingNote.comment || '';
+                if (modalTitle) modalTitle.innerHTML = '<i class="ri-edit-line"></i> 编辑随笔感悟';
+                if (confirmBtn) confirmBtn.textContent = '更新随笔笔记';
+            } else {
+                elements.modalQuotePreview.textContent = `“${quote}”`;
+                elements.modalNoteTextarea.value = '';
+                if (modalTitle) modalTitle.innerHTML = '<i class="ri-sticky-note-add-line"></i> 添加随笔';
+                if (confirmBtn) confirmBtn.textContent = '保存划线笔记';
+            }
+        } else {
+            // 检查当前页是否已存在重叠/完全相同引文的高亮节点，若存在则自动切换为编辑该节点
+            const overlapNote = state.notes.find(n => n.page === state.currentPage && (n.quote === quote || (n.quote && quote && (n.quote.includes(quote) || quote.includes(n.quote)))));
+            if (overlapNote) {
+                state.editingNoteId = overlapNote.id;
+                elements.modalQuotePreview.textContent = `“${overlapNote.quote || quote}”`;
+                elements.modalNoteTextarea.value = overlapNote.comment || '';
+                if (modalTitle) modalTitle.innerHTML = '<i class="ri-edit-line"></i> 编辑随笔感悟';
+                if (confirmBtn) confirmBtn.textContent = '更新随笔笔记';
+            } else {
+                elements.modalQuotePreview.textContent = `“${quote}”`;
+                elements.modalNoteTextarea.value = '';
+                if (modalTitle) modalTitle.innerHTML = '<i class="ri-sticky-note-add-line"></i> 添加随笔';
+                if (confirmBtn) confirmBtn.textContent = '保存划线笔记';
+            }
+        }
+
         elements.noteModal.classList.add('active');
         elements.modalNoteTextarea.focus();
     }
 
     function closeNoteModal() {
+        state.editingNoteId = null;
         elements.noteModal.classList.remove('active');
     }
 
     function saveModalNote() {
         const comment = elements.modalNoteTextarea.value.trim();
-        const quote = state.pendingSelection ? state.pendingSelection.text : '';
+        
+        if (state.editingNoteId) {
+            // 原地更新已存在的笔记节点，绝不产生重复卡片
+            const noteIndex = state.notes.findIndex(n => n.id === state.editingNoteId);
+            if (noteIndex !== -1) {
+                state.notes[noteIndex].comment = comment;
+                state.notes[noteIndex].timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
+                saveNoteToDB(state.notes[noteIndex]);
+                showToast('随笔感悟已成功更新');
+            }
+        } else {
+            // 新建划线随笔
+            const quote = state.pendingSelection ? state.pendingSelection.text : '';
+            const currentBookObj = demoBooks[state.currentBook];
+            const chapter = (currentBookObj && currentBookObj.toc && currentBookObj.toc[0]) ? currentBookObj.toc[0].title : '章节选区';
 
-        const newNote = {
-            id: 'note-' + Date.now(),
-            bookId: state.currentBook,
-            quote: quote,
-            comment: comment,
-            color: 'yellow',
-            page: state.currentPage,
-            chapter: demoBooks[state.currentBook].toc[0]?.title || '章节选区',
-            timestamp: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
-        };
+            const newNote = {
+                id: 'note-' + Date.now(),
+                bookId: state.currentBook,
+                quote: quote,
+                comment: comment,
+                color: 'yellow',
+                page: state.currentPage,
+                chapter: chapter,
+                timestamp: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
+            };
 
-        state.notes.unshift(newNote);
-        saveNoteToDB(newNote);
+            state.notes.unshift(newNote);
+            saveNoteToDB(newNote);
+            showToast('高亮及随笔已成功保存');
+        }
+
         renderNotesList();
         renderPage(state.currentPage, true);
         closeNoteModal();
-        window.getSelection().removeAllRanges();
-        showToast('高亮及随笔已成功保存');
+        if (window.getSelection) window.getSelection().removeAllRanges();
     }
 
     async function refreshShelfUI() {
