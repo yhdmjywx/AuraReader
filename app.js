@@ -616,23 +616,36 @@
     // 5. Text Selection & Tooltip
     // --------------------------------------------------------------------------
     function initTextSelection() {
-        document.addEventListener('selectionchange', handleSelection);
+        document.addEventListener('selectionchange', () => {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+                hideSelectionTooltip();
+            }
+        });
+
+        // 监听松开鼠标 / 触摸结束，触发浮动工具条精准定位
+        elements.bookPaper.addEventListener('mouseup', () => setTimeout(handleSelection, 20));
+        elements.bookPaper.addEventListener('touchend', () => setTimeout(handleSelection, 20));
         
         // Tooltip buttons
         document.querySelectorAll('.tooltip-btn[data-color]').forEach(btn => {
-            btn.addEventListener('click', function () {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
                 const color = this.getAttribute('data-color');
                 createHighlight(color);
             });
         });
 
-        elements.btnAddNote.addEventListener('click', function () {
+        elements.btnAddNote.addEventListener('click', function (e) {
+            e.stopPropagation();
             if (!state.pendingSelection) return;
+            const text = state.pendingSelection.text;
             hideSelectionTooltip();
-            openNoteModal(state.pendingSelection.text);
+            openNoteModal(text);
         });
 
-        elements.btnAskAiSelection.addEventListener('click', function () {
+        elements.btnAskAiSelection.addEventListener('click', function (e) {
+            e.stopPropagation();
             if (!state.pendingSelection) return;
             const text = state.pendingSelection.text;
             hideSelectionTooltip();
@@ -666,10 +679,16 @@
             });
         }
 
-        // Global click handler to dismiss floating tooltips cleanly
+        // Global click handler to dismiss floating tooltips cleanly without wiping active selections
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('#selection-tooltip') && !e.target.closest('#highlight-action-tooltip') && !e.target.closest('mark')) {
+            const selection = window.getSelection();
+            const hasActiveSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+
+            if (!e.target.closest('#selection-tooltip') && !hasActiveSelection) {
                 hideSelectionTooltip();
+            }
+
+            if (!e.target.closest('#highlight-action-tooltip') && !e.target.closest('mark')) {
                 hideHighlightActionTooltip();
             }
         });
@@ -677,8 +696,12 @@
 
     function handleSelection() {
         const selection = window.getSelection();
-        const selectedText = selection.toString().trim();
+        if (!selection || selection.isCollapsed) {
+            hideSelectionTooltip();
+            return;
+        }
 
+        const selectedText = selection.toString().trim();
         if (!selectedText || !elements.bookPaper.contains(selection.anchorNode)) {
             hideSelectionTooltip();
             return;
@@ -688,6 +711,8 @@
         const range = selection.getRangeAt(0);
         const rect = range.getBoundingClientRect();
         
+        if (rect.width === 0 && rect.height === 0) return;
+
         state.pendingSelection = {
             text: selectedText,
             range: range
