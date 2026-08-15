@@ -173,8 +173,11 @@
             <!-- Tab Content 1: Highlights & User Notes -->
             <div class="tab-content active" id="tab-highlights">
                 <div class="notes-toolbar">
-                    <span class="notes-count-text">包含 <strong id="notes-total-count">0</strong> 条笔记选区</span>
-                    <div class="notes-actions">
+                    <span class="notes-count-text"><strong id="notes-total-count">0</strong> 条随笔</span>
+                    <div class="notes-actions" style="display: flex; gap: 6px; align-items: center;">
+                        <button id="btn-toggle-show-highlights" class="btn btn-outline-sm" style="font-size: 0.78rem; padding: 3px 8px;" title="点击切换是否在笔记区显示纯划线">
+                            <i class="ri-eye-line"></i> 显示划线 (<span id="count-pure-highlights">0</span>)
+                        </button>
                         <button id="btn-trigger-ai-batch" class="btn btn-primary-sm">
                             <i class="ri-sparkles-line"></i> AI 一键整理
                         </button>
@@ -419,6 +422,6 @@
     <div class="toast" id="toast-msg"></div>
 
     <!-- JS Scripts -->
-    <script src="app.js?v=18"></script>
+    <script src="app.js?v=19"></script>
 </body>
 </html>

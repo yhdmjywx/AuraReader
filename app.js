@@ -35,7 +35,8 @@
 
         // Selection cache
         pendingSelection: null,
-        editingNoteId: null
+        editingNoteId: null,
+        showHighlightsInSidebar: false
     };
 
     // Demo Books Content Database
@@ -169,6 +170,8 @@
         emptyNotesState: document.getElementById('empty-notes-state'),
         countHighlights: document.getElementById('count-highlights'),
         notesTotalCount: document.getElementById('notes-total-count'),
+        btnToggleShowHighlights: document.getElementById('btn-toggle-show-highlights'),
+        countPureHighlights: document.getElementById('count-pure-highlights'),
         quickNoteInput: document.getElementById('quick-note-input'),
         btnSaveQuickNote: document.getElementById('btn-save-quick-note'),
         btnTriggerAiBatch: document.getElementById('btn-trigger-ai-batch'),
@@ -591,15 +594,24 @@
             }
         });
         
-        // Add click listener to inline marks for jumping to note & in-place editing
+        // Add click listener to inline marks for locating, removing pure highlight or editing note
         elements.bookPaper.querySelectorAll('mark').forEach(mark => {
             mark.addEventListener('click', function (e) {
                 e.stopPropagation();
                 const noteId = this.getAttribute('data-id');
-                highlightNoteCard(noteId);
                 const note = state.notes.find(n => n.id === noteId);
                 if (note) {
-                    openNoteModal(note.quote, noteId);
+                    jumpToNoteLocation(note);
+                    highlightNoteCard(noteId);
+                    
+                    const isPureHighlight = !note.comment || note.comment.trim() === '';
+                    if (isPureHighlight) {
+                        if (confirm(`【高亮定位】P.${note.page}\n“${note.quote.slice(0, 45)}...”\n\n是否需要移除此高亮？`)) {
+                            deleteNote(noteId);
+                        }
+                    } else {
+                        openNoteModal(note.quote, noteId);
+                    }
                 }
             });
         });
@@ -715,39 +727,70 @@
 
     function renderNotesList() {
         elements.notesList.innerHTML = '';
-        elements.countHighlights.textContent = state.notes.length;
-        elements.notesTotalCount.textContent = state.notes.length;
+
+        // 分类提取：纯高亮 vs 带感悟的随笔
+        const thoughtNotes = state.notes.filter(n => n.comment && n.comment.trim() !== '');
+        const pureHighlights = state.notes.filter(n => !n.comment || n.comment.trim() === '');
+
+        // 更新工具栏纯划线数量与开关按钮
+        if (elements.countPureHighlights) {
+            elements.countPureHighlights.textContent = pureHighlights.length;
+        }
+        if (elements.btnToggleShowHighlights) {
+            if (state.showHighlightsInSidebar) {
+                elements.btnToggleShowHighlights.innerHTML = `<i class="ri-eye-off-line"></i> 隐藏划线 (${pureHighlights.length})`;
+                elements.btnToggleShowHighlights.classList.add('active');
+            } else {
+                elements.btnToggleShowHighlights.innerHTML = `<i class="ri-eye-line"></i> 显示划线 (${pureHighlights.length})`;
+                elements.btnToggleShowHighlights.classList.remove('active');
+            }
+        }
+
+        // 确定要在右侧列表显示的条目：默认只显示随笔，若开启开关则显示全部
+        const displayedNotes = state.showHighlightsInSidebar ? state.notes : thoughtNotes;
+
+        elements.countHighlights.textContent = displayedNotes.length;
+        elements.notesTotalCount.textContent = displayedNotes.length;
 
         persistNotes();
 
-        if (state.notes.length === 0) {
+        if (displayedNotes.length === 0) {
             elements.emptyNotesState.style.display = 'block';
+            const emptyText = elements.emptyNotesState.querySelector('p');
+            if (emptyText) {
+                emptyText.textContent = state.showHighlightsInSidebar ? '暂无划线与随笔' : '暂无随笔感悟';
+            }
             return;
         }
         elements.emptyNotesState.style.display = 'none';
 
-        state.notes.forEach(note => {
+        displayedNotes.forEach(note => {
+            const isPureHighlight = !note.comment || note.comment.trim() === '';
             const card = document.createElement('div');
-            card.className = `note-card ${note.color === 'green' ? 'hl-green-card' : ''}`;
+            card.className = `note-card ${note.color === 'green' ? 'hl-green-card' : ''} ${isPureHighlight ? 'pure-highlight-card' : ''}`;
             card.id = `card-${note.id}`;
 
             const chapterLabel = note.chapter ? escapeHtml(note.chapter) : '章节选区';
+            const typeBadge = isPureHighlight ? 
+                `<span class="note-loc-tag" style="background: rgba(245,158,11,0.1); color: #d97706; font-weight: 500;"><i class="ri-sparkling-line"></i> 划线</span>` : 
+                `<span class="note-loc-tag" style="background: rgba(16,185,129,0.1); color: var(--accent-color); font-weight: 500;"><i class="ri-chat-1-line"></i> 随笔</span>`;
 
             card.innerHTML = `
                 <div class="note-card-header">
                     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                        <span class="note-loc-tag" style="background: rgba(16,185,129,0.1); color: var(--accent-color); font-weight: 500;"><i class="ri-book-open-line"></i> ${chapterLabel}</span>
+                        ${typeBadge}
+                        <span class="note-loc-tag" style="background: rgba(0,0,0,0.04);"><i class="ri-book-open-line"></i> ${chapterLabel}</span>
                         <span class="note-loc-tag"><i class="ri-bookmark-3-line"></i> P.${note.page}</span>
                     </div>
                     <span style="font-size: 0.76rem; color: var(--text-sub);">${note.timestamp}</span>
                 </div>
                 ${note.quote ? `<div class="note-quote-text">“${escapeHtml(note.quote)}”</div>` : ''}
-                ${note.comment ? `<div class="note-comment-text">${escapeHtml(note.comment)}</div>` : ''}
+                ${note.comment ? `<div class="note-comment-text">💭 ${escapeHtml(note.comment)}</div>` : ''}
                 <div class="note-card-actions">
-                    <button class="btn btn-ghost-sm btn-edit-note" data-id="${note.id}" title="编辑随笔感悟">
+                    <button class="btn btn-ghost-sm btn-edit-note" data-id="${note.id}" title="${isPureHighlight ? '为此高亮添加随笔感悟' : '编辑随笔感悟'}">
                         <i class="ri-edit-line"></i>
                     </button>
-                    <button class="btn btn-ghost-sm btn-delete-note" data-id="${note.id}" title="删除笔记">
+                    <button class="btn btn-ghost-sm btn-delete-note" data-id="${note.id}" title="删除此条记录">
                         <i class="ri-delete-bin-line"></i>
                     </button>
                 </div>
@@ -1552,6 +1595,15 @@
         if (elements.btnCloseShelf) {
             elements.btnCloseShelf.addEventListener('click', () => {
                 elements.shelfOverlay.classList.remove('active');
+            });
+        }
+
+        // Toggle Show Highlights in Sidebar
+        if (elements.btnToggleShowHighlights) {
+            elements.btnToggleShowHighlights.addEventListener('click', () => {
+                state.showHighlightsInSidebar = !state.showHighlightsInSidebar;
+                renderNotesList();
+                showToast(state.showHighlightsInSidebar ? '已开启：笔记区显示全部划线' : '已恢复：笔记区仅显示随笔思考');
             });
         }
 

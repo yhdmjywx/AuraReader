@@ -698,6 +698,15 @@ mark.hl-active {
 .note-card.hl-green-card {
     border-left-color: #22c55e;
 }
+.note-card.pure-highlight-card {
+    border-left-color: #f59e0b;
+    background-color: var(--bg-panel);
+}
+#btn-toggle-show-highlights.active {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+}
 
 .note-card-header {
     display: flex;
