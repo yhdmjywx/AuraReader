@@ -1602,6 +1602,29 @@
             if (state.currentPage < state.totalPages) renderPage(state.currentPage + 1);
         });
 
+        // TOC Drawer Toggle & Close
+        if (elements.btnToc) {
+            elements.btnToc.addEventListener('click', (e) => {
+                e.stopPropagation();
+                elements.tocDrawer.classList.toggle('open');
+            });
+        }
+        if (elements.btnCloseToc) {
+            elements.btnCloseToc.addEventListener('click', (e) => {
+                e.stopPropagation();
+                elements.tocDrawer.classList.remove('open');
+            });
+        }
+
+        // Close TOC Drawer on Outside Click
+        document.addEventListener('click', (e) => {
+            if (elements.tocDrawer && elements.tocDrawer.classList.contains('open')) {
+                if (!e.target.closest('#toc-drawer') && !e.target.closest('#btn-toc')) {
+                    elements.tocDrawer.classList.remove('open');
+                }
+            }
+        });
+
         // Font Family
         elements.fontFamilySelect.addEventListener('change', function () {
             state.fontFamily = this.value;
