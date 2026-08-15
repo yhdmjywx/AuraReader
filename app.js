@@ -922,6 +922,7 @@
 
     function deleteNote(id) {
         state.notes = state.notes.filter(n => n.id !== id);
+        deleteNoteFromDB(id);
         renderNotesList();
         renderPage(state.currentPage, true);
         showToast('已删除笔记');
@@ -935,17 +936,22 @@
             return;
         }
 
+        const currentBookObj = demoBooks[state.currentBook];
+        const chapter = (currentBookObj && currentBookObj.toc && currentBookObj.toc[0]) ? currentBookObj.toc[0].title : '独立思考';
+
         const newNote = {
             id: 'note-' + Date.now(),
+            bookId: state.currentBook,
             quote: '',
             comment: text,
             color: 'yellow',
             page: state.currentPage,
-            chapter: demoBooks[state.currentBook].toc[0]?.title || '随笔',
+            chapter: chapter,
             timestamp: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
         };
 
         state.notes.unshift(newNote);
+        saveNoteToDB(newNote);
         renderNotesList();
         elements.quickNoteInput.value = '';
         showToast('已保存独立随笔');
