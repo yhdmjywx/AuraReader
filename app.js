@@ -547,10 +547,45 @@
     function applyHighlightsToPaper() {
         state.notes.forEach(note => {
             if (note.page === state.currentPage && note.quote) {
-                const paperHtml = elements.bookPaper.innerHTML;
+                const colorClass = `hl-${note.color || 'yellow'}`;
+                let paperHtml = elements.bookPaper.innerHTML;
+
+                // 1. 尝试直接整段精准匹配 (单段落无 HTML 标签干扰)
                 if (paperHtml.includes(note.quote)) {
-                    const markedSnippet = `<mark class="hl-${note.color || 'yellow'}" data-id="${note.id}">${note.quote}</mark>`;
+                    const markedSnippet = `<mark class="${colorClass}" data-id="${note.id}">${note.quote}</mark>`;
                     elements.bookPaper.innerHTML = paperHtml.replace(note.quote, markedSnippet);
+                    return;
+                }
+
+                // 2. 跨段落多行 / 多片段拆分匹配 (按换行符 \n 或 \r 拆分成独立段落片段)
+                const segments = note.quote.split(/[\r\n]+/).map(s => s.trim()).filter(s => s.length > 1);
+
+                if (segments.length > 0) {
+                    let updatedHtml = paperHtml;
+                    let matchFound = false;
+
+                    for (const seg of segments) {
+                        // 2.1 段落直接匹配
+                        if (updatedHtml.includes(seg)) {
+                            const markedSnippet = `<mark class="${colorClass}" data-id="${note.id}">${seg}</mark>`;
+                            updatedHtml = updatedHtml.replace(seg, markedSnippet);
+                            matchFound = true;
+                        } else {
+                            // 2.2 如果段落内部带有 HTML 实体或标签，尝试按句拆分匹配
+                            const subSentences = seg.split(/([。！？；;\n]+)/).map(s => s.trim()).filter(s => s.length > 3);
+                            subSentences.forEach(sub => {
+                                if (updatedHtml.includes(sub)) {
+                                    const markedSub = `<mark class="${colorClass}" data-id="${note.id}">${sub}</mark>`;
+                                    updatedHtml = updatedHtml.replace(sub, markedSub);
+                                    matchFound = true;
+                                }
+                            });
+                        }
+                    }
+
+                    if (matchFound) {
+                        elements.bookPaper.innerHTML = updatedHtml;
+                    }
                 }
             }
         });
