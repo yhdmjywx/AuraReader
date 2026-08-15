@@ -36,7 +36,8 @@
         // Selection cache
         pendingSelection: null,
         editingNoteId: null,
-        showHighlightsInSidebar: false
+        showHighlightsInSidebar: false,
+        activeHighlightId: null
     };
 
     // Demo Books Content Database
@@ -160,6 +161,9 @@
         selectionTooltip: document.getElementById('selection-tooltip'),
         btnAddNote: document.getElementById('btn-add-note'),
         btnAskAiSelection: document.getElementById('btn-ask-ai-selection'),
+        highlightActionTooltip: document.getElementById('highlight-action-tooltip'),
+        btnHlAddThought: document.getElementById('btn-hl-add-thought'),
+        btnHlRemove: document.getElementById('btn-hl-remove'),
         
         // Tabs
         tabBtns: document.querySelectorAll('.tab-btn'),
@@ -594,24 +598,15 @@
             }
         });
         
-        // Add click listener to inline marks for locating, removing pure highlight or editing note
+        // Add click listener to inline marks for showing sleek mini popover
         elements.bookPaper.querySelectorAll('mark').forEach(mark => {
             mark.addEventListener('click', function (e) {
                 e.stopPropagation();
                 const noteId = this.getAttribute('data-id');
                 const note = state.notes.find(n => n.id === noteId);
                 if (note) {
-                    jumpToNoteLocation(note);
                     highlightNoteCard(noteId);
-                    
-                    const isPureHighlight = !note.comment || note.comment.trim() === '';
-                    if (isPureHighlight) {
-                        if (confirm(`【高亮定位】P.${note.page}\n“${note.quote.slice(0, 45)}...”\n\n是否需要移除此高亮？`)) {
-                            deleteNote(noteId);
-                        }
-                    } else {
-                        openNoteModal(note.quote, noteId);
-                    }
+                    showHighlightActionTooltip(this, note);
                 }
             });
         });
@@ -646,6 +641,38 @@
             switchTab('tab-ai-summary');
             triggerAiSingleAnalysis(text);
         });
+
+        // Floating Highlight Mini Popover Actions (Sleek & Non-intrusive)
+        if (elements.btnHlAddThought) {
+            elements.btnHlAddThought.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!state.activeHighlightId) return;
+                const note = state.notes.find(n => n.id === state.activeHighlightId);
+                hideHighlightActionTooltip();
+                if (note) {
+                    openNoteModal(note.quote, note.id);
+                }
+            });
+        }
+
+        if (elements.btnHlRemove) {
+            elements.btnHlRemove.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!state.activeHighlightId) return;
+                const noteId = state.activeHighlightId;
+                hideHighlightActionTooltip();
+                deleteNote(noteId);
+                showToast('已移除高亮划线');
+            });
+        }
+
+        // Global click handler to dismiss floating tooltips cleanly
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#selection-tooltip') && !e.target.closest('#highlight-action-tooltip') && !e.target.closest('mark')) {
+                hideSelectionTooltip();
+                hideHighlightActionTooltip();
+            }
+        });
     }
 
     function handleSelection() {
@@ -657,6 +684,7 @@
             return;
         }
 
+        hideHighlightActionTooltip();
         const range = selection.getRangeAt(0);
         const rect = range.getBoundingClientRect();
         
@@ -674,6 +702,27 @@
 
     function hideSelectionTooltip() {
         elements.selectionTooltip.style.display = 'none';
+    }
+
+    function showHighlightActionTooltip(markEl, note) {
+        hideSelectionTooltip();
+        state.activeHighlightId = note.id;
+
+        const markRect = markEl.getBoundingClientRect();
+        const readerRect = elements.readerPanel.getBoundingClientRect();
+
+        if (elements.highlightActionTooltip) {
+            elements.highlightActionTooltip.style.left = `${markRect.left + markRect.width / 2 - readerRect.left}px`;
+            elements.highlightActionTooltip.style.top = `${markRect.top - readerRect.top}px`;
+            elements.highlightActionTooltip.style.display = 'flex';
+        }
+    }
+
+    function hideHighlightActionTooltip() {
+        state.activeHighlightId = null;
+        if (elements.highlightActionTooltip) {
+            elements.highlightActionTooltip.style.display = 'none';
+        }
     }
 
     function createHighlight(color = 'yellow') {
