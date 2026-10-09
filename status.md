@@ -9,7 +9,7 @@
   - **访问地址**：👉 **`http://localhost:8095`**
 - **Git 版本库状态**：
   - **分支**：`master`
-  - **最新 Commit**：`7f72369` (彻底移除所有现存 AI 功能，回归纯粹无干扰的 Local-First 阅读工作台)
+  - **最新 Commit**：`2100903` (彻底移除所有现存 AI 功能，净化文档与样式，回归纯粹无干扰的 Local-First 阅读工作台)
   - **工作区**：干净（Working tree clean）
 
 ---
@@ -45,6 +45,8 @@
 - **IndexedDB 数据库联调测试**：PASSED (Books & Notes store transaction verified)
 - **消除重复 Markdown 生成测试**：PASSED (0 Duplicated `原文：“...` strings)
 - **HTML/Zip 导出产物解压校验**：PASSED (Single-file HTML & Multi-chapter Zip verified)
+- **全量深度标签栈与孤立 DOM 审查**：PASSED (377 标签完全闭合，66 个 DOM ID 100% 匹配，0 孤立选择器)
+- **按钮实用类与缓存版本升级**：PASSED (.btn-sm / .btn-ghost-sm 样式补全，版本更新为 css?v=9 & js?v=25)
 
 ---
 
