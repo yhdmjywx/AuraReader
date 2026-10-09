@@ -1,7 +1,7 @@
 /* ==========================================================================
    AuraReader Workstation - Core Application Logic
    Handles EPUB/PDF Reading Engine, 75:25 Split Resizer, Text Annotations,
-   Bidirectional Navigation, AI Summarization & Note Export.
+   Bidirectional Navigation & Note Export.
    ========================================================================== */
 
 (function () {
@@ -25,10 +25,6 @@
         
         // Annotations & Notes Store
         notes: [],
-        
-        // AI Settings
-        aiProvider: 'demo',
-        apiKey: localStorage.getItem('aura_api_key') || '',
 
         // Selection cache
         pendingSelection: null,
@@ -157,7 +153,6 @@
         // Floating Selection Tooltip
         selectionTooltip: document.getElementById('selection-tooltip'),
         btnAddNote: document.getElementById('btn-add-note'),
-        btnAskAiSelection: document.getElementById('btn-ask-ai-selection'),
         highlightActionTooltip: document.getElementById('highlight-action-tooltip'),
         btnHlAddThought: document.getElementById('btn-hl-add-thought'),
         btnHlRemove: document.getElementById('btn-hl-remove'),
@@ -175,15 +170,6 @@
         countPureHighlights: document.getElementById('count-pure-highlights'),
         quickNoteInput: document.getElementById('quick-note-input'),
         btnSaveQuickNote: document.getElementById('btn-save-quick-note'),
-        btnTriggerAiBatch: document.getElementById('btn-trigger-ai-batch'),
-        
-        // AI Tab
-        btnReGenerateAi: document.getElementById('btn-re-generate-ai'),
-        aiStatusBanner: document.getElementById('ai-status-banner'),
-        aiCoreIdeas: document.getElementById('ai-core-ideas'),
-        aiKeyBullets: document.getElementById('ai-key-bullets'),
-        aiTagsCloud: document.getElementById('ai-tags-cloud'),
-        aiActionables: document.getElementById('ai-actionables'),
         
         // Settings Tab
         btnExportMarkdown: document.getElementById('btn-export-markdown'),
@@ -202,10 +188,6 @@
         backupBookCheckboxList: document.getElementById('backup-book-checkbox-list'),
         chkBackupIncludeNotes: document.getElementById('chk-backup-include-notes'),
         chkBackupIncludeSettings: document.getElementById('chk-backup-include-settings'),
-        aiProviderSelect: document.getElementById('ai-provider'),
-        groupApiKey: document.getElementById('group-api-key'),
-        inputApiKey: document.getElementById('input-api-key'),
-        btnSaveSettings: document.getElementById('btn-save-settings'),
         
         // Modal, Shelf & Toast
         btnShelf: document.getElementById('btn-shelf'),
@@ -636,17 +618,6 @@
             openNoteModal(text);
         });
 
-        elements.btnAskAiSelection.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (!state.pendingSelection) return;
-            const text = state.pendingSelection.text;
-            hideSelectionTooltip();
-            
-            // Switch to AI Tab & Trigger single quote AI analysis
-            switchTab('tab-ai-summary');
-            triggerAiSingleAnalysis(text);
-        });
-
         // Floating Highlight Mini Popover Actions (Sleek & Non-intrusive)
         if (elements.btnHlAddThought) {
             elements.btnHlAddThought.addEventListener('click', (e) => {
@@ -949,85 +920,7 @@
     });
 
     // --------------------------------------------------------------------------
-    // 7. AI Processing & Structured Summarization
-    // --------------------------------------------------------------------------
-    function triggerAiBatchProcessing() {
-        if (state.notes.length === 0) {
-            showToast('请先在图书中进行划线或记录随笔');
-            return;
-        }
-
-        switchTab('tab-ai-summary');
-        
-        elements.aiStatusBanner.innerHTML = `<i class="ri-loader-4-line ri-spin"></i> AI 正在深度分析 ${state.notes.length} 条笔记与划线...`;
-        
-        // Construct prompt context from notes
-        const contextText = state.notes.map(n => `P.${n.page} 引文: "${n.quote}" | 笔记: ${n.comment}`).join('\n');
-        
-        if (state.aiProvider === 'demo') {
-            runMockAiStream(contextText);
-        } else {
-            runRealAiStream(contextText);
-        }
-    }
-
-    function triggerAiSingleAnalysis(singleText) {
-        elements.aiStatusBanner.innerHTML = `<i class="ri-loader-4-line ri-spin"></i> AI 正在归纳选中文段...`;
-        runMockAiStream(`选中文段: "${singleText}"`);
-    }
-
-    function runMockAiStream(context) {
-        // Reset card outputs
-        elements.aiCoreIdeas.innerHTML = '<em><i class="ri-loader-4-line ri-spin"></i> 生成中...</em>';
-        elements.aiKeyBullets.innerHTML = '<em><i class="ri-loader-4-line ri-spin"></i> 梳理中...</em>';
-        elements.aiTagsCloud.innerHTML = '<span class="tag-skeleton">生成标签...</span>';
-        elements.aiActionables.innerHTML = '<em><i class="ri-loader-4-line ri-spin"></i> 提炼中...</em>';
-
-        setTimeout(() => {
-            // Typing / Stream Effect Sim
-            typeText(elements.aiCoreIdeas, `本文段核心讨论了<strong>经济周期中的债务积累与抗风险框架</strong>。作者认为周期规律不可逆转，债务高企是结构性矛盾的集中爆发，个体应当建立基于“实体价值与资产韧性”的避险思维，避免盲目乐观。`);
-            
-            typeText(elements.aiKeyBullets, `<ul>
-                <li><strong>周期不可违背：</strong>长达10年以上的市场繁荣往往蕴含泡沫，历史的均值回归具有必然性。</li>
-                <li><strong>债务指标是风向标：</strong>社会过度借贷意味着底层经济效能递减，资产负债表健康度至关重要。</li>
-                <li><strong>反脆弱思维框架：</strong>从预测危机转变为构建具备流动性与实体锚点的防护网。</li>
-            </ul>`);
-
-            elements.aiTagsCloud.innerHTML = `
-                <span class="tag-pill"># 周期律</span>
-                <span class="tag-pill"># 债务去杠杆</span>
-                <span class="tag-pill"># 反脆弱框架</span>
-                <span class="tag-pill"># 实体锚点</span>
-                <span class="tag-pill"># 资产韧性</span>
-            `;
-
-            typeText(elements.aiActionables, `<ul>
-                <li><strong>实践建议 1：</strong>审查个人或项目的现金流及杠杆率，确保至少储备 6-12 个月的高流动性安全垫。</li>
-                <li><strong>实践建议 2：</strong>在阅读过程中，将“现象描述”与“底层归因”分开标记，定期使用 AI 归纳卡片复盘。</li>
-            </ul>`);
-
-            elements.aiStatusBanner.innerHTML = `<i class="ri-checkbox-circle-fill" style="color: #22c55e;"></i> AI 已成功完成划线洞察萃取！`;
-            showToast('AI 结构化总结已生成');
-        }, 1200);
-    }
-
-    function typeText(targetElement, fullHtml) {
-        targetElement.innerHTML = fullHtml;
-    }
-
-    function runRealAiStream(context) {
-        // Fallback or API call logic
-        if (!state.apiKey) {
-            showToast('未检测到 API Key，已自动切回内置演示 AI Engine');
-            runMockAiStream(context);
-            return;
-        }
-        showToast(`已调用 ${state.aiProvider.toUpperCase()} API 处理笔记`);
-        runMockAiStream(context);
-    }
-
-    // --------------------------------------------------------------------------
-    // 8. Tabs, Settings & Export
+    // 7. Tabs, Settings & Export
     // --------------------------------------------------------------------------
     function switchTab(tabId) {
         state.activeTab = tabId;
@@ -1045,36 +938,19 @@
         });
     });
 
-    // AI Provider Switch
-    elements.aiProviderSelect.addEventListener('change', function () {
-        state.aiProvider = this.value;
-        elements.groupApiKey.style.display = (this.value === 'demo' || this.value === 'ollama') ? 'none' : 'block';
-    });
-
-    elements.btnSaveSettings.addEventListener('click', function () {
-        const key = elements.inputApiKey.value.trim();
-        state.apiKey = key;
-        localStorage.setItem('aura_api_key', key);
-        showToast('配置已保存至本地浏览器');
-    });
-
     // Export to Markdown
     elements.btnExportMarkdown.addEventListener('click', function () {
         const bookTitle = demoBooks[state.currentBook].title;
-        let md = `# 划线笔记与 AI 萃取：《${bookTitle}》\n\n`;
+        let md = `# 划线与随笔笔记：《${bookTitle}》\n\n`;
         md += `> 导出时间：${new Date().toLocaleString()}\n\n`;
         
-        md += `## 一、 划线与随笔精选 (${state.notes.length} 条)\n\n`;
+        md += `## 划线与随笔精选 (${state.notes.length} 条)\n\n`;
         state.notes.forEach((n, idx) => {
             md += `### ${idx + 1}. P.${n.page} ${n.chapter || ''}\n`;
             if (n.quote) md += `==${n.quote}==\n\n`;
             if (n.comment) md += `> 💭 **随笔思考**：${n.comment}\n\n`;
             md += `---\n\n`;
         });
-
-        md += `## 二、 AI 萃取核心洞察\n\n`;
-        md += `### 核心观点\n${elements.aiCoreIdeas.innerText}\n\n`;
-        md += `### 关键要点\n${elements.aiKeyBullets.innerText}\n\n`;
 
         downloadFile(`${bookTitle}_划线随笔.md`, md, 'text/markdown');
         showToast('已导出高亮与随笔 Markdown 文件');
@@ -1701,14 +1577,6 @@
             });
         }
 
-        // AI Triggers
-        if (elements.btnTriggerAiBatch) {
-            elements.btnTriggerAiBatch.addEventListener('click', triggerAiBatchProcessing);
-        }
-        if (elements.btnReGenerateAi) {
-            elements.btnReGenerateAi.addEventListener('click', triggerAiBatchProcessing);
-        }
-
         // Note Modal Handlers
         if (elements.btnCloseModal) {
             elements.btnCloseModal.addEventListener('click', closeNoteModal);
@@ -2175,10 +2043,11 @@
     // 9. Bootstrap Application
     // --------------------------------------------------------------------------
     document.addEventListener('DOMContentLoaded', async function () {
-        // 彻底清理历史残存的云同步本地缓存键值
+        // 彻底清理历史残存的云同步与 AI 本地缓存键值
         try {
             localStorage.removeItem('aura_sync_secret');
             localStorage.removeItem('aura_sync_last_time');
+            localStorage.removeItem('aura_api_key');
         } catch (e) {
             // ignore
         }

@@ -1,6 +1,6 @@
 /* ==========================================================================
    AuraReader Workstation - Styles & Design System
-   75:25 Flexible Split Reader & AI Note Workspace
+   75:25 Flexible Split Reader & Note Workspace
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -19,10 +19,6 @@
     --primary: #3b82f6;
     --primary-hover: #2563eb;
     --primary-light: #eff6ff;
-    
-    --ai-purple: #8b5cf6;
-    --ai-purple-hover: #7c3aed;
-    --ai-purple-light: #f5f3ff;
     
     --text-primary: #1d2129;
     --text-secondary: #4e5969;
@@ -125,18 +121,6 @@ button, input, select, textarea {
 }
 .btn-primary:hover {
     background-color: var(--primary-hover);
-}
-
-.btn-primary-sm {
-    padding: 4px 10px;
-    font-size: 12px;
-    background-color: var(--ai-purple);
-    color: #ffffff;
-    border-radius: 20px;
-}
-.btn-primary-sm:hover {
-    background-color: var(--ai-purple-hover);
-    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
 }
 
 .btn-outline {
@@ -246,7 +230,7 @@ button, input, select, textarea {
 .badge {
     font-size: 10px;
     font-weight: 600;
-    background: linear-gradient(135deg, var(--primary), var(--ai-purple));
+    background: linear-gradient(135deg, var(--primary), #6366f1);
     color: #fff;
     padding: 2px 6px;
     border-radius: 10px;
@@ -528,14 +512,6 @@ mark.hl-active {
     background-color: rgba(255, 255, 255, 0.2);
 }
 
-.btn-ai-sparkle {
-    background: linear-gradient(135deg, #8b5cf6, #ec4899);
-    font-weight: 600;
-}
-.btn-ai-sparkle:hover {
-    opacity: 0.9;
-}
-
 /* Resizer Handle (Divider) */
 .resizer-handle {
     width: 8px;
@@ -558,7 +534,7 @@ mark.hl-active {
     border-radius: 2px;
 }
 
-/* Right Panel: Notes & AI Workbench (Remaining 25%) */
+/* Right Panel: Notes & Workbench (Remaining 25%) */
 .notes-panel {
     flex: 1;
     height: 100%;
@@ -602,10 +578,6 @@ mark.hl-active {
     border-bottom-color: var(--primary);
     background-color: var(--bg-panel);
     font-weight: 600;
-}
-
-.icon-ai {
-    color: var(--ai-purple);
 }
 
 .badge-count {
@@ -764,93 +736,7 @@ mark.hl-active {
     font-size: 12px;
 }
 
-/* Tab 2: AI Summary */
-.ai-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-}
-.ai-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.ai-title h3 {
-    font-size: 15px;
-    font-weight: 600;
-}
-.icon-sparkle {
-    color: var(--ai-purple);
-    font-size: 18px;
-}
-
-.ai-status-banner {
-    background: linear-gradient(135deg, var(--ai-purple-light), #f0f9ff);
-    border: 1px solid rgba(139, 92, 246, 0.2);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 12px;
-    color: var(--ai-purple-hover);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.ai-card {
-    background-color: var(--bg-panel);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 12px 14px;
-    margin-bottom: 14px;
-    box-shadow: var(--shadow-sm);
-}
-
-.ai-card-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 8px;
-    border-bottom: 1px dashed var(--border-color);
-    padding-bottom: 6px;
-}
-.ai-card-title i {
-    color: var(--ai-purple);
-}
-
-.ai-card-body {
-    font-size: 13px;
-    color: var(--text-secondary);
-    line-height: 1.6;
-}
-.ai-card-body ul {
-    padding-left: 18px;
-}
-.ai-card-body li {
-    margin-bottom: 6px;
-}
-
-/* Tags Cloud */
-.tags-cloud {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-.tag-pill {
-    background-color: var(--primary-light);
-    color: var(--primary);
-    font-size: 11px;
-    font-weight: 500;
-    padding: 2px 8px;
-    border-radius: 12px;
-    border: 1px solid rgba(59, 130, 246, 0.2);
-}
-
-/* Settings Tab */
+/* Tab 2: Settings & Export */
 .settings-section {
     margin-bottom: 24px;
 }

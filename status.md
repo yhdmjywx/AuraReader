@@ -24,7 +24,7 @@
 | **书内超链接拦截** | `interceptInTextLinks` 拦截电子书内部 `<a href>` 链接，实现工作台内部关联跳转。 | ✅ 100% |
 | **首行缩进多档调节** | 顶部工具栏支持 `0em` (无缩进)、`2em` (标准缩进)、`3em` (大缩进) 动态切换与持久化。 | ✅ 100% |
 | **IndexedDB 本地书房** | 接入 `AuraReaderDB` v1 数据库 + “我的书库”抽屉，导入图书与笔记刷新免重复选取。 | ✅ 100% |
-| **选文中 Tooltip 精简** | 移除与高亮功能重叠的“重点”按钮，保留“高亮”🟨、“笔记”✍️、“AI 归纳”🤖。 | ✅ 100% |
+| **选文中 Tooltip 精简** | 移除与高亮功能重叠的“重点”按钮与 AI 归纳，仅保留纯粹的“高亮”🟨与“笔记”✍️。 | ✅ 100% |
 | **划线随笔 Modal 修复** | 修复 Modal 按钮事件绑定误置于局部解析函数的 Bug，全量全局绑定生效。 | ✅ 100% |
 | **消除高亮重复 Markdown 导出** | 采用 `==高亮文字==` 行内无缝嵌入，无随笔 0 追加，有随笔仅追加感悟块，绝对零原文重复。 | ✅ 100% |
 | **📦 分章节 Zip 包导出** | 一键打包输出 `00_目录概览.md` 以及按章节切分的 `01_第一章.md`，适配 Obsidian/Logseq。 | ✅ 100% |
@@ -38,8 +38,9 @@
 
 - **JavaScript 语法校验 (`node -c app.js; node -c server.js`)**：PASSED (0 Syntax Errors)
 - **HTML 结构与标签平衡校验**：PASSED (0 Mismatches, 0 Unclosed Tags)
+- **AI 模块彻底剥离与孤立依赖检查**：PASSED (所有 AI 按钮、Tab、设置卡片及业务函数彻底清除，0 运行时破损引用)
 - **云同步废弃 API 路由隔离校验**：PASSED (/api/sync/pull 与 /api/sync/push 均精确返回 404)
-- **历史残存 LocalStorage 键防御性清除**：PASSED (`aura_sync_secret` 与 `aura_sync_last_time` 启动自动清除)
+- **历史残存 LocalStorage 键防御性清除**：PASSED (`aura_sync_secret`, `aura_sync_last_time`, `aura_api_key` 启动自动清除)
 - **NCX 132 目录提取测试**：PASSED (132/132 Entries)
 - **IndexedDB 数据库联调测试**：PASSED (Books & Notes store transaction verified)
 - **消除重复 Markdown 生成测试**：PASSED (0 Duplicated `原文：“...` strings)
@@ -59,3 +60,4 @@
 | 规划项 | 现状说明 | 最终处理方案 | 状态 |
 | :--- | :--- | :--- | :--- |
 | **☁️ SQLite Cloud Sync 功能** | 彻底放弃并清理跨端云同步相关 API、前端同步引擎及 UI 表单。 | 全面收敛并回归 **100% Local-First** 隐私架构：IndexedDB 本地持久化 + `.aurabackup` 离线备份迁移。 | 🗑️ **已彻底移除 (Removed)** |
+| **🤖 AI 辅助与结构化总结功能** | 彻底移除浮动气泡 AI 归纳、笔记区 AI 一键整理、AI 结构化总结 Tab、设置面板 AI API 配置及流式业务逻辑。 | 回归纯粹无干扰的沉浸式 Local-First 阅读与笔记体验；后续若需重新引入将重新进行产品设计与架构规划。 | 🗑️ **已彻底移除 (Removed)** |

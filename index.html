@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AuraReader Workstation | 智能阅读与 AI 笔记工作台</title>
+    <title>AuraReader Workstation | 智能阅读与笔记工作台</title>
     <!-- Remix Icons -->
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <!-- Google Fonts -->
@@ -20,7 +20,7 @@
         <div class="brand">
             <i class="ri-book-open-fill brand-icon"></i>
             <span class="brand-name">AuraReader</span>
-            <span class="badge">AI Workstation</span>
+            <span class="badge">Workstation</span>
         </div>
 
         <div class="header-center">
@@ -137,12 +137,10 @@
                 </article>
             </div>
 
-            <!-- Floating Selection Toolbar (Highlight / Add Note / Ask AI) -->
+            <!-- Floating Selection Toolbar (Highlight / Add Note) -->
             <div class="selection-tooltip" id="selection-tooltip">
                 <button class="tooltip-btn hl-yellow" data-color="yellow" title="高亮标记"><i class="ri-mark-pen-line"></i> 高亮</button>
                 <button class="tooltip-btn" id="btn-add-note" title="添加随笔"><i class="ri-sticky-note-line"></i> 笔记</button>
-                <span class="tooltip-divider"></span>
-                <button class="tooltip-btn btn-ai-sparkle" id="btn-ask-ai-selection"><i class="ri-sparkles-line"></i> AI 归纳</button>
             </div>
 
             <!-- Floating Highlight Action Toolbar (Add Thought / Remove Highlight) -->
@@ -158,7 +156,7 @@
             <div class="resizer-line"></div>
         </div>
 
-        <!-- Right Panel: Notes & AI Workbench (25%) -->
+        <!-- Right Panel: Notes & Workbench (25%) -->
         <section class="notes-panel" id="notes-panel">
             <!-- Tabs Header -->
             <div class="tabs-header">
@@ -166,10 +164,6 @@
                     <i class="ri-quill-pen-line"></i>
                     <span>划线与笔记</span>
                     <span class="badge-count" id="count-highlights">0</span>
-                </button>
-                <button class="tab-btn" data-tab="tab-ai-summary">
-                    <i class="ri-sparkles-fill icon-ai"></i>
-                    <span>AI 结构化总结</span>
                 </button>
                 <button class="tab-btn" data-tab="tab-settings">
                     <i class="ri-settings-3-line"></i>
@@ -184,9 +178,6 @@
                     <div class="notes-actions" style="display: flex; gap: 6px; align-items: center;">
                         <button id="btn-toggle-show-highlights" class="btn btn-outline-sm" style="font-size: 0.78rem; padding: 3px 8px;" title="点击切换是否在笔记区显示纯划线">
                             <i class="ri-eye-line"></i> 显示划线 (<span id="count-pure-highlights">0</span>)
-                        </button>
-                        <button id="btn-trigger-ai-batch" class="btn btn-primary-sm">
-                            <i class="ri-sparkles-line"></i> AI 一键整理
                         </button>
                     </div>
                 </div>
@@ -210,63 +201,11 @@
                 </div>
             </div>
 
-            <!-- Tab Content 2: AI Structured Summary -->
-            <div class="tab-content" id="tab-ai-summary">
-                <div class="ai-header">
-                    <div class="ai-title">
-                        <i class="ri-robot-line icon-sparkle"></i>
-                        <h3>AI 智能萃取洞察</h3>
-                    </div>
-                    <button id="btn-re-generate-ai" class="btn btn-ghost-sm" title="重新生成">
-                        <i class="ri-refresh-line"></i> 重新分析
-                    </button>
-                </div>
-
-                <div class="ai-status-banner" id="ai-status-banner">
-                    <i class="ri-sparkles-line"></i> 点击“AI 一键整理”即可将划线与随笔凝练为提纲
-                </div>
-
-                <!-- AI Output Stream View -->
-                <div class="ai-output-container" id="ai-output-container">
-                    <!-- Core Insights Card -->
-                    <div class="ai-card">
-                        <div class="ai-card-title"><i class="ri-lightbulb-flash-line"></i> 核心观点摘要</div>
-                        <div class="ai-card-body" id="ai-core-ideas">
-                            <em>等待生成...</em>
-                        </div>
-                    </div>
-
-                    <!-- Key Bullet Points Card -->
-                    <div class="ai-card">
-                        <div class="ai-card-title"><i class="ri-file-list-3-line"></i> 关键要点归纳</div>
-                        <div class="ai-card-body" id="ai-key-bullets">
-                            <em>等待生成...</em>
-                        </div>
-                    </div>
-
-                    <!-- Knowledge Tags -->
-                    <div class="ai-card">
-                        <div class="ai-card-title"><i class="ri-price-tag-3-line"></i> 智能概念标签</div>
-                        <div class="tags-cloud" id="ai-tags-cloud">
-                            <span class="tag-skeleton">点击整理生成标签</span>
-                        </div>
-                    </div>
-
-                    <!-- Actionable Insights Card -->
-                    <div class="ai-card">
-                        <div class="ai-card-title"><i class="ri-compass-3-line"></i> 延伸思考与实践</div>
-                        <div class="ai-card-body" id="ai-actionables">
-                            <em>等待生成...</em>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab Content 3: Settings & Export -->
+            <!-- Tab Content 2: Settings & Export -->
             <div class="tab-content" id="tab-settings">
                 <div class="settings-section">
                     <h4><i class="ri-download-cloud-2-line"></i> 笔记导出</h4>
-                    <p class="section-desc">将书中的所有划线、高亮、用户笔记及 AI 智能总结一键打包导出。</p>
+                    <p class="section-desc">将书中的所有划线、高亮及用户笔记一键打包导出。</p>
                     <div class="export-buttons">
                         <button id="btn-export-markdown" class="btn btn-primary btn-block">
                             <i class="ri-markdown-line"></i> 导出笔记摘要为 Markdown (.md)
@@ -296,32 +235,6 @@
                         </button>
                     </div>
                     <input type="file" id="backup-file-input" accept=".aurabackup,.json" style="display: none;">
-                </div>
-
-                <div class="settings-section">
-                    <h4><i class="ri-key-2-line"></i> AI 服务 API 设置</h4>
-                    <p class="section-desc">默认开启内置演示 AI 引擎。如需体验真实的云端 LLM，请在下方配置 API Key：</p>
-                    
-                    <div class="form-group">
-                        <label for="ai-provider">AI 服务商：</label>
-                        <select id="ai-provider" class="select-full">
-                            <option value="demo" selected>内置智能演示 AI 引擎 (免费/无需 Key)</option>
-                            <option value="deepseek">DeepSeek API (R1 / V3)</option>
-                            <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
-                            <option value="gemini">Google Gemini (Gemini 1.5 Pro/Flash)</option>
-                            <option value="ollama">Ollama (本地私有模型 http://localhost:11434)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group" id="group-api-key" style="display: none;">
-                        <label for="input-api-key">API Key：</label>
-                        <input type="password" id="input-api-key" placeholder="sk-..." class="input-full">
-                        <small class="hint-text"><i class="ri-shield-check-line"></i> 密钥仅储存在您的浏览器本地 LocalStorage 中，决不上传中转服务器。</small>
-                    </div>
-
-                    <button id="btn-save-settings" class="btn btn-outline btn-block" style="margin-top: 12px;">
-                        <i class="ri-save-line"></i> 保存配置
-                    </button>
                 </div>
             </div>
         </section>
