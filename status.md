@@ -48,3 +48,11 @@
 
 1. **更多格式增强**：可进一步增加电子书书签（Bookmark）跨章比对视图。
 2. **全文搜索**：基于 IndexedDB 正文索引提供全书/全书库关键字搜索支持。
+
+---
+
+## 5. 待合并 / 暂缓实施清单 (Pending / Backlog Items)
+
+| 规划项 | 现状说明 | 后续合并方案 | 状态 |
+| :--- | :--- | :--- | :--- |
+| **☁️ SQLite Cloud Sync 真实数据库重构** | 当前客户端采用 `IndexedDB`（`AuraReaderDB`）+ `.aurabackup` 本地持久化；服务端使用免编译依赖的原子 JSON（`data/aura_sync_db.json`）。 | 暂不变更现有运行逻辑。后续视需要将 VPS 端收敛为独立单文件 SQLite 数据库（`data/reader.db`），或评估前端 SQLite WASM + OPFS 方案。 | ⏸️ **已挂起（列入待合并项，暂不修改）** |

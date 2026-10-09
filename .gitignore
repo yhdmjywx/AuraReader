@@ -3,3 +3,4 @@ data/
 *.tmp
 deploy_vps_runner.js
 scratch/
+*.log
