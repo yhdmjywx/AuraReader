@@ -9,7 +9,7 @@
   - **访问地址**：👉 **`http://localhost:8095`**
 - **Git 版本库状态**：
   - **分支**：`master`
-  - **最新 Commit**：`2979567` (闭合 HTML 标签、自动清理无主缓存、全面回归 100% Local-First)
+  - **最新 Commit**：`7c741e4` (闭合 HTML 标签、自动清理无主缓存、全面回归 100% Local-First)
   - **工作区**：干净（Working tree clean）
 
 ---
