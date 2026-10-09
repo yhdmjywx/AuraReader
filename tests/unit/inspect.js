@@ -1,8 +1,10 @@
 const fs = require('fs');
+const path = require('path');
 const JSZip = require('jszip');
 
 async function testFullNcx() {
-    const data = fs.readFileSync('./test.epub');
+    const epubPath = path.resolve(__dirname, '../fixtures/test.epub');
+    const data = fs.readFileSync(epubPath);
     const zip = await JSZip.loadAsync(data);
     
     // Find container.xml

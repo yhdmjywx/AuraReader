@@ -43,13 +43,18 @@
 ## 4. 项目目录结构 (Directory Structure)
 
 ```text
-e:\dp\reader_workstation\
-├── index.html        # 主应用 UI 布局与组件结构
-├── styles.css        # 全局设计系统、主题 Token 与组件样式
-├── app.js            # 阅读引擎、IndexedDB 数据库与导出主逻辑
-├── .gitignore        # Git 版本控制忽略规则
-├── agent.md          # Agent 开发与架构指南文档 (本文件)
-└── status.md         # 项目最新运行与工程状态文档
+reader_workstation/
+├── src/
+│   ├── client/          # 客户端前端资源 (index.html, styles.css, app.js)
+│   └── server/          # 服务端静态托管与健康探测服务 (server.js)
+├── docs/                # 规范与设计文档 (prd_v0_5.md, workflow_architecture.md, agent.md, status.md, deploy_vps.md)
+├── deploy/              # 生产部署与容器编排 (Dockerfile, docker-compose.yml, nginx.conf, deploy.sh)
+├── tests/               # 测试套件 (fixtures/, unit/, regression/)
+├── data/                # 本地数据目录 (已 gitignore)
+├── .gitignore           # Git 版本控制忽略规则
+├── package.json         # 项目元数据与脚本入口
+├── package-lock.json    # 依赖锁文件
+└── README.md            # 项目说明手册
 ```
 
 ---

@@ -3,15 +3,15 @@ version: '3.8'
 services:
   aurareader:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: deploy/Dockerfile
     container_name: aurareader-workstation
     restart: unless-stopped
     ports:
       - "8095:8095"
     volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
+      - ../certbot/conf:/etc/letsencrypt
+      - ../certbot/www:/var/www/certbot
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8095/api/health > /dev/null || exit 1"]
       interval: 15s

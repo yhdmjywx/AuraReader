@@ -9,7 +9,7 @@
   - **访问地址**：👉 **`http://localhost:8095`**
 - **Git 版本库状态**：
   - **分支**：`master`
-  - **最新 Commit**：`8e299ea` (彻底移除所有现存 AI 功能，净化文档与样式，回归纯粹无干扰的 Local-First 阅读工作台)
+  - **最新 Commit**：`02c0509` (标准工程文件树重构，完成 src/docs/deploy/tests 规范分层与全量测试闭环)
   - **工作区**：干净（Working tree clean）
 
 ---
@@ -36,8 +36,9 @@
 
 ## 3. 校验套件结果 (Verification Results)
 
-- **JavaScript 语法校验 (`node -c app.js; node -c server.js`)**：PASSED (0 Syntax Errors)
-- **HTML 结构与标签平衡校验**：PASSED (0 Mismatches, 0 Unclosed Tags)
+- **JavaScript 语法校验 (`node -c src/server/server.js; node -c src/client/app.js`)**：PASSED (0 Syntax Errors)
+- **单元测试套件 (`npm test`)**：PASSED (132/132 NCX 目录解析与 OPF 映射验证)
+- **HTML 结构与标签平衡校验 (`node tests/regression/test_html_and_dom_audit.js`)**：PASSED (0 Mismatches, 0 Unclosed Tags)
 - **AI 模块彻底剥离与孤立依赖检查**：PASSED (所有 AI 按钮、Tab、设置卡片及业务函数彻底清除，0 运行时破损引用)
 - **云同步废弃 API 路由隔离校验**：PASSED (/api/sync/pull 与 /api/sync/push 均精确返回 404)
 - **历史残存 LocalStorage 键防御性清除**：PASSED (`aura_sync_secret`, `aura_sync_last_time`, `aura_api_key` 启动自动清除)

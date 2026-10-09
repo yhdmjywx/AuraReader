@@ -2,5 +2,4 @@ node_modules/
 data/
 *.tmp
 deploy_vps_runner.js
-scratch/
 *.log

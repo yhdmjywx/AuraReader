@@ -19,55 +19,81 @@
 
 ## 🚀 快速开始 (Quick Start)
 
-项目采用纯前端技术栈打造（HTML5 + Vanilla CSS3 + Modern ES6+ JS），无需复杂的 Node Build 构建依赖，即开即用！
+项目采用现代轻量级技术栈打造（HTML5 + Vanilla CSS3 + Modern ES6+ JS），内置 Node.js 原生 HTTP / 静态资源与探针托管服务，无需打包编译，即开即用！
 
-### 1. 本地预览运行：
+### 1. 本地启动运行：
 
 ```bash
-# 进入项目目录
-cd e:/dp/reader_workstation
-
-# 使用任意静态 HTTP 服务器启动（例如 http-server）
-npx -y http-server -p 8095
+# 启动内置 Node.js Web 服务器（默认端口 8095）
+npm start
+# 或者: node src/server/server.js
 
 # 浏览器访问
 http://localhost:8095
 ```
 
-### 2. VPS 生产环境 1 键 Docker 部署：
+### 2. 运行自动化测试套件：
 
 ```bash
-# 赋予脚本执行权限并一键部署
-chmod +x deploy.sh && ./deploy.sh
+# 运行单元测试（NCX 目录与 OPF 解析）
+npm test
+
+# 运行全链路回归测试套件
+node tests/regression/test_html_and_dom_audit.js
+node tests/regression/test_advanced_highlight_engine.js
+node tests/regression/test_local_persistence_pipeline.js
+node tests/regression/audit_user_backup_flow.js
 ```
 
-👉 **详细 VPS 部署、域名绑定与 HTTPS 证书配置指南见：[deploy_vps.md](file:///e:/dp/reader_workstation/deploy_vps.md)**
+### 3. VPS 生产环境一键 Docker 部署：
+
+```bash
+# 进入部署脚本目录并一键执行
+chmod +x deploy/deploy.sh && ./deploy/deploy.sh
+```
+
+👉 **详细 VPS 部署、域名绑定与 HTTPS 证书配置指南见：[docs/deploy_vps.md](docs/deploy_vps.md)**
 
 ---
 
 ## 📂 项目文件架构 (Directory Architecture)
 
 ```text
-e:\dp\reader_workstation\
-├── index.html               # 主应用 UI 布局、工作台 DOM 结构
-├── styles.css               # 全局设计系统、纸张主题 Token 与响应式样式
-├── app.js                   # 阅读引擎、IndexedDB 数据库与导出逻辑主程序
-├── README.md                # 项目说明文档 (本文件)
-├── prd_v0_5.md              # -0.5 版（核对升级版）产品需求文档 (PRD)
-├── workflow_architecture.md # 全流程 Agent 与人类协同工作流落地架构
-├── agent.md                 # Agent 架构规范与人机契约指南
-├── status.md                # 当前项目运行与工程交付状态
-└── .gitignore               # Git 版本控制忽略配置
+reader_workstation/
+├── src/
+│   ├── client/          # 客户端前端资源 (index.html, styles.css, app.js)
+│   └── server/          # 服务端静态托管与健康探测服务 (server.js)
+├── docs/                # 规范与设计文档
+│   ├── prd_v0_5.md              # 产品需求文档 (PRD v-0.5)
+│   ├── workflow_architecture.md # 5 阶段工程工作流落地架构
+│   ├── agent.md                 # Agent 开发与人机协作契约
+│   ├── status.md                # 实时工程状态与校验记录
+│   └── deploy_vps.md            # VPS 节点与 HTTPS 部署手册
+├── deploy/              # 生产部署与容器编排
+│   ├── Dockerfile               # Node 20 容器构建镜像
+│   ├── docker-compose.yml       # Docker Compose 编排文件
+│   ├── nginx.conf               # Nginx 生产反向代理与 Gzip 缓存配置
+│   └── deploy.sh                # VPS 一键部署与环境巡检脚本
+├── tests/               # 测试套件与测试夹具
+│   ├── fixtures/        # 测试电子书等测试资产 (test.epub)
+│   ├── unit/            # 核心算法与解析单元测试 (test_ncx.js, inspect.js)
+│   └── regression/      # 静态审计与交互回归测试套件
+├── data/                # 本地临时数据目录 (已配置 .gitignore 忽略)
+├── .gitignore           # Git 忽略配置
+├── package.json         # 项目元数据与脚本入口
+├── package-lock.json    # 依赖锁文件
+└── README.md            # 项目说明手册 (本文件)
 ```
 
 ---
 
-## 📚 完善的项目文档索引 (Documentation Index)
+## 📚 项目文档索引 (Documentation Index)
 
-- 📋 **[prd_v0_5.md](file:///e:/dp/reader_workstation/prd_v0_5.md)**：包含全量 10 个阶段沟通对照的完整 PRD 规范与测试矩阵。
-- 🏗️ **[workflow_architecture.md](file:///e:/dp/reader_workstation/workflow_architecture.md)**：详细记录了 5 阶段工作流架构、分级受控修复与 Antigravity 斜杠命令共生促进矩阵。
-- 🤖 **[agent.md](file:///e:/dp/reader_workstation/agent.md)**：Agent 开发与架构指南，包含“开发过程小 Bug 自治，阶段测试问题受控呈报”的契约规范。
-- 📊 **[status.md](file:///e:/dp/reader_workstation/status.md)**：项目实时工程状态、Git 提交记录与校验测试报告。
+- 📋 **[prd_v0_5.md](docs/prd_v0_5.md)**：包含全量 10 个阶段沟通对照的完整 PRD 规范与测试矩阵。
+- 🏗️ **[workflow_architecture.md](docs/workflow_architecture.md)**：详细记录了 5 阶段工作流架构、分级受控修复与 Antigravity 斜杠命令共生促进矩阵。
+- 🤖 **[agent.md](docs/agent.md)**：Agent 开发与架构指南，包含“开发过程小 Bug 自治，阶段测试问题受控呈报”的契约规范。
+- 📊 **[status.md](docs/status.md)**：项目实时工程状态、Git 提交记录与校验测试报告。
+- 🚀 **[deploy_vps.md](docs/deploy_vps.md)**：VPS 生产部署、反向代理与 HTTPS / SSL 证书配置指南。
 
 ---
 

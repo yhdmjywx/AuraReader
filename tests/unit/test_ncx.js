@@ -1,8 +1,10 @@
 const fs = require('fs');
+const path = require('path');
 const JSZip = require('jszip');
 
 async function testNcxParser() {
-    const data = fs.readFileSync('e:/dp/reader_workstation/test.epub');
+    const epubPath = path.resolve(__dirname, '../fixtures/test.epub');
+    const data = fs.readFileSync(epubPath);
     const zip = await JSZip.loadAsync(data);
     
     // Find toc.ncx
