@@ -83,6 +83,12 @@
                     <button id="btn-next-page" class="btn btn-icon-sm" title="下一页 (→)">
                         <i class="ri-arrow-right-s-line"></i>
                     </button>
+                    <span class="divider"></span>
+                    <!-- Single / Double Page Mode Switcher -->
+                    <button id="btn-page-mode" class="btn btn-icon-sm" title="切换单页 / 双页阅读模式 (快捷键: D)">
+                        <i class="ri-book-read-line" id="icon-page-mode"></i>
+                        <span id="text-page-mode">单页</span>
+                    </button>
                 </div>
 
                 <div class="toolbar-group">
@@ -115,6 +121,14 @@
                         <button class="paper-btn paper-sepia" data-paper="sepia" title="护眼羊皮纸"></button>
                         <button class="paper-btn paper-dark" data-paper="dark" title="夜间墨黑"></button>
                     </div>
+
+                    <span class="divider"></span>
+
+                    <!-- Sidebar Toggle Button -->
+                    <button id="btn-toggle-sidebar" class="btn btn-icon-sm" title="收起/展开笔记侧边栏 (快捷键: B)">
+                        <i class="ri-side-bar-line" id="icon-toggle-sidebar"></i>
+                        <span id="text-toggle-sidebar">笔记栏</span>
+                    </button>
                 </div>
             </div>
 
@@ -131,11 +145,28 @@
 
             <!-- Book Content Viewport -->
             <div class="reader-viewport" id="reader-viewport">
-                <!-- Book Page Paper Canvas -->
-                <article class="book-paper" id="book-paper">
-                    <!-- Content populated dynamically by JS -->
-                </article>
+                <!-- Book Paper Container (supports Single Page and Double Page Spread) -->
+                <div class="paper-container" id="paper-container">
+                    <!-- Left / Primary Book Page Paper Canvas -->
+                    <article class="book-paper book-paper-left" id="book-paper">
+                        <!-- Content populated dynamically by JS -->
+                    </article>
+
+                    <!-- Spread spine divider between left & right pages -->
+                    <div class="spread-spine" id="spread-spine"></div>
+
+                    <!-- Right / Secondary Book Page Paper Canvas (Double Page Spread) -->
+                    <article class="book-paper book-paper-right" id="book-paper-right">
+                        <!-- Content populated dynamically by JS -->
+                    </article>
+                </div>
             </div>
+
+            <!-- Floating Sidebar Recall Handle (visible when sidebar is collapsed) -->
+            <button id="btn-sidebar-recall" class="sidebar-recall-handle" title="展开笔记侧边栏 (快捷键: B)">
+                <i class="ri-arrow-left-s-line"></i>
+                <span>笔记</span>
+            </button>
 
             <!-- Floating Selection Toolbar (Highlight / Add Note) -->
             <div class="selection-tooltip" id="selection-tooltip">
@@ -168,6 +199,9 @@
                 <button class="tab-btn" data-tab="tab-settings">
                     <i class="ri-settings-3-line"></i>
                     <span>设置与导出</span>
+                </button>
+                <button id="btn-collapse-sidebar" class="btn btn-icon-sm btn-sidebar-close" title="收起笔记侧边栏 (快捷键: B)">
+                    <i class="ri-arrow-right-s-line"></i>
                 </button>
             </div>
 

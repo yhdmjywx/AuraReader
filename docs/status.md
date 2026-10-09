@@ -25,6 +25,7 @@
 | **首行缩进多档调节** | 顶部工具栏支持 `0em` (无缩进)、`2em` (标准缩进)、`3em` (大缩进) 动态切换与持久化。 | ✅ 100% |
 | **IndexedDB 本地书房** | 接入 `AuraReaderDB` v1 数据库 + “我的书库”抽屉，导入图书与笔记刷新免重复选取。 | ✅ 100% |
 | **选文中 Tooltip 精简** | 移除与高亮功能重叠的“重点”按钮与 AI 归纳，仅保留纯粹的“高亮”🟨与“笔记”✍️。 | ✅ 100% |
+| **双模式 4 组合弹性布局系统** | 支持单页/双页 (Spread) 与侧边栏展开/收起 4 种正交布局，双页左右对称微质感书脊，右侧微型召回把手，宽度不足时非破坏性自动降级与恢复。 | ✅ 100% |
 | **划线随笔 Modal 修复** | 修复 Modal 按钮事件绑定误置于局部解析函数的 Bug，全量全局绑定生效。 | ✅ 100% |
 | **消除高亮重复 Markdown 导出** | 采用 `==高亮文字==` 行内无缝嵌入，无随笔 0 追加，有随笔仅追加感悟块，绝对零原文重复。 | ✅ 100% |
 | **📦 分章节 Zip 包导出** | 一键打包输出 `00_目录概览.md` 以及按章节切分的 `01_第一章.md`，适配 Obsidian/Logseq。 | ✅ 100% |
@@ -39,7 +40,8 @@
 - **JavaScript 语法静态校验 (`npm run test:syntax` / `node --check src/server/server.js && node --check src/client/app.js`)**：PASSED (0 Syntax Errors)
 - **依赖与包管理健全性校验 (`npm ls`)**：PASSED (`devDependencies`: `jszip@3.10.1`, `ssh2@1.17.0` 正常锁定，0 extraneous 孤立依赖)
 - **单元测试套件 (`npm test` / `npm run test:unit`)**：PASSED (132/132 NCX 目录解析与 OPF 263-href 映射验证)
-- **全链路回归测试套件 (`npm run test:regression` / `node tests/regression/run_all.js`)**：PASSED (11/11 项全部通过，包含退出码硬断言校验)
+- **全链路回归测试套件 (`npm run test:regression` / `node tests/regression/run_all.js`)**：PASSED (12/12 项全部通过，包含退出码硬断言校验)
+- **页面布局系统 4 组合与自适应降级回归**：PASSED (单页/双页切换、侧栏收起召回、双页对称间距、双页笔记查重防重复)
 - **一键全量自动化测试 (`npm run test:all`)**：PASSED (语法 + 单元 + 回归一体化自动化通过)
 - **静态资源安全与路径穿越防御**：PASSED (URL 解码容错、客户端根目录严格边界与路径规范化加固)
 - **HTML 结构与标签平衡校验 (`node tests/regression/test_html_and_dom_audit.js`)**：PASSED (377 标签闭合，66 DOM ID 100% 匹配)

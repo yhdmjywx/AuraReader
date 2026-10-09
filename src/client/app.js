@@ -18,9 +18,13 @@
         paperTheme: 'white',
         appTheme: 'light',
         currentPage: 1,
+        currentLeftPage: 1,
+        currentRightPage: 2,
         totalPages: 10,
-        readerWidthPercent: 75,
-        isCollapsed: false,
+        readerWidthPercent: parseFloat(localStorage.getItem('aura_reader_width')) || 75,
+        isCollapsed: localStorage.getItem('aura_sidebar_collapsed') === 'true',
+        layoutMode: localStorage.getItem('aura_layout_mode') || 'single', // 'single' | 'double'
+        isAutoDowngraded: false,
         activeTab: 'tab-highlights',
         
         // Annotations & Notes Store
@@ -127,12 +131,23 @@
         
         // Reader Controls
         bookPaper: document.getElementById('book-paper'),
+        bookPaperRight: document.getElementById('book-paper-right'),
+        paperContainer: document.getElementById('paper-container'),
+        spreadSpine: document.getElementById('spread-spine'),
         currentBookTitle: document.getElementById('current-book-title'),
         currentBookTag: document.getElementById('current-book-tag'),
         currentPageSpan: document.getElementById('current-page'),
         totalPagesSpan: document.getElementById('total-pages'),
         btnPrevPage: document.getElementById('btn-prev-page'),
         btnNextPage: document.getElementById('btn-next-page'),
+        btnPageMode: document.getElementById('btn-page-mode'),
+        textPageMode: document.getElementById('text-page-mode'),
+        iconPageMode: document.getElementById('icon-page-mode'),
+        btnToggleSidebar: document.getElementById('btn-toggle-sidebar'),
+        btnCollapseSidebar: document.getElementById('btn-collapse-sidebar'),
+        btnSidebarRecall: document.getElementById('btn-sidebar-recall'),
+        textToggleSidebar: document.getElementById('text-toggle-sidebar'),
+        iconToggleSidebar: document.getElementById('icon-toggle-sidebar'),
         fontFamilySelect: document.getElementById('font-family-select'),
         indentSelect: document.getElementById('indent-select'),
         fontSizeLabel: document.getElementById('font-size-label'),
@@ -353,8 +368,10 @@
             // Clamp between 25% and 85%
             percent = Math.max(25, Math.min(85, percent));
             state.readerWidthPercent = percent;
+            localStorage.setItem('aura_reader_width', percent);
             
             elements.readerPanel.style.width = `${percent}%`;
+            checkResponsiveLayout();
         });
 
         document.addEventListener('mouseup', function () {
@@ -368,16 +385,158 @@
 
         // Double click to toggle collapse/unfold notes panel
         elements.resizerHandle.addEventListener('dblclick', function () {
-            if (state.isCollapsed) {
-                state.isCollapsed = false;
-                elements.readerPanel.style.width = `${state.readerWidthPercent}%`;
-                showToast('已展开 25% 笔记工作台');
-            } else {
-                state.isCollapsed = true;
-                elements.readerPanel.style.width = '100%';
-                showToast('已进入 100% 全屏专注阅读模式');
-            }
+            toggleSidebar(true);
         });
+    }
+
+    // --------------------------------------------------------------------------
+    // 3.1 Layout System & Mode Management
+    // --------------------------------------------------------------------------
+    const DOUBLE_PAGE_MIN_WIDTH = 760;
+
+    function isDoublePageEffective() {
+        return state.layoutMode === 'double' && !state.isAutoDowngraded;
+    }
+
+    function checkResponsiveLayout() {
+        const notify = arguments.length > 0 ? arguments[0] : true;
+        if (state.layoutMode !== 'double') {
+            if (state.isAutoDowngraded) {
+                state.isAutoDowngraded = false;
+                updateLayoutClasses();
+            }
+            return;
+        }
+
+        const availableWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
+        const shouldDowngrade = availableWidth < DOUBLE_PAGE_MIN_WIDTH;
+
+        if (shouldDowngrade !== state.isAutoDowngraded) {
+            state.isAutoDowngraded = shouldDowngrade;
+            if (notify) {
+                if (state.isAutoDowngraded) {
+                    showToast('可用空间不足，已自适应降级为单页展示');
+                } else {
+                    showToast('可用空间充足，已自动恢复双页展开模式');
+                }
+            }
+            updateLayoutClasses();
+            renderPage(state.currentPage, true);
+        }
+    }
+
+    function togglePageMode() {
+        const nextMode = (state.layoutMode === 'double') ? 'single' : 'double';
+        setPageMode(nextMode);
+    }
+
+    function setPageMode(mode) {
+        state.layoutMode = mode;
+        localStorage.setItem('aura_layout_mode', mode);
+
+        const availableWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
+        if (mode === 'double' && availableWidth < DOUBLE_PAGE_MIN_WIDTH) {
+            state.isAutoDowngraded = true;
+            showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
+        } else {
+            state.isAutoDowngraded = false;
+            showToast(mode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
+        }
+
+        updateLayoutClasses();
+        renderPage(state.currentPage, true);
+    }
+
+    function updateLayoutClasses() {
+        if (!elements.workspaceContainer) return;
+
+        if (state.isCollapsed) {
+            elements.workspaceContainer.classList.add('sidebar-collapsed');
+        } else {
+            elements.workspaceContainer.classList.remove('sidebar-collapsed');
+        }
+
+        const isDouble = isDoublePageEffective();
+        if (isDouble) {
+            elements.workspaceContainer.classList.add('layout-double');
+            elements.workspaceContainer.classList.remove('layout-single');
+        } else {
+            elements.workspaceContainer.classList.add('layout-single');
+            elements.workspaceContainer.classList.remove('layout-double');
+        }
+
+        updatePageModeButtonUI();
+        updateSidebarButtonsUI();
+    }
+
+    function updatePageModeButtonUI() {
+        if (!elements.btnPageMode) return;
+
+        if (state.layoutMode === 'double') {
+            elements.btnPageMode.classList.add('active');
+            if (state.isAutoDowngraded) {
+                elements.btnPageMode.classList.add('auto-downgraded');
+                if (elements.textPageMode) elements.textPageMode.textContent = '双页(自适应)';
+                elements.btnPageMode.title = '双页模式（因宽度受限临时单页展示，展开窗口或收起侧栏后将自动恢复）';
+            } else {
+                elements.btnPageMode.classList.remove('auto-downgraded');
+                if (elements.textPageMode) elements.textPageMode.textContent = '双页';
+                elements.btnPageMode.title = '切换为单页模式 (快捷键: D)';
+            }
+            if (elements.iconPageMode) elements.iconPageMode.className = 'ri-book-open-line';
+        } else {
+            elements.btnPageMode.classList.remove('active', 'auto-downgraded');
+            if (elements.textPageMode) elements.textPageMode.textContent = '单页';
+            elements.btnPageMode.title = '切换为双页模式 (快捷键: D)';
+            if (elements.iconPageMode) elements.iconPageMode.className = 'ri-book-read-line';
+        }
+    }
+
+    function updateSidebarButtonsUI() {
+        if (state.isCollapsed) {
+            if (elements.btnToggleSidebar) {
+                elements.btnToggleSidebar.classList.remove('active');
+                elements.btnToggleSidebar.title = '展开笔记侧边栏 (快捷键: B)';
+            }
+            if (elements.textToggleSidebar) elements.textToggleSidebar.textContent = '展开笔记';
+            if (elements.iconToggleSidebar) elements.iconToggleSidebar.className = 'ri-layout-right-line';
+            if (elements.btnSidebarRecall) elements.btnSidebarRecall.style.display = 'flex';
+        } else {
+            if (elements.btnToggleSidebar) {
+                elements.btnToggleSidebar.classList.add('active');
+                elements.btnToggleSidebar.title = '收起笔记侧边栏 (快捷键: B)';
+            }
+            if (elements.textToggleSidebar) elements.textToggleSidebar.textContent = '收起笔记';
+            if (elements.iconToggleSidebar) elements.iconToggleSidebar.className = 'ri-side-bar-line';
+            if (elements.btnSidebarRecall) elements.btnSidebarRecall.style.display = 'none';
+        }
+    }
+
+    function toggleSidebar(notify = true) {
+        state.isCollapsed = !state.isCollapsed;
+        localStorage.setItem('aura_sidebar_collapsed', state.isCollapsed ? 'true' : 'false');
+        applySidebarState(notify);
+    }
+
+    function applySidebarState(notify = false) {
+        if (state.isCollapsed) {
+            elements.workspaceContainer.classList.add('sidebar-collapsed');
+            elements.readerPanel.style.width = '100%';
+            elements.notesPanel.style.display = 'none';
+            elements.resizerHandle.style.display = 'none';
+            if (notify) showToast('已进入 100% 全屏专注阅读模式');
+        } else {
+            elements.workspaceContainer.classList.remove('sidebar-collapsed');
+            elements.readerPanel.style.width = `${state.readerWidthPercent}%`;
+            elements.notesPanel.style.display = 'flex';
+            elements.resizerHandle.style.display = 'flex';
+            if (notify) showToast(`已展开 ${Math.round(100 - state.readerWidthPercent)}% 笔记工作台`);
+        }
+
+        updateSidebarButtonsUI();
+
+        // Check if double-page mode needs adaptation
+        checkResponsiveLayout(notify);
     }
 
     // --------------------------------------------------------------------------
@@ -432,25 +591,114 @@
         const viewport = document.getElementById('reader-viewport');
         const savedScrollTop = (viewport && preserveScroll) ? viewport.scrollTop : 0;
 
-        state.currentPage = pageNum;
-        elements.currentPageSpan.textContent = pageNum;
-        
         const book = demoBooks[state.currentBook];
         if (!book || !book.pages) return;
-        
-        let htmlContent = book.pages[pageNum - 1] || '<p>页面暂无内容</p>';
-        
-        // Safety render
-        try {
-            elements.bookPaper.innerHTML = htmlContent;
-            elements.bookPaper.style.setProperty('--book-text-indent', state.textIndent || '2em');
-            applyHighlightsToPaper();
+
+        const totalPages = book.pages.length || 1;
+        state.totalPages = totalPages;
+        elements.totalPagesSpan.textContent = totalPages;
+
+        // Bound pageNum
+        pageNum = Math.max(1, Math.min(pageNum, totalPages));
+        state.currentPage = pageNum;
+
+        const isDouble = isDoublePageEffective();
+
+        if (!isDouble) {
+            // SINGLE PAGE MODE
+            state.currentLeftPage = pageNum;
+            state.currentRightPage = null;
+            elements.currentPageSpan.textContent = pageNum;
+
+            let htmlContent = book.pages[pageNum - 1] || '<p>页面暂无内容</p>';
+
+            if (elements.bookPaperRight) {
+                elements.bookPaperRight.style.display = 'none';
+            }
+            if (elements.spreadSpine) {
+                elements.spreadSpine.style.display = 'none';
+            }
+            if (elements.paperContainer) {
+                elements.paperContainer.classList.remove('spread-active');
+            }
+
+            try {
+                elements.bookPaper.innerHTML = htmlContent;
+                elements.bookPaper.style.setProperty('--book-text-indent', state.textIndent || '2em');
+                applyHighlightsToPaper(elements.bookPaper, pageNum);
+                interceptInTextLinks();
+            } catch (e) {
+                console.error("页面渲染高亮出现异常:", e);
+                elements.bookPaper.innerHTML = htmlContent;
+            }
+
+            // Update navigation button states
+            elements.btnPrevPage.disabled = (pageNum <= 1);
+            elements.btnNextPage.disabled = (pageNum >= totalPages);
+        } else {
+            // DOUBLE PAGE SPREAD MODE
+            const leftPageNum = (pageNum % 2 === 1) ? pageNum : pageNum - 1;
+            const rightPageNum = leftPageNum + 1;
+
+            state.currentLeftPage = leftPageNum;
+            state.currentRightPage = rightPageNum;
+            state.currentPage = pageNum;
+
+            if (rightPageNum <= totalPages) {
+                elements.currentPageSpan.textContent = `${leftPageNum}-${rightPageNum}`;
+            } else {
+                elements.currentPageSpan.textContent = `${leftPageNum}`;
+            }
+
+            if (elements.paperContainer) {
+                elements.paperContainer.classList.add('spread-active');
+            }
+            if (elements.spreadSpine) {
+                elements.spreadSpine.style.display = 'block';
+            }
+            if (elements.bookPaperRight) {
+                elements.bookPaperRight.style.display = 'block';
+            }
+
+            // Render Left Page
+            let leftHtml = book.pages[leftPageNum - 1] || '<p>页面暂无内容</p>';
+            try {
+                elements.bookPaper.innerHTML = leftHtml;
+                elements.bookPaper.style.setProperty('--book-text-indent', state.textIndent || '2em');
+                applyHighlightsToPaper(elements.bookPaper, leftPageNum);
+            } catch (e) {
+                elements.bookPaper.innerHTML = leftHtml;
+            }
+
+            // Render Right Page
+            if (rightPageNum <= totalPages) {
+                let rightHtml = book.pages[rightPageNum - 1] || '<p>页面暂无内容</p>';
+                try {
+                    elements.bookPaperRight.innerHTML = rightHtml;
+                    elements.bookPaperRight.style.setProperty('--book-text-indent', state.textIndent || '2em');
+                    applyHighlightsToPaper(elements.bookPaperRight, rightPageNum);
+                } catch (e) {
+                    elements.bookPaperRight.innerHTML = rightHtml;
+                }
+            } else {
+                elements.bookPaperRight.innerHTML = `
+                    <div class="spread-blank-page">
+                        <i class="ri-book-open-line"></i>
+                        <span class="spread-blank-title">全书完</span>
+                        <p class="spread-blank-sub">已到达本书最后一页</p>
+                    </div>
+                `;
+            }
+
             interceptInTextLinks();
-        } catch (e) {
-            console.error("页面渲染高亮出现异常:", e);
-            elements.bookPaper.innerHTML = htmlContent;
+
+            // Update navigation button states
+            elements.btnPrevPage.disabled = (leftPageNum <= 1);
+            elements.btnNextPage.disabled = (leftPageNum + 1 >= totalPages);
         }
-        
+
+        updatePageModeButtonUI();
+
         // Restore saved scroll position or reset to top
         if (viewport) {
             viewport.scrollTop = savedScrollTop;
@@ -458,7 +706,11 @@
     }
 
     function interceptInTextLinks() {
-        elements.bookPaper.querySelectorAll('a[href]').forEach(a => {
+        const linkSelector = (elements.bookPaperRight && elements.bookPaperRight.style.display !== 'none')
+            ? '#book-paper a[href], #book-paper-right a[href]'
+            : '#book-paper a[href]';
+
+        document.querySelectorAll(linkSelector).forEach(a => {
             const href = a.getAttribute('href');
             if (!href) return;
             
@@ -487,6 +739,11 @@
                             let targetEl = elements.bookPaper.querySelector(`#${CSS.escape(anchor)}`) 
                                 || elements.bookPaper.querySelector(`[name="${anchor}"]`)
                                 || elements.bookPaper.querySelector(`[id*="${anchor}"]`);
+                            if (!targetEl && elements.bookPaperRight) {
+                                targetEl = elements.bookPaperRight.querySelector(`#${CSS.escape(anchor)}`)
+                                    || elements.bookPaperRight.querySelector(`[name="${anchor}"]`)
+                                    || elements.bookPaperRight.querySelector(`[id*="${anchor}"]`);
+                            }
                             if (targetEl) {
                                 targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                             }
@@ -516,6 +773,11 @@
                         let targetEl = elements.bookPaper.querySelector(`#${CSS.escape(item.anchor)}`) 
                             || elements.bookPaper.querySelector(`[name="${item.anchor}"]`)
                             || elements.bookPaper.querySelector(`[id*="${item.anchor}"]`);
+                        if (!targetEl && elements.bookPaperRight) {
+                            targetEl = elements.bookPaperRight.querySelector(`#${CSS.escape(item.anchor)}`)
+                                || elements.bookPaperRight.querySelector(`[name="${item.anchor}"]`)
+                                || elements.bookPaperRight.querySelector(`[id*="${item.anchor}"]`);
+                        }
                         if (targetEl) {
                             targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }
@@ -526,16 +788,17 @@
         });
     }
 
-    function applyHighlightsToPaper() {
+    function applyHighlightsToPaper(targetPaper = elements.bookPaper, targetPage = state.currentPage) {
+        if (!targetPaper) return;
         state.notes.forEach(note => {
-            if (note.page === state.currentPage && note.quote) {
+            if (note.page === targetPage && note.quote) {
                 const colorClass = `hl-${note.color || 'yellow'}`;
-                let paperHtml = elements.bookPaper.innerHTML;
+                let paperHtml = targetPaper.innerHTML;
 
                 // 1. 尝试直接整段精准匹配 (单段落无 HTML 标签干扰)
                 if (paperHtml.includes(note.quote)) {
                     const markedSnippet = `<mark class="${colorClass}" data-id="${note.id}">${note.quote}</mark>`;
-                    elements.bookPaper.innerHTML = paperHtml.replace(note.quote, markedSnippet);
+                    targetPaper.innerHTML = paperHtml.replace(note.quote, markedSnippet);
                     return;
                 }
 
@@ -566,14 +829,14 @@
                     }
 
                     if (matchFound) {
-                        elements.bookPaper.innerHTML = updatedHtml;
+                        targetPaper.innerHTML = updatedHtml;
                     }
                 }
             }
         });
         
         // Add click listener to inline marks for showing sleek mini popover
-        elements.bookPaper.querySelectorAll('mark').forEach(mark => {
+        targetPaper.querySelectorAll('mark').forEach(mark => {
             mark.addEventListener('click', function (e) {
                 e.stopPropagation();
                 const noteId = this.getAttribute('data-id');
@@ -600,6 +863,10 @@
         // 监听松开鼠标 / 触摸结束，触发浮动工具条精准定位
         elements.bookPaper.addEventListener('mouseup', () => setTimeout(handleSelection, 20));
         elements.bookPaper.addEventListener('touchend', () => setTimeout(handleSelection, 20));
+        if (elements.bookPaperRight) {
+            elements.bookPaperRight.addEventListener('mouseup', () => setTimeout(handleSelection, 20));
+            elements.bookPaperRight.addEventListener('touchend', () => setTimeout(handleSelection, 20));
+        }
         
         // Tooltip buttons
         document.querySelectorAll('.tooltip-btn[data-color]').forEach(btn => {
@@ -665,7 +932,9 @@
         }
 
         const selectedText = selection.toString().trim();
-        if (!selectedText || !elements.bookPaper.contains(selection.anchorNode)) {
+        const isInLeft = elements.bookPaper.contains(selection.anchorNode);
+        const isInRight = elements.bookPaperRight && elements.bookPaperRight.contains(selection.anchorNode);
+        if (!selectedText || (!isInLeft && !isInRight)) {
             hideSelectionTooltip();
             return;
         }
@@ -676,9 +945,12 @@
         
         if (rect.width === 0 && rect.height === 0) return;
 
+        const effectivePage = isInRight ? (state.currentRightPage || (state.currentPage + 1)) : (state.currentLeftPage || state.currentPage);
+
         state.pendingSelection = {
             text: selectedText,
-            range: range
+            range: range,
+            page: effectivePage
         };
 
         // Position floating tooltip above selection
@@ -718,10 +990,15 @@
         
         const quote = state.pendingSelection.text;
         const currentBookObj = demoBooks[state.currentBook];
-        const chapter = currentBookObj.toc[0]?.title || '当前章节';
+        const highlightPage = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
+        let chapter = '当前章节';
+        if (currentBookObj && currentBookObj.toc && currentBookObj.toc.length > 0) {
+            const matchedToc = [...currentBookObj.toc].reverse().find(t => t.page <= highlightPage);
+            chapter = matchedToc ? matchedToc.title : currentBookObj.toc[0].title;
+        }
 
         // 检查是否存在同页重叠的高亮/随笔节点，若存在则就地更新颜色，不重复生成卡片
-        const existingNote = state.notes.find(n => n.page === state.currentPage && n.quote === quote);
+        const existingNote = state.notes.find(n => n.page === highlightPage && n.quote === quote);
         if (existingNote) {
             existingNote.color = color;
             saveNoteToDB(existingNote);
@@ -733,7 +1010,7 @@
                 quote: quote,
                 comment: '',
                 color: color,
-                page: state.currentPage,
+                page: highlightPage,
                 chapter: chapter,
                 timestamp: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
             };
@@ -855,19 +1132,39 @@
     }
 
     function jumpToNoteLocation(note) {
-        if (state.currentPage !== note.page) {
+        const isDouble = isDoublePageEffective();
+        let needsRender = false;
+
+        if (isDouble) {
+            const currentLeft = state.currentLeftPage || 1;
+            const currentRight = state.currentRightPage || 2;
+            if (note.page !== currentLeft && note.page !== currentRight) {
+                needsRender = true;
+            }
+        } else {
+            if (state.currentPage !== note.page) {
+                needsRender = true;
+            }
+        }
+
+        if (needsRender) {
             renderPage(note.page);
+        } else {
+            state.currentPage = note.page;
         }
         
         // Find mark in book paper
         setTimeout(() => {
-            const mark = elements.bookPaper.querySelector(`mark[data-id="${note.id}"]`);
+            let mark = elements.bookPaper.querySelector(`mark[data-id="${note.id}"]`);
+            if (!mark && elements.bookPaperRight) {
+                mark = elements.bookPaperRight.querySelector(`mark[data-id="${note.id}"]`);
+            }
             if (mark) {
                 mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 mark.classList.add('hl-active');
                 setTimeout(() => mark.classList.remove('hl-active'), 2000);
             }
-        }, 100);
+        }, 120);
 
         showToast(`跳转至 P.${note.page} 原文所在位置`);
     }
@@ -1461,13 +1758,59 @@
     // 9. UI Controls & Helpers
     // --------------------------------------------------------------------------
     function initUIControls() {
-        // Prev / Next Page
+        // Prev / Next Page (Supports Single & Double Spread stepping)
         elements.btnPrevPage.addEventListener('click', () => {
-            if (state.currentPage > 1) renderPage(state.currentPage - 1);
+            const isDouble = isDoublePageEffective();
+            if (isDouble) {
+                const currentLeft = (state.currentPage % 2 === 1) ? state.currentPage : state.currentPage - 1;
+                const prevLeft = Math.max(1, currentLeft - 2);
+                if (prevLeft !== currentLeft) {
+                    renderPage(prevLeft);
+                }
+            } else {
+                if (state.currentPage > 1) renderPage(state.currentPage - 1);
+            }
         });
         elements.btnNextPage.addEventListener('click', () => {
-            if (state.currentPage < state.totalPages) renderPage(state.currentPage + 1);
+            const isDouble = isDoublePageEffective();
+            if (isDouble) {
+                const currentLeft = (state.currentPage % 2 === 1) ? state.currentPage : state.currentPage - 1;
+                const nextLeft = currentLeft + 2;
+                if (nextLeft <= state.totalPages) {
+                    renderPage(nextLeft);
+                }
+            } else {
+                if (state.currentPage < state.totalPages) renderPage(state.currentPage + 1);
+            }
         });
+
+        // Single / Double Page Mode Switcher
+        if (elements.btnPageMode) {
+            elements.btnPageMode.addEventListener('click', () => {
+                togglePageMode();
+            });
+        }
+
+        // Sidebar Toggle Button in Toolbar
+        if (elements.btnToggleSidebar) {
+            elements.btnToggleSidebar.addEventListener('click', () => {
+                toggleSidebar(true);
+            });
+        }
+
+        // Sidebar Collapse Button in Tabs Header
+        if (elements.btnCollapseSidebar) {
+            elements.btnCollapseSidebar.addEventListener('click', () => {
+                toggleSidebar(true);
+            });
+        }
+
+        // Sidebar Recall Handle on Reader Panel
+        if (elements.btnSidebarRecall) {
+            elements.btnSidebarRecall.addEventListener('click', () => {
+                toggleSidebar(true);
+            });
+        }
 
         // TOC Drawer Toggle & Close
         if (elements.btnToc) {
@@ -1496,6 +1839,7 @@
         elements.fontFamilySelect.addEventListener('change', function () {
             state.fontFamily = this.value;
             elements.bookPaper.style.fontFamily = this.value;
+            if (elements.bookPaperRight) elements.bookPaperRight.style.fontFamily = this.value;
         });
 
         // Font Size Adjust
@@ -1504,6 +1848,7 @@
                 state.fontSize -= 1;
                 elements.fontSizeLabel.textContent = `${state.fontSize}px`;
                 elements.bookPaper.style.fontSize = `${state.fontSize}px`;
+                if (elements.bookPaperRight) elements.bookPaperRight.style.fontSize = `${state.fontSize}px`;
             }
         });
         elements.btnFontInc.addEventListener('click', () => {
@@ -1511,6 +1856,7 @@
                 state.fontSize += 1;
                 elements.fontSizeLabel.textContent = `${state.fontSize}px`;
                 elements.bookPaper.style.fontSize = `${state.fontSize}px`;
+                if (elements.bookPaperRight) elements.bookPaperRight.style.fontSize = `${state.fontSize}px`;
             }
         });
 
@@ -1521,9 +1867,46 @@
                 state.textIndent = this.value;
                 localStorage.setItem('aura_text_indent', this.value);
                 elements.bookPaper.style.setProperty('--book-text-indent', this.value);
+                if (elements.bookPaperRight) elements.bookPaperRight.style.setProperty('--book-text-indent', this.value);
                 showToast(`已切换首行缩进：${this.options[this.selectedIndex].text}`);
             });
         }
+
+        // Responsive window resize listener with debounce to prevent toast floods & render races
+        let resizeDebounceTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeDebounceTimer);
+            resizeDebounceTimer = setTimeout(() => {
+                checkResponsiveLayout(true);
+            }, 60);
+        });
+
+        // Desktop Keyboard Shortcuts
+        document.addEventListener('keydown', (e) => {
+            const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            if (tag === 'input' || tag === 'textarea' || document.activeElement.isContentEditable) {
+                return;
+            }
+
+            // Do not trigger shortcuts when modal overlays are open
+            if (elements.noteModal && elements.noteModal.classList.contains('active')) return;
+            if (elements.backupSelectModal && elements.backupSelectModal.classList.contains('active')) return;
+            if (elements.shelfOverlay && elements.shelfOverlay.classList.contains('active')) return;
+
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                elements.btnPrevPage.click();
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                elements.btnNextPage.click();
+            } else if (e.key === 'b' || e.key === 'B') {
+                e.preventDefault();
+                toggleSidebar(true);
+            } else if (e.key === 'd' || e.key === 'D') {
+                e.preventDefault();
+                togglePageMode();
+            }
+        });
 
         // Paper Theme Switch
         elements.paperBtns.forEach(btn => {
@@ -1897,7 +2280,8 @@
             }
         } else {
             // 检查当前页是否已存在重叠/完全相同引文的高亮节点，若存在则自动切换为编辑该节点
-            const overlapNote = state.notes.find(n => n.page === state.currentPage && (n.quote === quote || (n.quote && quote && (n.quote.includes(quote) || quote.includes(n.quote)))));
+            const targetPage = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
+            const overlapNote = state.notes.find(n => n.page === targetPage && (n.quote === quote || (n.quote && quote && (n.quote.includes(quote) || quote.includes(n.quote)))));
             if (overlapNote) {
                 state.editingNoteId = overlapNote.id;
                 elements.modalQuotePreview.textContent = `“${overlapNote.quote || quote}”`;
@@ -1937,7 +2321,12 @@
             // 新建划线随笔
             const quote = state.pendingSelection ? state.pendingSelection.text : '';
             const currentBookObj = demoBooks[state.currentBook];
-            const chapter = (currentBookObj && currentBookObj.toc && currentBookObj.toc[0]) ? currentBookObj.toc[0].title : '章节选区';
+            const notePage = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
+            let chapter = '章节选区';
+            if (currentBookObj && currentBookObj.toc && currentBookObj.toc.length > 0) {
+                const matchedToc = [...currentBookObj.toc].reverse().find(t => t.page <= notePage);
+                chapter = matchedToc ? matchedToc.title : (currentBookObj.toc[0] ? currentBookObj.toc[0].title : '章节选区');
+            }
 
             const newNote = {
                 id: 'note-' + Date.now(),
@@ -1945,7 +2334,7 @@
                 quote: quote,
                 comment: comment,
                 color: 'yellow',
-                page: state.currentPage,
+                page: notePage,
                 chapter: chapter,
                 timestamp: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
             };
@@ -2055,6 +2444,9 @@
         initResizer();
         initTextSelection();
         initUIControls();
+        applySidebarState(false);
+        checkResponsiveLayout(false);
+        updateLayoutClasses();
         await initDB();
         await loadBook('crisis-era');
     });
