@@ -9,7 +9,7 @@
   - **访问地址**：👉 **`http://localhost:8095`**
 - **Git 版本库状态**：
   - **分支**：`master`
-  - **最新 Commit**：`7c741e4` (闭合 HTML 标签、自动清理无主缓存、全面回归 100% Local-First)
+  - **最新 Commit**：`7f72369` (彻底移除所有现存 AI 功能，回归纯粹无干扰的 Local-First 阅读工作台)
   - **工作区**：干净（Working tree clean）
 
 ---
