@@ -9,7 +9,7 @@
   - **访问地址**：👉 **`http://localhost:8095`**
 - **Git 版本库状态**：
   - **分支**：`master`
-  - **最新 Commit**：`02e8b32` (实现双模式4组合弹性布局系统、单/双页平滑切换、侧栏收起召回把手、双页对称书脊与响应式自适应降级恢复)
+  - **最新 Commit**：`2edf017` (完成阅读器工作台核心能力架构解耦：分离阅读位置与视觉页面，建立数据边界与独立内核，通过全量回归测试)
   - **工作区**：干净（Working tree clean）
 
 ---
@@ -18,6 +18,7 @@
 
 | 功能模块 | 实现描述 | 状态 |
 | --- | --- | --- |
+| **核心能力架构解耦** | 将 2,400+ 行单体 `app.js` 解耦为以「独立变化能力」为边界的五大模块层级：应用协调层、阅读内核 (`readerEngine`/`readingLocation`)、标注内核 (`annotationEngine`)、UI 呈现系统 (`layoutSystem`/`paperRenderer`/`notesUI`/`shelfUI`/`tocUI`) 以及基础设施适配器 (`bookRepository`/`annotationRepository`/`epubParser`/`exporters`)。彻底消除跨书笔记串线与多书备份数据丢失。 | ✅ 100% |
 | **75:25 可分栏工作台** | 左侧 75% 阅读区 + 右侧 25% 笔记区，支持 25%-85% 弹性拖拽 Clamp 与双击快捷折叠。 | ✅ 100% |
 | **EPUB NCX 132 目录解析** | 支持提取 EPUB 2/3 132 条规范目录，实现 `#anchor` 锚点平滑跳转。 | ✅ 100% |
 | **图片 Base64 自动转换** | 兼容相对路径 `<img>` 及 SVG `<image xlink:href>`，彻底消除 404 破损图片。 | ✅ 100% |
