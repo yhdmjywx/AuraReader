@@ -91,7 +91,7 @@ export function createAnnotationObject({
     bookId = '',
     quote = '',
     comment = '',
-    color = 'yellow',
+    color = null,
     page = 1,
     chapter = '章节选区',
     timestamp = null,
@@ -105,12 +105,13 @@ export function createAnnotationObject({
         page: validPage,
         offset: Number(offset) || 0
     };
+    const finalColor = color || (comment && comment.trim() !== '' ? 'green' : 'yellow');
     return {
         id: id || ('note-' + Date.now() + '-' + Math.floor(Math.random() * 1000)),
         bookId,
         quote: quote || '',
         comment: comment || '',
-        color: color || 'yellow',
+        color: finalColor,
         page: validPage,
         chapter: chapter || '章节选区',
         timestamp: timestamp || new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16),

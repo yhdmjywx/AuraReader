@@ -103,6 +103,14 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
     assert.strictEqual(annot1.location.sectionId, 'chapter-2', "Annotation 必须包含 location.sectionId");
     assert.strictEqual(annot1.location.offset, 1250, "Annotation 必须包含 location.offset");
     assert.strictEqual(annot1.location.page, 2, "Annotation 必须包含 location.page");
+    assert.strictEqual(annot1.color, 'green', "含随笔思考的标注应自动赋予 green 颜色");
+
+    const pureAnnot = createAnnotationObject({
+        bookId: 'book-1',
+        quote: '纯划线文字',
+        comment: ''
+    });
+    assert.strictEqual(pureAnnot.color, 'yellow', "纯划线标注应自动赋予 yellow 颜色");
 
     const testNotes = [
         { id: 'n1', quote: '重要引文1', comment: '我的思考感悟', page: 1 },

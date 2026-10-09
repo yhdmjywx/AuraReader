@@ -689,6 +689,7 @@ export function saveModalNote() {
         const noteIndex = state.notes.findIndex(n => n.id === state.editingNoteId);
         if (noteIndex !== -1) {
             state.notes[noteIndex].comment = comment;
+            state.notes[noteIndex].color = (comment && comment.trim() !== '') ? 'green' : 'yellow';
             state.notes[noteIndex].timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
             saveNoteToDB(state.notes[noteIndex]);
             persistNotes();
@@ -704,11 +705,12 @@ export function saveModalNote() {
             chapter = matchedToc ? matchedToc.title : currentBookObj.toc[0].title;
         }
 
+        const noteColor = (comment && comment.trim() !== '') ? 'green' : 'yellow';
         const newNote = createAnnotationObject({
             bookId: state.currentBook,
             quote,
             comment,
-            color: 'yellow',
+            color: noteColor,
             page: notePage,
             chapter
         });
@@ -1043,7 +1045,7 @@ function initUIControls() {
                 bookId: state.currentBook,
                 quote: '',
                 comment: text,
-                color: 'yellow',
+                color: 'green',
                 page: state.currentPage,
                 chapter
             });

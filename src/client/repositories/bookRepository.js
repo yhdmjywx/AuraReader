@@ -72,7 +72,7 @@ export const seedNotes = [
         bookId: 'crisis-era',
         quote: '当一个社会拼命借钱的时候，意味着这个社会存在着极为深刻（且不易解决）的结构性问题。',
         comment: '深刻分析了高债务杠杆背后的隐患，值得在研究宏观经济时作为风险指标。',
-        color: 'yellow',
+        color: 'green',
         page: 1,
         chapter: '第一章：人生最险恶的危机不可避免',
         timestamp: '2026-07-29 22:15'
