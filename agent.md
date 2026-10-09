@@ -4,7 +4,7 @@
 
 ## 1. 项目身份与核心使命 (Project Identity & Core Mission)
 
-**AuraReader Workstation** 是一款基于 Web 前端架构打造的 **75:25 黄金比例 AI 智能阅读工作台**。
+**AuraReader Workstation** 是一款基于 Web 前端架构打造的 **75:25 黄金比例智能阅读与笔记工作台**。
 
 - **核心使命**：为读者、研究者与知识卡片管理重度用户提供**零服务器成本、100% 隐私安全、离线全自动持久化、无冗余文本重复导出**的高性能阅读与笔记环境。
 - **运行特征**：全前端架构（HTML5 + Vanilla CSS3 + Modern ES6+ JS），结合浏览器原生 `IndexedDB` 数据库与 `JSZip` 引擎，支持免联网离线运行。

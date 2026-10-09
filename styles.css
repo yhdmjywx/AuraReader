@@ -132,6 +132,11 @@ button, input, select, textarea {
     color: var(--primary);
 }
 
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
 .btn-outline-sm {
     padding: 4px 10px;
     font-size: 12px;
@@ -147,6 +152,16 @@ button, input, select, textarea {
     color: var(--text-secondary);
 }
 .btn-ghost:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--text-primary);
+}
+
+.btn-ghost-sm {
+    padding: 3px 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+.btn-ghost-sm:hover {
     background-color: rgba(0, 0, 0, 0.05);
     color: var(--text-primary);
 }
