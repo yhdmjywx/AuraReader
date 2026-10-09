@@ -297,31 +297,6 @@
                     <input type="file" id="backup-file-input" accept=".aurabackup,.json" style="display: none;">
                 </div>
 
-                <div class="settings-section" style="border: 1px solid var(--primary-light); background: rgba(99, 102, 241, 0.03);">
-                    <h4><i class="ri-cloud-line" style="color: var(--primary);"></i> ☁️ SQLite Cloud Sync 云端多设备实时同步</h4>
-                    <p class="section-desc">设置您的专属同步密钥，多设备（电脑/手机/平板）输入相同密钥即可无缝同步全量划线与随笔：</p>
-                    
-                    <div class="form-group">
-                        <label for="sync-secret-input">专属同步密钥 (Sync Secret)：</label>
-                        <input type="password" id="sync-secret-input" placeholder="自定义您的专属同步密钥 (如 my-secret-888)..." class="input-full">
-                        <small class="hint-text"><i class="ri-shield-keyhole-line"></i> 密钥为您云端独立的个人数据库隔离凭证。</small>
-                    </div>
-
-                    <div class="sync-status-bar" id="sync-status-bar" style="margin: 10px 0; padding: 8px 12px; background: rgba(0,0,0,0.04); border-radius: 6px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
-                        <span>状态: <strong id="sync-status-badge" style="color: #64748b;">⚪ 未设置密钥</strong></span>
-                        <small id="sync-last-time" style="color: var(--text-sub);">尚未同步</small>
-                    </div>
-
-                    <div style="display: flex; gap: 8px;">
-                        <button id="btn-pull-sync" class="btn btn-outline btn-sm" style="flex: 1;">
-                            <i class="ri-download-cloud-line"></i> 云端拉取 (Pull)
-                        </button>
-                        <button id="btn-push-sync" class="btn btn-primary btn-sm" style="flex: 1;">
-                            <i class="ri-upload-cloud-line"></i> 推送云端 (Push)
-                        </button>
-                    </div>
-                </div>
-
                 <div class="settings-section">
                     <h4><i class="ri-key-2-line"></i> AI 服务 API 设置</h4>
                     <p class="section-desc">默认开启内置演示 AI 引擎。如需体验真实的云端 LLM，请在下方配置 API Key：</p>
@@ -429,6 +404,6 @@
     <div class="toast" id="toast-msg"></div>
 
     <!-- JS Scripts -->
-    <script src="app.js?v=23"></script>
+    <script src="app.js?v=24"></script>
 </body>
 </html>

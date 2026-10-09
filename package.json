@@ -1,7 +1,7 @@
 {
   "name": "aurareader-workstation",
   "version": "1.0.0",
-  "description": "AuraReader Workstation - Smart Reading & AI Notes Workstation with Cloud Sync",
+  "description": "AuraReader Workstation - Smart Reading & AI Notes Workstation",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,8 +11,7 @@
     "reader",
     "epub",
     "notes",
-    "ai",
-    "cloud-sync"
+    "ai"
   ],
   "author": "Antigravity",
   "license": "MIT"

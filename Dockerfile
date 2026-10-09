@@ -9,11 +9,8 @@ COPY package.json ./
 COPY index.html styles.css app.js server.js ./
 COPY README.md prd_v0_5.md workflow_architecture.md agent.md status.md ./
 
-# 创建数据库持久化目录
-RUN mkdir -p /app/data
-
 # 暴露工作台服务端口
 EXPOSE 8095
 
-# 启动 Node.js 一体化 Web 与 Cloud Sync API 服务
+# 启动 Node.js 一体化 Web 服务
 CMD ["node", "server.js"]

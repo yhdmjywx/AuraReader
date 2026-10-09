@@ -53,6 +53,6 @@
 
 ## 5. 待合并 / 暂缓实施清单 (Pending / Backlog Items)
 
-| 规划项 | 现状说明 | 后续合并方案 | 状态 |
+| 规划项 | 现状说明 | 最终处理方案 | 状态 |
 | :--- | :--- | :--- | :--- |
-| **☁️ SQLite Cloud Sync 真实数据库重构** | 当前客户端采用 `IndexedDB`（`AuraReaderDB`）+ `.aurabackup` 本地持久化；服务端使用免编译依赖的原子 JSON（`data/aura_sync_db.json`）。 | 暂不变更现有运行逻辑。后续视需要将 VPS 端收敛为独立单文件 SQLite 数据库（`data/reader.db`），或评估前端 SQLite WASM + OPFS 方案。 | ⏸️ **已挂起（列入待合并项，暂不修改）** |
+| **☁️ SQLite Cloud Sync 功能** | 彻底放弃并清理跨端云同步相关 API、前端同步引擎及 UI 表单。 | 全面收敛并回归 **100% Local-First** 隐私架构：IndexedDB 本地持久化 + `.aurabackup` 离线备份迁移。 | 🗑️ **已彻底移除 (Removed)** |
