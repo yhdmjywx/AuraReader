@@ -35,6 +35,16 @@ export class LayoutSystem {
         return this.isAutoDowngraded;
     }
 
+    getLayoutState() {
+        return {
+            pageMode: this.layoutMode,
+            sidebarOpen: !this.isCollapsed,
+            splitRatio: this.readerWidthPercent / 100,
+            isAutoDowngraded: this.isAutoDowngraded,
+            isDoubleEffective: this.isDoublePageEffective()
+        };
+    }
+
     setPageMode(mode, availableWidth = 1200) {
         this.layoutMode = mode;
         if (typeof localStorage !== 'undefined') {

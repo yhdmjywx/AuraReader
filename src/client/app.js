@@ -380,9 +380,10 @@ export function renderPage(pageNum, preserveScroll = false) {
         notes: state.notes,
         textIndent: state.textIndent,
         preserveScroll,
-        onMarkClick: (markEl, note) => {
+        onMarkClick: function (markEl, note) {
             highlightNoteCard(note.id);
-            showHighlightActionTooltip(this, note);
+            const target = markEl || this;
+            showHighlightActionTooltip(target, note); // showHighlightActionTooltip(this, note)
         },
         onLinkClick: (href) => {
             handleInTextLinkClick(href);
@@ -422,16 +423,21 @@ export function renderTOC(tocItems) {
 // 6. Highlights & Tooltip Actions
 // --------------------------------------------------------------------------
 export function applyHighlightsToPaper(targetPaper = elements.bookPaper, targetPage = state.currentPage) {
-    renderHighlightsToPaper(targetPaper, targetPage, state.notes, (markEl, note) => {
+    renderHighlightsToPaper(targetPaper, targetPage, state.notes, function (markEl, note) {
         highlightNoteCard(note.id);
-        showHighlightActionTooltip(this, note);
+        const target = markEl || this;
+        showHighlightActionTooltip(target, note); // showHighlightActionTooltip(this, note)
     });
 }
 
 export function showHighlightActionTooltip(markEl, note) {
     hideSelectionTooltip();
+    if (!note) return;
     state.activeHighlightId = note.id;
-    uiShowHighlightActionTooltip(markEl, note, elements);
+    const targetEl = (markEl && markEl.nodeType)
+        ? markEl
+        : (document.querySelector(`mark[data-id="${note.id}"]`) || null);
+    uiShowHighlightActionTooltip(targetEl, note, elements);
 }
 
 export function hideHighlightActionTooltip() {
@@ -564,6 +570,7 @@ export function createHighlight(color = 'yellow') {
     if (existingNote) {
         existingNote.color = color;
         saveNoteToDB(existingNote);
+        persistNotes();
         showToast('已更新该段落高亮颜色');
     } else {
         const newNote = createAnnotationObject({
@@ -577,6 +584,7 @@ export function createHighlight(color = 'yellow') {
 
         state.notes.unshift(newNote);
         saveNoteToDB(newNote);
+        persistNotes();
         showToast('已成功高亮选中文本');
     }
 
@@ -590,16 +598,15 @@ export function createHighlight(color = 'yellow') {
 // 7. Notes UI Coordination
 // --------------------------------------------------------------------------
 export function renderNotesList() {
-    const thoughtNotes = state.notes.filter(n => n.comment && n.comment.trim() !== '');
+    // Decoupled: filtering logic state.showHighlightsInSidebar ? state.notes : thoughtNotes is delegated to notesUI
     uiRenderNotesList({
         elements,
-        notes: state.showHighlightsInSidebar ? state.notes : thoughtNotes,
+        notes: state.notes,
         showHighlightsInSidebar: state.showHighlightsInSidebar,
         onJump: (note) => jumpToNoteLocation(note),
         onEdit: (note) => openNoteModal(note.quote, note.id),
         onDelete: (id) => deleteNote(id)
     });
-    persistNotes();
 }
 
 export function jumpToNoteLocation(note) {
@@ -642,6 +649,7 @@ export function jumpToNoteLocation(note) {
 export function deleteNote(id) {
     state.notes = state.notes.filter(n => n.id !== id);
     deleteNoteFromDB(id);
+    persistNotes();
     renderNotesList();
     renderPage(state.currentPage, true);
     showToast('已删除笔记');
@@ -683,6 +691,7 @@ export function saveModalNote() {
             state.notes[noteIndex].comment = comment;
             state.notes[noteIndex].timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
             saveNoteToDB(state.notes[noteIndex]);
+            persistNotes();
             showToast('随笔感悟已成功更新');
         }
     } else {
@@ -706,6 +715,7 @@ export function saveModalNote() {
 
         state.notes.unshift(newNote);
         saveNoteToDB(newNote);
+        persistNotes();
         showToast('高亮及随笔已成功保存');
     }
 
@@ -770,16 +780,20 @@ async function openBackupSelectModal() {
         return;
     }
 
+    const allBookIds = availableBackupBooks.map(b => b.id || b.title);
+    const allNotes = await repoGetNotesForBooks(allBookIds);
+
     elements.backupBookCheckboxList.innerHTML = '';
     availableBackupBooks.forEach((book, idx) => {
         const item = document.createElement('div');
         item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.04);';
 
-        const noteCount = state.notes.filter(n => (n.chapter && n.chapter.includes(book.title)) || n.bookId === book.id).length;
+        const bookId = book.id || String(idx);
+        const noteCount = allNotes.filter(n => n.bookId === bookId || (n.chapter && n.chapter.includes(book.title))).length;
 
         item.innerHTML = `
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; font-weight: 500; font-size: 0.88rem;">
-                <input type="checkbox" class="chk-backup-book" data-id="${book.id || idx}" checked>
+                <input type="checkbox" class="chk-backup-book" data-id="${bookId}" checked>
                 <span>${book.title}</span>
             </label>
             <small style="color: var(--text-sub); font-size: 0.78rem;">${book.format || 'EPUB'} · ${book.pages ? book.pages.length : 1} 章节 · ${noteCount} 条划线</small>
@@ -851,7 +865,7 @@ async function importFullBackup(file) {
                 if (b && (b.id || b.title)) {
                     const bId = b.id || ('custom_' + Date.now());
                     b.id = bId;
-                    await saveBookToDB(b);
+                    await repoSaveBook(b);
                     importedBooksCount++;
                 }
             }
@@ -881,6 +895,7 @@ async function importFullBackup(file) {
             localStorage.setItem('aura_text_indent', state.textIndent);
         }
 
+        persistNotes();
         await refreshShelfUI();
         renderNotesList();
         renderPage(state.currentPage, true);
@@ -1035,6 +1050,7 @@ function initUIControls() {
 
             state.notes.unshift(newNote);
             saveNoteToDB(newNote);
+            persistNotes();
             renderNotesList();
             elements.quickNoteInput.value = '';
             showToast('已保存独立随笔');

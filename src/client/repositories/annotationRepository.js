@@ -86,13 +86,26 @@ export async function getNotesForBooks(bookIds = []) {
         const store = tx.objectStore("notes");
         const req = store.getAll();
         req.onsuccess = () => {
-            const all = req.result || [];
+            let all = req.result || [];
             if (!bookIds || bookIds.length === 0) {
                 resolve(all);
-            } else {
-                const idSet = new Set(bookIds);
-                resolve(all.filter(n => idSet.has(n.bookId)));
+                return;
             }
+            const idSet = new Set(bookIds);
+            let filtered = all.filter(n => idSet.has(n.bookId));
+
+            for (const bId of bookIds) {
+                if (!filtered.some(n => n.bookId === bId)) {
+                    const localNotes = loadNotesFromLocalStorage(bId);
+                    if (localNotes && localNotes.length > 0) {
+                        filtered.push(...localNotes);
+                    } else if (bId === 'crisis-era') {
+                        filtered.push(...getSeedNotes());
+                    }
+                }
+            }
+
+            resolve(filtered);
         };
         req.onerror = (e) => reject(e);
     });

@@ -94,16 +94,26 @@ export function createAnnotationObject({
     color = 'yellow',
     page = 1,
     chapter = '章节选区',
-    timestamp = null
+    timestamp = null,
+    sectionId = '',
+    offset = 0,
+    location = null
 } = {}) {
+    const validPage = Number(page) || 1;
+    const loc = location || {
+        sectionId: sectionId || `chapter-${validPage}`,
+        page: validPage,
+        offset: Number(offset) || 0
+    };
     return {
         id: id || ('note-' + Date.now() + '-' + Math.floor(Math.random() * 1000)),
         bookId,
         quote: quote || '',
         comment: comment || '',
         color: color || 'yellow',
-        page: Number(page) || 1,
+        page: validPage,
         chapter: chapter || '章节选区',
-        timestamp: timestamp || new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
+        timestamp: timestamp || new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16),
+        location: loc
     };
 }

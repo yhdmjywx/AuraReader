@@ -53,7 +53,7 @@ export class ReaderEngine {
         return this.location.page;
     }
 
-    goToPage(pageNum) {
+    goToPage(pageNum, offset = 0) {
         if (!this.hasBook()) return this.location;
 
         const total = this.location.totalPages;
@@ -62,6 +62,8 @@ export class ReaderEngine {
 
         this.location.page = validPage;
         this.location.chapter = chapter;
+        this.location.sectionId = `chapter-${validPage}`;
+        this.location.offset = Number(offset) || 0;
 
         return { ...this.location };
     }

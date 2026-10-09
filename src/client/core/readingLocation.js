@@ -4,13 +4,24 @@
    chapter matching & internal link resolution.
    ========================================================================== */
 
-export function createReadingLocation({ bookId = '', page = 1, totalPages = 1, chapter = '', anchor = '' } = {}) {
+export function createReadingLocation({
+    bookId = '',
+    page = 1,
+    totalPages = 1,
+    chapter = '',
+    anchor = '',
+    sectionId = '',
+    offset = 0
+} = {}) {
+    const validPage = clampPage(page, totalPages);
     return {
         bookId,
-        page: clampPage(page, totalPages),
+        page: validPage,
         totalPages: Math.max(1, totalPages),
         chapter: chapter || '章节选区',
-        anchor: anchor || ''
+        anchor: anchor || '',
+        sectionId: sectionId || `chapter-${validPage}`,
+        offset: Number(offset) || 0
     };
 }
 

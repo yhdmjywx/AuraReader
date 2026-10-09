@@ -6,9 +6,13 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
 (async () => {
     // 1. 测试 ReadingLocation 模型与转换
     console.log("\n--- [测试 1: ReadingLocation 定位模型] ---");
-    const { clampPage, calcSpreadPages, resolveTargetPage, findChapterForPage } = await import(
+    const { clampPage, calcSpreadPages, resolveTargetPage, findChapterForPage, createReadingLocation } = await import(
         '../../src/client/core/readingLocation.js'
     );
+
+    const loc1 = createReadingLocation({ bookId: 'book-1', page: 2, totalPages: 5, sectionId: 'chapter-2', offset: 1250 });
+    assert.strictEqual(loc1.sectionId, 'chapter-2', "ReadingLocation 必须保留独立 sectionId");
+    assert.strictEqual(loc1.offset, 1250, "ReadingLocation 必须保留独立 offset");
 
     assert.strictEqual(clampPage(0, 10), 1, "clampPage 应该限制下界为 1");
     assert.strictEqual(clampPage(15, 10), 10, "clampPage 应该限制上界为 10");
@@ -75,13 +79,30 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
     assert.strictEqual(engine.getCurrentPage(), 3, "双页对开向后翻页应步退 2 页");
 
     assert.strictEqual(engine.getPageContent(1), '<p>第1页</p>');
+
+    const locGo = engine.goToPage(3, 450);
+    assert.strictEqual(locGo.page, 3);
+    assert.strictEqual(locGo.offset, 450, "ReaderEngine 必须支持并保留偏移量 offset");
+    assert.strictEqual(locGo.sectionId, 'chapter-3', "ReaderEngine 必须维护 sectionId");
+
     console.log("✅ ReaderEngine 阅读内核状态机测试全部通过！");
 
     // 3. 测试 AnnotationEngine 标注内核
     console.log("\n--- [测试 3: AnnotationEngine 标注算法内核] ---");
-    const { filterNotes, findOverlappingNote, applyHighlightToHtml } = await import(
+    const { filterNotes, findOverlappingNote, applyHighlightToHtml, createAnnotationObject } = await import(
         '../../src/client/core/annotationEngine.js'
     );
+
+    const annot1 = createAnnotationObject({
+        bookId: 'book-1',
+        page: 2,
+        offset: 1250,
+        quote: '深度思考',
+        comment: '思考笔记'
+    });
+    assert.strictEqual(annot1.location.sectionId, 'chapter-2', "Annotation 必须包含 location.sectionId");
+    assert.strictEqual(annot1.location.offset, 1250, "Annotation 必须包含 location.offset");
+    assert.strictEqual(annot1.location.page, 2, "Annotation 必须包含 location.page");
 
     const testNotes = [
         { id: 'n1', quote: '重要引文1', comment: '我的思考感悟', page: 1 },
@@ -119,6 +140,10 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
 
     layout.setPageMode('double', 1000);
     assert.strictEqual(layout.isDoublePageEffective(), true, "宽度 1000px 时双页模式生效");
+    const lState = layout.getLayoutState();
+    assert.strictEqual(lState.pageMode, 'double', "getLayoutState 应返回当前 pageMode");
+    assert.strictEqual(typeof lState.sidebarOpen, 'boolean', "getLayoutState 应返回 sidebarOpen 状态");
+    assert.strictEqual(typeof lState.splitRatio, 'number', "getLayoutState 应返回 splitRatio");
 
     // 模拟视口变窄降级
     const resp1 = layout.checkResponsiveLayout(600);
@@ -142,6 +167,11 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
     // 验证新书未保存笔记时返回空数组，而不是沿用上一本书的笔记
     const emptyBookNotes = await loadNotesForBook('non-existent-custom-book');
     assert.deepStrictEqual(emptyBookNotes, [], "未保存笔记的新书必须返回空数组，杜绝跨书笔记串线！");
+
+    // 验证多书查询能正确获取 crisis-era 种子笔记
+    const crisisNotes = await getNotesForBooks(['crisis-era']);
+    assert.ok(crisisNotes.length > 0, "多书查询时 crisis-era 必须保留种子笔记");
+    assert.strictEqual(crisisNotes[0].bookId, 'crisis-era');
 
     console.log("✅ 数据边界隔离与跨书防串线测试全部通过！");
 
