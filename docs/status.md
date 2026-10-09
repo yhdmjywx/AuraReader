@@ -9,7 +9,7 @@
   - **访问地址**：👉 **`http://localhost:8095`**
 - **Git 版本库状态**：
   - **分支**：`master`
-  - **最新 Commit**：`4db5b31` (标准工程文件树重构，完成 src/docs/deploy/tests 规范分层与全量测试闭环)
+  - **最新 Commit**：`6a61607` (锁定 devDependencies、补齐回归测试执行器、对齐 deploy 文档路径与静态服务路径安全加固)
   - **工作区**：干净（Working tree clean）
 
 ---
