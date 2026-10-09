@@ -22,4 +22,9 @@ console.log(`[冒泡检查 4] 选区按钮阻止事件冒泡: ${hasStopPropagati
 const allPass = hasMouseUpListener && hasTouchEndListener && hasActiveSelectionGuard && hasStopPropagationOnButtons;
 console.log(`\n最终结论: ${allPass ? '✅ 100% 通过！彻底修复划选文字后菜单被误杀消失的 Bug！' : '❌ 校验失败'}`);
 
+if (!allPass) {
+    console.error("❌ SELECTION FIX CHECKS FAILED!");
+    process.exit(1);
+}
+
 console.log("\n=== ALL SELECTION FIX CHECKS PASSED (100% SUCCESS) ===");

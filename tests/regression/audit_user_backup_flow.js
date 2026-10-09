@@ -128,4 +128,9 @@ async function simulateImportFullBackup(data) {
     console.log("\n--------------------------------------------------");
     console.log(`全链路闭环模拟判定: ${isSuccess ? '✅ 链路完全正确，无死角漏洞' : '❌ 发现死角漏洞'}`);
     console.log("--------------------------------------------------");
+
+    if (!isSuccess) {
+        console.error("❌ BACKUP FLOW AUDIT FAILED!");
+        process.exit(1);
+    }
 })();

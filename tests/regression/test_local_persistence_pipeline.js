@@ -45,4 +45,10 @@ checks.forEach((chk, idx) => {
 
 console.log(`\n审查结论: ${allPassed ? '🎉 100% 本地双重持久化（IndexedDB + LocalStorage）已完全闭环！' : '❌ 存在未持久化的漏洞'}`);
 
+if (!allPassed) {
+    console.error("❌ LOCAL PERSISTENCE PIPELINE CHECKS FAILED!");
+    process.exit(1);
+}
+
 console.log("\n=== ALL LOCAL PERSISTENCE PIPELINE CHECKS PASSED (100% SUCCESS) ===");
+

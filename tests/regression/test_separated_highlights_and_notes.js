@@ -58,4 +58,9 @@ console.log(`笔记区展示条目数: ${view3.displayed.length} 条 (期望: 1 
 const allPass = (view1.displayed.length === 1 && view2.displayed.length === 3 && view3.displayed.length === 1);
 console.log(`\n最终验证结论: ${allPass ? '✅ 100% 测试通过！' : '❌ 失败'}`);
 
+if (!allPass) {
+    console.error("❌ SEPARATED HIGHLIGHTS AND NOTES CHECKS FAILED!");
+    process.exit(1);
+}
+
 console.log("\n=== ALL SEPARATED HIGHLIGHTS AND NOTES TESTS PASSED (100% SUCCESS) ===");

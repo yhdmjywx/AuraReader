@@ -38,11 +38,15 @@ http://localhost:8095
 # 运行单元测试（NCX 目录与 OPF 解析）
 npm test
 
-# 运行全链路回归测试套件
-node tests/regression/test_html_and_dom_audit.js
-node tests/regression/test_advanced_highlight_engine.js
-node tests/regression/test_local_persistence_pipeline.js
-node tests/regression/audit_user_backup_flow.js
+# 运行全链路回归测试套件 (自动化批处理 11 项深度审计与交互回归)
+npm run test:regression
+# 或者直接调用测试执行器: node tests/regression/run_all.js
+
+# 运行 JavaScript 语法静态校验
+npm run test:syntax
+
+# 一键运行全量自动化测试（语法 + 单元 + 回归）
+npm run test:all
 ```
 
 ### 3. VPS 生产环境一键 Docker 部署：

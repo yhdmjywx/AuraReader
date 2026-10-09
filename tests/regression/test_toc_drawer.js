@@ -35,4 +35,9 @@ console.log(`[JS 逻辑 7] renderTOC 动态章节生成与一键跨章跳转: ${
 const allPass = hasBtnTocInHtml && hasDrawerInHtml && hasTocCss && hasBtnTocListener && hasCloseListener && hasRenderTOC;
 console.log(`\n最终测试结论: ${allPass ? '✅ 100% 成功！书籍目录抽屉完整就绪！' : '❌ 校验失败'}`);
 
+if (!allPass) {
+    console.error("❌ TOC DRAWER CHECKS FAILED!");
+    process.exit(1);
+}
+
 console.log("\n=== ALL TOC DRAWER CHECKS PASSED (100% SUCCESS) ===");

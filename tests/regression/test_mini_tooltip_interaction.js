@@ -27,4 +27,9 @@ console.log(`[交互检查 4] 点击空白处无感平滑收起: ${hasDismissOnO
 const allPass = !hasConfirmInReader && hasTooltipHtml && hasBtnAddThought && hasBtnRemove && hasShowActionTooltip && hasDismissOnOutsideClick;
 console.log(`\n最终体验判定: ${allPass ? '✅ 100% 成功！完美还原自然纯粹的书本阅读质感！' : '❌ 校验失败'}`);
 
+if (!allPass) {
+    console.error("❌ MINI TOOLTIP INTERACTION CHECKS FAILED!");
+    process.exit(1);
+}
+
 console.log("\n=== ALL MINI TOOLTIP INTERACTION CHECKS PASSED (100% SUCCESS) ===");

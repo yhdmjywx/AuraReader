@@ -6,7 +6,15 @@
   "scripts": {
     "start": "node src/server/server.js",
     "dev": "node src/server/server.js",
-    "test": "node tests/unit/test_ncx.js && node tests/unit/inspect.js"
+    "test": "node tests/unit/test_ncx.js && node tests/unit/inspect.js",
+    "test:unit": "node tests/unit/test_ncx.js && node tests/unit/inspect.js",
+    "test:syntax": "node --check src/server/server.js && node --check src/client/app.js",
+    "test:regression": "node tests/regression/run_all.js",
+    "test:all": "npm run test:syntax && npm run test:unit && npm run test:regression"
+  },
+  "devDependencies": {
+    "jszip": "^3.10.1",
+    "ssh2": "^1.17.0"
   },
   "keywords": [
     "reader",

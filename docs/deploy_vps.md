@@ -14,12 +14,12 @@ git clone https://github.com/your-username/reader_workstation.git
 cd reader_workstation
 
 # 2. 赋予脚本执行权限并一键部署
-chmod +x deploy.sh
-./deploy.sh
+chmod +x deploy/deploy.sh
+./deploy/deploy.sh
 ```
 
 部署完成后，即可在浏览器直接访问：
-`http://<您的VPS公网IP>:80` 或 `http://<您的VPS公网IP>:8095`
+`http://<您的VPS公网IP>:8095`
 
 ---
 
@@ -36,9 +36,9 @@ sudo apt-get install -y certbot
 # 2. 申请域名 SSL 证书 (替换 your-domain.com 为您的实际域名)
 sudo certbot certonly --webroot -w ./certbot/www -d your-domain.com
 
-# 3. 编辑 nginx.conf，取消 SSL server 块的注释并填写您的域名
+# 3. 编辑 deploy/nginx.conf，取消 SSL server 块的注释并填写您的域名
 # 4. 重启 Docker 容器
-docker compose restart
+docker compose -f deploy/docker-compose.yml restart
 ```
 
 ### 方式二：使用 Cloudflare (最省心推荐)
@@ -53,16 +53,16 @@ docker compose restart
 
 ```bash
 # 查看容器实时运行状态
-docker compose ps
+docker compose -f deploy/docker-compose.yml ps
 
 # 查看访问日志与错误日志
-docker compose logs -f aurareader
+docker compose -f deploy/docker-compose.yml logs -f aurareader
 
 # 重启容器服务
-docker compose restart
+docker compose -f deploy/docker-compose.yml restart
 
 # 更新代码后重新构建部署
-git pull && ./deploy.sh
+git pull && ./deploy/deploy.sh
 ```
 
 ---

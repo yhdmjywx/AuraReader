@@ -46,13 +46,23 @@ const server = http.createServer((req, res) => {
     // Static Files Handler
     // --------------------------------------------------------------------------
     const CLIENT_DIR = path.resolve(__dirname, '../client');
-    let safePath = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, '');
+    let decodedPath;
+    try {
+        decodedPath = decodeURIComponent(pathname);
+    } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('400 Bad Request');
+        return;
+    }
+
+    let safePath = path.normalize(decodedPath).replace(/^(\.\.[\/\\])+/, '');
     if (safePath === '/' || safePath === '\\') safePath = '/index.html';
 
-    const filePath = path.join(CLIENT_DIR, safePath);
+    const filePath = path.resolve(CLIENT_DIR, '.' + (safePath.startsWith('/') || safePath.startsWith('\\') ? safePath : '/' + safePath));
+    const relativePath = path.relative(CLIENT_DIR, filePath);
 
     // Prevent directory traversal outside CLIENT_DIR
-    if (!filePath.startsWith(CLIENT_DIR)) {
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
         res.writeHead(403, { 'Content-Type': 'text/plain' });
         res.end('403 Forbidden');
         return;

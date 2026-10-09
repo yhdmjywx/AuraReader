@@ -61,7 +61,7 @@ reader_workstation/
 
 ## 5. Agent 开发与维护法则 (Operating Guidelines)
 
-1. **语法自检**：开发过程中每次修改 `app.js` 后，执行 `node -c app.js` 自行修正小语法错漏。
+1. **语法自检**：开发过程中每次修改 `app.js` 后，执行 `node -c src/client/app.js`（或 `npm run test:syntax`）自行修正小语法错漏。
 2. **拒绝代码重复与文本粘连**：导出 Markdown 时必须严格遵守 `==高亮==` 嵌入规范，绝对禁止生成 `💡 [划线随笔] 原文：“...”` 格式的重复文本。
 3. **保持根目录干净**：所有临时测试脚本在验证完成后必须及时清理，勿将其提交入 Git 仓库。
 4. **强缓存控制 (Cache Busting)**：修改 JS / CSS 时需同步更新 `index.html` 中的引用版本参数（如 `app.js?v=9`）。

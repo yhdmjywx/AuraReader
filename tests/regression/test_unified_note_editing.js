@@ -96,4 +96,9 @@ console.log(`更新后感悟内容: "${mockState.notes[0].comment}"`);
 const testPassed = (mockState.notes.length === 1 && mockState.notes[0].comment === '修改后的深度思考感悟');
 console.log(`\n判定结果: ${testPassed ? '✅ 100% 通过！彻底解决高亮与随笔分离重复生成两张卡片的问题！' : '❌ 校验失败'}`);
 
+if (!testPassed) {
+    console.error("❌ UNIFIED NOTE EDITING CHECKS FAILED!");
+    process.exit(1);
+}
+
 console.log("\n=== ALL UNIFIED NOTE EDITING TESTS PASSED (100% SUCCESS) ===");

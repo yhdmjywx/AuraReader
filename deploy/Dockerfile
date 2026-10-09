@@ -5,7 +5,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # 复制项目核心文件与代码
-COPY package.json ./
+COPY package*.json ./
 COPY src/ ./src/
 COPY docs/ ./docs/
 COPY README.md ./

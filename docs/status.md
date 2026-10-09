@@ -36,18 +36,18 @@
 
 ## 3. 校验套件结果 (Verification Results)
 
-- **JavaScript 语法校验 (`node -c src/server/server.js; node -c src/client/app.js`)**：PASSED (0 Syntax Errors)
-- **单元测试套件 (`npm test`)**：PASSED (132/132 NCX 目录解析与 OPF 映射验证)
-- **HTML 结构与标签平衡校验 (`node tests/regression/test_html_and_dom_audit.js`)**：PASSED (0 Mismatches, 0 Unclosed Tags)
-- **AI 模块彻底剥离与孤立依赖检查**：PASSED (所有 AI 按钮、Tab、设置卡片及业务函数彻底清除，0 运行时破损引用)
+- **JavaScript 语法静态校验 (`npm run test:syntax` / `node --check src/server/server.js && node --check src/client/app.js`)**：PASSED (0 Syntax Errors)
+- **依赖与包管理健全性校验 (`npm ls`)**：PASSED (`devDependencies`: `jszip@3.10.1`, `ssh2@1.17.0` 正常锁定，0 extraneous 孤立依赖)
+- **单元测试套件 (`npm test` / `npm run test:unit`)**：PASSED (132/132 NCX 目录解析与 OPF 263-href 映射验证)
+- **全链路回归测试套件 (`npm run test:regression` / `node tests/regression/run_all.js`)**：PASSED (11/11 项全部通过，包含退出码硬断言校验)
+- **一键全量自动化测试 (`npm run test:all`)**：PASSED (语法 + 单元 + 回归一体化自动化通过)
+- **静态资源安全与路径穿越防御**：PASSED (URL 解码容错、客户端根目录严格边界与路径规范化加固)
+- **HTML 结构与标签平衡校验 (`node tests/regression/test_html_and_dom_audit.js`)**：PASSED (377 标签闭合，66 DOM ID 100% 匹配)
+- **AI 模块彻底剥离与孤立依赖检查**：PASSED (0 孤立选择器与 AI 残余)
 - **云同步废弃 API 路由隔离校验**：PASSED (/api/sync/pull 与 /api/sync/push 均精确返回 404)
 - **历史残存 LocalStorage 键防御性清除**：PASSED (`aura_sync_secret`, `aura_sync_last_time`, `aura_api_key` 启动自动清除)
-- **NCX 132 目录提取测试**：PASSED (132/132 Entries)
-- **IndexedDB 数据库联调测试**：PASSED (Books & Notes store transaction verified)
-- **消除重复 Markdown 生成测试**：PASSED (0 Duplicated `原文：“...` strings)
-- **HTML/Zip 导出产物解压校验**：PASSED (Single-file HTML & Multi-chapter Zip verified)
-- **全量深度标签栈与孤立 DOM 审查**：PASSED (377 标签完全闭合，66 个 DOM ID 100% 匹配，0 孤立选择器)
-- **按钮实用类与缓存版本升级**：PASSED (.btn-sm / .btn-ghost-sm 样式补全，版本更新为 css?v=9 & js?v=25)
+- **本地服务探针探测 (`http://localhost:8095/api/health`)**：PASSED (200 OK, JSON 探针健康正常)
+- **生产与容器部署规范 (`deploy/` 目录)**：PASSED (Dockerfile, docker-compose.yml, deploy.sh, deploy_vps.md 路径 100% 对齐)
 
 ---
 
