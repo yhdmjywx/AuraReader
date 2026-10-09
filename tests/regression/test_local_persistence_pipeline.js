@@ -3,7 +3,11 @@ const path = require('path');
 
 console.log("=== AuraReader 本地数据持久化全链路审查与测试 ===");
 
-const jsContent = fs.readFileSync(path.resolve(__dirname, '../../src/client/app.js'), 'utf8');
+const clientDir = path.resolve(__dirname, '../../src/client');
+const appJs = fs.readFileSync(path.join(clientDir, 'app.js'), 'utf8');
+const bookRepoJs = fs.readFileSync(path.join(clientDir, 'repositories/bookRepository.js'), 'utf8');
+const annotRepoJs = fs.readFileSync(path.join(clientDir, 'repositories/annotationRepository.js'), 'utf8');
+const jsContent = [appJs, bookRepoJs, annotRepoJs].join('\n');
 
 // 1. 静态检测核心持久化管道
 const checks = [

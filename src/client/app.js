@@ -1,882 +1,468 @@
 /* ==========================================================================
-   AuraReader Workstation - Core Application Logic
-   Handles EPUB/PDF Reading Engine, 75:25 Split Resizer, Text Annotations,
-   Bidirectional Navigation & Note Export.
+   AuraReader Workstation - Application Coordinator Layer
+   Coordinates reading core, annotation core, UI system & persistence repositories.
+   Receives user interactions, maintains session state, delegates capability execution.
    ========================================================================== */
 
-(function () {
-    'use strict';
+import {
+    initDB as initBookDB,
+    saveBookToDB as repoSaveBook,
+    loadBookFromDB as repoLoadBook,
+    getAllBooksFromDB as repoGetAllBooks,
+    deleteBookFromDB as repoDeleteBook,
+    demoBooks,
+    seedNotes
+} from './repositories/bookRepository.js';
 
-    // --------------------------------------------------------------------------
-    // 1. App State & Book Data
-    // --------------------------------------------------------------------------
-    const state = {
-        currentBook: 'crisis-era',
-        fontSize: 18,
-        fontFamily: "'Inter', sans-serif",
-        textIndent: localStorage.getItem('aura_text_indent') || '2em',
-        paperTheme: 'white',
-        appTheme: 'light',
-        currentPage: 1,
-        currentLeftPage: 1,
-        currentRightPage: 2,
-        totalPages: 10,
-        readerWidthPercent: parseFloat(localStorage.getItem('aura_reader_width')) || 75,
-        isCollapsed: localStorage.getItem('aura_sidebar_collapsed') === 'true',
-        layoutMode: localStorage.getItem('aura_layout_mode') || 'single', // 'single' | 'double'
-        isAutoDowngraded: false,
-        activeTab: 'tab-highlights',
-        
-        // Annotations & Notes Store
-        notes: [],
+import {
+    saveNoteToDB as repoSaveNote,
+    deleteNoteFromDB as repoDeleteNote,
+    loadNotesFromDB as repoLoadNotes,
+    loadNotesForBook as repoLoadNotesForBook,
+    getNotesForBooks as repoGetNotesForBooks,
+    persistNotesToLocalStorage
+} from './repositories/annotationRepository.js';
 
-        // Selection cache
-        pendingSelection: null,
-        editingNoteId: null,
-        showHighlightsInSidebar: false,
-        activeHighlightId: null
-    };
+import { readerEngine } from './core/readerEngine.js';
+import { resolveTargetPage } from './core/readingLocation.js';
+import {
+    filterNotes,
+    findOverlappingNote,
+    createAnnotationObject
+} from './core/annotationEngine.js';
 
-    // Demo Books Content Database
-    const demoBooks = {
-        'crisis-era': {
-            title: '危机时代（罗杰斯·思考与洞察）',
-            format: 'EPUB',
-            toc: [
-                { title: '第一章：人生最险恶的危机不可避免', page: 1 },
-                { title: '第二章：债台高筑与全球市场动荡', page: 3 },
-                { title: '第三章：通货膨胀下的资产保值之道', page: 6 },
-                { title: '第四章：如何在危机爆发前识别信号', page: 8 },
-                { title: '第五章：面向未来二十年的投资哲学', page: 10 }
-            ],
-            pages: [
-                // Page 1
-                `<h1>第一章：人生最险恶的危机不可避免</h1>
-                <p>这次的危机，与过往的危机在本质上并无任何不同。历史的轮回而已。</p>
-                <p>雷曼危机之后的十二年间，全世界主要经济体的资本市场，均经历了股价长期大幅上涨的好景气。</p>
-                <p>从历史上看，连续十到十二年股价上涨，是极为罕见的现象。事出反常必有妖。股价已经上涨了这么长时间，是时候掉头向下了。这才是真正的“必然”。</p>
-                <p>也许是这次超长股市景气所带来的乐观情绪使然，在同一段时期内，世界各国的债务水平也大幅飙升。</p>
-                <p>还是那句话，事出反常必有妖。当一个社会拼命借钱的时候，意味着这个社会存在着极为深刻（且不易解决）的结构性问题。</p>
-                <p>正因如此，心虚的市场在危机爆发时往往会显得底气不足，极为脆弱。这是一中正常的表现。这一回也不例外。</p>`,
-                
-                // Page 2
-                `<h2>周期的铁律与历史的经验</h2>
-                <p>每一个时代的人都倾向于相信：“这一次不一样”。然而在长达几百年的金融历史面前，人性从未改变。贪婪与恐惧交替支配着市场价格。</p>
-                <p>危机发生时，绝大部分投资者会感到恐慌，试图在最低点抛售一切。但真正的长期思考者会明白，危机的另一面是绝佳的资产重组机会。</p>
-                <p>我们需要建立的不是预测危机的水晶球，而是一套在危机中生存并繁衍的思维框架。这意味着控制杠杆、保持流动性，并时刻关注核心实体价值。</p>`,
+import { layoutSystem, DOUBLE_PAGE_MIN_WIDTH } from './ui/layoutSystem.js';
+import {
+    renderPaperSpread,
+    applyHighlightsToPaper as renderHighlightsToPaper,
+    showHighlightActionTooltip as uiShowHighlightActionTooltip,
+    hideHighlightActionTooltip as uiHideHighlightActionTooltip,
+    scrollToAnchor
+} from './ui/paperRenderer.js';
+import {
+    renderNotesList as uiRenderNotesList,
+    highlightNoteCard,
+    openNoteModal as uiOpenNoteModal,
+    closeNoteModal as uiCloseNoteModal
+} from './ui/notesUI.js';
+import {
+    renderShelf as uiRenderShelf,
+    openShelf as uiOpenShelf,
+    closeShelf as uiCloseShelf
+} from './ui/shelfUI.js';
+import {
+    renderTOC as uiRenderTOC,
+    openTOC as uiOpenTOC,
+    closeTOC as uiCloseTOC,
+    toggleTOC as uiToggleTOC
+} from './ui/tocUI.js';
 
-                // Page 3
-                `<h1>第二章：债台高筑与全球市场动荡</h1>
-                <p>央行的超发货币政策像是一种剧毒的麻醉剂。它能在短期内掩盖结构性矛盾，却在无形中把债务的雪球越推越大。</p>
-                <p>当全球主要经济体的债务 GDP 占比突破历史警戒线时，边际收益开始急速递减。每一单位新发行的债务所能带来的经济增长微乎其微。</p>
-                <p>作为独立的研读者与投资者，你必须学会看清资产负债表的真相，而不是被官方的乐观表态所蒙蔽。</p>`,
+import { parseEpub, parseTxt } from './adapters/epubParser.js';
+import {
+    exportMarkdown,
+    exportJson,
+    exportChapterZip,
+    exportStandaloneHtml,
+    exportSelectiveBackup,
+    parseBackupFile
+} from './adapters/exporters.js';
 
-                // Page 4
-                `<h2>实体供应链与大宗商品的锚点</h2>
-                <p>在纸面财富与金融衍生品极度膨胀的时代，硬通货与实体资源将重新焕发光芒。无论是农产品、能源还是基础金属，它们是人类社会运转的物理基础。</p>
-                <p>在危机到来时，那些拥有不可替代资源与强劲自由现金流的企业，能够抵御最严酷的寒冬。</p>`
-            ]
-        },
-        'deep-work': {
-            title: '深度工作（Cal Newport）',
-            format: 'PDF',
-            toc: [
-                { title: '引言：深度工作的价值', page: 1 },
-                { title: '准则一：工作要深度', page: 2 },
-                { title: '准则二：拥抱无聊', page: 3 }
-            ],
-            pages: [
-                `<h1>引言：深度工作的价值</h1>
-                <p>在日益无休止的打扰与碎片化信息中，深度专注的能力正变得越来越稀缺。正因稀缺，它才变得无比珍贵。</p>
-                <p>深度工作（Deep Work）是指在无干扰的状态下专注进行职业活动的能力。这种能力能将你的认知能力推向极限，创造出难以复制的新价值。</p>`,
+// --------------------------------------------------------------------------
+// 1. App State
+// --------------------------------------------------------------------------
+const state = {
+    currentBook: 'crisis-era',
+    fontSize: 18,
+    fontFamily: "'Inter', sans-serif",
+    textIndent: localStorage.getItem('aura_text_indent') || '2em',
+    paperTheme: 'white',
+    appTheme: 'light',
+    currentPage: 1,
+    currentLeftPage: 1,
+    currentRightPage: 2,
+    totalPages: 10,
+    readerWidthPercent: parseFloat(localStorage.getItem('aura_reader_width')) || 75,
+    isCollapsed: localStorage.getItem('aura_sidebar_collapsed') === 'true',
+    layoutMode: localStorage.getItem('aura_layout_mode') || 'single', // 'single' | 'double'
+    isAutoDowngraded: false,
+    activeTab: 'tab-highlights',
 
-                `<h1>准则一：工作要深度</h1>
-                <p>意志力是有限的资源，而不是无限的源泉。想要建立持久的深度工作习惯，关键在于建立固定且不可侵犯的日程仪式。</p>
-                <p>打造你的工作台环境，屏蔽一切即时通讯工具，为最重要的思考留下整块的时间。</p>`
-            ]
-        }
-    };
+    // Annotations & Notes Store
+    notes: [],
 
-    // Initialize Default Seed Notes
-    const seedNotes = [
-        {
-            id: 'note-seed-1',
-            quote: '当一个社会拼命借钱的时候，意味着这个社会存在着极为深刻（且不易解决）的结构性问题。',
-            comment: '深刻分析了高债务杠杆背后的隐患，值得在研究宏观经济时作为风险指标。',
-            color: 'yellow',
-            page: 1,
-            chapter: '第一章：人生最险恶的危机不可避免',
-            timestamp: '2026-07-29 22:15'
-        },
-        {
-            id: 'note-seed-2',
-            quote: '我们需要建立的不是预测危机的水晶球，而是一套在危机中生存并繁衍的思维框架。',
-            comment: '从单纯预测转向构建抗风险的韧性系统，这是反脆弱思维的核心。',
-            color: 'green',
-            page: 2,
-            chapter: '第一章：人生最险恶的危机不可避免',
-            timestamp: '2026-07-29 22:20'
-        }
-    ];
+    // Selection cache
+    pendingSelection: null,
+    editingNoteId: null,
+    showHighlightsInSidebar: false,
+    activeHighlightId: null
+};
 
-    // --------------------------------------------------------------------------
-    // 2. DOM Elements Selection
-    // --------------------------------------------------------------------------
-    const elements = {
-        appHeader: document.querySelector('.app-header'),
-        workspaceContainer: document.getElementById('workspace-container'),
-        readerPanel: document.getElementById('reader-panel'),
-        notesPanel: document.getElementById('notes-panel'),
-        resizerHandle: document.getElementById('resizer-handle'),
-        
-        // Reader Controls
-        bookPaper: document.getElementById('book-paper'),
-        bookPaperRight: document.getElementById('book-paper-right'),
-        paperContainer: document.getElementById('paper-container'),
-        spreadSpine: document.getElementById('spread-spine'),
-        currentBookTitle: document.getElementById('current-book-title'),
-        currentBookTag: document.getElementById('current-book-tag'),
-        currentPageSpan: document.getElementById('current-page'),
-        totalPagesSpan: document.getElementById('total-pages'),
-        btnPrevPage: document.getElementById('btn-prev-page'),
-        btnNextPage: document.getElementById('btn-next-page'),
-        btnPageMode: document.getElementById('btn-page-mode'),
-        textPageMode: document.getElementById('text-page-mode'),
-        iconPageMode: document.getElementById('icon-page-mode'),
-        btnToggleSidebar: document.getElementById('btn-toggle-sidebar'),
-        btnCollapseSidebar: document.getElementById('btn-collapse-sidebar'),
-        btnSidebarRecall: document.getElementById('btn-sidebar-recall'),
-        textToggleSidebar: document.getElementById('text-toggle-sidebar'),
-        iconToggleSidebar: document.getElementById('icon-toggle-sidebar'),
-        fontFamilySelect: document.getElementById('font-family-select'),
-        indentSelect: document.getElementById('indent-select'),
-        fontSizeLabel: document.getElementById('font-size-label'),
-        btnFontDec: document.getElementById('btn-font-dec'),
-        btnFontInc: document.getElementById('btn-font-inc'),
-        paperBtns: document.querySelectorAll('.paper-btn'),
-        btnThemeToggle: document.getElementById('btn-theme-toggle'),
-        btnFullscreen: document.getElementById('btn-fullscreen'),
-        btnSwitchDemo: document.getElementById('btn-switch-demo'),
-        fileInput: document.getElementById('file-input'),
-        
-        // TOC Drawer
-        btnToc: document.getElementById('btn-toc'),
-        tocDrawer: document.getElementById('toc-drawer'),
-        btnCloseToc: document.getElementById('btn-close-toc'),
-        tocList: document.getElementById('toc-list'),
-        
-        // Floating Selection Tooltip
-        selectionTooltip: document.getElementById('selection-tooltip'),
-        btnAddNote: document.getElementById('btn-add-note'),
-        highlightActionTooltip: document.getElementById('highlight-action-tooltip'),
-        btnHlAddThought: document.getElementById('btn-hl-add-thought'),
-        btnHlRemove: document.getElementById('btn-hl-remove'),
-        
-        // Tabs
-        tabBtns: document.querySelectorAll('.tab-btn'),
-        tabContents: document.querySelectorAll('.tab-content'),
-        
-        // Notes Tab
-        notesList: document.getElementById('notes-list'),
-        emptyNotesState: document.getElementById('empty-notes-state'),
-        countHighlights: document.getElementById('count-highlights'),
-        notesTotalCount: document.getElementById('notes-total-count'),
-        btnToggleShowHighlights: document.getElementById('btn-toggle-show-highlights'),
-        countPureHighlights: document.getElementById('count-pure-highlights'),
-        quickNoteInput: document.getElementById('quick-note-input'),
-        btnSaveQuickNote: document.getElementById('btn-save-quick-note'),
-        
-        // Settings Tab
-        btnExportMarkdown: document.getElementById('btn-export-markdown'),
-        btnExportJson: document.getElementById('btn-export-json'),
-        btnExportChapterZip: document.getElementById('btn-export-chapter-zip'),
-        btnExportStandaloneHtml: document.getElementById('btn-export-standalone-html'),
-        btnExportFullBackup: document.getElementById('btn-export-full-backup'),
-        btnImportFullBackup: document.getElementById('btn-import-full-backup'),
-        backupFileInput: document.getElementById('backup-file-input'),
-        backupSelectModal: document.getElementById('backup-select-modal'),
-        btnCloseBackupModal: document.getElementById('btn-close-backup-modal'),
-        btnCancelBackupModal: document.getElementById('btn-cancel-backup-modal'),
-        btnConfirmExportBackup: document.getElementById('btn-confirm-export-backup'),
-        btnSelectAllBackup: document.getElementById('btn-select-all-backup'),
-        btnDeselectAllBackup: document.getElementById('btn-deselect-all-backup'),
-        backupBookCheckboxList: document.getElementById('backup-book-checkbox-list'),
-        chkBackupIncludeNotes: document.getElementById('chk-backup-include-notes'),
-        chkBackupIncludeSettings: document.getElementById('chk-backup-include-settings'),
-        
-        // Modal, Shelf & Toast
-        btnShelf: document.getElementById('btn-shelf'),
-        shelfOverlay: document.getElementById('shelf-overlay'),
-        btnCloseShelf: document.getElementById('btn-close-shelf'),
-        shelfGrid: document.getElementById('shelf-grid'),
-        shelfBookCount: document.getElementById('shelf-book-count'),
-        noteModal: document.getElementById('note-modal'),
-        modalQuotePreview: document.getElementById('modal-quote-preview'),
-        modalNoteTextarea: document.getElementById('modal-note-textarea'),
-        btnCloseModal: document.getElementById('btn-close-modal'),
-        btnCancelModal: document.getElementById('btn-cancel-modal'),
-        btnConfirmModal: document.getElementById('btn-confirm-modal'),
-        toastMsg: document.getElementById('toast-msg')
-    };
+// --------------------------------------------------------------------------
+// 2. DOM Elements Selection
+// --------------------------------------------------------------------------
+const elements = {
+    appHeader: document.querySelector('.app-header'),
+    workspaceContainer: document.getElementById('workspace-container'),
+    readerPanel: document.getElementById('reader-panel'),
+    notesPanel: document.getElementById('notes-panel'),
+    resizerHandle: document.getElementById('resizer-handle'),
 
-    // --------------------------------------------------------------------------
-    // 2.5 IndexedDB Storage Engine Architecture
-    // --------------------------------------------------------------------------
-    let db = null;
+    // Reader Controls
+    bookPaper: document.getElementById('book-paper'),
+    bookPaperRight: document.getElementById('book-paper-right'),
+    paperContainer: document.getElementById('paper-container'),
+    spreadSpine: document.getElementById('spread-spine'),
+    currentBookTitle: document.getElementById('current-book-title'),
+    currentBookTag: document.getElementById('current-book-tag'),
+    currentPageSpan: document.getElementById('current-page'),
+    totalPagesSpan: document.getElementById('total-pages'),
+    btnPrevPage: document.getElementById('btn-prev-page'),
+    btnNextPage: document.getElementById('btn-next-page'),
+    btnPageMode: document.getElementById('btn-page-mode'),
+    textPageMode: document.getElementById('text-page-mode'),
+    iconPageMode: document.getElementById('icon-page-mode'),
+    btnToggleSidebar: document.getElementById('btn-toggle-sidebar'),
+    btnCollapseSidebar: document.getElementById('btn-collapse-sidebar'),
+    btnSidebarRecall: document.getElementById('btn-sidebar-recall'),
+    textToggleSidebar: document.getElementById('text-toggle-sidebar'),
+    iconToggleSidebar: document.getElementById('icon-toggle-sidebar'),
+    fontFamilySelect: document.getElementById('font-family-select'),
+    indentSelect: document.getElementById('indent-select'),
+    fontSizeLabel: document.getElementById('font-size-label'),
+    btnFontDec: document.getElementById('btn-font-dec'),
+    btnFontInc: document.getElementById('btn-font-inc'),
+    paperBtns: document.querySelectorAll('.paper-btn'),
+    btnThemeToggle: document.getElementById('btn-theme-toggle'),
+    btnFullscreen: document.getElementById('btn-fullscreen'),
+    btnSwitchDemo: document.getElementById('btn-switch-demo'),
+    fileInput: document.getElementById('file-input'),
 
-    function initDB() {
-        return new Promise((resolve) => {
-            if (!window.indexedDB) {
-                console.warn("当前浏览器不支持 IndexedDB");
-                resolve(null);
-                return;
+    // TOC Drawer
+    btnToc: document.getElementById('btn-toc'),
+    tocDrawer: document.getElementById('toc-drawer'),
+    btnCloseToc: document.getElementById('btn-close-toc'),
+    tocList: document.getElementById('toc-list'),
+
+    // Floating Selection Tooltip
+    selectionTooltip: document.getElementById('selection-tooltip'),
+    btnAddNote: document.getElementById('btn-add-note'),
+    highlightActionTooltip: document.getElementById('highlight-action-tooltip'),
+    btnHlAddThought: document.getElementById('btn-hl-add-thought'),
+    btnHlRemove: document.getElementById('btn-hl-remove'),
+
+    // Tabs
+    tabBtns: document.querySelectorAll('.tab-btn'),
+    tabContents: document.querySelectorAll('.tab-content'),
+
+    // Notes Tab
+    notesList: document.getElementById('notes-list'),
+    emptyNotesState: document.getElementById('empty-notes-state'),
+    countHighlights: document.getElementById('count-highlights'),
+    notesTotalCount: document.getElementById('notes-total-count'),
+    btnToggleShowHighlights: document.getElementById('btn-toggle-show-highlights'),
+    countPureHighlights: document.getElementById('count-pure-highlights'),
+    quickNoteInput: document.getElementById('quick-note-input'),
+    btnSaveQuickNote: document.getElementById('btn-save-quick-note'),
+
+    // Settings Tab
+    btnExportMarkdown: document.getElementById('btn-export-markdown'),
+    btnExportJson: document.getElementById('btn-export-json'),
+    btnExportChapterZip: document.getElementById('btn-export-chapter-zip'),
+    btnExportStandaloneHtml: document.getElementById('btn-export-standalone-html'),
+    btnExportFullBackup: document.getElementById('btn-export-full-backup'),
+    btnImportFullBackup: document.getElementById('btn-import-full-backup'),
+    backupFileInput: document.getElementById('backup-file-input'),
+    backupSelectModal: document.getElementById('backup-select-modal'),
+    btnCloseBackupModal: document.getElementById('btn-close-backup-modal'),
+    btnCancelBackupModal: document.getElementById('btn-cancel-backup-modal'),
+    btnConfirmExportBackup: document.getElementById('btn-confirm-export-backup'),
+    btnSelectAllBackup: document.getElementById('btn-select-all-backup'),
+    btnDeselectAllBackup: document.getElementById('btn-deselect-all-backup'),
+    backupBookCheckboxList: document.getElementById('backup-book-checkbox-list'),
+    chkBackupIncludeNotes: document.getElementById('chk-backup-include-notes'),
+    chkBackupIncludeSettings: document.getElementById('chk-backup-include-settings'),
+
+    // Modal, Shelf & Toast
+    btnShelf: document.getElementById('btn-shelf'),
+    shelfOverlay: document.getElementById('shelf-overlay'),
+    btnCloseShelf: document.getElementById('btn-close-shelf'),
+    shelfGrid: document.getElementById('shelf-grid'),
+    shelfBookCount: document.getElementById('shelf-book-count'),
+    noteModal: document.getElementById('note-modal'),
+    modalQuotePreview: document.getElementById('modal-quote-preview'),
+    modalNoteTextarea: document.getElementById('modal-note-textarea'),
+    btnCloseModal: document.getElementById('btn-close-modal'),
+    btnCancelModal: document.getElementById('btn-cancel-modal'),
+    btnConfirmModal: document.getElementById('btn-confirm-modal'),
+    toastMsg: document.getElementById('toast-msg')
+};
+
+// --------------------------------------------------------------------------
+// 3. Persistence Repository Facade & Coordination
+// --------------------------------------------------------------------------
+export async function initDB() {
+    const db = await initBookDB();
+    await refreshShelfUI();
+    return db;
+}
+
+export async function saveBookToDB(bookObj) {
+    await repoSaveBook(bookObj);
+    await refreshShelfUI();
+}
+
+export async function loadBookFromDB(bookId) {
+    return repoLoadBook(bookId);
+}
+
+export async function getAllBooksFromDB() {
+    return repoGetAllBooks();
+}
+
+export async function deleteBookFromDB(bookId) {
+    await repoDeleteBook(bookId);
+    await refreshShelfUI();
+}
+
+export async function saveNoteToDB(noteObj) {
+    await repoSaveNote(noteObj);
+}
+
+export async function deleteNoteFromDB(noteId) {
+    await repoDeleteNote(noteId, state.currentBook);
+}
+
+export async function loadNotesFromDB(bookId) {
+    return repoLoadNotes(bookId);
+}
+
+export function persistNotes() {
+    if (!state.currentBook) return;
+    localStorage.setItem('aura_notes_' + state.currentBook, JSON.stringify(state.notes));
+    persistNotesToLocalStorage(state.currentBook, state.notes);
+}
+
+// --------------------------------------------------------------------------
+// 4. Layout System Coordination
+// --------------------------------------------------------------------------
+export function isDoublePageEffective() {
+    return layoutSystem.isDoublePageEffective();
+}
+
+export function checkResponsiveLayout() {
+    const notify = arguments.length > 0 ? arguments[0] : true;
+    const availableWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
+    const res = layoutSystem.checkResponsiveLayout(availableWidth);
+
+    state.isAutoDowngraded = layoutSystem.getIsAutoDowngraded();
+
+    if (res.changed) {
+        if (notify) {
+            if (res.isAutoDowngraded) {
+                showToast('可用空间不足，已自适应降级为单页展示');
+            } else {
+                showToast('可用空间充足，已自动恢复双页展开模式');
             }
-            const request = window.indexedDB.open("AuraReaderDB", 1);
-            
-            request.onupgradeneeded = function (e) {
-                const dbInstance = e.target.result;
-                if (!dbInstance.objectStoreNames.contains("books")) {
-                    dbInstance.createObjectStore("books", { keyPath: "id" });
-                }
-                if (!dbInstance.objectStoreNames.contains("notes")) {
-                    const notesStore = dbInstance.createObjectStore("notes", { keyPath: "id" });
-                    notesStore.createIndex("bookId", "bookId", { unique: false });
-                }
-            };
-
-            request.onsuccess = function (e) {
-                db = e.target.result;
-                console.log("IndexedDB 数据库初始化完成");
-                refreshShelfUI();
-                resolve(db);
-            };
-
-            request.onerror = function (e) {
-                console.error("IndexedDB 打开失败:", e);
-                resolve(null);
-            };
-        });
-    }
-
-    function saveBookToDB(bookObj) {
-        if (!db) return Promise.resolve();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(["books"], "readwrite");
-            const store = tx.objectStore("books");
-            store.put(bookObj);
-            tx.oncomplete = () => {
-                refreshShelfUI();
-                resolve();
-            };
-            tx.onerror = (e) => reject(e);
-        });
-    }
-
-    function loadBookFromDB(bookId) {
-        if (!db) return Promise.resolve(null);
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(["books"], "readonly");
-            const store = tx.objectStore("books");
-            const req = store.get(bookId);
-            req.onsuccess = () => resolve(req.result || null);
-            req.onerror = (e) => reject(e);
-        });
-    }
-
-    function getAllBooksFromDB() {
-        if (!db) return Promise.resolve([]);
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(["books"], "readonly");
-            const store = tx.objectStore("books");
-            const req = store.getAll();
-            req.onsuccess = () => resolve(req.result || []);
-            req.onerror = (e) => reject(e);
-        });
-    }
-
-    function deleteBookFromDB(bookId) {
-        if (!db) return Promise.resolve();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(["books", "notes"], "readwrite");
-            tx.objectStore("books").delete(bookId);
-            
-            // 删除关联笔记
-            const notesStore = tx.objectStore("notes");
-            const index = notesStore.index("bookId");
-            const req = index.getAllKeys(bookId);
-            req.onsuccess = () => {
-                const keys = req.result || [];
-                keys.forEach(k => notesStore.delete(k));
-            };
-
-            tx.oncomplete = () => {
-                refreshShelfUI();
-                resolve();
-            };
-        });
-    }
-
-    function saveNoteToDB(noteObj) {
-        if (!db) return Promise.resolve();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(["notes"], "readwrite");
-            tx.objectStore("notes").put(noteObj);
-            tx.oncomplete = () => resolve();
-        });
-    }
-
-    function deleteNoteFromDB(noteId) {
-        if (!db) return Promise.resolve();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(["notes"], "readwrite");
-            tx.objectStore("notes").delete(noteId);
-            tx.oncomplete = () => resolve();
-        });
-    }
-
-    function loadNotesFromDB(bookId) {
-        if (!db) return Promise.resolve([]);
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(["notes"], "readonly");
-            const index = tx.objectStore("notes").index("bookId");
-            const req = index.getAll(bookId);
-            req.onsuccess = () => resolve(req.result || []);
-            req.onerror = (e) => reject(e);
-        });
-    }
-
-    // --------------------------------------------------------------------------
-    // 3. Resizer (75:25 Flexible Split Divider)
-    // --------------------------------------------------------------------------
-    function initResizer() {
-        let isDragging = false;
-
-        elements.resizerHandle.addEventListener('mousedown', function (e) {
-            isDragging = true;
-            elements.resizerHandle.classList.add('dragging');
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
-        });
-
-        document.addEventListener('mousemove', function (e) {
-            if (!isDragging) return;
-
-            const containerWidth = elements.workspaceContainer.clientWidth;
-            const newLeftWidthPx = e.clientX;
-            let percent = (newLeftWidthPx / containerWidth) * 100;
-
-            // Clamp between 25% and 85%
-            percent = Math.max(25, Math.min(85, percent));
-            state.readerWidthPercent = percent;
-            localStorage.setItem('aura_reader_width', percent);
-            
-            elements.readerPanel.style.width = `${percent}%`;
-            checkResponsiveLayout();
-        });
-
-        document.addEventListener('mouseup', function () {
-            if (isDragging) {
-                isDragging = false;
-                elements.resizerHandle.classList.remove('dragging');
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-            }
-        });
-
-        // Double click to toggle collapse/unfold notes panel
-        elements.resizerHandle.addEventListener('dblclick', function () {
-            toggleSidebar(true);
-        });
-    }
-
-    // --------------------------------------------------------------------------
-    // 3.1 Layout System & Mode Management
-    // --------------------------------------------------------------------------
-    const DOUBLE_PAGE_MIN_WIDTH = 760;
-
-    function isDoublePageEffective() {
-        return state.layoutMode === 'double' && !state.isAutoDowngraded;
-    }
-
-    function checkResponsiveLayout() {
-        const notify = arguments.length > 0 ? arguments[0] : true;
-        if (state.layoutMode !== 'double') {
-            if (state.isAutoDowngraded) {
-                state.isAutoDowngraded = false;
-                updateLayoutClasses();
-            }
-            return;
         }
-
-        const availableWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
-        const shouldDowngrade = availableWidth < DOUBLE_PAGE_MIN_WIDTH;
-
-        if (shouldDowngrade !== state.isAutoDowngraded) {
-            state.isAutoDowngraded = shouldDowngrade;
-            if (notify) {
-                if (state.isAutoDowngraded) {
-                    showToast('可用空间不足，已自适应降级为单页展示');
-                } else {
-                    showToast('可用空间充足，已自动恢复双页展开模式');
-                }
-            }
-            updateLayoutClasses();
-            renderPage(state.currentPage, true);
-        }
-    }
-
-    function togglePageMode() {
-        const nextMode = (state.layoutMode === 'double') ? 'single' : 'double';
-        setPageMode(nextMode);
-    }
-
-    function setPageMode(mode) {
-        state.layoutMode = mode;
-        localStorage.setItem('aura_layout_mode', mode);
-
-        const availableWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
-        if (mode === 'double' && availableWidth < DOUBLE_PAGE_MIN_WIDTH) {
-            state.isAutoDowngraded = true;
-            showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
-        } else {
-            state.isAutoDowngraded = false;
-            showToast(mode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
-        }
-
         updateLayoutClasses();
         renderPage(state.currentPage, true);
     }
+}
 
-    function updateLayoutClasses() {
-        if (!elements.workspaceContainer) return;
+export function togglePageMode() {
+    const nextMode = (state.layoutMode === 'double') ? 'single' : 'double';
+    setPageMode(nextMode);
+}
 
-        if (state.isCollapsed) {
-            elements.workspaceContainer.classList.add('sidebar-collapsed');
-        } else {
-            elements.workspaceContainer.classList.remove('sidebar-collapsed');
-        }
+export function setPageMode(mode) {
+    state.layoutMode = mode;
+    const availableWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
+    const res = layoutSystem.setPageMode(mode, availableWidth);
 
-        const isDouble = isDoublePageEffective();
-        if (isDouble) {
-            elements.workspaceContainer.classList.add('layout-double');
-            elements.workspaceContainer.classList.remove('layout-single');
-        } else {
-            elements.workspaceContainer.classList.add('layout-single');
-            elements.workspaceContainer.classList.remove('layout-double');
-        }
+    state.isAutoDowngraded = res.isAutoDowngraded;
 
-        updatePageModeButtonUI();
-        updateSidebarButtonsUI();
+    if (mode === 'double' && res.isAutoDowngraded) {
+        showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
+    } else {
+        showToast(mode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
     }
 
-    function updatePageModeButtonUI() {
-        if (!elements.btnPageMode) return;
+    updateLayoutClasses();
+    renderPage(state.currentPage, true);
+}
 
-        if (state.layoutMode === 'double') {
-            elements.btnPageMode.classList.add('active');
-            if (state.isAutoDowngraded) {
-                elements.btnPageMode.classList.add('auto-downgraded');
-                if (elements.textPageMode) elements.textPageMode.textContent = '双页(自适应)';
-                elements.btnPageMode.title = '双页模式（因宽度受限临时单页展示，展开窗口或收起侧栏后将自动恢复）';
-            } else {
-                elements.btnPageMode.classList.remove('auto-downgraded');
-                if (elements.textPageMode) elements.textPageMode.textContent = '双页';
-                elements.btnPageMode.title = '切换为单页模式 (快捷键: D)';
-            }
-            if (elements.iconPageMode) elements.iconPageMode.className = 'ri-book-open-line';
-        } else {
-            elements.btnPageMode.classList.remove('active', 'auto-downgraded');
-            if (elements.textPageMode) elements.textPageMode.textContent = '单页';
-            elements.btnPageMode.title = '切换为双页模式 (快捷键: D)';
-            if (elements.iconPageMode) elements.iconPageMode.className = 'ri-book-read-line';
-        }
+export function toggleSidebar(notify = true) {
+    state.isCollapsed = layoutSystem.toggleSidebar();
+    applySidebarState(notify);
+}
+
+export function applySidebarState(notify = false) {
+    layoutSystem.applySidebarState(elements);
+
+    if (state.isCollapsed) {
+        if (notify) showToast('已进入 100% 全屏专注阅读模式');
+    } else {
+        if (notify) showToast(`已展开 ${Math.round(100 - layoutSystem.getReaderWidthPercent())}% 笔记工作台`);
     }
 
-    function updateSidebarButtonsUI() {
-        if (state.isCollapsed) {
-            if (elements.btnToggleSidebar) {
-                elements.btnToggleSidebar.classList.remove('active');
-                elements.btnToggleSidebar.title = '展开笔记侧边栏 (快捷键: B)';
-            }
-            if (elements.textToggleSidebar) elements.textToggleSidebar.textContent = '展开笔记';
-            if (elements.iconToggleSidebar) elements.iconToggleSidebar.className = 'ri-layout-right-line';
-            if (elements.btnSidebarRecall) elements.btnSidebarRecall.style.display = 'flex';
-        } else {
-            if (elements.btnToggleSidebar) {
-                elements.btnToggleSidebar.classList.add('active');
-                elements.btnToggleSidebar.title = '收起笔记侧边栏 (快捷键: B)';
-            }
-            if (elements.textToggleSidebar) elements.textToggleSidebar.textContent = '收起笔记';
-            if (elements.iconToggleSidebar) elements.iconToggleSidebar.className = 'ri-side-bar-line';
-            if (elements.btnSidebarRecall) elements.btnSidebarRecall.style.display = 'none';
-        }
+    updateLayoutClasses();
+    checkResponsiveLayout(notify);
+}
+
+export function updateLayoutClasses() {
+    layoutSystem.updateLayoutClasses(elements);
+}
+
+function initResizer() {
+    layoutSystem.initResizer(elements, (percent) => {
+        state.readerWidthPercent = percent;
+        checkResponsiveLayout();
+    }, () => {
+        toggleSidebar(true);
+    });
+}
+
+// --------------------------------------------------------------------------
+// 5. Reading Core Coordination & Book Loading
+// --------------------------------------------------------------------------
+export async function loadBook(bookKey) {
+    state.currentBook = bookKey;
+
+    let book = await loadBookFromDB(bookKey);
+    if (!book && demoBooks[bookKey]) {
+        book = demoBooks[bookKey];
+    }
+    if (!book) return;
+
+    readerEngine.setBook(bookKey, book);
+    const loc = readerEngine.getLocation();
+
+    state.currentPage = loc.page;
+    state.totalPages = loc.totalPages;
+
+    // Update header & toolbar
+    if (elements.currentBookTitle) elements.currentBookTitle.textContent = book.title;
+    if (elements.currentBookTag) elements.currentBookTag.textContent = book.format || 'EPUB';
+    if (elements.totalPagesSpan) elements.totalPagesSpan.textContent = state.totalPages;
+
+    renderTOC(book.toc || []);
+
+    // Load notes with zero cross-book leakage
+    const dbNotes = await loadNotesFromDB(bookKey);
+    if (dbNotes && dbNotes.length > 0) {
+        state.notes = dbNotes;
+    } else {
+        state.notes = await repoLoadNotesForBook(bookKey);
     }
 
-    function toggleSidebar(notify = true) {
-        state.isCollapsed = !state.isCollapsed;
-        localStorage.setItem('aura_sidebar_collapsed', state.isCollapsed ? 'true' : 'false');
-        applySidebarState(notify);
+    renderNotesList();
+    renderPage(1);
+}
+
+export function renderPage(pageNum, preserveScroll = false) {
+    const loc = readerEngine.goToPage(pageNum);
+    state.currentPage = loc.page;
+    state.currentLeftPage = loc.page;
+
+    const isDouble = isDoublePageEffective();
+    if (isDouble) {
+        const spread = readerEngine.getSpreadPages(loc.page);
+        state.currentLeftPage = spread.leftPage;
+        state.currentRightPage = spread.rightPage;
+    } else {
+        state.currentRightPage = null;
     }
 
-    function applySidebarState(notify = false) {
-        if (state.isCollapsed) {
-            elements.workspaceContainer.classList.add('sidebar-collapsed');
-            elements.readerPanel.style.width = '100%';
-            elements.notesPanel.style.display = 'none';
-            elements.resizerHandle.style.display = 'none';
-            if (notify) showToast('已进入 100% 全屏专注阅读模式');
-        } else {
-            elements.workspaceContainer.classList.remove('sidebar-collapsed');
-            elements.readerPanel.style.width = `${state.readerWidthPercent}%`;
-            elements.notesPanel.style.display = 'flex';
-            elements.resizerHandle.style.display = 'flex';
-            if (notify) showToast(`已展开 ${Math.round(100 - state.readerWidthPercent)}% 笔记工作台`);
+    renderPaperSpread({
+        elements,
+        readerEngine,
+        layoutSystem,
+        notes: state.notes,
+        textIndent: state.textIndent,
+        preserveScroll,
+        onMarkClick: (markEl, note) => {
+            highlightNoteCard(note.id);
+            showHighlightActionTooltip(this, note);
+        },
+        onLinkClick: (href) => {
+            handleInTextLinkClick(href);
         }
+    });
 
-        updateSidebarButtonsUI();
+    updateLayoutClasses();
+}
 
-        // Check if double-page mode needs adaptation
-        checkResponsiveLayout(notify);
+function handleInTextLinkClick(href) {
+    const currentBookObj = readerEngine.getCurrentBook();
+    const map = currentBookObj ? (currentBookObj.hrefToPageMap || {}) : {};
+    const targetPage = resolveTargetPage(href, map, state.currentPage);
+
+    renderPage(targetPage);
+    showToast(`书内关联跳转至 P.${targetPage}`);
+
+    const [, anchor] = href.split('#');
+    if (anchor) {
+        scrollToAnchor(anchor, elements);
+    }
+}
+
+export function renderTOC(tocItems) {
+    uiRenderTOC(tocItems, elements, (item) => {
+        renderPage(item.page);
+        uiCloseTOC(elements);
+        showToast(`跳转至：${item.title}`);
+
+        if (item.anchor) {
+            scrollToAnchor(item.anchor, elements);
+        }
+    });
+}
+
+// --------------------------------------------------------------------------
+// 6. Highlights & Tooltip Actions
+// --------------------------------------------------------------------------
+export function applyHighlightsToPaper(targetPaper = elements.bookPaper, targetPage = state.currentPage) {
+    renderHighlightsToPaper(targetPaper, targetPage, state.notes, (markEl, note) => {
+        highlightNoteCard(note.id);
+        showHighlightActionTooltip(this, note);
+    });
+}
+
+export function showHighlightActionTooltip(markEl, note) {
+    hideSelectionTooltip();
+    state.activeHighlightId = note.id;
+    uiShowHighlightActionTooltip(markEl, note, elements);
+}
+
+export function hideHighlightActionTooltip() {
+    state.activeHighlightId = null;
+    uiHideHighlightActionTooltip(elements);
+}
+
+export function initTextSelection() {
+    document.addEventListener('selectionchange', () => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+            hideSelectionTooltip();
+        }
+    });
+
+    elements.bookPaper.addEventListener('mouseup', () => setTimeout(handleSelection, 20));
+    elements.bookPaper.addEventListener('touchend', () => setTimeout(handleSelection, 20));
+    if (elements.bookPaperRight) {
+        elements.bookPaperRight.addEventListener('mouseup', () => setTimeout(handleSelection, 20));
+        elements.bookPaperRight.addEventListener('touchend', () => setTimeout(handleSelection, 20));
     }
 
-    // --------------------------------------------------------------------------
-    // 4. Reader Engine & Book Rendering
-    // --------------------------------------------------------------------------
-    async function loadBook(bookKey) {
-        state.currentBook = bookKey;
-        
-        // 若内存无此书，自动从 IndexedDB 数据库中检索
-        if (!demoBooks[bookKey]) {
-            const dbBook = await loadBookFromDB(bookKey);
-            if (dbBook) demoBooks[bookKey] = dbBook;
-        }
-
-        const book = demoBooks[bookKey];
-        if (!book) return;
-
-        state.currentPage = 1;
-        state.totalPages = book.pages ? (book.pages.length || 1) : 1;
-
-        // Update header & toolbar
-        elements.currentBookTitle.textContent = book.title;
-        elements.currentBookTag.textContent = book.format;
-        elements.totalPagesSpan.textContent = state.totalPages;
-        
-        renderTOC(book.toc || []);
-        
-        // 优先从 IndexedDB 异步读取笔记
-        const dbNotes = await loadNotesFromDB(bookKey);
-        if (dbNotes && dbNotes.length > 0) {
-            state.notes = dbNotes;
-        } else {
-            const savedNotesJson = localStorage.getItem('aura_notes_' + bookKey);
-            if (savedNotesJson) {
-                try {
-                    state.notes = JSON.parse(savedNotesJson);
-                } catch (e) {
-                    if (!state.notes || state.notes.length === 0) {
-                        state.notes = bookKey.startsWith('custom') ? [] : [...seedNotes];
-                    }
-                }
-            } else if (!state.notes || state.notes.length === 0) {
-                state.notes = bookKey.startsWith('custom') ? [] : [...seedNotes];
-            }
-        }
-        
-        renderNotesList();
-        renderPage(1);
-    }
-
-    function renderPage(pageNum, preserveScroll = false) {
-        const viewport = document.getElementById('reader-viewport');
-        const savedScrollTop = (viewport && preserveScroll) ? viewport.scrollTop : 0;
-
-        const book = demoBooks[state.currentBook];
-        if (!book || !book.pages) return;
-
-        const totalPages = book.pages.length || 1;
-        state.totalPages = totalPages;
-        elements.totalPagesSpan.textContent = totalPages;
-
-        // Bound pageNum
-        pageNum = Math.max(1, Math.min(pageNum, totalPages));
-        state.currentPage = pageNum;
-
-        const isDouble = isDoublePageEffective();
-
-        if (!isDouble) {
-            // SINGLE PAGE MODE
-            state.currentLeftPage = pageNum;
-            state.currentRightPage = null;
-            elements.currentPageSpan.textContent = pageNum;
-
-            let htmlContent = book.pages[pageNum - 1] || '<p>页面暂无内容</p>';
-
-            if (elements.bookPaperRight) {
-                elements.bookPaperRight.style.display = 'none';
-            }
-            if (elements.spreadSpine) {
-                elements.spreadSpine.style.display = 'none';
-            }
-            if (elements.paperContainer) {
-                elements.paperContainer.classList.remove('spread-active');
-            }
-
-            try {
-                elements.bookPaper.innerHTML = htmlContent;
-                elements.bookPaper.style.setProperty('--book-text-indent', state.textIndent || '2em');
-                applyHighlightsToPaper(elements.bookPaper, pageNum);
-                interceptInTextLinks();
-            } catch (e) {
-                console.error("页面渲染高亮出现异常:", e);
-                elements.bookPaper.innerHTML = htmlContent;
-            }
-
-            // Update navigation button states
-            elements.btnPrevPage.disabled = (pageNum <= 1);
-            elements.btnNextPage.disabled = (pageNum >= totalPages);
-        } else {
-            // DOUBLE PAGE SPREAD MODE
-            const leftPageNum = (pageNum % 2 === 1) ? pageNum : pageNum - 1;
-            const rightPageNum = leftPageNum + 1;
-
-            state.currentLeftPage = leftPageNum;
-            state.currentRightPage = rightPageNum;
-            state.currentPage = pageNum;
-
-            if (rightPageNum <= totalPages) {
-                elements.currentPageSpan.textContent = `${leftPageNum}-${rightPageNum}`;
-            } else {
-                elements.currentPageSpan.textContent = `${leftPageNum}`;
-            }
-
-            if (elements.paperContainer) {
-                elements.paperContainer.classList.add('spread-active');
-            }
-            if (elements.spreadSpine) {
-                elements.spreadSpine.style.display = 'block';
-            }
-            if (elements.bookPaperRight) {
-                elements.bookPaperRight.style.display = 'block';
-            }
-
-            // Render Left Page
-            let leftHtml = book.pages[leftPageNum - 1] || '<p>页面暂无内容</p>';
-            try {
-                elements.bookPaper.innerHTML = leftHtml;
-                elements.bookPaper.style.setProperty('--book-text-indent', state.textIndent || '2em');
-                applyHighlightsToPaper(elements.bookPaper, leftPageNum);
-            } catch (e) {
-                elements.bookPaper.innerHTML = leftHtml;
-            }
-
-            // Render Right Page
-            if (rightPageNum <= totalPages) {
-                let rightHtml = book.pages[rightPageNum - 1] || '<p>页面暂无内容</p>';
-                try {
-                    elements.bookPaperRight.innerHTML = rightHtml;
-                    elements.bookPaperRight.style.setProperty('--book-text-indent', state.textIndent || '2em');
-                    applyHighlightsToPaper(elements.bookPaperRight, rightPageNum);
-                } catch (e) {
-                    elements.bookPaperRight.innerHTML = rightHtml;
-                }
-            } else {
-                elements.bookPaperRight.innerHTML = `
-                    <div class="spread-blank-page">
-                        <i class="ri-book-open-line"></i>
-                        <span class="spread-blank-title">全书完</span>
-                        <p class="spread-blank-sub">已到达本书最后一页</p>
-                    </div>
-                `;
-            }
-
-            interceptInTextLinks();
-
-            // Update navigation button states
-            elements.btnPrevPage.disabled = (leftPageNum <= 1);
-            elements.btnNextPage.disabled = (leftPageNum + 1 >= totalPages);
-        }
-
-        updatePageModeButtonUI();
-
-        // Restore saved scroll position or reset to top
-        if (viewport) {
-            viewport.scrollTop = savedScrollTop;
-        }
-    }
-
-    function interceptInTextLinks() {
-        const linkSelector = (elements.bookPaperRight && elements.bookPaperRight.style.display !== 'none')
-            ? '#book-paper a[href], #book-paper-right a[href]'
-            : '#book-paper a[href]';
-
-        document.querySelectorAll(linkSelector).forEach(a => {
-            const href = a.getAttribute('href');
-            if (!href) return;
-            
-            // 拦截电子书内部相对链接与锚点
-            if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('mailto:')) {
-                a.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const [srcPath, anchor] = href.split('#');
-                    const cleanPath = srcPath.replace(/^\/+/, '');
-                    const currentBookObj = demoBooks[state.currentBook];
-                    
-                    let targetPage = state.currentPage;
-                    if (currentBookObj && currentBookObj.hrefToPageMap && cleanPath) {
-                        targetPage = currentBookObj.hrefToPageMap[cleanPath] 
-                            || currentBookObj.hrefToPageMap[cleanPath.split('/').pop()] 
-                            || state.currentPage;
-                    }
-                    
-                    renderPage(targetPage);
-                    showToast(`书内关联跳转至 P.${targetPage}`);
-                    
-                    if (anchor) {
-                        setTimeout(() => {
-                            let targetEl = elements.bookPaper.querySelector(`#${CSS.escape(anchor)}`) 
-                                || elements.bookPaper.querySelector(`[name="${anchor}"]`)
-                                || elements.bookPaper.querySelector(`[id*="${anchor}"]`);
-                            if (!targetEl && elements.bookPaperRight) {
-                                targetEl = elements.bookPaperRight.querySelector(`#${CSS.escape(anchor)}`)
-                                    || elements.bookPaperRight.querySelector(`[name="${anchor}"]`)
-                                    || elements.bookPaperRight.querySelector(`[id*="${anchor}"]`);
-                            }
-                            if (targetEl) {
-                                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }
-                        }, 120);
-                    }
-                });
-            }
+    document.querySelectorAll('.tooltip-btn[data-color]').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const color = this.getAttribute('data-color');
+            createHighlight(color);
         });
-    }
+    });
 
-    function renderTOC(tocItems) {
-        elements.tocList.innerHTML = '';
-        tocItems.forEach((item, index) => {
-            const li = document.createElement('li');
-            li.className = 'toc-item';
-            if (item.level) {
-                li.style.paddingLeft = `${16 + Math.min(item.level, 4) * 14}px`;
-            }
-            li.innerHTML = `<span>${escapeHtml(item.title)}</span><small>P.${item.page}</small>`;
-            li.addEventListener('click', () => {
-                renderPage(item.page);
-                elements.tocDrawer.classList.remove('open');
-                showToast(`跳转至：${item.title}`);
-
-                if (item.anchor) {
-                    setTimeout(() => {
-                        let targetEl = elements.bookPaper.querySelector(`#${CSS.escape(item.anchor)}`) 
-                            || elements.bookPaper.querySelector(`[name="${item.anchor}"]`)
-                            || elements.bookPaper.querySelector(`[id*="${item.anchor}"]`);
-                        if (!targetEl && elements.bookPaperRight) {
-                            targetEl = elements.bookPaperRight.querySelector(`#${CSS.escape(item.anchor)}`)
-                                || elements.bookPaperRight.querySelector(`[name="${item.anchor}"]`)
-                                || elements.bookPaperRight.querySelector(`[id*="${item.anchor}"]`);
-                        }
-                        if (targetEl) {
-                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }
-                    }, 120);
-                }
-            });
-            elements.tocList.appendChild(li);
-        });
-    }
-
-    function applyHighlightsToPaper(targetPaper = elements.bookPaper, targetPage = state.currentPage) {
-        if (!targetPaper) return;
-        state.notes.forEach(note => {
-            if (note.page === targetPage && note.quote) {
-                const colorClass = `hl-${note.color || 'yellow'}`;
-                let paperHtml = targetPaper.innerHTML;
-
-                // 1. 尝试直接整段精准匹配 (单段落无 HTML 标签干扰)
-                if (paperHtml.includes(note.quote)) {
-                    const markedSnippet = `<mark class="${colorClass}" data-id="${note.id}">${note.quote}</mark>`;
-                    targetPaper.innerHTML = paperHtml.replace(note.quote, markedSnippet);
-                    return;
-                }
-
-                // 2. 跨段落多行 / 多片段拆分匹配 (按换行符 \n 或 \r 拆分成独立段落片段)
-                const segments = note.quote.split(/[\r\n]+/).map(s => s.trim()).filter(s => s.length > 1);
-
-                if (segments.length > 0) {
-                    let updatedHtml = paperHtml;
-                    let matchFound = false;
-
-                    for (const seg of segments) {
-                        // 2.1 段落直接匹配
-                        if (updatedHtml.includes(seg)) {
-                            const markedSnippet = `<mark class="${colorClass}" data-id="${note.id}">${seg}</mark>`;
-                            updatedHtml = updatedHtml.replace(seg, markedSnippet);
-                            matchFound = true;
-                        } else {
-                            // 2.2 如果段落内部带有 HTML 实体或标签，尝试按句拆分匹配
-                            const subSentences = seg.split(/([。！？；;\n]+)/).map(s => s.trim()).filter(s => s.length > 3);
-                            subSentences.forEach(sub => {
-                                if (updatedHtml.includes(sub)) {
-                                    const markedSub = `<mark class="${colorClass}" data-id="${note.id}">${sub}</mark>`;
-                                    updatedHtml = updatedHtml.replace(sub, markedSub);
-                                    matchFound = true;
-                                }
-                            });
-                        }
-                    }
-
-                    if (matchFound) {
-                        targetPaper.innerHTML = updatedHtml;
-                    }
-                }
-            }
-        });
-        
-        // Add click listener to inline marks for showing sleek mini popover
-        targetPaper.querySelectorAll('mark').forEach(mark => {
-            mark.addEventListener('click', function (e) {
-                e.stopPropagation();
-                const noteId = this.getAttribute('data-id');
-                const note = state.notes.find(n => n.id === noteId);
-                if (note) {
-                    highlightNoteCard(noteId);
-                    showHighlightActionTooltip(this, note);
-                }
-            });
-        });
-    }
-
-    // --------------------------------------------------------------------------
-    // 5. Text Selection & Tooltip
-    // --------------------------------------------------------------------------
-    function initTextSelection() {
-        document.addEventListener('selectionchange', () => {
-            const selection = window.getSelection();
-            if (!selection || selection.isCollapsed || !selection.toString().trim()) {
-                hideSelectionTooltip();
-            }
-        });
-
-        // 监听松开鼠标 / 触摸结束，触发浮动工具条精准定位
-        elements.bookPaper.addEventListener('mouseup', () => setTimeout(handleSelection, 20));
-        elements.bookPaper.addEventListener('touchend', () => setTimeout(handleSelection, 20));
-        if (elements.bookPaperRight) {
-            elements.bookPaperRight.addEventListener('mouseup', () => setTimeout(handleSelection, 20));
-            elements.bookPaperRight.addEventListener('touchend', () => setTimeout(handleSelection, 20));
-        }
-        
-        // Tooltip buttons
-        document.querySelectorAll('.tooltip-btn[data-color]').forEach(btn => {
-            btn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                const color = this.getAttribute('data-color');
-                createHighlight(color);
-            });
-        });
-
+    if (elements.btnAddNote) {
         elements.btnAddNote.addEventListener('click', function (e) {
             e.stopPropagation();
             if (!state.pendingSelection) return;
@@ -884,402 +470,637 @@
             hideSelectionTooltip();
             openNoteModal(text);
         });
+    }
 
-        // Floating Highlight Mini Popover Actions (Sleek & Non-intrusive)
-        if (elements.btnHlAddThought) {
-            elements.btnHlAddThought.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (!state.activeHighlightId) return;
-                const note = state.notes.find(n => n.id === state.activeHighlightId);
-                hideHighlightActionTooltip();
-                if (note) {
-                    openNoteModal(note.quote, note.id);
-                }
-            });
-        }
-
-        if (elements.btnHlRemove) {
-            elements.btnHlRemove.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (!state.activeHighlightId) return;
-                const noteId = state.activeHighlightId;
-                hideHighlightActionTooltip();
-                deleteNote(noteId);
-                showToast('已移除高亮划线');
-            });
-        }
-
-        // Global click handler to dismiss floating tooltips cleanly without wiping active selections
-        document.addEventListener('click', (e) => {
-            const selection = window.getSelection();
-            const hasActiveSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
-
-            if (!e.target.closest('#selection-tooltip') && !hasActiveSelection) {
-                hideSelectionTooltip();
-            }
-
-            if (!e.target.closest('#highlight-action-tooltip') && !e.target.closest('mark')) {
-                hideHighlightActionTooltip();
+    if (elements.btnHlAddThought) {
+        elements.btnHlAddThought.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!state.activeHighlightId) return;
+            const note = state.notes.find(n => n.id === state.activeHighlightId);
+            hideHighlightActionTooltip();
+            if (note) {
+                openNoteModal(note.quote, note.id);
             }
         });
     }
 
-    function handleSelection() {
-        const selection = window.getSelection();
-        if (!selection || selection.isCollapsed) {
-            hideSelectionTooltip();
-            return;
-        }
-
-        const selectedText = selection.toString().trim();
-        const isInLeft = elements.bookPaper.contains(selection.anchorNode);
-        const isInRight = elements.bookPaperRight && elements.bookPaperRight.contains(selection.anchorNode);
-        if (!selectedText || (!isInLeft && !isInRight)) {
-            hideSelectionTooltip();
-            return;
-        }
-
-        hideHighlightActionTooltip();
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        
-        if (rect.width === 0 && rect.height === 0) return;
-
-        const effectivePage = isInRight ? (state.currentRightPage || (state.currentPage + 1)) : (state.currentLeftPage || state.currentPage);
-
-        state.pendingSelection = {
-            text: selectedText,
-            range: range,
-            page: effectivePage
-        };
-
-        // Position floating tooltip above selection
-        const readerRect = elements.readerPanel.getBoundingClientRect();
-        elements.selectionTooltip.style.left = `${rect.left + rect.width / 2 - readerRect.left}px`;
-        elements.selectionTooltip.style.top = `${rect.top - readerRect.top}px`;
-        elements.selectionTooltip.style.display = 'flex';
+    if (elements.btnHlRemove) {
+        elements.btnHlRemove.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!state.activeHighlightId) return;
+            const noteId = state.activeHighlightId;
+            hideHighlightActionTooltip();
+            deleteNote(noteId);
+            showToast('已移除高亮划线');
+        });
     }
 
-    function hideSelectionTooltip() {
+    document.addEventListener('click', (e) => {
+        const selection = window.getSelection();
+        const hasActiveSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+
+        if (!e.target.closest('#selection-tooltip') && !hasActiveSelection) {
+            hideSelectionTooltip();
+        }
+
+        if (!e.target.closest('#highlight-action-tooltip') && !e.target.closest('mark')) {
+            hideHighlightActionTooltip();
+        }
+    });
+}
+
+function handleSelection() {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+        hideSelectionTooltip();
+        return;
+    }
+
+    const selectedText = selection.toString().trim();
+    const isInLeft = elements.bookPaper && elements.bookPaper.contains(selection.anchorNode);
+    const isInRight = elements.bookPaperRight && elements.bookPaperRight.contains(selection.anchorNode);
+    if (!selectedText || (!isInLeft && !isInRight)) {
+        hideSelectionTooltip();
+        return;
+    }
+
+    hideHighlightActionTooltip();
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+
+    if (rect.width === 0 && rect.height === 0) return;
+
+    const effectivePage = isInRight ? (state.currentRightPage || (state.currentPage + 1)) : (state.currentLeftPage || state.currentPage);
+
+    state.pendingSelection = {
+        text: selectedText,
+        range,
+        page: effectivePage
+    };
+
+    const readerRect = elements.readerPanel.getBoundingClientRect();
+    elements.selectionTooltip.style.left = `${rect.left + rect.width / 2 - readerRect.left}px`;
+    elements.selectionTooltip.style.top = `${rect.top - readerRect.top}px`;
+    elements.selectionTooltip.style.display = 'flex';
+}
+
+function hideSelectionTooltip() {
+    if (elements.selectionTooltip) {
         elements.selectionTooltip.style.display = 'none';
     }
+}
 
-    function showHighlightActionTooltip(markEl, note) {
-        hideSelectionTooltip();
-        state.activeHighlightId = note.id;
+export function createHighlight(color = 'yellow') {
+    if (!state.pendingSelection) return;
 
-        const markRect = markEl.getBoundingClientRect();
-        const readerRect = elements.readerPanel.getBoundingClientRect();
+    const quote = state.pendingSelection.text;
+    const highlightPage = state.pendingSelection.page || state.currentPage;
+    const currentBookObj = readerEngine.getCurrentBook();
+    const chapter = currentBookObj && currentBookObj.toc && currentBookObj.toc.length > 0
+        ? readerEngine.getLocation().chapter
+        : '当前章节';
 
-        if (elements.highlightActionTooltip) {
-            elements.highlightActionTooltip.style.left = `${markRect.left + markRect.width / 2 - readerRect.left}px`;
-            elements.highlightActionTooltip.style.top = `${markRect.top - readerRect.top}px`;
-            elements.highlightActionTooltip.style.display = 'flex';
-        }
-    }
-
-    function hideHighlightActionTooltip() {
-        state.activeHighlightId = null;
-        if (elements.highlightActionTooltip) {
-            elements.highlightActionTooltip.style.display = 'none';
-        }
-    }
-
-    function createHighlight(color = 'yellow') {
-        if (!state.pendingSelection) return;
-        
-        const quote = state.pendingSelection.text;
-        const currentBookObj = demoBooks[state.currentBook];
-        const highlightPage = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
-        let chapter = '当前章节';
-        if (currentBookObj && currentBookObj.toc && currentBookObj.toc.length > 0) {
-            const matchedToc = [...currentBookObj.toc].reverse().find(t => t.page <= highlightPage);
-            chapter = matchedToc ? matchedToc.title : currentBookObj.toc[0].title;
-        }
-
-        // 检查是否存在同页重叠的高亮/随笔节点，若存在则就地更新颜色，不重复生成卡片
-        const existingNote = state.notes.find(n => n.page === highlightPage && n.quote === quote);
-        if (existingNote) {
-            existingNote.color = color;
-            saveNoteToDB(existingNote);
-            showToast('已更新该段落高亮颜色');
-        } else {
-            const newNote = {
-                id: 'note-' + Date.now(),
-                bookId: state.currentBook,
-                quote: quote,
-                comment: '',
-                color: color,
-                page: highlightPage,
-                chapter: chapter,
-                timestamp: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
-            };
-
-            state.notes.unshift(newNote);
-            saveNoteToDB(newNote);
-            showToast('已成功高亮选中文本');
-        }
-
-        renderNotesList();
-        renderPage(state.currentPage, true);
-        hideSelectionTooltip();
-        window.getSelection().removeAllRanges();
-    }
-
-    // --------------------------------------------------------------------------
-    // 6. Notes List & Bidirectional Navigation
-    // --------------------------------------------------------------------------
-    function persistNotes() {
-        if (!state.currentBook) return;
-        try {
-            localStorage.setItem('aura_notes_' + state.currentBook, JSON.stringify(state.notes));
-        } catch (e) {
-            console.warn("保存笔记至 LocalStorage 失败:", e);
-        }
-    }
-
-    function renderNotesList() {
-        elements.notesList.innerHTML = '';
-
-        // 分类提取：纯高亮 vs 带感悟的随笔
-        const thoughtNotes = state.notes.filter(n => n.comment && n.comment.trim() !== '');
-        const pureHighlights = state.notes.filter(n => !n.comment || n.comment.trim() === '');
-
-        // 更新工具栏纯划线数量与开关按钮
-        if (elements.countPureHighlights) {
-            elements.countPureHighlights.textContent = pureHighlights.length;
-        }
-        if (elements.btnToggleShowHighlights) {
-            if (state.showHighlightsInSidebar) {
-                elements.btnToggleShowHighlights.innerHTML = `<i class="ri-eye-off-line"></i> 隐藏划线 (${pureHighlights.length})`;
-                elements.btnToggleShowHighlights.classList.add('active');
-            } else {
-                elements.btnToggleShowHighlights.innerHTML = `<i class="ri-eye-line"></i> 显示划线 (${pureHighlights.length})`;
-                elements.btnToggleShowHighlights.classList.remove('active');
-            }
-        }
-
-        // 确定要在右侧列表显示的条目：默认只显示随笔，若开启开关则显示全部
-        const displayedNotes = state.showHighlightsInSidebar ? state.notes : thoughtNotes;
-
-        elements.countHighlights.textContent = displayedNotes.length;
-        elements.notesTotalCount.textContent = displayedNotes.length;
-
-        persistNotes();
-
-        if (displayedNotes.length === 0) {
-            elements.emptyNotesState.style.display = 'block';
-            const emptyText = elements.emptyNotesState.querySelector('p');
-            if (emptyText) {
-                emptyText.textContent = state.showHighlightsInSidebar ? '暂无划线与随笔' : '暂无随笔感悟';
-            }
-            return;
-        }
-        elements.emptyNotesState.style.display = 'none';
-
-        displayedNotes.forEach(note => {
-            const isPureHighlight = !note.comment || note.comment.trim() === '';
-            const card = document.createElement('div');
-            card.className = `note-card ${note.color === 'green' ? 'hl-green-card' : ''} ${isPureHighlight ? 'pure-highlight-card' : ''}`;
-            card.id = `card-${note.id}`;
-
-            const chapterLabel = note.chapter ? escapeHtml(note.chapter) : '章节选区';
-            const typeBadge = isPureHighlight ? 
-                `<span class="note-loc-tag" style="background: rgba(245,158,11,0.1); color: #d97706; font-weight: 500;"><i class="ri-sparkling-line"></i> 划线</span>` : 
-                `<span class="note-loc-tag" style="background: rgba(16,185,129,0.1); color: var(--accent-color); font-weight: 500;"><i class="ri-chat-1-line"></i> 随笔</span>`;
-
-            card.innerHTML = `
-                <div class="note-card-header">
-                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                        ${typeBadge}
-                        <span class="note-loc-tag" style="background: rgba(0,0,0,0.04);"><i class="ri-book-open-line"></i> ${chapterLabel}</span>
-                        <span class="note-loc-tag"><i class="ri-bookmark-3-line"></i> P.${note.page}</span>
-                    </div>
-                    <span style="font-size: 0.76rem; color: var(--text-sub);">${note.timestamp}</span>
-                </div>
-                ${note.quote ? `<div class="note-quote-text">“${escapeHtml(note.quote)}”</div>` : ''}
-                ${note.comment ? `<div class="note-comment-text">💭 ${escapeHtml(note.comment)}</div>` : ''}
-                <div class="note-card-actions">
-                    <button class="btn btn-ghost-sm btn-edit-note" data-id="${note.id}" title="${isPureHighlight ? '为此高亮添加随笔感悟' : '编辑随笔感悟'}">
-                        <i class="ri-edit-line"></i>
-                    </button>
-                    <button class="btn btn-ghost-sm btn-delete-note" data-id="${note.id}" title="删除此条记录">
-                        <i class="ri-delete-bin-line"></i>
-                    </button>
-                </div>
-            `;
-
-            // Bidirectional Jump on Card Click
-            card.addEventListener('click', function (e) {
-                if (e.target.closest('.btn-delete-note') || e.target.closest('.btn-edit-note')) return;
-                jumpToNoteLocation(note);
-            });
-
-            // Edit Note button
-            card.querySelector('.btn-edit-note').addEventListener('click', function (e) {
-                e.stopPropagation();
-                openNoteModal(note.quote, note.id);
-            });
-
-            // Delete Note button
-            card.querySelector('.btn-delete-note').addEventListener('click', function (e) {
-                e.stopPropagation();
-                deleteNote(note.id);
-            });
-
-            elements.notesList.appendChild(card);
-        });
-    }
-
-    function jumpToNoteLocation(note) {
-        const isDouble = isDoublePageEffective();
-        let needsRender = false;
-
-        if (isDouble) {
-            const currentLeft = state.currentLeftPage || 1;
-            const currentRight = state.currentRightPage || 2;
-            if (note.page !== currentLeft && note.page !== currentRight) {
-                needsRender = true;
-            }
-        } else {
-            if (state.currentPage !== note.page) {
-                needsRender = true;
-            }
-        }
-
-        if (needsRender) {
-            renderPage(note.page);
-        } else {
-            state.currentPage = note.page;
-        }
-        
-        // Find mark in book paper
-        setTimeout(() => {
-            let mark = elements.bookPaper.querySelector(`mark[data-id="${note.id}"]`);
-            if (!mark && elements.bookPaperRight) {
-                mark = elements.bookPaperRight.querySelector(`mark[data-id="${note.id}"]`);
-            }
-            if (mark) {
-                mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                mark.classList.add('hl-active');
-                setTimeout(() => mark.classList.remove('hl-active'), 2000);
-            }
-        }, 120);
-
-        showToast(`跳转至 P.${note.page} 原文所在位置`);
-    }
-
-    function highlightNoteCard(noteId) {
-        switchTab('tab-highlights');
-        const card = document.getElementById(`card-${noteId}`);
-        if (card) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            card.style.outline = '2px solid var(--primary)';
-            setTimeout(() => card.style.outline = '', 2000);
-        }
-    }
-
-    function deleteNote(id) {
-        state.notes = state.notes.filter(n => n.id !== id);
-        deleteNoteFromDB(id);
-        renderNotesList();
-        renderPage(state.currentPage, true);
-        showToast('已删除笔记');
-    }
-
-    // Add Standalone Quick Note
-    elements.btnSaveQuickNote.addEventListener('click', function () {
-        const text = elements.quickNoteInput.value.trim();
-        if (!text) {
-            showToast('请输入笔记内容');
-            return;
-        }
-
-        const currentBookObj = demoBooks[state.currentBook];
-        const chapter = (currentBookObj && currentBookObj.toc && currentBookObj.toc[0]) ? currentBookObj.toc[0].title : '独立思考';
-
-        const newNote = {
-            id: 'note-' + Date.now(),
+    const existingNote = state.notes.find(n => n.page === highlightPage && n.quote === quote);
+    if (existingNote) {
+        existingNote.color = color;
+        saveNoteToDB(existingNote);
+        showToast('已更新该段落高亮颜色');
+    } else {
+        const newNote = createAnnotationObject({
             bookId: state.currentBook,
-            quote: '',
-            comment: text,
-            color: 'yellow',
-            page: state.currentPage,
-            chapter: chapter,
-            timestamp: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
-        };
+            quote,
+            comment: '',
+            color,
+            page: highlightPage,
+            chapter
+        });
 
         state.notes.unshift(newNote);
         saveNoteToDB(newNote);
-        renderNotesList();
-        elements.quickNoteInput.value = '';
-        showToast('已保存独立随笔');
+        showToast('已成功高亮选中文本');
+    }
+
+    renderNotesList();
+    renderPage(state.currentPage, true);
+    hideSelectionTooltip();
+    if (window.getSelection) window.getSelection().removeAllRanges();
+}
+
+// --------------------------------------------------------------------------
+// 7. Notes UI Coordination
+// --------------------------------------------------------------------------
+export function renderNotesList() {
+    const thoughtNotes = state.notes.filter(n => n.comment && n.comment.trim() !== '');
+    uiRenderNotesList({
+        elements,
+        notes: state.showHighlightsInSidebar ? state.notes : thoughtNotes,
+        showHighlightsInSidebar: state.showHighlightsInSidebar,
+        onJump: (note) => jumpToNoteLocation(note),
+        onEdit: (note) => openNoteModal(note.quote, note.id),
+        onDelete: (id) => deleteNote(id)
+    });
+    persistNotes();
+}
+
+export function jumpToNoteLocation(note) {
+    const isDouble = isDoublePageEffective();
+    let needsRender = false;
+
+    if (isDouble) {
+        const currentLeft = state.currentLeftPage || 1;
+        const currentRight = state.currentRightPage || 2;
+        if (note.page !== currentLeft && note.page !== currentRight) {
+            needsRender = true;
+        }
+    } else {
+        if (state.currentPage !== note.page) {
+            needsRender = true;
+        }
+    }
+
+    if (needsRender) {
+        renderPage(note.page);
+    } else {
+        state.currentPage = note.page;
+    }
+
+    setTimeout(() => {
+        let mark = elements.bookPaper ? elements.bookPaper.querySelector(`mark[data-id="${note.id}"]`) : null;
+        if (!mark && elements.bookPaperRight) {
+            mark = elements.bookPaperRight.querySelector(`mark[data-id="${note.id}"]`);
+        }
+        if (mark) {
+            mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            mark.classList.add('hl-active');
+            setTimeout(() => mark.classList.remove('hl-active'), 2000);
+        }
+    }, 120);
+
+    showToast(`跳转至 P.${note.page} 原文所在位置`);
+}
+
+export function deleteNote(id) {
+    state.notes = state.notes.filter(n => n.id !== id);
+    deleteNoteFromDB(id);
+    renderNotesList();
+    renderPage(state.currentPage, true);
+    showToast('已删除笔记');
+}
+
+export function openNoteModal(quote, existingNoteId = null) {
+    state.editingNoteId = existingNoteId;
+
+    let existingNote = null;
+    if (existingNoteId) {
+        existingNote = state.notes.find(n => n.id === existingNoteId);
+    } else {
+        const targetPage = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
+        const overlapNote = findOverlappingNote(state.notes, targetPage, quote);
+        if (overlapNote) {
+            state.editingNoteId = overlapNote.id;
+            existingNote = overlapNote;
+        }
+    }
+
+    uiOpenNoteModal({
+        elements,
+        quote,
+        existingNote
+    });
+}
+
+export function closeNoteModal() {
+    state.editingNoteId = null;
+    uiCloseNoteModal(elements);
+}
+
+export function saveModalNote() {
+    const comment = elements.modalNoteTextarea ? elements.modalNoteTextarea.value.trim() : '';
+
+    if (state.editingNoteId) {
+        const noteIndex = state.notes.findIndex(n => n.id === state.editingNoteId);
+        if (noteIndex !== -1) {
+            state.notes[noteIndex].comment = comment;
+            state.notes[noteIndex].timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
+            saveNoteToDB(state.notes[noteIndex]);
+            showToast('随笔感悟已成功更新');
+        }
+    } else {
+        const quote = state.pendingSelection ? state.pendingSelection.text : '';
+        const notePage = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
+        const currentBookObj = readerEngine.getCurrentBook();
+        let chapter = '章节选区';
+        if (currentBookObj && currentBookObj.toc && currentBookObj.toc.length > 0) {
+            const matchedToc = [...currentBookObj.toc].reverse().find(t => t.page <= notePage);
+            chapter = matchedToc ? matchedToc.title : currentBookObj.toc[0].title;
+        }
+
+        const newNote = createAnnotationObject({
+            bookId: state.currentBook,
+            quote,
+            comment,
+            color: 'yellow',
+            page: notePage,
+            chapter
+        });
+
+        state.notes.unshift(newNote);
+        saveNoteToDB(newNote);
+        showToast('高亮及随笔已成功保存');
+    }
+
+    renderNotesList();
+    renderPage(state.currentPage, true);
+    closeNoteModal();
+    if (window.getSelection) window.getSelection().removeAllRanges();
+}
+
+// --------------------------------------------------------------------------
+// 8. Book Shelf Coordination
+// --------------------------------------------------------------------------
+export async function refreshShelfUI() {
+    const books = await getAllBooksFromDB();
+    uiRenderShelf({
+        elements,
+        books,
+        onOpenBook: async (bookId) => {
+            await openBookFromShelf(bookId);
+        },
+        onDeleteBook: async (book) => {
+            if (confirm(`确定要从本地 IndexedDB 书库移除《${book.title}》及其划线笔记吗？`)) {
+                await deleteBookFromDB(book.id);
+                showToast(`已从书库移除：《${book.title}》`);
+            }
+        }
+    });
+}
+
+async function openBookFromShelf(bookId) {
+    const bookObj = await loadBookFromDB(bookId);
+    if (!bookObj) {
+        showToast("未能载入图书，请重新导入");
+        return;
+    }
+    await loadBook(bookId);
+    showToast(`已从 IndexedDB 书库加载：《${bookObj.title}》`);
+}
+
+// --------------------------------------------------------------------------
+// 9. Exporters & Backup Coordination
+// --------------------------------------------------------------------------
+let availableBackupBooks = [];
+
+async function openBackupSelectModal() {
+    const booksFromDB = await getAllBooksFromDB();
+    const map = new Map();
+    if (booksFromDB && booksFromDB.length > 0) {
+        booksFromDB.forEach(b => map.set(b.id || b.title, b));
+    }
+    Object.keys(demoBooks).forEach(key => {
+        const b = demoBooks[key];
+        if (b && !map.has(b.id || key)) {
+            map.set(b.id || key, Object.assign({ id: key }, b));
+        }
     });
 
-    // --------------------------------------------------------------------------
-    // 7. Tabs, Settings & Export
-    // --------------------------------------------------------------------------
-    function switchTab(tabId) {
-        state.activeTab = tabId;
-        elements.tabBtns.forEach(btn => {
-            btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+    availableBackupBooks = Array.from(map.values());
+
+    if (availableBackupBooks.length === 0) {
+        showToast('本地暂无可用于备份的图书');
+        return;
+    }
+
+    elements.backupBookCheckboxList.innerHTML = '';
+    availableBackupBooks.forEach((book, idx) => {
+        const item = document.createElement('div');
+        item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.04);';
+
+        const noteCount = state.notes.filter(n => (n.chapter && n.chapter.includes(book.title)) || n.bookId === book.id).length;
+
+        item.innerHTML = `
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; font-weight: 500; font-size: 0.88rem;">
+                <input type="checkbox" class="chk-backup-book" data-id="${book.id || idx}" checked>
+                <span>${book.title}</span>
+            </label>
+            <small style="color: var(--text-sub); font-size: 0.78rem;">${book.format || 'EPUB'} · ${book.pages ? book.pages.length : 1} 章节 · ${noteCount} 条划线</small>
+        `;
+        elements.backupBookCheckboxList.appendChild(item);
+    });
+
+    if (elements.backupSelectModal) elements.backupSelectModal.classList.add('active');
+}
+
+function closeBackupSelectModal() {
+    if (elements.backupSelectModal) elements.backupSelectModal.classList.remove('active');
+}
+
+function toggleAllBackupCheckboxes(checked) {
+    if (!elements.backupBookCheckboxList) return;
+    elements.backupBookCheckboxList.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+        chk.checked = checked;
+    });
+}
+
+async function executeSelectiveBackupExport() {
+    const selectedCheckboxes = elements.backupBookCheckboxList.querySelectorAll('.chk-backup-book:checked');
+    if (selectedCheckboxes.length === 0) {
+        showToast('请至少勾选一本要备份的图书');
+        return;
+    }
+
+    const selectedIds = Array.from(selectedCheckboxes).map(chk => chk.getAttribute('data-id'));
+    const selectedBooks = availableBackupBooks.filter((b, idx) => selectedIds.includes(b.id || String(idx)));
+
+    const includeNotes = elements.chkBackupIncludeNotes ? elements.chkBackupIncludeNotes.checked : true;
+    const includeSettings = elements.chkBackupIncludeSettings ? elements.chkBackupIncludeSettings.checked : true;
+
+    // Fix Bug 2: Query notes for ALL selected books reliably via AnnotationRepository
+    let notesToExport = [];
+    if (includeNotes) {
+        notesToExport = await repoGetNotesForBooks(selectedIds);
+    }
+
+    const settings = includeSettings ? {
+        textIndent: state.textIndent,
+        fontSize: state.fontSize,
+        paperTheme: state.paperTheme,
+        appTheme: state.appTheme
+    } : {};
+
+    exportSelectiveBackup({
+        selectedBooks,
+        notes: notesToExport,
+        settings
+    });
+
+    closeBackupSelectModal();
+    showToast(`🎉 成功导出选中的 ${selectedBooks.length} 本图书与 ${notesToExport.length} 条划线备份包！`);
+}
+
+async function importFullBackup(file) {
+    if (!file) return;
+
+    try {
+        const data = await parseBackupFile(file);
+        let importedBooksCount = 0;
+        let importedNotesCount = 0;
+
+        // 1. Restore all books
+        if (Array.isArray(data.books) && data.books.length > 0) {
+            for (const b of data.books) {
+                if (b && (b.id || b.title)) {
+                    const bId = b.id || ('custom_' + Date.now());
+                    b.id = bId;
+                    await saveBookToDB(b);
+                    importedBooksCount++;
+                }
+            }
+        }
+
+        // 2. Restore all annotations with isolation
+        const firstBookId = (data.books && data.books[0]) ? data.books[0].id : state.currentBook;
+        if (Array.isArray(data.notes) && data.notes.length > 0) {
+            for (const n of data.notes) {
+                if (n && n.id) {
+                    n.bookId = n.bookId || firstBookId || state.currentBook;
+                    await saveNoteToDB(n);
+                    importedNotesCount++;
+                }
+            }
+        }
+
+        // 3. Load first book
+        if (data.books && data.books.length > 0 && data.books[0].id) {
+            const targetBookId = data.books[0].id;
+            await loadBook(targetBookId);
+        }
+
+        // 4. Restore settings
+        if (data.settings && data.settings.textIndent) {
+            state.textIndent = data.settings.textIndent;
+            localStorage.setItem('aura_text_indent', state.textIndent);
+        }
+
+        await refreshShelfUI();
+        renderNotesList();
+        renderPage(state.currentPage, true);
+
+        const activeTitle = readerEngine.getCurrentBook() ? readerEngine.getCurrentBook().title : '恢复图书';
+        showToast(`🎉 成功从备份恢复！已为您自动打开《${activeTitle}》，加载 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
+    } catch (err) {
+        console.error("备份解析失败:", err);
+        showToast("备份恢复失败: " + err.message);
+    }
+}
+
+// --------------------------------------------------------------------------
+// 10. UI Controls & Listeners
+// --------------------------------------------------------------------------
+function switchTab(tabId) {
+    state.activeTab = tabId;
+    elements.tabBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+    });
+    elements.tabContents.forEach(content => {
+        content.classList.toggle('active', content.id === tabId);
+    });
+}
+
+function initUIControls() {
+    // Navigation
+    elements.btnPrevPage.addEventListener('click', () => {
+        const isDouble = isDoublePageEffective();
+        const loc = readerEngine.prevPage(isDouble);
+        renderPage(loc.page);
+    });
+
+    elements.btnNextPage.addEventListener('click', () => {
+        const isDouble = isDoublePageEffective();
+        const loc = readerEngine.nextPage(isDouble);
+        renderPage(loc.page);
+    });
+
+    if (elements.btnPageMode) {
+        elements.btnPageMode.addEventListener('click', () => togglePageMode());
+    }
+
+    if (elements.btnToggleSidebar) {
+        elements.btnToggleSidebar.addEventListener('click', () => toggleSidebar(true));
+    }
+
+    if (elements.btnCollapseSidebar) {
+        elements.btnCollapseSidebar.addEventListener('click', () => toggleSidebar(true));
+    }
+
+    if (elements.btnSidebarRecall) {
+        elements.btnSidebarRecall.addEventListener('click', () => toggleSidebar(true));
+    }
+
+    // TOC
+    if (elements.btnToc) {
+        elements.btnToc.addEventListener('click', (e) => {
+            e.stopPropagation();
+            uiToggleTOC(elements);
         });
-        elements.tabContents.forEach(content => {
-            content.classList.toggle('active', content.id === tabId);
+    }
+    if (elements.btnCloseToc) {
+        elements.btnCloseToc.addEventListener('click', (e) => {
+            e.stopPropagation();
+            uiCloseTOC(elements);
         });
     }
 
+    document.addEventListener('click', (e) => {
+        if (elements.tocDrawer && elements.tocDrawer.classList.contains('open')) {
+            if (!e.target.closest('#toc-drawer') && !e.target.closest('#btn-toc')) {
+                uiCloseTOC(elements);
+            }
+        }
+    });
+
+    // Font Controls
+    elements.fontFamilySelect.addEventListener('change', function () {
+        state.fontFamily = this.value;
+        if (elements.bookPaper) elements.bookPaper.style.fontFamily = this.value;
+        if (elements.bookPaperRight) elements.bookPaperRight.style.fontFamily = this.value;
+    });
+
+    elements.btnFontDec.addEventListener('click', () => {
+        if (state.fontSize > 13) {
+            state.fontSize -= 1;
+            elements.fontSizeLabel.textContent = `${state.fontSize}px`;
+            if (elements.bookPaper) elements.bookPaper.style.fontSize = `${state.fontSize}px`;
+            if (elements.bookPaperRight) elements.bookPaperRight.style.fontSize = `${state.fontSize}px`;
+        }
+    });
+
+    elements.btnFontInc.addEventListener('click', () => {
+        if (state.fontSize < 32) {
+            state.fontSize += 1;
+            elements.fontSizeLabel.textContent = `${state.fontSize}px`;
+            if (elements.bookPaper) elements.bookPaper.style.fontSize = `${state.fontSize}px`;
+            if (elements.bookPaperRight) elements.bookPaperRight.style.fontSize = `${state.fontSize}px`;
+        }
+    });
+
+    if (elements.indentSelect) {
+        elements.indentSelect.value = state.textIndent || '2em';
+        elements.indentSelect.addEventListener('change', function () {
+            state.textIndent = this.value;
+            localStorage.setItem('aura_text_indent', this.value);
+            if (elements.bookPaper) elements.bookPaper.style.setProperty('--book-text-indent', this.value);
+            if (elements.bookPaperRight) elements.bookPaperRight.style.setProperty('--book-text-indent', this.value);
+            showToast(`已切换首行缩进：${this.options[this.selectedIndex].text}`);
+        });
+    }
+
+    // Tabs
     elements.tabBtns.forEach(btn => {
         btn.addEventListener('click', function () {
             switchTab(this.getAttribute('data-tab'));
         });
     });
 
-    // Export to Markdown
-    elements.btnExportMarkdown.addEventListener('click', function () {
-        const bookTitle = demoBooks[state.currentBook].title;
-        let md = `# 划线与随笔笔记：《${bookTitle}》\n\n`;
-        md += `> 导出时间：${new Date().toLocaleString()}\n\n`;
-        
-        md += `## 划线与随笔精选 (${state.notes.length} 条)\n\n`;
-        state.notes.forEach((n, idx) => {
-            md += `### ${idx + 1}. P.${n.page} ${n.chapter || ''}\n`;
-            if (n.quote) md += `==${n.quote}==\n\n`;
-            if (n.comment) md += `> 💭 **随笔思考**：${n.comment}\n\n`;
-            md += `---\n\n`;
+    // Toggle highlights in sidebar
+    if (elements.btnToggleShowHighlights) {
+        elements.btnToggleShowHighlights.addEventListener('click', () => {
+            state.showHighlightsInSidebar = !state.showHighlightsInSidebar;
+            renderNotesList();
+            showToast(state.showHighlightsInSidebar ? '已开启：笔记区显示全部划线' : '已恢复：笔记区仅显示随笔思考');
         });
+    }
 
-        downloadFile(`${bookTitle}_划线随笔.md`, md, 'text/markdown');
-        showToast('已导出高亮与随笔 Markdown 文件');
-    });
+    // Quick Note
+    if (elements.btnSaveQuickNote) {
+        elements.btnSaveQuickNote.addEventListener('click', () => {
+            const text = elements.quickNoteInput.value.trim();
+            if (!text) {
+                showToast('请输入笔记内容');
+                return;
+            }
 
-    // Export to JSON
-    elements.btnExportJson.addEventListener('click', function () {
-        const data = {
-            book: demoBooks[state.currentBook].title,
-            exportDate: new Date().toISOString(),
-            notes: state.notes
-        };
-        downloadFile(`notes_${state.currentBook}.json`, JSON.stringify(data, null, 2), 'application/json');
-        showToast('已导出 JSON 结构化数据');
-    });
+            const currentBookObj = readerEngine.getCurrentBook();
+            const chapter = (currentBookObj && currentBookObj.toc && currentBookObj.toc[0])
+                ? currentBookObj.toc[0].title
+                : '独立思考';
 
-    // 📦 Export Chapter-by-Chapter Zip Package
+            const newNote = createAnnotationObject({
+                bookId: state.currentBook,
+                quote: '',
+                comment: text,
+                color: 'yellow',
+                page: state.currentPage,
+                chapter
+            });
+
+            state.notes.unshift(newNote);
+            saveNoteToDB(newNote);
+            renderNotesList();
+            elements.quickNoteInput.value = '';
+            showToast('已保存独立随笔');
+        });
+    }
+
+    // Note Modal
+    if (elements.btnCloseModal) elements.btnCloseModal.addEventListener('click', closeNoteModal);
+    if (elements.btnCancelModal) elements.btnCancelModal.addEventListener('click', closeNoteModal);
+    if (elements.btnConfirmModal) elements.btnConfirmModal.addEventListener('click', saveModalNote);
+
+    // Shelf
+    if (elements.btnShelf) {
+        elements.btnShelf.addEventListener('click', () => {
+            refreshShelfUI();
+            uiOpenShelf(elements);
+        });
+    }
+    if (elements.btnCloseShelf) {
+        elements.btnCloseShelf.addEventListener('click', () => {
+            uiCloseShelf(elements);
+        });
+    }
+
+    // Exporters
+    if (elements.btnExportMarkdown) {
+        elements.btnExportMarkdown.addEventListener('click', () => {
+            const title = readerEngine.getCurrentBook() ? readerEngine.getCurrentBook().title : '图书';
+            exportMarkdown(title, state.notes);
+            showToast('已导出高亮与随笔 Markdown 文件');
+        });
+    }
+
+    if (elements.btnExportJson) {
+        elements.btnExportJson.addEventListener('click', () => {
+            const title = readerEngine.getCurrentBook() ? readerEngine.getCurrentBook().title : '图书';
+            exportJson(title, state.notes, state.currentBook);
+            showToast('已导出 JSON 结构化数据');
+        });
+    }
+
     if (elements.btnExportChapterZip) {
-        elements.btnExportChapterZip.addEventListener('click', exportChapterZip);
+        elements.btnExportChapterZip.addEventListener('click', async () => {
+            try {
+                showToast('正在生成分章节 Zip 压缩包...');
+                await exportChapterZip(readerEngine.getCurrentBook(), state.notes, window.JSZip);
+                showToast('已成功导出分章节 Zip 压缩包！');
+            } catch (err) {
+                showToast('导出 Zip 失败: ' + err.message);
+            }
+        });
     }
 
-    // 🌐 Export Standalone Dual-Column HTML Book
     if (elements.btnExportStandaloneHtml) {
-        elements.btnExportStandaloneHtml.addEventListener('click', exportStandaloneHtml);
+        elements.btnExportStandaloneHtml.addEventListener('click', () => {
+            try {
+                exportStandaloneHtml(readerEngine.getCurrentBook(), state.notes);
+                showToast('已成功导出双栏带标注独立 HTML 电子书！');
+            } catch (err) {
+                showToast('导出 HTML 失败: ' + err.message);
+            }
+        });
     }
 
-    // 📦 Selective Book Backup (.aurabackup)
-    let availableBackupBooks = [];
-
-    if (elements.btnExportFullBackup) {
-        elements.btnExportFullBackup.addEventListener('click', openBackupSelectModal);
-    }
+    // Backup
+    if (elements.btnExportFullBackup) elements.btnExportFullBackup.addEventListener('click', openBackupSelectModal);
     if (elements.btnImportFullBackup) {
         elements.btnImportFullBackup.addEventListener('click', () => {
             if (elements.backupFileInput) elements.backupFileInput.click();
@@ -1292,1163 +1113,153 @@
             this.value = '';
         });
     }
+    if (elements.btnCloseBackupModal) elements.btnCloseBackupModal.addEventListener('click', closeBackupSelectModal);
+    if (elements.btnCancelBackupModal) elements.btnCancelBackupModal.addEventListener('click', closeBackupSelectModal);
+    if (elements.btnSelectAllBackup) elements.btnSelectAllBackup.addEventListener('click', () => toggleAllBackupCheckboxes(true));
+    if (elements.btnDeselectAllBackup) elements.btnDeselectAllBackup.addEventListener('click', () => toggleAllBackupCheckboxes(false));
+    if (elements.btnConfirmExportBackup) elements.btnConfirmExportBackup.addEventListener('click', executeSelectiveBackupExport);
 
-    if (elements.btnCloseBackupModal) {
-        elements.btnCloseBackupModal.addEventListener('click', closeBackupSelectModal);
-    }
-    if (elements.btnCancelBackupModal) {
-        elements.btnCancelBackupModal.addEventListener('click', closeBackupSelectModal);
-    }
-    if (elements.btnSelectAllBackup) {
-        elements.btnSelectAllBackup.addEventListener('click', () => toggleAllBackupCheckboxes(true));
-    }
-    if (elements.btnDeselectAllBackup) {
-        elements.btnDeselectAllBackup.addEventListener('click', () => toggleAllBackupCheckboxes(false));
-    }
-    if (elements.btnConfirmExportBackup) {
-        elements.btnConfirmExportBackup.addEventListener('click', executeSelectiveBackupExport);
-    }
-
-    function closeBackupSelectModal() {
-        if (elements.backupSelectModal) elements.backupSelectModal.classList.remove('active');
-    }
-
-    function toggleAllBackupCheckboxes(checked) {
-        if (!elements.backupBookCheckboxList) return;
-        elements.backupBookCheckboxList.querySelectorAll('input[type="checkbox"]').forEach(chk => {
-            chk.checked = checked;
+    // Paper Theme
+    elements.paperBtns.forEach(btn => {
+        btn.addEventListener('click', function () {
+            elements.paperBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            const theme = this.getAttribute('data-paper');
+            elements.readerPanel.className = `reader-panel paper-${theme}`;
         });
-    }
-
-    async function openBackupSelectModal() {
-        const booksFromDB = await getAllBooksFromDB();
-        
-        const map = new Map();
-        if (booksFromDB && booksFromDB.length > 0) {
-            booksFromDB.forEach(b => map.set(b.id || b.title, b));
-        }
-        Object.keys(demoBooks).forEach(key => {
-            const b = demoBooks[key];
-            if (b && !map.has(b.id || key)) {
-                map.set(b.id || key, Object.assign({ id: key }, b));
-            }
-        });
-
-        availableBackupBooks = Array.from(map.values());
-
-        if (availableBackupBooks.length === 0) {
-            showToast('本地暂无可用于备份的图书');
-            return;
-        }
-
-        // Render Checkbox List
-        elements.backupBookCheckboxList.innerHTML = '';
-        availableBackupBooks.forEach((book, idx) => {
-            const item = document.createElement('div');
-            item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.04);';
-            
-            const noteCount = state.notes.filter(n => (n.chapter && n.chapter.includes(book.title)) || n.bookId === book.id).length;
-
-            item.innerHTML = `
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; font-weight: 500; font-size: 0.88rem;">
-                    <input type="checkbox" class="chk-backup-book" data-id="${book.id || idx}" checked>
-                    <span>${escapeHtml(book.title)}</span>
-                </label>
-                <small style="color: var(--text-sub); font-size: 0.78rem;">${book.format || 'EPUB'} · ${pageOrChapCount(book)} · ${noteCount} 条划线</small>
-            `;
-            elements.backupBookCheckboxList.appendChild(item);
-        });
-
-        if (elements.backupSelectModal) elements.backupSelectModal.classList.add('active');
-    }
-
-    function pageOrChapCount(b) {
-        return b.pages ? `${b.pages.length} 章节` : (b.toc ? `${b.toc.length} 目录` : '1 章节');
-    }
-
-    async function executeSelectiveBackupExport() {
-        const selectedCheckboxes = elements.backupBookCheckboxList.querySelectorAll('.chk-backup-book:checked');
-        if (selectedCheckboxes.length === 0) {
-            showToast('请至少勾选一本要备份的图书');
-            return;
-        }
-
-        const selectedIds = new Set(Array.from(selectedCheckboxes).map(chk => chk.getAttribute('data-id')));
-        const selectedBooks = availableBackupBooks.filter((b, idx) => selectedIds.has(b.id || String(idx)));
-        const selectedTitles = new Set(selectedBooks.map(b => b.title));
-
-        const includeNotes = elements.chkBackupIncludeNotes ? elements.chkBackupIncludeNotes.checked : true;
-        const includeSettings = elements.chkBackupIncludeSettings ? elements.chkBackupIncludeSettings.checked : true;
-
-        let notesToExport = [];
-        if (includeNotes) {
-            notesToExport = state.notes.filter(n => {
-                if (n.bookId && selectedIds.has(n.bookId)) return true;
-                if (n.chapter && Array.from(selectedTitles).some(t => n.chapter.includes(t))) return true;
-                return selectedBooks.length === availableBackupBooks.length;
-            });
-        }
-
-        const backupPayload = {
-            version: "1.0",
-            type: "aurareader_full_backup",
-            exportedAt: new Date().toISOString(),
-            notes: notesToExport,
-            settings: includeSettings ? {
-                textIndent: state.textIndent,
-                fontSize: state.fontSize,
-                paperTheme: state.paperTheme,
-                appTheme: state.appTheme
-            } : {},
-            books: selectedBooks
-        };
-
-        const jsonStr = JSON.stringify(backupPayload, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
-
-        const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const fileName = `AuraReader_Backup_${selectedBooks.length}本_${yyyymmdd}.aurabackup`;
-
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-
-        closeBackupSelectModal();
-        showToast(`🎉 成功导出选中的 ${selectedBooks.length} 本图书与 ${notesToExport.length} 条划线备份包！`);
-    }
-
-    function importFullBackup(file) {
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async function (e) {
-            try {
-                const data = JSON.parse(e.target.result);
-                
-                if (!data || (data.type !== 'aurareader_full_backup' && !Array.isArray(data.notes) && !Array.isArray(data.books))) {
-                    showToast('未识别的备份包格式');
-                    return;
-                }
-
-                let importedBooksCount = 0;
-                let importedNotesCount = 0;
-
-                // 1. 恢复所有图书至 demoBooks 与 IndexedDB
-                if (Array.isArray(data.books) && data.books.length > 0) {
-                    for (const b of data.books) {
-                        if (b && (b.id || b.title)) {
-                            const bId = b.id || ('custom_' + Date.now());
-                            b.id = bId;
-                            demoBooks[bId] = b;
-                            await saveBookToDB(b);
-                            importedBooksCount++;
-                        }
-                    }
-                }
-
-                // 2. 恢复所有划线随笔至 IndexedDB 与 state.notes
-                const firstBookId = (data.books && data.books[0]) ? data.books[0].id : state.currentBook;
-                const allImportedNotes = [];
-                
-                if (Array.isArray(data.notes) && data.notes.length > 0) {
-                    for (const n of data.notes) {
-                        if (n && n.id) {
-                            n.bookId = n.bookId || firstBookId || state.currentBook;
-                            allImportedNotes.push(n);
-                            await saveNoteToDB(n);
-                        }
-                    }
-                }
-
-                // 3. 预载入笔记至 state.notes，防止被空覆盖
-                const noteMap = new Map(state.notes.map(n => [n.id, n]));
-                allImportedNotes.forEach(n => noteMap.set(n.id, n));
-                state.notes = Array.from(noteMap.values());
-                importedNotesCount = allImportedNotes.length;
-
-                // 4. 自动激活并装载恢复的第 1 本图书
-                if (data.books && data.books.length > 0 && data.books[0].id) {
-                    const targetBookId = data.books[0].id;
-                    await loadBook(targetBookId);
-                    
-                    // 保障笔记列表包含恢复的笔记
-                    if (allImportedNotes.length > 0) {
-                        const mergedNotes = new Map(state.notes.map(n => [n.id, n]));
-                        allImportedNotes.forEach(n => mergedNotes.set(n.id, n));
-                        state.notes = Array.from(mergedNotes.values());
-                    }
-                }
-
-                // 5. 恢复界面偏好设置
-                if (data.settings) {
-                    if (data.settings.textIndent) {
-                        state.textIndent = data.settings.textIndent;
-                        localStorage.setItem('aura_text_indent', state.textIndent);
-                    }
-                }
-
-                // 6. 强制刷新界面、划线高亮与右侧列表
-                await refreshShelfUI();
-                persistNotes();
-                renderNotesList();
-                renderPage(state.currentPage, true);
-
-                const activeTitle = demoBooks[state.currentBook] ? demoBooks[state.currentBook].title : '恢复图书';
-                showToast(`🎉 成功从备份恢复！已为您自动打开《${activeTitle}》，加载 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
-            } catch (err) {
-                console.error("备份解析失败:", err);
-                showToast("备份恢复失败: " + err.message);
-            }
-        };
-        reader.readAsText(file);
-    }
-
-    async function exportChapterZip() {
-        if (typeof JSZip === 'undefined') {
-            showToast('JSZip 尚未就绪，请检查网络连接');
-            return;
-        }
-        const currentBookObj = demoBooks[state.currentBook];
-        if (!currentBookObj || !currentBookObj.pages) {
-            showToast('当前图书无可导出内容');
-            return;
-        }
-
-        const zip = new JSZip();
-        const folderName = `${currentBookObj.title}_分章节笔记包`;
-        const folder = zip.folder(folderName);
-        
-        let indexMd = `# 《${currentBookObj.title}》 导读书册与笔记全览\n\n`;
-        indexMd += `- 格式：${currentBookObj.format}\n`;
-        indexMd += `- 总章节数：${currentBookObj.pages.length}\n`;
-        indexMd += `- 划线随笔数：${state.notes.length}\n`;
-        indexMd += `- 导出时间：${new Date().toLocaleString()}\n\n`;
-        indexMd += `## 目录结构\n`;
-
-        currentBookObj.pages.forEach((pageHtml, idx) => {
-            const pageNum = idx + 1;
-            const pageNotes = state.notes.filter(n => n.page === pageNum);
-            
-            let chapTitle = `第${pageNum}章`;
-            if (currentBookObj.toc && currentBookObj.toc[idx]) {
-                chapTitle = currentBookObj.toc[idx].title || chapTitle;
-            }
-            chapTitle = chapTitle.replace(/[\\/:*?"<>|]/g, '_');
-            
-            indexMd += `${pageNum}. [${chapTitle}](./${String(pageNum).padStart(2, '0')}_${chapTitle}.md)\n`;
-
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = pageHtml;
-            
-            let chapMd = `# ${chapTitle}\n\n`;
-            chapMd += `> 页码：P.${pageNum} | 本章划线数：${pageNotes.length}\n\n---\n\n`;
-            
-            const paragraphs = tempDiv.querySelectorAll('p, h1, h2, h3, blockquote, div');
-            const processedNoteIds = new Set();
-
-            if (paragraphs.length > 0) {
-                paragraphs.forEach(p => {
-                    // 仅处理最深层包含文本的段落，避免外层 div 元素重复处理
-                    if (p.children.length > 0 && p.querySelector('p, h1, h2, h3, blockquote')) return;
-
-                    let text = p.innerText.trim();
-                    if (!text) return;
-                    
-                    if (p.tagName.startsWith('H')) {
-                        chapMd += `## ${text}\n\n`;
-                    } else if (p.tagName === 'BLOCKQUOTE') {
-                        chapMd += `> ${text}\n\n`;
-                    } else {
-                        // 在段落正文中精准无失真插入 ==高亮文字== 标记
-                        let paragraphText = text;
-                        const matchedComments = [];
-
-                        pageNotes.forEach(note => {
-                            if (!note.quote) return;
-                            const cleanQuote = note.quote.trim();
-                            
-                            // 模糊忽略换行与空格进行匹配
-                            const normP = paragraphText.replace(/[\s\u00a0]+/g, ' ');
-                            const normQ = cleanQuote.replace(/[\s\u00a0]+/g, ' ');
-                            
-                            if (paragraphText.includes(cleanQuote) || normP.includes(normQ)) {
-                                processedNoteIds.add(note.id);
-                                if (!paragraphText.includes(`==${cleanQuote}==`)) {
-                                    if (paragraphText.includes(cleanQuote)) {
-                                        paragraphText = paragraphText.replace(cleanQuote, `==${cleanQuote}==`);
-                                    } else {
-                                        // 解决空格换行微差异下的包裹
-                                        const firstWords = cleanQuote.slice(0, Math.min(8, cleanQuote.length));
-                                        const lastWords = cleanQuote.slice(Math.max(0, cleanQuote.length - 8));
-                                        const startIdx = paragraphText.indexOf(firstWords);
-                                        const endIdx = paragraphText.indexOf(lastWords);
-                                        if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
-                                            const matchedSegment = paragraphText.substring(startIdx, endIdx + lastWords.length);
-                                            paragraphText = paragraphText.replace(matchedSegment, `==${matchedSegment}==`);
-                                        }
-                                    }
-                                }
-                                if (note.comment && !matchedComments.includes(note.comment)) {
-                                    matchedComments.push(note.comment);
-                                }
-                            }
-                        });
-
-                        chapMd += `${paragraphText}\n\n`;
-                        
-                        // 仅当存在随笔感悟时，在段落下方追加纯思考引用块（绝不重复引文原文）
-                        matchedComments.forEach(comment => {
-                            chapMd += `> 💭 **[随笔思考 | P.${pageNum}]**：${comment}\n\n`;
-                        });
-                    }
-                });
-            } else {
-                chapMd += tempDiv.innerText.trim() + '\n\n';
-            }
-
-            // 处理可能未在正文段落中匹配上的独立随笔感悟（不重复原文）
-            pageNotes.forEach(note => {
-                if (!processedNoteIds.has(note.id) && note.comment) {
-                    chapMd += `> 💭 **[随笔思考 | P.${pageNum}]**：${note.comment}\n\n`;
-                }
-            });
-
-            const fileName = `${String(pageNum).padStart(2, '0')}_${chapTitle}.md`;
-            folder.file(fileName, chapMd);
-        });
-
-        folder.file('00_目录概览.md', indexMd);
-
-        showToast('正在生成分章节 Zip 压缩包...');
-        const blob = await zip.generateAsync({ type: 'blob' });
-        downloadFile(`${currentBookObj.title}_分章节笔记包.zip`, blob, 'application/zip');
-        showToast('已成功导出分章节 Zip 压缩包！');
-    }
-
-    function exportStandaloneHtml() {
-        const currentBookObj = demoBooks[state.currentBook];
-        if (!currentBookObj || !currentBookObj.pages) {
-            showToast('当前图书无可导出内容');
-            return;
-        }
-
-        const bookTitle = currentBookObj.title;
-        const allPages = currentBookObj.pages;
-        const allNotes = state.notes;
-        const allToc = currentBookObj.toc || [];
-
-        const standaloneHtml = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>《${escapeHtml(bookTitle)}》 - 离线双栏带标注电子书</title>
-    <style>
-        :root {
-            --primary: #4f46e5;
-            --bg: #f8fafc;
-            --paper-bg: #ffffff;
-            --text: #1e293b;
-            --border: #e2e8f0;
-        }
-        body {
-            margin: 0;
-            font-family: system-ui, -apple-system, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-        .sidebar {
-            width: 280px;
-            background: #ffffff;
-            border-right: 1px solid var(--border);
-            padding: 16px;
-            overflow-y: auto;
-        }
-        .sidebar h2 { font-size: 16px; margin-top: 0; color: var(--primary); }
-        .toc-item { padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 6px; }
-        .toc-item:hover { background: #f1f5f9; color: var(--primary); }
-        .main-workspace {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-        .reader-col {
-            flex: 3;
-            padding: 32px 48px;
-            overflow-y: auto;
-            background: var(--paper-bg);
-            line-height: 1.85;
-            font-size: 18px;
-        }
-        .notes-col {
-            flex: 1;
-            min-width: 300px;
-            background: #f8fafc;
-            border-left: 1px solid var(--border);
-            padding: 20px;
-            overflow-y: auto;
-        }
-        mark.hl { background-color: #fef08a; padding: 2px 4px; border-radius: 3px; }
-        .note-card {
-            background: #ffffff;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 14px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            font-size: 13px;
-        }
-        .note-quote { color: #64748b; font-style: italic; margin-bottom: 6px; }
-        .note-comment { font-weight: 600; color: #0f172a; }
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <h2>《${escapeHtml(bookTitle)}》</h2>
-        <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">全书共有 ${allPages.length} 章节 | 标注 ${allNotes.length} 条</div>
-        <div id="toc-list">
-            ${allToc.map((t, idx) => `<div class="toc-item" onclick="jumpPage(${t.page || idx+1})">${idx+1}. ${escapeHtml(t.title)}</div>`).join('')}
-        </div>
-    </div>
-    <div class="main-workspace">
-        <div class="reader-col" id="reader-canvas">
-            ${allPages.map((p, idx) => `<div id="page-${idx+1}" style="margin-bottom: 60px;">${p}</div>`).join('')}
-        </div>
-        <div class="notes-col">
-            <h3 style="font-size: 15px; margin-top: 0; color: var(--primary);">随笔标注卡片 (${allNotes.length})</h3>
-            ${allNotes.map(n => `
-                <div class="note-card">
-                    <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">P.${n.page} | ${escapeHtml(n.chapter || '')}</div>
-                    ${n.quote ? `<div class="note-quote">“${escapeHtml(n.quote)}”</div>` : ''}
-                    ${n.comment ? `<div class="note-comment">💭 ${escapeHtml(n.comment)}</div>` : ''}
-                </div>
-            `).join('')}
-        </div>
-    </div>
-    <script>
-        function jumpPage(p) {
-            const el = document.getElementById('page-' + p);
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-        }
-    </script>
-</body>
-</html>`;
-
-        const blob = new Blob([standaloneHtml], { type: 'text/html;charset=utf-8' });
-        downloadFile(`${bookTitle}_带标注电子书.html`, blob, 'text/html');
-        showToast('已成功导出双栏带标注独立 HTML 电子书！');
-    }
-
-    function downloadFile(filename, data, type) {
-        const blob = (data instanceof Blob) ? data : new Blob([data], { type: type });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(a.href);
-    }
-
-    // --------------------------------------------------------------------------
-    // 9. UI Controls & Helpers
-    // --------------------------------------------------------------------------
-    function initUIControls() {
-        // Prev / Next Page (Supports Single & Double Spread stepping)
-        elements.btnPrevPage.addEventListener('click', () => {
-            const isDouble = isDoublePageEffective();
-            if (isDouble) {
-                const currentLeft = (state.currentPage % 2 === 1) ? state.currentPage : state.currentPage - 1;
-                const prevLeft = Math.max(1, currentLeft - 2);
-                if (prevLeft !== currentLeft) {
-                    renderPage(prevLeft);
-                }
-            } else {
-                if (state.currentPage > 1) renderPage(state.currentPage - 1);
-            }
-        });
-        elements.btnNextPage.addEventListener('click', () => {
-            const isDouble = isDoublePageEffective();
-            if (isDouble) {
-                const currentLeft = (state.currentPage % 2 === 1) ? state.currentPage : state.currentPage - 1;
-                const nextLeft = currentLeft + 2;
-                if (nextLeft <= state.totalPages) {
-                    renderPage(nextLeft);
-                }
-            } else {
-                if (state.currentPage < state.totalPages) renderPage(state.currentPage + 1);
-            }
-        });
-
-        // Single / Double Page Mode Switcher
-        if (elements.btnPageMode) {
-            elements.btnPageMode.addEventListener('click', () => {
-                togglePageMode();
-            });
-        }
-
-        // Sidebar Toggle Button in Toolbar
-        if (elements.btnToggleSidebar) {
-            elements.btnToggleSidebar.addEventListener('click', () => {
-                toggleSidebar(true);
-            });
-        }
-
-        // Sidebar Collapse Button in Tabs Header
-        if (elements.btnCollapseSidebar) {
-            elements.btnCollapseSidebar.addEventListener('click', () => {
-                toggleSidebar(true);
-            });
-        }
-
-        // Sidebar Recall Handle on Reader Panel
-        if (elements.btnSidebarRecall) {
-            elements.btnSidebarRecall.addEventListener('click', () => {
-                toggleSidebar(true);
-            });
-        }
-
-        // TOC Drawer Toggle & Close
-        if (elements.btnToc) {
-            elements.btnToc.addEventListener('click', (e) => {
-                e.stopPropagation();
-                elements.tocDrawer.classList.toggle('open');
-            });
-        }
-        if (elements.btnCloseToc) {
-            elements.btnCloseToc.addEventListener('click', (e) => {
-                e.stopPropagation();
-                elements.tocDrawer.classList.remove('open');
-            });
-        }
-
-        // Close TOC Drawer on Outside Click
-        document.addEventListener('click', (e) => {
-            if (elements.tocDrawer && elements.tocDrawer.classList.contains('open')) {
-                if (!e.target.closest('#toc-drawer') && !e.target.closest('#btn-toc')) {
-                    elements.tocDrawer.classList.remove('open');
-                }
-            }
-        });
-
-        // Font Family
-        elements.fontFamilySelect.addEventListener('change', function () {
-            state.fontFamily = this.value;
-            elements.bookPaper.style.fontFamily = this.value;
-            if (elements.bookPaperRight) elements.bookPaperRight.style.fontFamily = this.value;
-        });
-
-        // Font Size Adjust
-        elements.btnFontDec.addEventListener('click', () => {
-            if (state.fontSize > 13) {
-                state.fontSize -= 1;
-                elements.fontSizeLabel.textContent = `${state.fontSize}px`;
-                elements.bookPaper.style.fontSize = `${state.fontSize}px`;
-                if (elements.bookPaperRight) elements.bookPaperRight.style.fontSize = `${state.fontSize}px`;
-            }
-        });
-        elements.btnFontInc.addEventListener('click', () => {
-            if (state.fontSize < 32) {
-                state.fontSize += 1;
-                elements.fontSizeLabel.textContent = `${state.fontSize}px`;
-                elements.bookPaper.style.fontSize = `${state.fontSize}px`;
-                if (elements.bookPaperRight) elements.bookPaperRight.style.fontSize = `${state.fontSize}px`;
-            }
-        });
-
-        // First Line Indent Select
-        if (elements.indentSelect) {
-            elements.indentSelect.value = state.textIndent || '2em';
-            elements.indentSelect.addEventListener('change', function () {
-                state.textIndent = this.value;
-                localStorage.setItem('aura_text_indent', this.value);
-                elements.bookPaper.style.setProperty('--book-text-indent', this.value);
-                if (elements.bookPaperRight) elements.bookPaperRight.style.setProperty('--book-text-indent', this.value);
-                showToast(`已切换首行缩进：${this.options[this.selectedIndex].text}`);
-            });
-        }
-
-        // Responsive window resize listener with debounce to prevent toast floods & render races
-        let resizeDebounceTimer = null;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeDebounceTimer);
-            resizeDebounceTimer = setTimeout(() => {
-                checkResponsiveLayout(true);
-            }, 60);
-        });
-
-        // Desktop Keyboard Shortcuts
-        document.addEventListener('keydown', (e) => {
-            const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-            if (tag === 'input' || tag === 'textarea' || document.activeElement.isContentEditable) {
-                return;
-            }
-
-            // Do not trigger shortcuts when modal overlays are open
-            if (elements.noteModal && elements.noteModal.classList.contains('active')) return;
-            if (elements.backupSelectModal && elements.backupSelectModal.classList.contains('active')) return;
-            if (elements.shelfOverlay && elements.shelfOverlay.classList.contains('active')) return;
-
-            if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                elements.btnPrevPage.click();
-            } else if (e.key === 'ArrowRight') {
-                e.preventDefault();
-                elements.btnNextPage.click();
-            } else if (e.key === 'b' || e.key === 'B') {
-                e.preventDefault();
-                toggleSidebar(true);
-            } else if (e.key === 'd' || e.key === 'D') {
-                e.preventDefault();
-                togglePageMode();
-            }
-        });
-
-        // Paper Theme Switch
-        elements.paperBtns.forEach(btn => {
-            btn.addEventListener('click', function () {
-                elements.paperBtns.forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                const theme = this.getAttribute('data-paper');
-                elements.readerPanel.className = `reader-panel paper-${theme}`;
-            });
-        });
-
-        // App Light / Dark Theme
-        elements.btnThemeToggle.addEventListener('click', () => {
-            if (state.appTheme === 'light') {
-                state.appTheme = 'dark';
-                document.body.className = 'theme-dark';
-                elements.btnThemeToggle.innerHTML = '<i class="ri-moon-line"></i>';
-            } else {
-                state.appTheme = 'light';
-                document.body.className = 'theme-light';
-                elements.btnThemeToggle.innerHTML = '<i class="ri-sun-line"></i>';
-            }
-        });
-
-        // Switch Demo Book
-        elements.btnSwitchDemo.addEventListener('click', () => {
-            const nextBookKey = state.currentBook === 'crisis-era' ? 'deep-work' : 'crisis-era';
-            loadBook(nextBookKey);
-            showToast(`已切换图书：《${demoBooks[nextBookKey].title}》`);
-        });
-
-        // My Shelf Drawer Handlers
-        if (elements.btnShelf) {
-            elements.btnShelf.addEventListener('click', () => {
-                refreshShelfUI();
-                elements.shelfOverlay.classList.add('active');
-            });
-        }
-        if (elements.btnCloseShelf) {
-            elements.btnCloseShelf.addEventListener('click', () => {
-                elements.shelfOverlay.classList.remove('active');
-            });
-        }
-
-        // Toggle Show Highlights in Sidebar
-        if (elements.btnToggleShowHighlights) {
-            elements.btnToggleShowHighlights.addEventListener('click', () => {
-                state.showHighlightsInSidebar = !state.showHighlightsInSidebar;
-                renderNotesList();
-                showToast(state.showHighlightsInSidebar ? '已开启：笔记区显示全部划线' : '已恢复：笔记区仅显示随笔思考');
-            });
-        }
-
-        // Note Modal Handlers
-        if (elements.btnCloseModal) {
-            elements.btnCloseModal.addEventListener('click', closeNoteModal);
-        }
-        if (elements.btnCancelModal) {
-            elements.btnCancelModal.addEventListener('click', closeNoteModal);
-        }
-        if (elements.btnConfirmModal) {
-            elements.btnConfirmModal.addEventListener('click', saveModalNote);
-        }
-
-        // Local File Input (.txt / .epub / .equb / .pdf)
-        elements.fileInput.addEventListener('change', function (e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const ext = file.name.split('.').pop().toLowerCase();
-            if (ext === 'epub' || ext === 'equb' || ext === 'zip') {
-                parseEpubFile(file);
-            } else {
-                // 智能魔法头检测：如果文件内容以 PK 开头，自动强行转为 EPUB 解压
-                const checkReader = new FileReader();
-                checkReader.onload = function(evt) {
-                    const text = evt.target.result || '';
-                    if (text.startsWith('PK')) {
-                        showToast("检测到 EPUB 压缩包，正在自动为您解压...");
-                        parseEpubFile(file);
-                    } else {
-                        parseTxtContent(file, text);
-                    }
-                };
-                checkReader.readAsText(file.slice(0, 100)); // 只取前100字节快检
-            }
-        });
-    }
-
-    function findZipFile(zip, targetPath) {
-        if (!targetPath) return null;
-        let normalized = targetPath.replace(/^\/+/, '').replace(/\/\//g, '/');
-        let decoded = decodeURIComponent(normalized);
-        
-        if (zip.file(normalized)) return zip.file(normalized);
-        if (zip.file(decoded)) return zip.file(decoded);
-        
-        // 模糊文件名后缀匹配
-        const keys = Object.keys(zip.files);
-        const matchedKey = keys.find(k => {
-            const kLower = k.toLowerCase();
-            const normLower = normalized.toLowerCase();
-            const decLower = decoded.toLowerCase();
-            return kLower === normLower || kLower === decLower || kLower.endsWith('/' + normLower) || kLower.endsWith('/' + decLower);
-        });
-        return matchedKey ? zip.file(matchedKey) : null;
-    }
-
-    async function processChapterImages(zip, chapterPath, chapDoc) {
-        const images = chapDoc.querySelectorAll("img, image, [*|href]");
-        if (images.length === 0) return;
-        
-        const chapDir = chapterPath.includes('/') ? chapterPath.substring(0, chapterPath.lastIndexOf('/') + 1) : '';
-        
-        for (const img of images) {
-            const rawSrc = img.getAttribute("src") || img.getAttribute("xlink:href") || img.getAttribute("href");
-            if (!rawSrc || rawSrc.startsWith('data:') || rawSrc.startsWith('http')) continue;
-            
-            let imgPath = chapDir + rawSrc;
-            const parts = imgPath.split('/');
-            const stack = [];
-            for (const p of parts) {
-                if (p === '..') stack.pop();
-                else if (p !== '.' && p !== '') stack.push(p);
-            }
-            imgPath = stack.join('/');
-            
-            const imgFile = findZipFile(zip, imgPath) || findZipFile(zip, rawSrc) || findZipFile(zip, rawSrc.split('/').pop());
-            if (imgFile) {
-                try {
-                    const base64 = await imgFile.async("base64");
-                    const ext = rawSrc.split('.').pop().toLowerCase();
-                    const mime = (ext === 'png') ? 'image/png' : (ext === 'gif') ? 'image/gif' : (ext === 'svg') ? 'image/svg+xml' : 'image/jpeg';
-                    const dataUrl = `data:${mime};base64,${base64}`;
-                    
-                    if (img.hasAttribute("src")) img.setAttribute("src", dataUrl);
-                    if (img.hasAttribute("xlink:href")) img.setAttribute("xlink:href", dataUrl);
-                    if (img.hasAttribute("href")) img.setAttribute("href", dataUrl);
-                } catch (e) {
-                    console.warn("未成功转换图片:", rawSrc, e);
-                }
-            }
-        }
-    }
-
-    async function extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap) {
-        const tocItems = [];
-        
-        // 1. 解析 EPUB 2 NCX 目录
-        const ncxItem = opfDoc.querySelector("manifest > item[media-type*='ncx']") || opfDoc.querySelector("manifest > item[id='ncx']");
-        let ncxPath = ncxItem ? opfDir + ncxItem.getAttribute("href") : null;
-        let ncxFile = ncxPath ? findZipFile(zip, ncxPath) : null;
-        if (!ncxFile) {
-            const ncxKey = Object.keys(zip.files).find(f => f.toLowerCase().endsWith('.ncx'));
-            if (ncxKey) ncxFile = zip.file(ncxKey);
-        }
-
-        if (ncxFile) {
-            try {
-                const ncxXmlText = await ncxFile.async("string");
-                const navRegex = /<navPoint[^>]*>[\s\S]*?<text>([\s\S]*?)<\/text>[\s\S]*?<content[^>]*src="([^"]*)"/gi;
-                let match;
-                while ((match = navRegex.exec(ncxXmlText)) !== null) {
-                    const labelText = match[1].replace(/<[^>]+>/g, '').trim();
-                    const contentSrc = match[2].trim();
-                    const [srcPath, anchor] = contentSrc.split('#');
-                    const cleanPath = srcPath.replace(/^\/+/, '');
-                    const fullPath = opfDir + cleanPath;
-                    
-                    const pageNum = hrefToPageMap[cleanPath] || hrefToPageMap[fullPath] || hrefToPageMap[cleanPath.split('/').pop()] || 1;
-                    
-                    tocItems.push({
-                        title: labelText,
-                        page: pageNum,
-                        href: cleanPath,
-                        anchor: anchor || '',
-                        level: 0
-                    });
-                }
-            } catch (e) {
-                console.warn("NCX 目录解析失败，将降级处理:", e);
-            }
-        }
-
-        // 2. 解析 EPUB 3 NAV.xhtml 目录 (作为备选)
-        if (tocItems.length === 0) {
-            const navKey = Object.keys(zip.files).find(f => f.toLowerCase().includes('nav') && (f.endsWith('.xhtml') || f.endsWith('.html')));
-            if (navKey) {
-                try {
-                    const navHtmlText = await zip.files[navKey].async("string");
-                    const parser = new DOMParser();
-                    const navDoc = parser.parseFromString(navHtmlText, "text/html");
-                    navDoc.querySelectorAll("a").forEach(a => {
-                        const title = a.textContent.trim();
-                        const href = a.getAttribute("href");
-                        if (title && href) {
-                            const [srcPath, anchor] = href.split('#');
-                            const cleanPath = srcPath.replace(/^\/+/, '');
-                            const pageNum = hrefToPageMap[cleanPath] || hrefToPageMap[cleanPath.split('/').pop()] || 1;
-                            tocItems.push({
-                                title: title,
-                                page: pageNum,
-                                href: cleanPath,
-                                anchor: anchor || '',
-                                level: 0
-                            });
-                        }
-                    });
-                } catch (e) {
-                    console.warn("NAV 目录解析错误:", e);
-                }
-            }
-        }
-
-        return tocItems;
-    }
-
-    function parseEpubFile(file) {
-        showToast(`正在解压解析 EPUB 图书: ${file.name}...`);
-        const reader = new FileReader();
-        reader.onload = async function (event) {
-            try {
-                if (typeof JSZip === 'undefined') {
-                    throw new Error("JSZip 解压库未加载，请刷新页面后重试");
-                }
-                const arrayBuffer = event.target.result;
-                const zip = await JSZip.loadAsync(arrayBuffer);
-                
-                // 1. 读取 container.xml 寻找到 full-path
-                const containerFile = findZipFile(zip, "META-INF/container.xml");
-                if (!containerFile) throw new Error("无效的 EPUB 格式：未找到 container.xml");
-                
-                const containerXmlText = await containerFile.async("string");
-                const parser = new DOMParser();
-                const containerDoc = parser.parseFromString(containerXmlText, "text/xml");
-                const rootfilePath = containerDoc.querySelector("rootfile")?.getAttribute("full-path");
-                
-                if (!rootfilePath) throw new Error("无法获取 EPUB 资源元数据路径 (rootfile)");
-                
-                // 2. 读取 OPF 文件
-                const opfFile = findZipFile(zip, rootfilePath);
-                if (!opfFile) throw new Error("未找到 OPF 配置文件: " + rootfilePath);
-                
-                const opfXmlText = await opfFile.async("string");
-                const opfDoc = parser.parseFromString(opfXmlText, "text/xml");
-                const opfDir = rootfilePath.includes('/') ? rootfilePath.substring(0, rootfilePath.lastIndexOf('/') + 1) : '';
-                
-                // 3. 构建 href 到 页码 的映射表
-                const manifestItems = {};
-                opfDoc.querySelectorAll("manifest > item").forEach(item => {
-                    manifestItems[item.getAttribute("id")] = item.getAttribute("href");
-                });
-                
-                const spineItemrefs = opfDoc.querySelectorAll("spine > itemref");
-                const pages = [];
-                const hrefToPageMap = {};
-                let pageNum = 1;
-
-                for (const itemref of spineItemrefs) {
-                    const idref = itemref.getAttribute("idref");
-                    const href = manifestItems[idref];
-                    if (!href) continue;
-                    
-                    const htmlPath = opfDir + href;
-                    const chapterFile = findZipFile(zip, htmlPath);
-                    if (chapterFile) {
-                        const chapterHtmlText = await chapterFile.async("string");
-                        const chapDoc = parser.parseFromString(chapterHtmlText, "text/html");
-                        
-                        // 净化样式与处理内联图片
-                        chapDoc.querySelectorAll("script, style, link").forEach(el => el.remove());
-                        chapDoc.querySelectorAll("[style]").forEach(el => el.removeAttribute("style"));
-                        
-                        await processChapterImages(zip, htmlPath, chapDoc);
-                        
-                        let bodyContent = chapDoc.body ? chapDoc.body.innerHTML : chapterHtmlText;
-                        pages.push(bodyContent);
-                        
-                        // 建立映射
-                        const cleanHref = href.replace(/^\/+/, '');
-                        hrefToPageMap[cleanHref] = pageNum;
-                        hrefToPageMap[opfDir + cleanHref] = pageNum;
-                        hrefToPageMap[cleanHref.split('/').pop()] = pageNum;
-                        
-                        pageNum++;
-                    }
-                }
-
-                if (pages.length === 0) throw new Error("未能解析提取出有效的章节正文文本");
-
-                // 4. 解析权威目录 (NCX / NAV)
-                let toc = await extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap);
-                
-                // 如果没有规范目录，退回自适应 H1/H2 提炼
-                if (toc.length === 0) {
-                    pages.forEach((pageHtml, idx) => {
-                        const pDoc = parser.parseFromString(pageHtml, "text/html");
-                        const title = pDoc.querySelector("h1, h2, h3, title")?.textContent.trim() || `第 ${idx + 1} 节`;
-                        toc.push({ title: title, page: idx + 1 });
-                    });
-                }
-
-                // 生成基于文件名的唯一 Book ID
-                const bookId = 'book_' + encodeURIComponent(file.name);
-                const customBookObj = {
-                    id: bookId,
-                    title: file.name.replace(/\.(epub|equb)$/i, ''),
-                    format: 'EPUB',
-                    toc: toc,
-                    pages: pages,
-                    hrefToPageMap: hrefToPageMap,
-                    updatedAt: new Date().toISOString()
-                };
-
-                demoBooks[bookId] = customBookObj;
-                await saveBookToDB(customBookObj);
-                await loadBook(bookId);
-                showToast(`成功解析并入库《${customBookObj.title}》(共 ${pages.length} 章节、${toc.length} 条规范目录)！`);
-            } catch (err) {
-                console.error("EPUB 解析错误:", err);
-                showToast(`EPUB 解析失败: ${err.message}`);
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    }
-
-    function parseTxtContent(file, previewText) {
-        const reader = new FileReader();
-        reader.onload = async function (event) {
-            const text = event.target.result;
-            // 按段落切分排版
-            const paragraphs = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-            const formattedHtml = `<h1>${escapeHtml(file.name)}</h1>` + paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('');
-            
-            const bookId = 'book_' + encodeURIComponent(file.name);
-            const customBookObj = {
-                id: bookId,
-                title: file.name,
-                format: file.name.split('.').pop().toUpperCase(),
-                toc: [{ title: '正文', page: 1 }],
-                pages: [formattedHtml],
-                updatedAt: new Date().toISOString()
-            };
-
-            demoBooks[bookId] = customBookObj;
-            await saveBookToDB(customBookObj);
-            await loadBook(bookId);
-            showToast(`成功导入并入库文件：《${file.name}》`);
-        };
-        reader.readAsText(file);
-    }
-
-    function openNoteModal(quote, existingNoteId = null) {
-        state.editingNoteId = existingNoteId;
-        
-        const modalTitle = elements.noteModal.querySelector('h3');
-        const confirmBtn = elements.btnConfirmModal;
-
-        if (existingNoteId) {
-            const existingNote = state.notes.find(n => n.id === existingNoteId);
-            if (existingNote) {
-                elements.modalQuotePreview.textContent = `“${existingNote.quote || quote}”`;
-                elements.modalNoteTextarea.value = existingNote.comment || '';
-                if (modalTitle) modalTitle.innerHTML = '<i class="ri-edit-line"></i> 编辑随笔感悟';
-                if (confirmBtn) confirmBtn.textContent = '更新随笔笔记';
-            } else {
-                elements.modalQuotePreview.textContent = `“${quote}”`;
-                elements.modalNoteTextarea.value = '';
-                if (modalTitle) modalTitle.innerHTML = '<i class="ri-sticky-note-add-line"></i> 添加随笔';
-                if (confirmBtn) confirmBtn.textContent = '保存划线笔记';
-            }
-        } else {
-            // 检查当前页是否已存在重叠/完全相同引文的高亮节点，若存在则自动切换为编辑该节点
-            const targetPage = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
-            const overlapNote = state.notes.find(n => n.page === targetPage && (n.quote === quote || (n.quote && quote && (n.quote.includes(quote) || quote.includes(n.quote)))));
-            if (overlapNote) {
-                state.editingNoteId = overlapNote.id;
-                elements.modalQuotePreview.textContent = `“${overlapNote.quote || quote}”`;
-                elements.modalNoteTextarea.value = overlapNote.comment || '';
-                if (modalTitle) modalTitle.innerHTML = '<i class="ri-edit-line"></i> 编辑随笔感悟';
-                if (confirmBtn) confirmBtn.textContent = '更新随笔笔记';
-            } else {
-                elements.modalQuotePreview.textContent = `“${quote}”`;
-                elements.modalNoteTextarea.value = '';
-                if (modalTitle) modalTitle.innerHTML = '<i class="ri-sticky-note-add-line"></i> 添加随笔';
-                if (confirmBtn) confirmBtn.textContent = '保存划线笔记';
-            }
-        }
-
-        elements.noteModal.classList.add('active');
-        elements.modalNoteTextarea.focus();
-    }
-
-    function closeNoteModal() {
-        state.editingNoteId = null;
-        elements.noteModal.classList.remove('active');
-    }
-
-    function saveModalNote() {
-        const comment = elements.modalNoteTextarea.value.trim();
-        
-        if (state.editingNoteId) {
-            // 原地更新已存在的笔记节点，绝不产生重复卡片
-            const noteIndex = state.notes.findIndex(n => n.id === state.editingNoteId);
-            if (noteIndex !== -1) {
-                state.notes[noteIndex].comment = comment;
-                state.notes[noteIndex].timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
-                saveNoteToDB(state.notes[noteIndex]);
-                showToast('随笔感悟已成功更新');
-            }
-        } else {
-            // 新建划线随笔
-            const quote = state.pendingSelection ? state.pendingSelection.text : '';
-            const currentBookObj = demoBooks[state.currentBook];
-            const notePage = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
-            let chapter = '章节选区';
-            if (currentBookObj && currentBookObj.toc && currentBookObj.toc.length > 0) {
-                const matchedToc = [...currentBookObj.toc].reverse().find(t => t.page <= notePage);
-                chapter = matchedToc ? matchedToc.title : (currentBookObj.toc[0] ? currentBookObj.toc[0].title : '章节选区');
-            }
-
-            const newNote = {
-                id: 'note-' + Date.now(),
-                bookId: state.currentBook,
-                quote: quote,
-                comment: comment,
-                color: 'yellow',
-                page: notePage,
-                chapter: chapter,
-                timestamp: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
-            };
-
-            state.notes.unshift(newNote);
-            saveNoteToDB(newNote);
-            showToast('高亮及随笔已成功保存');
-        }
-
-        renderNotesList();
-        renderPage(state.currentPage, true);
-        closeNoteModal();
-        if (window.getSelection) window.getSelection().removeAllRanges();
-    }
-
-    async function refreshShelfUI() {
-        if (!elements.shelfGrid) return;
-        const books = await getAllBooksFromDB();
-        if (elements.shelfBookCount) elements.shelfBookCount.textContent = books.length;
-        
-        elements.shelfGrid.innerHTML = '';
-        if (books.length === 0) {
-            elements.shelfGrid.innerHTML = `
-                <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 40px 0; color: var(--text-muted);">
-                    <i class="ri-book-shelf-line" style="font-size: 42px; color: var(--border-color);"></i>
-                    <p style="margin-top: 10px; font-weight: 500;">本地 IndexedDB 书库暂无离线图书</p>
-                    <small>点击顶部“导入书籍”选取的 EPUB/TXT 将自动永久保存在此处</small>
-                </div>
-            `;
-            return;
-        }
-
-        books.forEach(b => {
-            const card = document.createElement('div');
-            card.className = 'shelf-card';
-            card.innerHTML = `
-                <div class="shelf-card-title">
-                    <i class="ri-book-2-line" style="color: var(--primary);"></i>
-                    <span>${escapeHtml(b.title)}</span>
-                </div>
-                <div class="shelf-card-info">
-                    <span class="book-format-tag">${b.format || 'EPUB'}</span>
-                    <span>${b.pages ? b.pages.length : 1} 章节</span>
-                </div>
-                <div class="shelf-card-footer">
-                    <button class="btn btn-outline-sm btn-open-shelf-book" data-id="${b.id}">
-                        <i class="ri-book-open-line"></i> 打开阅读
-                    </button>
-                    <button class="btn btn-ghost-sm btn-del-shelf-book" data-id="${b.id}" title="从书库移除">
-                        <i class="ri-delete-bin-line"></i>
-                    </button>
-                </div>
-            `;
-
-            card.querySelector('.btn-open-shelf-book').addEventListener('click', async function (e) {
-                e.stopPropagation();
-                if (elements.shelfOverlay) elements.shelfOverlay.classList.remove('active');
-                await openBookFromShelf(b.id);
-            });
-
-            card.querySelector('.btn-del-shelf-book').addEventListener('click', async function (e) {
-                e.stopPropagation();
-                if (confirm(`确定要从本地 IndexedDB 书库移除《${b.title}》及其划线笔记吗？`)) {
-                    await deleteBookFromDB(b.id);
-                    showToast(`已从书库移除：《${b.title}》`);
-                }
-            });
-
-            elements.shelfGrid.appendChild(card);
-        });
-    }
-
-    async function openBookFromShelf(bookId) {
-        const bookObj = await loadBookFromDB(bookId);
-        if (!bookObj) {
-            showToast("未能载入图书，请重新导入");
-            return;
-        }
-        demoBooks[bookId] = bookObj;
-        await loadBook(bookId);
-        showToast(`已从 IndexedDB 书库加载：《${bookObj.title}》`);
-    }
-
-    function showToast(msg) {
-        elements.toastMsg.textContent = msg;
-        elements.toastMsg.classList.add('show');
-        setTimeout(() => elements.toastMsg.classList.remove('show'), 2600);
-    }
-
-    function escapeHtml(str) {
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    // --------------------------------------------------------------------------
-    // 9. Bootstrap Application
-    // --------------------------------------------------------------------------
-    document.addEventListener('DOMContentLoaded', async function () {
-        // 彻底清理历史残存的云同步与 AI 本地缓存键值
-        try {
-            localStorage.removeItem('aura_sync_secret');
-            localStorage.removeItem('aura_sync_last_time');
-            localStorage.removeItem('aura_api_key');
-        } catch (e) {
-            // ignore
-        }
-
-        initResizer();
-        initTextSelection();
-        initUIControls();
-        applySidebarState(false);
-        checkResponsiveLayout(false);
-        updateLayoutClasses();
-        await initDB();
-        await loadBook('crisis-era');
     });
 
-})();
+    // App Dark/Light Theme
+    elements.btnThemeToggle.addEventListener('click', () => {
+        if (state.appTheme === 'light') {
+            state.appTheme = 'dark';
+            document.body.className = 'theme-dark';
+            elements.btnThemeToggle.innerHTML = '<i class="ri-moon-line"></i>';
+        } else {
+            state.appTheme = 'light';
+            document.body.className = 'theme-light';
+            elements.btnThemeToggle.innerHTML = '<i class="ri-sun-line"></i>';
+        }
+    });
+
+    // Switch Demo Book
+    elements.btnSwitchDemo.addEventListener('click', () => {
+        const nextBookKey = state.currentBook === 'crisis-era' ? 'deep-work' : 'crisis-era';
+        loadBook(nextBookKey);
+        showToast(`已切换图书：《${demoBooks[nextBookKey].title}》`);
+    });
+
+    // File Input Import (EPUB/TXT)
+    elements.fileInput.addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext === 'epub' || ext === 'equb' || ext === 'zip') {
+            handleEpubUpload(file);
+        } else {
+            const checkReader = new FileReader();
+            checkReader.onload = function (evt) {
+                const text = evt.target.result || '';
+                if (text.startsWith('PK')) {
+                    showToast("检测到 EPUB 压缩包，正在自动为您解压...");
+                    handleEpubUpload(file);
+                } else {
+                    handleTxtUpload(file, text);
+                }
+            };
+            checkReader.readAsText(file.slice(0, 100));
+        }
+    });
+
+    // Keyboard Shortcuts
+    document.addEventListener('keydown', (e) => {
+        const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+        if (tag === 'input' || tag === 'textarea' || document.activeElement.isContentEditable) {
+            return;
+        }
+
+        if (elements.noteModal && elements.noteModal.classList.contains('active')) return;
+        if (elements.backupSelectModal && elements.backupSelectModal.classList.contains('active')) return;
+        if (elements.shelfOverlay && elements.shelfOverlay.classList.contains('active')) return;
+
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            elements.btnPrevPage.click();
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            elements.btnNextPage.click();
+        } else if (e.key === 'b' || e.key === 'B') {
+            e.preventDefault();
+            toggleSidebar(true);
+        } else if (e.key === 'd' || e.key === 'D') {
+            e.preventDefault();
+            togglePageMode();
+        }
+    });
+
+    // Window Resize
+    let resizeDebounceTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeDebounceTimer);
+        resizeDebounceTimer = setTimeout(() => {
+            checkResponsiveLayout(true);
+        }, 60);
+    });
+}
+
+async function handleEpubUpload(file) {
+    showToast(`正在解压解析 EPUB 图书: ${file.name}...`);
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const bookObj = await parseEpub(arrayBuffer, file.name, window.JSZip);
+        await saveBookToDB(bookObj);
+        await loadBook(bookObj.id);
+        showToast(`成功解析并入库《${bookObj.title}》(共 ${bookObj.pages.length} 章节、${bookObj.toc.length} 条规范目录)！`);
+    } catch (err) {
+        console.error("EPUB 解析失败:", err);
+        showToast(`EPUB 解析失败: ${err.message}`);
+    }
+}
+
+async function handleTxtUpload(file, previewText) {
+    try {
+        const text = await file.text();
+        const bookObj = parseTxt(text, file.name);
+        await saveBookToDB(bookObj);
+        await loadBook(bookObj.id);
+        showToast(`成功导入并入库文件：《${file.name}》`);
+    } catch (err) {
+        console.error("TXT 导入失败:", err);
+        showToast(`TXT 导入失败: ${err.message}`);
+    }
+}
+
+function showToast(msg) {
+    if (!elements.toastMsg) return;
+    elements.toastMsg.textContent = msg;
+    elements.toastMsg.classList.add('show');
+    setTimeout(() => elements.toastMsg.classList.remove('show'), 2600);
+}
+
+// --------------------------------------------------------------------------
+// 11. Bootstrap Application
+// --------------------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', async function () {
+    try {
+        localStorage.removeItem('aura_sync_secret');
+        localStorage.removeItem('aura_sync_last_time');
+        localStorage.removeItem('aura_api_key');
+    } catch (e) {
+        // ignore
+    }
+
+    initResizer();
+    initTextSelection();
+    initUIControls();
+    applySidebarState(false);
+    checkResponsiveLayout(false);
+    updateLayoutClasses();
+    await initDB();
+    await loadBook('crisis-era');
+});

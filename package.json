@@ -6,9 +6,9 @@
   "scripts": {
     "start": "node src/server/server.js",
     "dev": "node src/server/server.js",
-    "test": "node tests/unit/test_ncx.js && node tests/unit/inspect.js",
-    "test:unit": "node tests/unit/test_ncx.js && node tests/unit/inspect.js",
-    "test:syntax": "node --check src/server/server.js && node --check src/client/app.js",
+    "test": "npm run test:all",
+    "test:unit": "node tests/unit/test_ncx.js && node tests/unit/inspect.js && node tests/unit/test_decoupled_architecture.js",
+    "test:syntax": "node --check src/server/server.js && node --check src/client/app.js && node --check src/client/repositories/bookRepository.js && node --check src/client/repositories/annotationRepository.js && node --check src/client/core/readingLocation.js && node --check src/client/core/readerEngine.js && node --check src/client/core/annotationEngine.js && node --check src/client/ui/layoutSystem.js && node --check src/client/ui/paperRenderer.js && node --check src/client/ui/notesUI.js && node --check src/client/ui/shelfUI.js && node --check src/client/ui/tocUI.js && node --check src/client/adapters/epubParser.js && node --check src/client/adapters/exporters.js",
     "test:regression": "node tests/regression/run_all.js",
     "test:all": "npm run test:syntax && npm run test:unit && npm run test:regression"
   },
