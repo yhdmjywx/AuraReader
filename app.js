@@ -2175,6 +2175,14 @@
     // 9. Bootstrap Application
     // --------------------------------------------------------------------------
     document.addEventListener('DOMContentLoaded', async function () {
+        // 彻底清理历史残存的云同步本地缓存键值
+        try {
+            localStorage.removeItem('aura_sync_secret');
+            localStorage.removeItem('aura_sync_last_time');
+        } catch (e) {
+            // ignore
+        }
+
         initResizer();
         initTextSelection();
         initUIControls();

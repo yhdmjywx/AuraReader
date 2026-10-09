@@ -9,7 +9,7 @@
   - **访问地址**：👉 **`http://localhost:8095`**
 - **Git 版本库状态**：
   - **分支**：`master`
-  - **最新 Commit**：`f204985` / `b413309` / `19c3586` / `0c62176` / `ef75f2b`
+  - **最新 Commit**：`1aa30f1` (彻底移除 SQLite Cloud Sync，全面回归 100% Local-First)
   - **工作区**：干净（Working tree clean）
 
 ---
@@ -36,7 +36,10 @@
 
 ## 3. 校验套件结果 (Verification Results)
 
-- **JavaScript 语法校验 (`node -c app.js`)**：PASSED (0 Syntax Errors)
+- **JavaScript 语法校验 (`node -c app.js; node -c server.js`)**：PASSED (0 Syntax Errors)
+- **HTML 结构与标签平衡校验**：PASSED (0 Mismatches, 0 Unclosed Tags)
+- **云同步废弃 API 路由隔离校验**：PASSED (/api/sync/pull 与 /api/sync/push 均精确返回 404)
+- **历史残存 LocalStorage 键防御性清除**：PASSED (`aura_sync_secret` 与 `aura_sync_last_time` 启动自动清除)
 - **NCX 132 目录提取测试**：PASSED (132/132 Entries)
 - **IndexedDB 数据库联调测试**：PASSED (Books & Notes store transaction verified)
 - **消除重复 Markdown 生成测试**：PASSED (0 Duplicated `原文：“...` strings)
