@@ -183,5 +183,110 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
 
     console.log("✅ 数据边界隔离与跨书防串线测试全部通过！");
 
+    // 6. 测试 Session 最小共享上下文与权威状态隔离
+    console.log("\n--- [测试 6: Session 最小共享上下文与权威状态隔离] ---");
+    const { Session } = await import('../../src/client/app/session.js');
+    const sess = new Session('initial-book');
+    assert.strictEqual(sess.getCurrentBookId(), 'initial-book', "Session 初始书籍 ID 正确");
+
+    let notificationReceived = null;
+    const unsubscribe = sess.subscribe(evt => {
+        notificationReceived = evt;
+    });
+
+    sess.setCurrentBookId('switched-book');
+    assert.strictEqual(sess.getCurrentBookId(), 'switched-book', "Session 书籍 ID 切换成功");
+    assert.deepStrictEqual(notificationReceived, { currentBookId: 'switched-book', previousBookId: 'initial-book' });
+
+    unsubscribe();
+    sess.setCurrentBookId('another-book');
+    assert.strictEqual(notificationReceived.currentBookId, 'switched-book', "退订后不再触发通知");
+    console.log("✅ Session 最小共享上下文测试全部通过！");
+
+    // 7. 测试 AppCoordinator 跨模块协作与独立 Feature Controllers
+    console.log("\n--- [测试 7: AppCoordinator 跨模块协调与 Feature Controllers 隔离] ---");
+    const { AppCoordinator } = await import('../../src/client/app/appCoordinator.js');
+    const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
+    const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
+    const { LayoutController } = await import('../../src/client/features/layout/layoutController.js');
+
+    const testEngine = new ReaderEngine();
+    testEngine.setBook('book-abc', mockBook);
+    const testLayout = new LayoutController();
+    const testReader = new ReaderController({
+        readerEngine: testEngine,
+        layoutController: testLayout
+    });
+    testReader.setBook('book-abc', mockBook);
+
+    const testAnnotations = new AnnotationController({
+        callbacks: { getCurrentBookId: () => sess.getCurrentBookId() }
+    });
+
+    let toastMessage = '';
+    const mockShell = {
+        showToast: (msg) => { toastMessage = msg; }
+    };
+
+    const coord = new AppCoordinator({
+        session: sess,
+        readerController: testReader,
+        annotationController: testAnnotations,
+        layoutController: testLayout,
+        appShell: mockShell
+    });
+
+    // 协调添加标注
+    await coord.addAnnotation({
+        type: 'highlight',
+        quote: '第2页核心引文',
+        page: 2,
+        color: 'yellow'
+    });
+
+    const notesInAnnot = testAnnotations.getNotes();
+    assert.strictEqual(notesInAnnot.length, 1, "Coordinator 协调添加高亮成功");
+    assert.strictEqual(notesInAnnot[0].quote, '第2页核心引文');
+    assert.strictEqual(notesInAnnot[0].color, 'yellow');
+
+    // 协调单双页布局切换
+    coord.changeReadingLayout('double');
+    assert.strictEqual(testLayout.getLayoutMode(), 'double', "Coordinator 切换阅读布局至 double");
+    assert.ok(toastMessage.includes('双页'), "AppShell 收到对应布局提示通知");
+
+    coord.changeReadingLayout('single');
+    assert.strictEqual(testLayout.getLayoutMode(), 'single', "Coordinator 切换阅读布局至 single");
+
+    console.log("✅ AppCoordinator 跨模块协调机制测试全部通过！");
+
+    // 8. 测试 ReaderController 封装高亮滚动与 Coordinator 委托
+    console.log("\n--- [测试 8: ReaderController 封装高亮跳转与 DOM 隔离] ---");
+    assert.strictEqual(typeof testReader.scrollToHighlight, 'function', "ReaderController 必须封装 scrollToHighlight");
+    // 在无 DOM 或 elements 为空环境下调用应静默且不崩溃
+    testReader.scrollToHighlight('note-123');
+
+    // 验证 Coordinator.jumpToAnnotation 委托至 ReaderController 而无 DOM 依赖侵入
+    coord.jumpToAnnotation(notesInAnnot[0].id);
+    assert.ok(toastMessage.includes('跳转至 P.2'), "jumpToAnnotation 提示通知正确触发");
+    console.log("✅ ReaderController 封装高亮跳转测试全部通过！");
+
+    // 9. 测试 app.js 薄门面与 main.js 权威控制器单例统一（无裂脑状态）
+    console.log("\n--- [测试 9: app.js 门面与 main.js 架构实例统一性] ---");
+    const mainModule = await import('../../src/client/main.js');
+    const appModule = await import('../../src/client/app.js');
+
+    assert.strictEqual(appModule.readerController, mainModule.reader, "app.js 与 main.js 共享唯一的 ReaderController 实例");
+    assert.strictEqual(appModule.annotationController, mainModule.annotations, "app.js 与 main.js 共享唯一的 AnnotationController 实例");
+    assert.strictEqual(appModule.appCoordinator, mainModule.coordinator, "app.js 与 main.js 共享唯一的 AppCoordinator 实例");
+    assert.strictEqual(appModule.session, mainModule.session, "app.js 与 main.js 共享唯一的 Session 实例");
+
+    // 测试状态同步性
+    mainModule.reader.currentPage = 4;
+    assert.strictEqual(appModule.state.currentPage, 4, "main.js 修改当前页时 app.js state 实时权威同步");
+    mainModule.reader.currentPage = 1; // 恢复初始状态
+
+    console.log("✅ app.js 与 main.js 架构实例统一性测试全部通过！");
+
     console.log("\n🎉 全部解耦架构单元测试 100% 成功！");
 })();
+

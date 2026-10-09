@@ -18,7 +18,7 @@
 
 | 功能模块 | 实现描述 | 状态 |
 | --- | --- | --- |
-| **核心能力架构解耦** | 将 2,400+ 行单体 `app.js` 解耦为以「独立变化能力」为边界的五大模块层级：应用协调层、阅读内核 (`readerEngine`/`readingLocation`)、标注内核 (`annotationEngine`)、UI 呈现系统 (`layoutSystem`/`paperRenderer`/`notesUI`/`shelfUI`/`tocUI`) 以及基础设施适配器 (`bookRepository`/`annotationRepository`/`epubParser`/`exporters`)。彻底消除跨书笔记串线与多书备份数据丢失。 | ✅ 100% |
+| **终极架构解耦 (三层六类职责)** | 落地 Bootstrap (`main.js`) + App 协调层 (`appCoordinator.js`/`session.js`/`appShell.js`) + 五大功能控制器 (`readerController`/`annotationController`/`selectionController`/`shelfController`/`backupController`/`layoutController`) + 纯业务领域内核 (`domain/`) + 基础设施适配 (`infrastructure/`)。`app.js` 彻底瘦身为薄门面（Thin Facade）并统一单例权威，彻底消除双实例与 DOM 侵入，通过全量回归测试。 | ✅ 100% |
 | **75:25 可分栏工作台** | 左侧 75% 阅读区 + 右侧 25% 笔记区，支持 25%-85% 弹性拖拽 Clamp 与双击快捷折叠。 | ✅ 100% |
 | **EPUB NCX 132 目录解析** | 支持提取 EPUB 2/3 132 条规范目录，实现 `#anchor` 锚点平滑跳转。 | ✅ 100% |
 | **图片 Base64 自动转换** | 兼容相对路径 `<img>` 及 SVG `<image xlink:href>`，彻底消除 404 破损图片。 | ✅ 100% |
