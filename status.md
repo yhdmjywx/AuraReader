@@ -9,7 +9,7 @@
   - **访问地址**：👉 **`http://localhost:8095`**
 - **Git 版本库状态**：
   - **分支**：`master`
-  - **最新 Commit**：`2100903` (彻底移除所有现存 AI 功能，净化文档与样式，回归纯粹无干扰的 Local-First 阅读工作台)
+  - **最新 Commit**：`8e299ea` (彻底移除所有现存 AI 功能，净化文档与样式，回归纯粹无干扰的 Local-First 阅读工作台)
   - **工作区**：干净（Working tree clean）
 
 ---
