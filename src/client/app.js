@@ -224,9 +224,11 @@ export function isDoublePageEffective() {
 
 export function checkResponsiveLayout() {
     const notify = arguments.length > 0 ? arguments[0] : true;
-    const availWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
+    const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
+        ? elements.readerPanel.clientWidth
+        : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
     const res = layoutController.checkResponsiveLayout(availWidth);
-    if (res.changed) {
+    if (res.changed && (!layoutController.callbacks || !layoutController.callbacks.onResponsiveChange)) {
         if (notify) {
             if (res.isAutoDowngraded) {
                 showToast('可用空间不足，已自适应降级为单页展示');
@@ -245,20 +247,28 @@ export function togglePageMode() {
 }
 
 export function setPageMode(mode) {
-    const availWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
+    const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
+        ? elements.readerPanel.clientWidth
+        : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
     const res = layoutController.setPageMode(mode, availWidth);
-    if (mode === 'double' && res.isAutoDowngraded) {
-        showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
-    } else {
-        showToast(mode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
+    if (!layoutController.callbacks || !layoutController.callbacks.onLayoutChange) {
+        if (mode === 'double' && res.isAutoDowngraded) {
+            showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
+        } else {
+            showToast(mode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
+        }
+        updateLayoutClasses();
+        renderPage(state.currentPage, true);
     }
-    updateLayoutClasses();
-    renderPage(state.currentPage, true);
+    return res;
 }
 
 export function toggleSidebar(notify = true) {
-    layoutController.toggleSidebar(notify);
-    applySidebarState(notify);
+    const isCollapsed = layoutController.toggleSidebar(notify);
+    if (!layoutController.callbacks || !layoutController.callbacks.onSidebarChange) {
+        applySidebarState(notify);
+    }
+    return isCollapsed;
 }
 
 export function applySidebarState(notify = false) {

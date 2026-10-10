@@ -15,6 +15,8 @@ export class LayoutController {
         this.readerWidthPercent = storage ? (parseFloat(storage.getItem('aura_reader_width')) || 75) : 75;
         this.isAutoDowngraded = false;
         this.callbacks = callbacks;
+        this.elements = null;
+        this._uiInitialized = false;
     }
 
     isDoublePageEffective() {
@@ -74,9 +76,14 @@ export class LayoutController {
         return res;
     }
 
-    togglePageMode(availableWidth = 1200) {
+    togglePageMode(availableWidth) {
         const nextMode = (this.layoutMode === 'double') ? 'single' : 'double';
-        return this.setPageMode(nextMode, availableWidth);
+        const width = (availableWidth !== undefined && availableWidth > 0)
+            ? availableWidth
+            : ((this.elements && this.elements.readerPanel && this.elements.readerPanel.clientWidth > 0)
+                ? this.elements.readerPanel.clientWidth
+                : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200));
+        return this.setPageMode(nextMode, width);
     }
 
     toggleSidebar(notify = true) {
@@ -117,98 +124,163 @@ export class LayoutController {
     }
 
     updateLayoutClasses(elements) {
-        if (!elements || !elements.workspaceContainer) return;
+        const el = elements || this.elements;
+        if (!el || !el.workspaceContainer) return;
 
         if (this.isCollapsed) {
-            elements.workspaceContainer.classList.add('sidebar-collapsed');
+            el.workspaceContainer.classList.add('sidebar-collapsed');
         } else {
-            elements.workspaceContainer.classList.remove('sidebar-collapsed');
+            el.workspaceContainer.classList.remove('sidebar-collapsed');
         }
 
         const isDouble = this.isDoublePageEffective();
         if (isDouble) {
-            elements.workspaceContainer.classList.add('layout-double');
-            elements.workspaceContainer.classList.remove('layout-single');
+            el.workspaceContainer.classList.add('layout-double');
+            el.workspaceContainer.classList.remove('layout-single');
         } else {
-            elements.workspaceContainer.classList.add('layout-single');
-            elements.workspaceContainer.classList.remove('layout-double');
+            el.workspaceContainer.classList.add('layout-single');
+            el.workspaceContainer.classList.remove('layout-double');
         }
 
-        this.updatePageModeButtonUI(elements);
-        this.updateSidebarButtonsUI(elements);
+        this.updatePageModeButtonUI(el);
+        this.updateSidebarButtonsUI(el);
     }
 
     updatePageModeButtonUI(elements) {
-        if (!elements || !elements.btnPageMode) return;
+        const el = elements || this.elements;
+        if (!el || !el.btnPageMode) return;
 
         if (this.layoutMode === 'double') {
-            elements.btnPageMode.classList.add('active');
+            el.btnPageMode.classList.add('active');
             if (this.isAutoDowngraded) {
-                elements.btnPageMode.classList.add('auto-downgraded');
-                if (elements.textPageMode) elements.textPageMode.textContent = '双页(自适应)';
-                elements.btnPageMode.title = '双页模式（因宽度受限临时单页展示，展开窗口或收起侧栏后将自动恢复）';
+                el.btnPageMode.classList.add('auto-downgraded');
+                if (el.textPageMode) el.textPageMode.textContent = '双页(自适应)';
+                el.btnPageMode.title = '双页模式（因宽度受限临时单页展示，展开窗口或收起侧栏后将自动恢复）';
             } else {
-                elements.btnPageMode.classList.remove('auto-downgraded');
-                if (elements.textPageMode) elements.textPageMode.textContent = '双页';
-                elements.btnPageMode.title = '切换为单页模式 (快捷键: D)';
+                el.btnPageMode.classList.remove('auto-downgraded');
+                if (el.textPageMode) el.textPageMode.textContent = '双页';
+                el.btnPageMode.title = '切换为单页模式 (快捷键: D)';
             }
-            if (elements.iconPageMode) elements.iconPageMode.className = 'ri-book-open-line';
+            if (el.iconPageMode) el.iconPageMode.className = 'ri-book-open-line';
         } else {
-            elements.btnPageMode.classList.remove('active', 'auto-downgraded');
-            if (elements.textPageMode) elements.textPageMode.textContent = '单页';
-            elements.btnPageMode.title = '切换为双页模式 (快捷键: D)';
-            if (elements.iconPageMode) elements.iconPageMode.className = 'ri-book-read-line';
+            el.btnPageMode.classList.remove('active', 'auto-downgraded');
+            if (el.textPageMode) el.textPageMode.textContent = '单页';
+            el.btnPageMode.title = '切换为双页模式 (快捷键: D)';
+            if (el.iconPageMode) el.iconPageMode.className = 'ri-book-read-line';
         }
     }
 
     updateSidebarButtonsUI(elements) {
-        if (!elements) return;
+        const el = elements || this.elements;
+        if (!el) return;
 
         if (this.isCollapsed) {
-            if (elements.btnToggleSidebar) {
-                elements.btnToggleSidebar.classList.remove('active');
-                elements.btnToggleSidebar.title = '展开笔记侧边栏 (快捷键: B)';
+            if (el.btnToggleSidebar) {
+                el.btnToggleSidebar.classList.remove('active');
+                el.btnToggleSidebar.title = '展开笔记侧边栏 (快捷键: B)';
             }
-            if (elements.textToggleSidebar) elements.textToggleSidebar.textContent = '展开笔记';
-            if (elements.iconToggleSidebar) elements.iconToggleSidebar.className = 'ri-layout-right-line';
-            if (elements.btnSidebarRecall) elements.btnSidebarRecall.style.display = 'flex';
+            if (el.textToggleSidebar) el.textToggleSidebar.textContent = '展开笔记';
+            if (el.iconToggleSidebar) el.iconToggleSidebar.className = 'ri-layout-right-line';
+            if (el.btnSidebarRecall) el.btnSidebarRecall.style.display = 'flex';
         } else {
-            if (elements.btnToggleSidebar) {
-                elements.btnToggleSidebar.classList.add('active');
-                elements.btnToggleSidebar.title = '收起笔记侧边栏 (快捷键: B)';
+            if (el.btnToggleSidebar) {
+                el.btnToggleSidebar.classList.add('active');
+                el.btnToggleSidebar.title = '收起笔记侧边栏 (快捷键: B)';
             }
-            if (elements.textToggleSidebar) elements.textToggleSidebar.textContent = '收起笔记';
-            if (elements.iconToggleSidebar) elements.iconToggleSidebar.className = 'ri-side-bar-line';
-            if (elements.btnSidebarRecall) elements.btnSidebarRecall.style.display = 'none';
+            if (el.textToggleSidebar) el.textToggleSidebar.textContent = '收起笔记';
+            if (el.iconToggleSidebar) el.iconToggleSidebar.className = 'ri-side-bar-line';
+            if (el.btnSidebarRecall) el.btnSidebarRecall.style.display = 'none';
         }
     }
 
     applySidebarState(elements) {
-        if (!elements) return;
+        const el = elements || this.elements;
+        if (!el) return;
 
         if (this.isCollapsed) {
-            if (elements.workspaceContainer) elements.workspaceContainer.classList.add('sidebar-collapsed');
-            if (elements.readerPanel) elements.readerPanel.style.width = '100%';
-            if (elements.notesPanel) elements.notesPanel.style.display = 'none';
-            if (elements.resizerHandle) elements.resizerHandle.style.display = 'none';
+            if (el.workspaceContainer) el.workspaceContainer.classList.add('sidebar-collapsed');
+            if (el.readerPanel) el.readerPanel.style.width = '100%';
+            if (el.notesPanel) el.notesPanel.style.display = 'none';
+            if (el.resizerHandle) el.resizerHandle.style.display = 'none';
         } else {
-            if (elements.workspaceContainer) elements.workspaceContainer.classList.remove('sidebar-collapsed');
-            if (elements.readerPanel) elements.readerPanel.style.width = `${this.readerWidthPercent}%`;
-            if (elements.notesPanel) elements.notesPanel.style.display = 'flex';
-            if (elements.resizerHandle) elements.resizerHandle.style.display = 'flex';
+            if (el.workspaceContainer) el.workspaceContainer.classList.remove('sidebar-collapsed');
+            if (el.readerPanel) el.readerPanel.style.width = `${this.readerWidthPercent}%`;
+            if (el.notesPanel) el.notesPanel.style.display = 'flex';
+            if (el.resizerHandle) el.resizerHandle.style.display = 'flex';
         }
 
-        this.updateSidebarButtonsUI(elements);
+        this.updateSidebarButtonsUI(el);
+    }
+
+    initUI(elements) {
+        this.elements = elements;
+        if (!elements) return;
+        if (this._uiInitialized) return;
+        this._uiInitialized = true;
+
+        this.applySidebarState(elements);
+        this.updateLayoutClasses(elements);
+
+        if (elements.btnPageMode) {
+            elements.btnPageMode.addEventListener('click', (e) => {
+                if (e && typeof e.preventDefault === 'function') e.preventDefault();
+                const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
+                    ? elements.readerPanel.clientWidth
+                    : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
+                this.togglePageMode(availWidth);
+                if (!this.callbacks || !this.callbacks.onLayoutChange) {
+                    this.updateLayoutClasses(elements);
+                }
+            });
+        }
+
+        if (elements.btnToggleSidebar) {
+            elements.btnToggleSidebar.addEventListener('click', (e) => {
+                if (e && typeof e.preventDefault === 'function') e.preventDefault();
+                this.toggleSidebar(true);
+                if (!this.callbacks || !this.callbacks.onSidebarChange) {
+                    this.applySidebarState(elements);
+                    this.updateLayoutClasses(elements);
+                }
+            });
+        }
+
+        if (elements.btnCollapseSidebar) {
+            elements.btnCollapseSidebar.addEventListener('click', (e) => {
+                if (e && typeof e.preventDefault === 'function') e.preventDefault();
+                if (!this.isCollapsed) {
+                    this.toggleSidebar(true);
+                    if (!this.callbacks || !this.callbacks.onSidebarChange) {
+                        this.applySidebarState(elements);
+                        this.updateLayoutClasses(elements);
+                    }
+                }
+            });
+        }
+
+        if (elements.btnSidebarRecall) {
+            elements.btnSidebarRecall.addEventListener('click', (e) => {
+                if (e && typeof e.preventDefault === 'function') e.preventDefault();
+                if (this.isCollapsed) {
+                    this.toggleSidebar(true);
+                    if (!this.callbacks || !this.callbacks.onSidebarChange) {
+                        this.applySidebarState(elements);
+                        this.updateLayoutClasses(elements);
+                    }
+                }
+            });
+        }
     }
 
     initResizer(elements, onWidthChange, onToggleSidebar) {
-        if (!elements || !elements.resizerHandle) return;
+        const el = elements || this.elements;
+        if (!el || !el.resizerHandle) return;
 
         let isDragging = false;
 
-        elements.resizerHandle.addEventListener('mousedown', function () {
+        el.resizerHandle.addEventListener('mousedown', function () {
             isDragging = true;
-            elements.resizerHandle.classList.add('dragging');
+            el.resizerHandle.classList.add('dragging');
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
         });
@@ -216,7 +288,7 @@ export class LayoutController {
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
 
-            const containerWidth = elements.workspaceContainer.clientWidth;
+            const containerWidth = el.workspaceContainer ? el.workspaceContainer.clientWidth : window.innerWidth;
             const newLeftWidthPx = e.clientX;
             let percent = (newLeftWidthPx / containerWidth) * 100;
 
@@ -227,8 +299,8 @@ export class LayoutController {
                 localStorage.setItem('aura_reader_width', percent);
             }
 
-            if (elements.readerPanel) {
-                elements.readerPanel.style.width = `${percent}%`;
+            if (el.readerPanel) {
+                el.readerPanel.style.width = `${percent}%`;
             }
 
             if (typeof onWidthChange === 'function') {
@@ -239,13 +311,13 @@ export class LayoutController {
         document.addEventListener('mouseup', () => {
             if (isDragging) {
                 isDragging = false;
-                elements.resizerHandle.classList.remove('dragging');
+                el.resizerHandle.classList.remove('dragging');
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
             }
         });
 
-        elements.resizerHandle.addEventListener('dblclick', () => {
+        el.resizerHandle.addEventListener('dblclick', () => {
             if (typeof onToggleSidebar === 'function') {
                 onToggleSidebar();
             }

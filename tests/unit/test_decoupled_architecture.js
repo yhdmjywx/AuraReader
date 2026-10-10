@@ -164,7 +164,90 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
     assert.strictEqual(resp2.changed, true);
     assert.strictEqual(layout.isDoublePageEffective(), true, "宽度恢复后应自动恢复双页展开");
 
-    console.log("✅ LayoutSystem 布局控制器测试全部通过！");
+    // 测试 LayoutSystem.initUI 事件监听与按钮点击响应
+    function createMockElement(id) {
+        const listeners = {};
+        const classes = new Set();
+        return {
+            id,
+            classList: {
+                add: (...cls) => cls.forEach(c => classes.add(c)),
+                remove: (...cls) => cls.forEach(c => classes.delete(c)),
+                contains: (c) => classes.has(c)
+            },
+            style: {},
+            textContent: '',
+            title: '',
+            className: '',
+            addEventListener: (event, cb) => {
+                listeners[event] = listeners[event] || [];
+                listeners[event].push(cb);
+            },
+            click: () => {
+                if (listeners['click']) {
+                    listeners['click'].forEach(cb => cb({ preventDefault: () => {} }));
+                }
+            }
+        };
+    }
+
+    const mockElements = {
+        workspaceContainer: createMockElement('workspace-container'),
+        readerPanel: { ...createMockElement('reader-panel'), clientWidth: 1000 },
+        notesPanel: createMockElement('notes-panel'),
+        resizerHandle: createMockElement('resizer-handle'),
+        btnPageMode: createMockElement('btn-page-mode'),
+        textPageMode: createMockElement('text-page-mode'),
+        iconPageMode: createMockElement('icon-page-mode'),
+        btnToggleSidebar: createMockElement('btn-toggle-sidebar'),
+        btnCollapseSidebar: createMockElement('btn-collapse-sidebar'),
+        btnSidebarRecall: createMockElement('btn-sidebar-recall'),
+        textToggleSidebar: createMockElement('text-toggle-sidebar'),
+        iconToggleSidebar: createMockElement('icon-toggle-sidebar')
+    };
+
+    layout.initUI(mockElements);
+
+    // 4.1 点击 btnPageMode 切换单/双页
+    assert.strictEqual(layout.getLayoutMode(), 'double');
+    mockElements.btnPageMode.click();
+    assert.strictEqual(layout.getLayoutMode(), 'single', "点击 btnPageMode 应从 double 切换为 single");
+    assert.strictEqual(mockElements.textPageMode.textContent, '单页');
+
+    mockElements.btnPageMode.click();
+    assert.strictEqual(layout.getLayoutMode(), 'double', "再次点击 btnPageMode 应恢复为 double");
+    assert.strictEqual(mockElements.textPageMode.textContent, '双页');
+
+    // 4.2 点击 btnToggleSidebar 收起/展开笔记侧边栏
+    assert.strictEqual(layout.getIsCollapsed(), false);
+    mockElements.btnToggleSidebar.click();
+    assert.strictEqual(layout.getIsCollapsed(), true, "点击 btnToggleSidebar 应收起笔记侧边栏");
+    assert.strictEqual(mockElements.workspaceContainer.classList.contains('sidebar-collapsed'), true);
+
+    mockElements.btnToggleSidebar.click();
+    assert.strictEqual(layout.getIsCollapsed(), false, "再次点击 btnToggleSidebar 应展开笔记侧边栏");
+    assert.strictEqual(mockElements.workspaceContainer.classList.contains('sidebar-collapsed'), false);
+
+    // 4.3 点击 btnCollapseSidebar 收起侧边栏
+    mockElements.btnCollapseSidebar.click();
+    assert.strictEqual(layout.getIsCollapsed(), true, "点击 btnCollapseSidebar 应收起侧边栏");
+
+    // 4.4 点击 btnSidebarRecall 展开侧边栏
+    mockElements.btnSidebarRecall.click();
+    assert.strictEqual(layout.getIsCollapsed(), false, "点击 btnSidebarRecall 应展开侧边栏");
+
+    // 4.5 测试宽度为 0 时的安全回退防误降级
+    const zeroWidthLayout = new LayoutSystem();
+    zeroWidthLayout.initUI({
+        ...mockElements,
+        readerPanel: { ...mockElements.readerPanel, clientWidth: 0 }
+    });
+    // 初始为 single，切换为 double 时，clientWidth 虽为 0，但不应误判为狭窄降级，而应回退至 1200px 正常展开
+    const zeroRes = zeroWidthLayout.togglePageMode();
+    assert.strictEqual(zeroRes.layoutMode, 'double');
+    assert.strictEqual(zeroRes.isAutoDowngraded, false, "clientWidth 为 0 时应回退兜底宽度，不应误触发 autoDowngraded");
+
+    console.log("✅ LayoutSystem 布局控制器与 initUI 按钮交互测试全部通过！");
 
     // 5. 测试核心解耦缺陷排查（验证跨书隔离与多书备份可靠性）
     console.log("\n--- [测试 5: 数据边界隔离与跨书防串线验证] ---");

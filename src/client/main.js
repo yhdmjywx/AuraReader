@@ -241,6 +241,13 @@ export function bootstrapApp() {
     layout.callbacks.onLayoutChange = (res) => {
         layout.updateLayoutClasses(elements);
         reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+        if (appShell) {
+            if (res.layoutMode === 'double' && res.isAutoDowngraded) {
+                appShell.showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
+            } else {
+                appShell.showToast(res.layoutMode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
+            }
+        }
     };
     layout.callbacks.onResponsiveChange = (res) => {
         layout.updateLayoutClasses(elements);
@@ -254,8 +261,13 @@ export function bootstrapApp() {
     layout.callbacks.onSidebarChange = ({ isCollapsed, notify }) => {
         layout.applySidebarState(elements);
         layout.updateLayoutClasses(elements);
-        const availWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
-        layout.checkResponsiveLayout(availWidth);
+        const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
+            ? elements.readerPanel.clientWidth
+            : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
+        const resp = layout.checkResponsiveLayout(availWidth);
+        if (!resp || !resp.changed) {
+            reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+        }
         if (notify) {
             appShell.showToast(isCollapsed ? '已进入 100% 全屏专注阅读模式' : `已展开 ${Math.round(100 - layout.getReaderWidthPercent())}% 笔记工作台`);
         }
@@ -268,11 +280,16 @@ export function bootstrapApp() {
         selection.initUI(elements);
         shelf.initUI(elements);
         backup.initUI(elements);
+        layout.initUI(elements);
 
         layout.initResizer(elements, (percent) => {
-            const availWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
-            layout.checkResponsiveLayout(availWidth);
-            reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+            const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
+                ? elements.readerPanel.clientWidth
+                : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
+            const resp = layout.checkResponsiveLayout(availWidth);
+            if (!resp || !resp.changed) {
+                reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+            }
         }, () => {
             layout.toggleSidebar(true);
         });
@@ -282,8 +299,10 @@ export function bootstrapApp() {
             onNextPage: () => reader.nextPage(annotations.getNotes()),
             onToggleSidebar: (notify) => layout.toggleSidebar(notify),
             onTogglePageMode: () => {
-                layout.togglePageMode();
-                reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+                const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
+                    ? elements.readerPanel.clientWidth
+                    : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
+                layout.togglePageMode(availWidth);
             },
             onSwitchDemo: () => {
                 const nextKey = session.getCurrentBookId() === 'crisis-era' ? 'deep-work' : 'crisis-era';
@@ -291,16 +310,23 @@ export function bootstrapApp() {
             },
             onImportFile: (file) => coordinator.importBook(file),
             onWindowResize: (notify) => {
-                const availWidth = elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth;
-                layout.checkResponsiveLayout(availWidth);
-                reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+                const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
+                    ? elements.readerPanel.clientWidth
+                    : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
+                const resp = layout.checkResponsiveLayout(availWidth);
+                if (!resp || !resp.changed) {
+                    reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+                }
             }
         });
 
         // 5. Initial Execution & Mounting
         layout.applySidebarState(elements);
         layout.updateLayoutClasses(elements);
-        layout.checkResponsiveLayout(elements.readerPanel ? elements.readerPanel.clientWidth : window.innerWidth);
+        const initWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
+            ? elements.readerPanel.clientWidth
+            : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
+        layout.checkResponsiveLayout(initWidth);
     }
 
     return {
@@ -353,8 +379,12 @@ export async function startApp() {
 if (typeof document !== 'undefined') {
     if (!window.__AURA_BOOTSTRAPPED__) {
         window.__AURA_BOOTSTRAPPED__ = true;
-        document.addEventListener('DOMContentLoaded', async () => {
-            await startApp();
-        });
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', async () => {
+                await startApp();
+            });
+        } else {
+            startApp();
+        }
     }
 }

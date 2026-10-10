@@ -9,7 +9,7 @@
   - **访问地址**：👉 **`http://localhost:8095`**
 - **Git 版本库状态**：
   - **分支**：`master`
-  - **最新 Commit**：`f5cec74` (fix(client): restore green highlight color for note annotations)
+  - **最新 Commit**：`403b3dd` (fix(layout): resolve unresponsive page mode and sidebar toggle buttons and add zero-width fallback)
   - **工作区**：干净（Working tree clean）
 
 ---
