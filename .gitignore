@@ -3,3 +3,5 @@ data/
 *.tmp
 deploy_vps_runner.js
 *.log
+.commandcode/
+docs/architecture_analysis_report.html
