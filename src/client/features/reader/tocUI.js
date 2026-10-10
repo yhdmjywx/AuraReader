@@ -11,12 +11,14 @@ export function renderTOC(tocItems = [], elements, onSelectChapter = null) {
     const items = Array.isArray(tocItems) ? tocItems : [];
 
     items.forEach(item => {
+        const title = item && item.title ? String(item.title).trim() : '';
+        if (!title) return;
+
+        const level = Math.max(0, Math.min(Number(item.level) || 0, 6));
         const li = document.createElement('li');
-        li.className = 'toc-item';
-        if (item.level) {
-            li.style.paddingLeft = `${16 + Math.min(item.level, 4) * 14}px`;
-        }
-        li.innerHTML = `<span>${escapeHtml(item.title)}</span><small>P.${item.page || 1}</small>`;
+        li.className = `toc-item toc-level-${level}${item.hasChildren ? ' toc-branch' : ''}`;
+        li.setAttribute('aria-level', String(level + 1));
+        li.innerHTML = `<span class="toc-title">${escapeHtml(title)}</span><small class="toc-page">P.${item.page || 1}</small>`;
 
         li.addEventListener('click', () => {
             if (typeof onSelectChapter === 'function') {

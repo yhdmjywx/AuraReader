@@ -6,7 +6,7 @@
    ========================================================================== */
 
 import { ReaderEngine } from '../../domain/readerEngine.js';
-import { resolveTargetPage } from '../../domain/readingLocation.js';
+import { resolveTargetPage, ensureTocHierarchy } from '../../domain/readingLocation.js';
 import {
     renderPaperSpread,
     applyHighlightsToPaper,
@@ -189,7 +189,8 @@ export class ReaderController {
 
     renderTOC(tocItems = []) {
         if (!this.elements) return;
-        domRenderTOC(tocItems, this.elements, (item) => {
+        const items = ensureTocHierarchy(tocItems);
+        domRenderTOC(items, this.elements, (item) => {
             this.renderPage(item.page, false, (this.callbacks.getNotes ? this.callbacks.getNotes() : []));
             domCloseTOC(this.elements);
             if (this.callbacks.showToast) {

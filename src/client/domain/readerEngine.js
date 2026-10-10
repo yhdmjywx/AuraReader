@@ -4,7 +4,7 @@
    content retrieval & reading location state.
    ========================================================================== */
 
-import { createReadingLocation, clampPage, calcSpreadPages, findChapterForPage } from './readingLocation.js';
+import { createReadingLocation, clampPage, calcSpreadPages, findChapterForPage, ensureTocHierarchy } from './readingLocation.js';
 
 export class ReaderEngine {
     constructor() {
@@ -19,9 +19,8 @@ export class ReaderEngine {
 
         const pages = (this.bookData && Array.isArray(this.bookData.pages)) ? this.bookData.pages : [];
         const totalPages = Math.max(1, pages.length);
-        const chapter = (this.bookData && this.bookData.toc && this.bookData.toc.length > 0)
-            ? this.bookData.toc[0].title
-            : '正文';
+        const toc = ensureTocHierarchy(this.bookData && this.bookData.toc);
+        const chapter = toc.length ? findChapterForPage(toc, 1) : '正文';
 
         this.location = createReadingLocation({
             bookId,
@@ -58,7 +57,7 @@ export class ReaderEngine {
 
         const total = this.location.totalPages;
         const validPage = clampPage(pageNum, total);
-        const chapter = findChapterForPage(this.bookData.toc, validPage);
+        const chapter = findChapterForPage(ensureTocHierarchy(this.bookData.toc), validPage);
 
         this.location.page = validPage;
         this.location.chapter = chapter;

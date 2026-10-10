@@ -31,7 +31,7 @@ import {
 } from './infrastructure/annotationRepository.js';
 
 import { readerEngine, ReaderEngine } from './domain/readerEngine.js';
-import { resolveTargetPage, calcSpreadPages, clampPage, findChapterForPage, createReadingLocation } from './domain/readingLocation.js';
+import { resolveTargetPage, calcSpreadPages, clampPage, findChapterForPage, createReadingLocation, ensureTocHierarchy } from './domain/readingLocation.js';
 import {
     filterNotes,
     findOverlappingNote,
@@ -491,8 +491,7 @@ export function saveModalNote() {
         const currentBookObj = readerEngine.getCurrentBook();
         let chapter = '章节选区';
         if (currentBookObj && currentBookObj.toc && currentBookObj.toc.length > 0) {
-            const matchedToc = [...currentBookObj.toc].reverse().find(t => t.page <= notePage);
-            chapter = matchedToc ? matchedToc.title : currentBookObj.toc[0].title;
+            chapter = findChapterForPage(ensureTocHierarchy(currentBookObj.toc), notePage);
         }
 
         const noteColor = (comment && comment.trim() !== '') ? 'green' : 'yellow';

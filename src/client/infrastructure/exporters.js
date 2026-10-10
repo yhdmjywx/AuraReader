@@ -4,6 +4,8 @@
    and Selective .aurabackup package export & import deserialization.
    ========================================================================== */
 
+import { ensureTocHierarchy } from '../domain/readingLocation.js';
+
 export function downloadFile(filename, data, type) {
     if (typeof window === 'undefined') return;
     const blob = (data instanceof Blob) ? data : new Blob([data], { type });
@@ -159,7 +161,7 @@ export function exportStandaloneHtml(book, notes = []) {
     const bookTitle = book.title;
     const allPages = book.pages;
     const allNotes = notes;
-    const allToc = book.toc || [];
+    const allToc = ensureTocHierarchy(book.toc || []);
 
     const standaloneHtml = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -233,7 +235,10 @@ export function exportStandaloneHtml(book, notes = []) {
         <h2>《${escapeHtml(bookTitle)}》</h2>
         <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">全书共有 ${allPages.length} 章节 | 标注 ${allNotes.length} 条</div>
         <div id="toc-list">
-            ${allToc.map((t, idx) => `<div class="toc-item" onclick="jumpPage(${t.page || idx+1})">${idx+1}. ${escapeHtml(t.title)}</div>`).join('')}
+            ${allToc.map((t, idx) => {
+                const level = Math.max(0, Math.min(Number(t.level) || 0, 6));
+                return `<div class="toc-item" style="padding-left:${12 + level * 22}px" onclick="jumpPage(${t.page || idx + 1})">${idx + 1}. ${escapeHtml(t.title)}</div>`;
+            }).join('')}
         </div>
     </div>
     <div class="main-workspace">
