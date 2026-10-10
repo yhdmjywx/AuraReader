@@ -16,7 +16,7 @@ const hasActiveSelectionGuard = jsContent.includes('hasActiveSelection');
 console.log(`[防护检查 3] 全局 click 事件防误杀有效选区: ${hasActiveSelectionGuard ? 'PASSED' : 'FAILED'}`);
 
 // 3. 检查 stopPropagation
-const hasStopPropagationOnButtons = jsContent.includes('e.stopPropagation();\n            if (!state.pendingSelection) return;');
+const hasStopPropagationOnButtons = /e\.stopPropagation\(\);\r?\n            if \(!state\.pendingSelection\) return;/.test(jsContent);
 console.log(`[冒泡检查 4] 选区按钮阻止事件冒泡: ${hasStopPropagationOnButtons ? 'PASSED' : 'FAILED'}`);
 
 const allPass = hasMouseUpListener && hasTouchEndListener && hasActiveSelectionGuard && hasStopPropagationOnButtons;

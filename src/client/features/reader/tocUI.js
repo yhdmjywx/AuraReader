@@ -30,21 +30,31 @@ export function renderTOC(tocItems = [], elements, onSelectChapter = null) {
     });
 }
 
+function syncTocTrigger(elements) {
+    if (!elements || !elements.btnToc || !elements.tocDrawer) return;
+    const open = elements.tocDrawer.classList.contains('open');
+    elements.btnToc.classList.toggle('is-open', open);
+    elements.btnToc.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
 export function openTOC(elements) {
     if (elements && elements.tocDrawer) {
         elements.tocDrawer.classList.add('open');
+        syncTocTrigger(elements);
     }
 }
 
 export function closeTOC(elements) {
     if (elements && elements.tocDrawer) {
         elements.tocDrawer.classList.remove('open');
+        syncTocTrigger(elements);
     }
 }
 
 export function toggleTOC(elements) {
     if (elements && elements.tocDrawer) {
         elements.tocDrawer.classList.toggle('open');
+        syncTocTrigger(elements);
     }
 }
 

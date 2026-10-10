@@ -52,6 +52,8 @@ export function queryElements() {
         btnFontInc: document.getElementById('btn-font-inc'),
         paperBtns: document.querySelectorAll('.paper-btn'),
         btnThemeToggle: document.getElementById('btn-theme-toggle'),
+        btnAppearance: document.getElementById('btn-appearance'),
+        appearancePanel: document.getElementById('appearance-panel'),
         btnFullscreen: document.getElementById('btn-fullscreen'),
         btnSwitchDemo: document.getElementById('btn-switch-demo'),
         fileInput: document.getElementById('file-input'),

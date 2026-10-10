@@ -40,6 +40,19 @@ export class AppShell {
         }
     }
 
+    toggleAppearance(forceOpen) {
+        const panel = this.elements && this.elements.appearancePanel;
+        const button = this.elements && this.elements.btnAppearance;
+        if (!panel) return;
+        const open = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('open');
+        panel.classList.toggle('open', open);
+        if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    closeAppearance() {
+        this.toggleAppearance(false);
+    }
+
     toggleFullscreen() {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => {
@@ -66,10 +79,36 @@ export class AppShell {
             });
         }
 
+        if (elements.btnAppearance && elements.appearancePanel) {
+            elements.btnAppearance.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleAppearance();
+            });
+            // Clicks inside the panel must not count as outside clicks. Some
+            // controls replace their own markup during the click (theme icon),
+            // which detaches event.target before a closest() walk.
+            elements.appearancePanel.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            document.addEventListener('click', (e) => {
+                if (!elements.appearancePanel.classList.contains('open')) return;
+                const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+                const inside = path.some((node) => node === elements.appearancePanel || node === elements.btnAppearance);
+                if (inside) return;
+                this.closeAppearance();
+            });
+        }
+
         // Fullscreen Button
         if (elements.btnFullscreen) {
             elements.btnFullscreen.addEventListener('click', () => {
                 this.toggleFullscreen();
+            });
+            document.addEventListener('fullscreenchange', () => {
+                const icon = elements.btnFullscreen.querySelector('i');
+                if (!icon) return;
+                icon.className = document.fullscreenElement ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
+                elements.btnFullscreen.title = document.fullscreenElement ? '退出全屏' : '全屏阅读';
             });
         }
 
@@ -103,6 +142,12 @@ export class AppShell {
             if (elements.noteModal && elements.noteModal.classList.contains('active')) return;
             if (elements.backupSelectModal && elements.backupSelectModal.classList.contains('active')) return;
             if (elements.shelfOverlay && elements.shelfOverlay.classList.contains('active')) return;
+
+            if (e.key === 'Escape' && elements.appearancePanel && elements.appearancePanel.classList.contains('open')) {
+                e.preventDefault();
+                this.closeAppearance();
+                return;
+            }
 
             if (e.key === 'ArrowLeft') {
                 e.preventDefault();

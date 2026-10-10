@@ -5,133 +5,99 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AuraReader Workstation | 智能阅读与笔记工作台</title>
     <!-- Remix Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <!-- JSZip & Stylesheet -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=9">
+    <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body class="theme-light">
-    <!-- Top Navigation Bar -->
+    <!-- Single navigation bar -->
     <header class="app-header">
-        <div class="brand">
-            <i class="ri-book-open-fill brand-icon"></i>
-            <span class="brand-name">AuraReader</span>
-            <span class="badge">Workstation</span>
-        </div>
-
-        <div class="header-center">
-            <div class="book-info">
-                <i class="ri-book-2-line"></i>
-                <span id="current-book-title">危机时代（罗杰斯·思考与洞察）</span>
-                <span class="book-format-tag" id="current-book-tag">EPUB</span>
+        <div class="header-side header-brand">
+            <div class="brand">
+                <i class="ri-book-open-fill brand-icon"></i>
+                <span class="brand-name">AuraReader</span>
             </div>
         </div>
 
-        <div class="header-actions">
-            <!-- My Shelf Drawer Button -->
-            <button id="btn-shelf" class="btn btn-outline" title="查看本地 IndexedDB 离线书库">
+        <div class="header-center">
+            <button id="btn-toc" class="book-nav-btn" type="button" title="打开章节目录" aria-expanded="false" aria-controls="toc-drawer">
+                <i class="ri-list-unordered"></i>
+                <span id="current-book-title" class="book-nav-title">未打开书籍</span>
+                <i class="ri-arrow-down-s-line book-nav-caret"></i>
+            </button>
+        </div>
+
+        <div class="header-side header-actions">
+            <button id="btn-shelf" class="btn btn-icon nav-icon" type="button" title="我的书库">
                 <i class="ri-book-shelf-line"></i>
-                <span>我的书库</span>
-                <span class="badge-count" id="shelf-book-count">0</span>
+                <span class="badge-count" id="shelf-book-count" hidden>0</span>
             </button>
-
-            <!-- Open File -->
-            <label for="file-input" class="btn btn-primary" title="打开本地 EPUB / PDF">
-                <i class="ri-folder-open-line"></i>
-                <span>导入书籍</span>
-            </label>
-            <input type="file" id="file-input" accept=".epub,.pdf,.txt" style="display: none;">
-
-            <!-- Switch Demo Book -->
-            <button id="btn-switch-demo" class="btn btn-ghost" title="切换示例图书">
-                <i class="ri-swap-line"></i> 示例图书
+            <button id="btn-appearance" class="btn btn-icon nav-icon" type="button" title="视觉偏好" aria-expanded="false" aria-controls="appearance-panel">
+                <i class="ri-palette-line"></i>
             </button>
-
-            <!-- Theme Toggle -->
-            <button id="btn-theme-toggle" class="btn btn-icon" title="切换主题">
-                <i class="ri-sun-line"></i>
-            </button>
-
-            <!-- Fullscreen -->
-            <button id="btn-fullscreen" class="btn btn-icon" title="全屏阅读器">
+            <button id="btn-fullscreen" class="btn btn-icon nav-icon" type="button" title="全屏阅读">
                 <i class="ri-fullscreen-line"></i>
             </button>
         </div>
     </header>
 
+    <div id="appearance-panel" class="appearance-panel" role="dialog" aria-label="视觉偏好">
+        <div class="appearance-row">
+            <label for="font-family-select">字体</label>
+            <select id="font-family-select" class="select-sm" title="字体切换">
+                <option value="'Noto Serif SC', serif">宋体/衬线</option>
+                <option value="'Inter', sans-serif" selected>黑体/无衬线</option>
+                <option value="system-ui">系统默认</option>
+            </select>
+        </div>
+        <div class="appearance-row">
+            <span>字号</span>
+            <div class="appearance-stepper">
+                <button id="btn-font-dec" class="btn btn-icon-sm" type="button" title="减小字号">A-</button>
+                <span id="font-size-label" class="font-size-text">18px</span>
+                <button id="btn-font-inc" class="btn btn-icon-sm" type="button" title="增大字号">A+</button>
+            </div>
+        </div>
+        <div class="appearance-row">
+            <label for="indent-select">段落缩进</label>
+            <select id="indent-select" class="select-sm" title="首行缩进模式">
+                <option value="0em">无</option>
+                <option value="2em" selected>2字</option>
+                <option value="3em">3字</option>
+            </select>
+        </div>
+        <div class="appearance-row">
+            <span>阅读背景</span>
+            <div class="paper-themes">
+                <button class="paper-btn paper-white active" type="button" data-paper="white" title="纯白"></button>
+                <button class="paper-btn paper-sepia" type="button" data-paper="sepia" title="护眼羊皮纸"></button>
+                <button class="paper-btn paper-dark" type="button" data-paper="dark" title="夜间墨黑"></button>
+            </div>
+        </div>
+        <div class="appearance-row">
+            <span>版式</span>
+            <button id="btn-page-mode" class="btn btn-icon-sm" type="button" title="切换单页 / 双页阅读模式 (快捷键: D)">
+                <i class="ri-book-read-line" id="icon-page-mode"></i>
+                <span id="text-page-mode">单页</span>
+            </button>
+        </div>
+        <div class="appearance-row">
+            <span>界面明暗</span>
+            <button id="btn-theme-toggle" class="btn btn-icon-sm" type="button" title="切换主题">
+                <i class="ri-sun-line"></i>
+            </button>
+        </div>
+    </div>
+
     <!-- Main Workspace (75:25 Split Layout) -->
     <main class="workspace-container" id="workspace-container">
         <!-- Left Panel: Reader (75%) -->
         <section class="reader-panel" id="reader-panel">
-            <!-- Reader Controls Toolbar -->
-            <div class="reader-toolbar">
-                <div class="toolbar-group">
-                    <button id="btn-toc" class="btn btn-icon-sm" title="目录导航">
-                        <i class="ri-menu-2-line"></i> 目录
-                    </button>
-                    <span class="divider"></span>
-                    <button id="btn-prev-page" class="btn btn-icon-sm" title="上一页 (←)">
-                        <i class="ri-arrow-left-s-line"></i>
-                    </button>
-                    <span class="page-indicator">
-                        第 <span id="current-page">1</span> / <span id="total-pages">24</span> 页
-                    </span>
-                    <button id="btn-next-page" class="btn btn-icon-sm" title="下一页 (→)">
-                        <i class="ri-arrow-right-s-line"></i>
-                    </button>
-                    <span class="divider"></span>
-                    <!-- Single / Double Page Mode Switcher -->
-                    <button id="btn-page-mode" class="btn btn-icon-sm" title="切换单页 / 双页阅读模式 (快捷键: D)">
-                        <i class="ri-book-read-line" id="icon-page-mode"></i>
-                        <span id="text-page-mode">单页</span>
-                    </button>
-                </div>
-
-                <div class="toolbar-group">
-                    <!-- Font Family Switcher -->
-                    <select id="font-family-select" class="select-sm" title="字体切换">
-                        <option value="'Noto Serif SC', serif">宋体/衬线 (Serif)</option>
-                        <option value="'Inter', sans-serif" selected>黑体/无衬线 (Sans)</option>
-                        <option value="system-ui">系统默认</option>
-                    </select>
-
-                    <!-- Font Size Adjust -->
-                    <button id="btn-font-dec" class="btn btn-icon-sm" title="减小字号">A-</button>
-                    <span id="font-size-label" class="font-size-text">18px</span>
-                    <button id="btn-font-inc" class="btn btn-icon-sm" title="增大字号">A+</button>
-
-                    <span class="divider"></span>
-
-                    <!-- First Line Indent Selector -->
-                    <select id="indent-select" class="select-sm" title="首行缩进模式">
-                        <option value="0em">缩进: 无</option>
-                        <option value="2em" selected>缩进: 2字(标准)</option>
-                        <option value="3em">缩进: 3字(大)</option>
-                    </select>
-
-                    <span class="divider"></span>
-
-                    <!-- Reader Paper Themes -->
-                    <div class="paper-themes">
-                        <button class="paper-btn paper-white active" data-paper="white" title="纯白"></button>
-                        <button class="paper-btn paper-sepia" data-paper="sepia" title="护眼羊皮纸"></button>
-                        <button class="paper-btn paper-dark" data-paper="dark" title="夜间墨黑"></button>
-                    </div>
-
-                    <span class="divider"></span>
-
-                    <!-- Sidebar Toggle Button -->
-                    <button id="btn-toggle-sidebar" class="btn btn-icon-sm" title="收起/展开笔记侧边栏 (快捷键: B)">
-                        <i class="ri-side-bar-line" id="icon-toggle-sidebar"></i>
-                        <span id="text-toggle-sidebar">笔记栏</span>
-                    </button>
-                </div>
-            </div>
-
             <!-- Table of Contents Drawer (Collapsible) -->
             <aside class="toc-drawer" id="toc-drawer">
                 <div class="toc-header">
@@ -161,6 +127,19 @@
                     </article>
                 </div>
             </div>
+
+            <nav class="reader-pagination" aria-label="翻页">
+                <button id="btn-prev-page" class="page-turn-btn" type="button" title="上一页 (←)">‹</button>
+                <span class="page-indicator">
+                    <span id="current-page">1</span> / <span id="total-pages">1</span> 页
+                </span>
+                <button id="btn-next-page" class="page-turn-btn" type="button" title="下一页 (→)">›</button>
+            </nav>
+
+            <button id="btn-toggle-sidebar" class="sidebar-toggle-proxy" type="button" hidden title="收起/展开笔记侧边栏 (快捷键: B)">
+                <i class="ri-side-bar-line" id="icon-toggle-sidebar"></i>
+                <span id="text-toggle-sidebar">笔记栏</span>
+            </button>
 
             <!-- Floating Sidebar Recall Handle (visible when sidebar is collapsed) -->
             <button id="btn-sidebar-recall" class="sidebar-recall-handle" title="展开笔记侧边栏 (快捷键: B)">
@@ -340,6 +319,16 @@
                 <button id="btn-close-shelf" class="btn btn-icon-sm"><i class="ri-close-line"></i></button>
             </div>
             <div class="shelf-body">
+                <div class="shelf-actions">
+                    <label for="file-input" class="btn btn-primary" title="打开本地 EPUB / PDF / TXT">
+                        <i class="ri-folder-open-line"></i>
+                        <span>导入书籍</span>
+                    </label>
+                    <input type="file" id="file-input" accept=".epub,.pdf,.txt" hidden>
+                    <button id="btn-switch-demo" class="btn btn-outline" type="button" title="切换示例图书">
+                        <i class="ri-swap-line"></i> 示例图书
+                    </button>
+                </div>
                 <p class="shelf-hint"><i class="ri-shield-flash-line"></i> 所有已导入的书籍与其划线笔记均保存在您浏览器的 IndexedDB 数据库中，免联网、无限容量、全自动持久化。</p>
                 <div class="shelf-grid" id="shelf-grid">
                     <!-- Dynamic Book Cards -->
@@ -351,6 +340,6 @@
     <!-- Notification Toast -->
     <div class="toast" id="toast-msg"></div>
 
-    <script type="module" src="main.js"></script>
+    <script type="module" src="main.js?v=11"></script>
 </body>
 </html>

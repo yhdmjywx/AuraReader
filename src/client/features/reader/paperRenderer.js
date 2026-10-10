@@ -52,7 +52,9 @@ export function renderPaperSpread({
         const leftPage = spread.leftPage;
         const rightPage = spread.rightPage;
 
-        if (elements.currentPageSpan) elements.currentPageSpan.textContent = spread.label;
+        if (elements.currentPageSpan) {
+            elements.currentPageSpan.textContent = String(spread.label).replace('-', '–');
+        }
         if (elements.totalPagesSpan) elements.totalPagesSpan.textContent = totalPages;
 
         if (elements.paperContainer) elements.paperContainer.classList.add('spread-active');
