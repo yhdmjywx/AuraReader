@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <!-- JSZip & Stylesheet -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=10">
+    <link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body class="theme-light">
     <!-- Single navigation bar -->
@@ -168,6 +168,10 @@
 
         <!-- Right Panel: Notes & Workbench (25%) -->
         <section class="notes-panel" id="notes-panel">
+            <button id="btn-collapse-sidebar" class="sidebar-collapse-handle" type="button" title="收起笔记侧边栏 (快捷键: B)">
+                <i class="ri-arrow-right-s-line"></i>
+                <span>收起</span>
+            </button>
             <!-- Tabs Header -->
             <div class="tabs-header">
                 <button class="tab-btn active" data-tab="tab-highlights">
@@ -178,9 +182,6 @@
                 <button class="tab-btn" data-tab="tab-settings">
                     <i class="ri-settings-3-line"></i>
                     <span>设置与导出</span>
-                </button>
-                <button id="btn-collapse-sidebar" class="btn btn-icon-sm btn-sidebar-close" title="收起笔记侧边栏 (快捷键: B)">
-                    <i class="ri-arrow-right-s-line"></i>
                 </button>
             </div>
 
