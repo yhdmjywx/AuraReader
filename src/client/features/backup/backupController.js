@@ -15,6 +15,8 @@ import {
     saveNoteToDB as repoSaveNote
 } from '../../infrastructure/annotationRepository.js';
 
+import { normalizeAnnotation } from '../../domain/annotationEngine.js';
+
 import {
     exportMarkdown as adapterExportMarkdown,
     exportJson as adapterExportJson,
@@ -37,7 +39,7 @@ export class BackupController {
     constructor({
         callbacks = {}
     } = {}) {
-        this.callbacks = callbacks; // getCurrentBook, getCurrentNotes, getSettings, onRestoreBackup, showToast
+        this.callbacks = callbacks; // getCurrentBook, getCurrentNotes, onRestoreBackup, showToast
         this.availableBackupBooks = [];
         this.elements = null;
     }
@@ -92,24 +94,21 @@ export class BackupController {
         }
 
         const selectedBooks = this.availableBackupBooks.filter((b, idx) => selectedIds.includes(b.id || String(idx)));
-        const { includeNotes, includeSettings } = getIncludeOptions(this.elements);
+        const { includeNotes } = getIncludeOptions(this.elements);
 
         let notesToExport = [];
         if (includeNotes) {
             notesToExport = await repoGetNotesForBooks(selectedIds);
         }
 
-        const settings = includeSettings && this.callbacks.getSettings ? this.callbacks.getSettings() : {};
-
         adapterExportSelectiveBackup({
             selectedBooks,
-            notes: notesToExport,
-            settings
+            notes: notesToExport
         });
 
         this.closeBackupSelectModal();
         if (this.callbacks.showToast) {
-            this.callbacks.showToast(`🎉 成功导出选中的 ${selectedBooks.length} 本图书与 ${notesToExport.length} 条划线备份包！`);
+            this.callbacks.showToast(`已为 ${selectedBooks.length} 本图书分别发起备份下载，包含 ${notesToExport.length} 条高亮与笔记`);
         }
     }
 
@@ -138,8 +137,12 @@ export class BackupController {
             if (Array.isArray(data.notes) && data.notes.length > 0) {
                 for (const n of data.notes) {
                     if (n && n.id) {
-                        n.bookId = n.bookId || defaultBookId;
-                        await repoSaveNote(n);
+                        const normalized = normalizeAnnotation({
+                            ...n,
+                            bookId: n.bookId || defaultBookId
+                        });
+                        if (!normalized) continue;
+                        await repoSaveNote(normalized);
                         importedNotesCount++;
                     }
                 }

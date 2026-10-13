@@ -7,7 +7,8 @@ const clientDir = path.resolve(__dirname, '../../src/client');
 const appJs = fs.readFileSync(path.join(clientDir, 'app.js'), 'utf8');
 const bookRepoJs = fs.readFileSync(path.join(clientDir, 'repositories/bookRepository.js'), 'utf8');
 const annotRepoJs = fs.readFileSync(path.join(clientDir, 'repositories/annotationRepository.js'), 'utf8');
-const jsContent = [appJs, bookRepoJs, annotRepoJs].join('\n');
+const controllerJs = fs.readFileSync(path.join(clientDir, 'features/annotations/annotationController.js'), 'utf8');
+const jsContent = [appJs, bookRepoJs, annotRepoJs, controllerJs].join('\n');
 
 // 1. 静态检测核心持久化管道
 const checks = [
@@ -17,11 +18,11 @@ const checks = [
     },
     {
         name: "高亮划线生成保存至 IndexedDB (saveNoteToDB)",
-        pass: jsContent.includes("function createHighlight") && jsContent.includes("saveNoteToDB(newNote);")
+        pass: jsContent.includes("function createHighlight") && jsContent.includes("repoSaveNote(newNote)")
     },
     {
         name: "随笔弹窗新建/更新保存至 IndexedDB (saveNoteToDB)",
-        pass: jsContent.includes("function saveModalNote") && jsContent.includes("saveNoteToDB(state.notes[noteIndex]);") && jsContent.includes("saveNoteToDB(newNote);")
+        pass: jsContent.includes("function saveModalNote") && jsContent.includes("repoSaveNote(this.notes[noteIndex])") && jsContent.includes("repoSaveNote(newNote)")
     },
     {
         name: "独立随笔写入 IndexedDB (saveNoteToDB 附带 bookId)",
@@ -29,7 +30,7 @@ const checks = [
     },
     {
         name: "笔记/高亮删除同步物理删除 IndexedDB (deleteNoteFromDB)",
-        pass: jsContent.includes("function deleteNote(id)") && jsContent.includes("deleteNoteFromDB(id);")
+        pass: jsContent.includes("function deleteNote(id)") && jsContent.includes("repoDeleteNote(id")
     },
     {
         name: "LocalStorage 自动同步持久化 (persistNotes 双保险)",

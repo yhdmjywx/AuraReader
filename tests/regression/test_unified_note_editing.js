@@ -10,13 +10,14 @@ const hasEditingNoteIdInState = jsContent.includes('editingNoteId: null');
 const hasOpenNoteModalEditParam = jsContent.includes('function openNoteModal(quote, existingNoteId = null)');
 const hasInPlaceSave = jsContent.includes('if (state.editingNoteId)');
 const hasEditButtonInCard = jsContent.includes('btn-edit-note');
-const hasOverlapDeduplication = jsContent.includes('overlapNote');
+const openBody = jsContent.slice(jsContent.indexOf('function openNoteModal'), jsContent.indexOf('function closeNoteModal'));
+const hasNoAutoMerge = openBody.length > 0 && !openBody.includes('findOverlappingNote');
 
 console.log(`[静态检查 1] state.editingNoteId 状态追踪: ${hasEditingNoteIdInState ? 'PASSED' : 'FAILED'}`);
 console.log(`[静态检查 2] openNoteModal 编辑模式支持: ${hasOpenNoteModalEditParam ? 'PASSED' : 'FAILED'}`);
 console.log(`[静态检查 3] saveModalNote 原地更新逻辑: ${hasInPlaceSave ? 'PASSED' : 'FAILED'}`);
 console.log(`[静态检查 4] 笔记卡片【编辑】按钮配置: ${hasEditButtonInCard ? 'PASSED' : 'FAILED'}`);
-console.log(`[静态检查 5] 选区重叠智能去重归并: ${hasOverlapDeduplication ? 'PASSED' : 'FAILED'}`);
+console.log(`[静态检查 5] 新建笔记不再自动改写已有高亮: ${hasNoAutoMerge ? 'PASSED' : 'FAILED'}`);
 
 // 2. 交互仿真测试 (Mock Interactive Lifecycle)
 const mockState = {
@@ -34,8 +35,9 @@ function mockCreateHighlight(quote, color = 'yellow') {
         existing.color = color;
     } else {
         mockState.notes.unshift({
-            id: 'note-' + Date.now(),
+            id: 'highlight-' + Date.now(),
             bookId: mockState.currentBook,
+            kind: 'highlight',
             quote: quote,
             comment: '',
             color: color,
@@ -44,30 +46,24 @@ function mockCreateHighlight(quote, color = 'yellow') {
     }
 }
 
-// 步骤 B: 用户点击该高亮或点击“笔记”输入随笔感悟
+// 步骤 B: 选区里的“笔记”始终新建，不改写已有高亮
 function mockOpenNoteModal(quote, existingId = null) {
-    mockState.editingNoteId = existingId;
-    if (!existingId) {
-        const overlap = mockState.notes.find(n => n.page === mockState.currentPage && (n.quote === quote || (n.quote && quote && (n.quote.includes(quote) || quote.includes(n.quote)))));
-        if (overlap) {
-            mockState.editingNoteId = overlap.id;
-        }
-    }
+    mockState.editingNoteId = existingId || null;
 }
 
 function mockSaveModalNote(quote, comment) {
     if (mockState.editingNoteId) {
         const idx = mockState.notes.findIndex(n => n.id === mockState.editingNoteId);
-        if (idx !== -1) {
+        if (idx !== -1 && mockState.notes[idx].kind !== 'highlight') {
             mockState.notes[idx].comment = comment;
         }
-    } else {
+    } else if (comment && comment.trim()) {
         mockState.notes.unshift({
             id: 'note-' + Date.now(),
             bookId: mockState.currentBook,
+            kind: 'note',
             quote: quote,
             comment: comment,
-            color: 'yellow',
             page: mockState.currentPage
         });
     }
@@ -80,21 +76,30 @@ console.log("\n--- [测试步骤 1: 用户点击高亮] ---");
 mockCreateHighlight(sampleQuote, 'yellow');
 console.log(`生成划线后笔记总数: ${mockState.notes.length} 条 (感悟: "${mockState.notes[0].comment}")`);
 
-console.log("\n--- [测试步骤 2: 用户继续添加随笔 'wfokfaw'] ---");
+console.log("\n--- [测试步骤 2: 用户为同一段文字新建笔记 'wfokfaw'] ---");
 mockOpenNoteModal(sampleQuote);
-console.log(`触发编辑关联 ID: ${mockState.editingNoteId} (匹配到已有卡片: ${mockState.editingNoteId === mockState.notes[0].id ? 'YES' : 'NO'})`);
+console.log(`新建流程不应进入编辑: ${mockState.editingNoteId === null ? 'YES' : 'NO'}`);
 mockSaveModalNote(sampleQuote, 'wfokfaw');
-console.log(`保存随笔后笔记总数: ${mockState.notes.length} 条 (期望: 1 条, 实际: ${mockState.notes.length} 条)`);
-console.log(`卡片内容: quote="${mockState.notes[0].quote}", comment="${mockState.notes[0].comment}"`);
+const highlight = mockState.notes.find(n => n.kind === 'highlight');
+const createdNote = mockState.notes.find(n => n.kind === 'note');
+console.log(`保存后记录数: ${mockState.notes.length} 条 (期望: 高亮 1 + 笔记 1)`);
+console.log(`高亮仍无正文: "${highlight && highlight.comment}", 笔记内容: "${createdNote && createdNote.comment}"`);
 
-console.log("\n--- [测试步骤 3: 用户点击编辑按钮修改感悟] ---");
-mockOpenNoteModal(sampleQuote, mockState.notes[0].id);
+console.log("\n--- [测试步骤 3: 用户只编辑这条笔记] ---");
+mockOpenNoteModal(sampleQuote, createdNote.id);
 mockSaveModalNote(sampleQuote, '修改后的深度思考感悟');
-console.log(`原地修改后笔记总数: ${mockState.notes.length} 条 (期望: 1 条, 实际: ${mockState.notes.length} 条)`);
-console.log(`更新后感悟内容: "${mockState.notes[0].comment}"`);
+const highlightAfter = mockState.notes.find(n => n.kind === 'highlight');
+const noteAfter = mockState.notes.find(n => n.id === createdNote.id);
+console.log(`编辑后记录数: ${mockState.notes.length} 条 (期望: 2 条)`);
+console.log(`笔记更新为: "${noteAfter && noteAfter.comment}", 高亮评论仍为: "${highlightAfter && highlightAfter.comment}"`);
 
-const testPassed = (mockState.notes.length === 1 && mockState.notes[0].comment === '修改后的深度思考感悟');
-console.log(`\n判定结果: ${testPassed ? '✅ 100% 通过！彻底解决高亮与随笔分离重复生成两张卡片的问题！' : '❌ 校验失败'}`);
+const testPassed = mockState.notes.length === 2
+    && noteAfter
+    && noteAfter.comment === '修改后的深度思考感悟'
+    && highlightAfter
+    && highlightAfter.comment === ''
+    && hasNoAutoMerge;
+console.log(`\n判定结果: ${testPassed ? '✅ 100% 通过！高亮与笔记独立保存，编辑笔记不会改写高亮。' : '❌ 校验失败'}`);
 
 if (!testPassed) {
     console.error("❌ UNIFIED NOTE EDITING CHECKS FAILED!");

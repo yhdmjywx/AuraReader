@@ -341,12 +341,10 @@ export function applyHighlightsToPaper(targetPaper = elements.bookPaper, targetP
 export function showHighlightActionTooltip(markEl, note) {
     hideSelectionTooltip();
     if (!note) return;
-    state.activeHighlightId = note.id;
     selectionController.showHighlightAction(markEl, note);
 }
 
 export function hideHighlightActionTooltip() {
-    state.activeHighlightId = null;
     selectionController.hideHighlightAction();
 }
 
@@ -386,39 +384,18 @@ export function initTextSelection() {
     });
 }
 
-export function createHighlight(color = 'yellow') {
+export async function createHighlight(color = 'yellow') {
     if (!state.pendingSelection) return;
 
-    const quote = state.pendingSelection.text;
-    const highlightPage = state.pendingSelection.page || state.currentPage;
-    const currentBookObj = readerEngine.getCurrentBook();
-    const chapter = currentBookObj && currentBookObj.toc && currentBookObj.toc.length > 0
-        ? readerEngine.getLocation().chapter
-        : '当前章节';
+    const pending = state.pendingSelection;
+    await annotationController.createHighlight({
+        quote: pending.text,
+        page: pending.page || state.currentPage,
+        chapter: readerController.getLocation().chapter,
+        color,
+        location: pending.location || null
+    });
 
-    const existingNote = state.notes.find(n => n.page === highlightPage && n.quote === quote);
-    if (existingNote) {
-        existingNote.color = color;
-        saveNoteToDB(existingNote);
-        persistNotes();
-        showToast('已更新该段落高亮颜色');
-    } else {
-        const newNote = createAnnotationObject({
-            bookId: state.currentBook,
-            quote,
-            comment: '',
-            color,
-            page: highlightPage,
-            chapter
-        });
-        state.notes.unshift(newNote);
-        saveNoteToDB(newNote);
-        persistNotes();
-        showToast('已成功高亮选中文本');
-    }
-
-    renderNotesList();
-    renderPage(state.currentPage, true);
     hideSelectionTooltip();
     if (window.getSelection) window.getSelection().removeAllRanges();
 }
@@ -442,29 +419,31 @@ export function highlightNoteCard(noteId) {
 }
 
 export function deleteNote(id) {
-    state.notes = state.notes.filter(n => n.id !== id);
-    deleteNoteFromDB(id);
-    persistNotes();
-    renderNotesList();
-    renderPage(state.currentPage, true);
-    showToast('已删除笔记');
+    return annotationController.deleteNote(id);
+}
+
+export function deleteHighlight(id) {
+    return annotationController.deleteHighlight(id);
+}
+
+export function deleteAnnotation(id) {
+    return annotationController.deleteAnnotation(id);
 }
 
 export function openNoteModal(quote, existingNoteId = null) {
-    state.editingNoteId = existingNoteId;
-    let existingNote = null;
-    if (existingNoteId) {
-        existingNote = state.notes.find(n => n.id === existingNoteId);
-    } else {
-        const targetPage = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
-        const overlapNote = findOverlappingNote(state.notes, targetPage, quote);
-        if (overlapNote) {
-            state.editingNoteId = overlapNote.id;
-            existingNote = overlapNote;
-        }
-    }
     // btn-edit-note
-    annotationController.openNoteModal(quote, existingNoteId, state.currentPage);
+    const page = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
+    if (existingNoteId) {
+        state.editingNoteId = existingNoteId;
+        annotationController.openNoteModal(quote, existingNoteId, page);
+        return;
+    }
+    state.editingNoteId = null;
+    annotationController.createNote({
+        quote,
+        page,
+        location: state.pendingSelection ? state.pendingSelection.location : null
+    });
 }
 
 export function closeNoteModal() {
@@ -474,45 +453,19 @@ export function closeNoteModal() {
 
 export function saveModalNote() {
     const comment = elements.modalNoteTextarea ? elements.modalNoteTextarea.value.trim() : '';
+    const pending = state.pendingSelection;
 
     if (state.editingNoteId) {
-        const noteIndex = state.notes.findIndex(n => n.id === state.editingNoteId);
-        if (noteIndex !== -1) {
-            state.notes[noteIndex].comment = comment;
-            state.notes[noteIndex].color = (comment && comment.trim() !== '') ? 'green' : 'yellow';
-            state.notes[noteIndex].timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
-            saveNoteToDB(state.notes[noteIndex]);
-            persistNotes();
-            showToast('随笔感悟已成功更新');
-        }
-    } else {
-        const quote = state.pendingSelection ? state.pendingSelection.text : '';
-        const notePage = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
-        const currentBookObj = readerEngine.getCurrentBook();
-        let chapter = '章节选区';
-        if (currentBookObj && currentBookObj.toc && currentBookObj.toc.length > 0) {
-            chapter = findChapterForPage(ensureTocHierarchy(currentBookObj.toc), notePage);
-        }
-
-        const noteColor = (comment && comment.trim() !== '') ? 'green' : 'yellow';
-        const newNote = createAnnotationObject({
-            bookId: state.currentBook,
-            quote,
-            comment,
-            color: noteColor,
-            page: notePage,
-            chapter
-        });
-
-        state.notes.unshift(newNote);
-        saveNoteToDB(newNote);
-        persistNotes();
-        showToast('高亮及随笔已成功保存');
+        annotationController.editingNoteId = state.editingNoteId;
     }
 
-    renderNotesList();
-    renderPage(state.currentPage, true);
-    closeNoteModal();
+    annotationController.saveModalNote({
+        quote: annotationController.modalQuote || (pending ? pending.text : ''),
+        comment,
+        page: annotationController.modalPage || (pending ? pending.page : state.currentPage),
+        chapter: annotationController.modalChapter || readerController.getLocation().chapter,
+        location: annotationController.modalLocation || (pending ? pending.location : null)
+    });
     if (window.getSelection) window.getSelection().removeAllRanges();
 }
 
@@ -546,6 +499,7 @@ function setupCompatibilityListeners() {
             const text = elements.quickNoteInput ? elements.quickNoteInput.value.trim() : '';
             if (!text) return;
             const newNote = createAnnotationObject({
+                kind: 'note',
                 bookId: state.currentBook,
                 quote: '',
                 comment: text,

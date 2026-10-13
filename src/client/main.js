@@ -68,6 +68,8 @@ export function queryElements() {
         selectionTooltip: document.getElementById('selection-tooltip'),
         btnAddNote: document.getElementById('btn-add-note'),
         highlightActionTooltip: document.getElementById('highlight-action-tooltip'),
+        btnHlViewNotes: document.getElementById('btn-hl-view-notes'),
+        btnHlOperate: document.getElementById('btn-hl-operate'),
         btnHlAddThought: document.getElementById('btn-hl-add-thought'),
         btnHlRemove: document.getElementById('btn-hl-remove'),
 
@@ -101,7 +103,6 @@ export function queryElements() {
         btnDeselectAllBackup: document.getElementById('btn-deselect-all-backup'),
         backupBookCheckboxList: document.getElementById('backup-book-checkbox-list'),
         chkBackupIncludeNotes: document.getElementById('chk-backup-include-notes'),
-        chkBackupIncludeSettings: document.getElementById('chk-backup-include-settings'),
 
         // Modal, Shelf & Toast
         btnShelf: document.getElementById('btn-shelf'),
@@ -148,6 +149,8 @@ export function bootstrapApp() {
                 currentLeftPage: reader.getCurrentLeftPage(),
                 currentRightPage: reader.getCurrentRightPage(),
                 currentPage: reader.getCurrentPage(),
+                sectionId: reader.getLocation().sectionId,
+                chapter: reader.getLocation().chapter,
                 notes: annotations.getNotes()
             })
         }
@@ -163,13 +166,7 @@ export function bootstrapApp() {
         callbacks: {
             showToast: (msg) => appShell.showToast(msg),
             getCurrentBook: () => reader.getCurrentBook(),
-            getCurrentNotes: () => annotations.getNotes(),
-            getSettings: () => ({
-                textIndent: reader.textIndent,
-                fontSize: reader.fontSize,
-                paperTheme: reader.paperTheme,
-                appTheme: appShell.appTheme
-            })
+            getCurrentNotes: () => annotations.getNotes()
         }
     });
 
@@ -186,11 +183,8 @@ export function bootstrapApp() {
     });
 
     // 3. Connect Cross-Module Callbacks
-    reader.callbacks.onMarkClick = (markEl, note) => {
-        annotations.highlightNoteCard(note.id);
-        selection.showHighlightAction(markEl, note);
-    };
     reader.callbacks.getNotes = () => annotations.getNotes();
+    reader.callbacks.onPageRendered = () => selection.restoreActiveTokens();
 
     annotations.callbacks.onNotesChanged = (notes) => {
         reader.renderPage(reader.getCurrentPage(), true, notes);
@@ -205,6 +199,10 @@ export function bootstrapApp() {
     annotations.callbacks.getPendingSelection = () => selection.getPendingSelection();
     annotations.callbacks.getCurrentPage = () => reader.getCurrentPage();
     annotations.callbacks.getCurrentChapter = () => reader.getLocation().chapter;
+    annotations.callbacks.ensureSidebarExpanded = () => layout.ensureSidebarExpanded({ notify: false });
+    annotations.callbacks.onFocusAnnotation = (record) => {
+        coordinator.jumpToAnnotation(record.id, { showMenu: true });
+    };
 
     selection.callbacks.onCreateHighlight = async (color, pending) => {
         await coordinator.addAnnotation({
@@ -212,15 +210,31 @@ export function bootstrapApp() {
             quote: pending.text,
             page: pending.page,
             chapter: reader.getLocation().chapter,
-            color
+            color,
+            location: pending.location || null
+        });
+    };
+    selection.callbacks.onCreateNote = ({ quote, page, location }) => {
+        annotations.createNote({
+            quote,
+            page,
+            chapter: reader.getLocation().chapter,
+            location
         });
     };
     selection.callbacks.onOpenNoteModal = (quote, noteId, page) => {
         annotations.openNoteModal(quote, noteId, page);
     };
-    selection.callbacks.onDeleteNote = async (noteId) => {
-        await annotations.deleteNote(noteId);
+    selection.callbacks.onDeleteHighlight = async (ids) => {
+        await annotations.deleteHighlights(ids);
     };
+    selection.callbacks.onViewNotes = (noteIds) => annotations.focusNotes(noteIds);
+    selection.callbacks.onOperateHighlights = (highlightIds) => annotations.focusHighlights(highlightIds);
+    selection.callbacks.onAnnotationActivated = (ctx) => {
+        if (ctx.noteIds && ctx.noteIds.length) annotations.focusNotes(ctx.noteIds);
+        else annotations.clearFocusedAnnotations();
+    };
+    selection.callbacks.onClearFocus = () => annotations.clearFocusedAnnotations();
 
     shelf.callbacks.onOpenBook = async (bookId) => {
         await coordinator.openBook(bookId);

@@ -53,8 +53,7 @@ export function getSelectedBookIds(elements) {
 
 export function getIncludeOptions(elements) {
     const includeNotes = elements && elements.chkBackupIncludeNotes ? elements.chkBackupIncludeNotes.checked : true;
-    const includeSettings = elements && elements.chkBackupIncludeSettings ? elements.chkBackupIncludeSettings.checked : true;
-    return { includeNotes, includeSettings };
+    return { includeNotes };
 }
 
 function escapeHtml(str) {

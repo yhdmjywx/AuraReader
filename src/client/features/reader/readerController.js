@@ -129,6 +129,9 @@ export class ReaderController {
         if (this.callbacks.onPageChange) {
             this.callbacks.onPageChange(this.getLocation());
         }
+        if (this.callbacks.onPageRendered) {
+            this.callbacks.onPageRendered();
+        }
 
         return loc;
     }
@@ -173,18 +176,16 @@ export class ReaderController {
     }
 
     scrollToHighlight(noteId) {
-        if (!this.elements || !noteId) return;
-        const bookPaper = this.elements.bookPaper;
-        const bookPaperRight = this.elements.bookPaperRight;
-        let mark = bookPaper ? bookPaper.querySelector(`mark[data-id="${noteId}"]`) : null;
-        if (!mark && bookPaperRight) {
-            mark = bookPaperRight.querySelector(`mark[data-id="${noteId}"]`);
-        }
-        if (mark) {
-            mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            mark.classList.add('hl-active');
-            setTimeout(() => mark.classList.remove('hl-active'), 2000);
-        }
+        return this.scrollToAnnotation(noteId);
+    }
+
+    scrollToAnnotation(annotationId) {
+        if (!this.elements || !annotationId) return null;
+        const token = findAnnotationToken(this.elements.bookPaper, annotationId)
+            || findAnnotationToken(this.elements.bookPaperRight, annotationId);
+        if (!token) return null;
+        token.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return token;
     }
 
     renderTOC(tocItems = []) {
@@ -305,4 +306,10 @@ export class ReaderController {
             }
         });
     }
+}
+
+function findAnnotationToken(paper, annotationId) {
+    if (!paper || !annotationId || typeof paper.querySelector !== 'function') return null;
+    const escaped = (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(annotationId) : String(annotationId).replace(/"/g, '\\"');
+    return paper.querySelector(`[data-highlight-ids~="${escaped}"], [data-note-ids~="${escaped}"]`);
 }

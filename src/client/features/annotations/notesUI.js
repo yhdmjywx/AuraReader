@@ -5,12 +5,14 @@
    Zero direct database persistence calls.
    ========================================================================== */
 
-import { filterNotes } from '../../domain/annotationEngine.js';
+import { filterNotes, isHighlight, isNote } from '../../domain/annotationEngine.js';
 
 export function renderNotesList({
     elements,
     notes = [],
     showHighlightsInSidebar = false,
+    focusedNoteIds = [],
+    focusedHighlightIds = [],
     onJump = null,
     onEdit = null,
     onDelete = null
@@ -48,7 +50,7 @@ export function renderNotesList({
             elements.emptyNotesState.style.display = 'block';
             const emptyText = elements.emptyNotesState.querySelector('p');
             if (emptyText) {
-                emptyText.textContent = showHighlightsInSidebar ? '暂无划线与随笔' : '暂无随笔感悟';
+                emptyText.textContent = showHighlightsInSidebar ? '暂无划线与笔记' : '暂无笔记';
             }
         }
         return;
@@ -58,16 +60,24 @@ export function renderNotesList({
         elements.emptyNotesState.style.display = 'none';
     }
 
+    const focusedIds = new Set([...(focusedNoteIds || []), ...(focusedHighlightIds || [])]);
+
     displayedNotes.forEach(note => {
-        const isPureHighlight = !note.comment || note.comment.trim() === '';
+        const highlight = isHighlight(note);
+        const noteKind = isNote(note);
         const card = document.createElement('div');
-        card.className = `note-card ${note.color === 'green' ? 'hl-green-card' : ''} ${isPureHighlight ? 'pure-highlight-card' : ''}`;
+        card.className = `note-card${noteKind ? ' hl-green-card' : ''}${highlight ? ' pure-highlight-card' : ''}${focusedIds.has(note.id) ? ' is-focused' : ''}`;
         card.id = `card-${note.id}`;
+        card.setAttribute('data-annotation-id', note.id);
 
         const chapterLabel = note.chapter ? escapeHtml(note.chapter) : '章节选区';
-        const typeBadge = isPureHighlight ?
+        const typeBadge = highlight ?
             `<span class="note-loc-tag" style="background: rgba(245,158,11,0.1); color: #d97706; font-weight: 500;"><i class="ri-sparkling-line"></i> 划线</span>` :
-            `<span class="note-loc-tag" style="background: rgba(16,185,129,0.1); color: var(--accent-color); font-weight: 500;"><i class="ri-chat-1-line"></i> 随笔</span>`;
+            `<span class="note-loc-tag" style="background: rgba(16,185,129,0.1); color: var(--accent-color); font-weight: 500;"><i class="ri-chat-1-line"></i> 笔记</span>`;
+        const editButton = noteKind ? `
+                <button class="btn btn-ghost-sm btn-edit-note" data-id="${note.id}" title="编辑这条笔记">
+                    <i class="ri-edit-line"></i>
+                </button>` : '';
 
         card.innerHTML = `
             <div class="note-card-header">
@@ -81,10 +91,8 @@ export function renderNotesList({
             ${note.quote ? `<div class="note-quote-text">“${escapeHtml(note.quote)}”</div>` : ''}
             ${note.comment ? `<div class="note-comment-text">💭 ${escapeHtml(note.comment)}</div>` : ''}
             <div class="note-card-actions">
-                <button class="btn btn-ghost-sm btn-edit-note" data-id="${note.id}" title="${isPureHighlight ? '为此高亮添加随笔感悟' : '编辑随笔感悟'}">
-                    <i class="ri-edit-line"></i>
-                </button>
-                <button class="btn btn-ghost-sm btn-delete-note" data-id="${note.id}" title="删除此条记录">
+                ${editButton}
+                <button class="btn btn-ghost-sm btn-delete-note" data-id="${note.id}" title="${highlight ? '删除高亮' : '删除这条笔记'}">
                     <i class="ri-delete-bin-line"></i>
                 </button>
             </div>
@@ -107,7 +115,7 @@ export function renderNotesList({
         if (deleteBtn) {
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (typeof onDelete === 'function') onDelete(note.id);
+                if (typeof onDelete === 'function') onDelete(note);
             });
         }
 
@@ -133,13 +141,13 @@ export function openNoteModal({ elements, quote = '', existingNote = null }) {
     if (existingNote) {
         if (elements.modalQuotePreview) elements.modalQuotePreview.textContent = `“${existingNote.quote || quote}”`;
         if (elements.modalNoteTextarea) elements.modalNoteTextarea.value = existingNote.comment || '';
-        if (modalTitle) modalTitle.innerHTML = '<i class="ri-edit-line"></i> 编辑随笔感悟';
-        if (confirmBtn) confirmBtn.textContent = '更新随笔笔记';
+        if (modalTitle) modalTitle.innerHTML = '<i class="ri-edit-line"></i> 编辑笔记';
+        if (confirmBtn) confirmBtn.textContent = '更新笔记';
     } else {
         if (elements.modalQuotePreview) elements.modalQuotePreview.textContent = `“${quote}”`;
         if (elements.modalNoteTextarea) elements.modalNoteTextarea.value = '';
-        if (modalTitle) modalTitle.innerHTML = '<i class="ri-sticky-note-add-line"></i> 添加随笔';
-        if (confirmBtn) confirmBtn.textContent = '保存划线笔记';
+        if (modalTitle) modalTitle.innerHTML = '<i class="ri-sticky-note-add-line"></i> 添加笔记';
+        if (confirmBtn) confirmBtn.textContent = '保存笔记';
     }
 
     elements.noteModal.classList.add('active');
