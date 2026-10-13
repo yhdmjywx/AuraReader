@@ -40,6 +40,9 @@
             <button id="btn-appearance" class="btn btn-icon nav-icon" type="button" title="视觉偏好" aria-expanded="false" aria-controls="appearance-panel">
                 <i class="ri-palette-line"></i>
             </button>
+            <button id="btn-export-menu" class="btn btn-icon nav-icon" type="button" title="导出与备份" aria-label="导出与备份" aria-expanded="false" aria-controls="export-panel">
+                <i class="ri-download-line" aria-hidden="true"></i>
+            </button>
             <button id="btn-fullscreen" class="btn btn-icon nav-icon" type="button" title="全屏阅读">
                 <i class="ri-fullscreen-line"></i>
             </button>
@@ -96,6 +99,38 @@
             </button>
         </div>
     </div>
+
+    <section id="export-panel" class="export-panel" role="dialog" aria-labelledby="export-panel-title" aria-hidden="true">
+        <div class="export-panel-heading">
+            <h2 id="export-panel-title">导出与备份</h2>
+            <p>当前书籍 · <span id="export-book-title">未打开书籍</span></p>
+        </div>
+        <h3 class="export-section-title">导出</h3>
+        <button id="btn-export-markdown" class="export-menu-action" type="button" data-export-action>
+            <i class="ri-file-text-line" aria-hidden="true"></i>
+            <span class="export-action-label">笔记摘要</span><span class="export-extension">.md</span>
+        </button>
+        <button id="btn-export-chapter-zip" class="export-menu-action" type="button" data-export-action>
+            <i class="ri-file-zip-line" aria-hidden="true"></i>
+            <span class="export-action-label">分章节正文与笔记</span><span class="export-extension">.zip</span>
+        </button>
+        <button id="btn-export-standalone-html" class="export-menu-action" type="button" data-export-action>
+            <i class="ri-book-open-line" aria-hidden="true"></i>
+            <span class="export-action-label">带标注离线电子书</span><span class="export-extension">.html</span>
+        </button>
+        <hr class="export-panel-divider">
+        <h3 class="export-section-title">书籍备份与恢复</h3>
+        <button id="btn-export-full-backup" class="export-menu-action export-backup-action" type="button" data-export-action>
+            <i class="ri-archive-line" aria-hidden="true"></i>
+            <span class="export-action-label">导出书籍备份</span><span class="export-extension">.aurabackup</span>
+        </button>
+        <button id="btn-import-full-backup" class="export-menu-action export-backup-action" type="button" data-export-action>
+            <i class="ri-upload-line" aria-hidden="true"></i>
+            <span class="export-action-label">从备份恢复书籍</span>
+        </button>
+        <p class="export-panel-note">每本书一个备份文件 · 包含高亮与笔记</p>
+        <input type="file" id="backup-file-input" accept=".aurabackup,.json" hidden>
+    </section>
 
     <!-- Main Workspace (75:25 Split Layout) -->
     <main class="workspace-container" id="workspace-container">
@@ -156,11 +191,13 @@
                 <button class="tooltip-btn" id="btn-add-note" title="添加随笔"><i class="ri-sticky-note-line"></i> 笔记</button>
             </div>
 
-            <!-- Floating Highlight Action Toolbar (Add Thought / Remove Highlight) -->
+            <!-- Annotation context menu. Note edit and delete stay on the note cards. -->
             <div class="selection-tooltip" id="highlight-action-tooltip">
-                <button class="tooltip-btn" id="btn-hl-add-thought" title="为此划线写下随笔感悟"><i class="ri-chat-1-line"></i> 写随笔</button>
+                <button class="tooltip-btn" id="btn-hl-view-notes" type="button" title="在笔记区查看这个位置的笔记"><i class="ri-chat-1-line"></i> 查看笔记（0）</button>
+                <button class="tooltip-btn" id="btn-hl-operate" type="button" title="在笔记区定位高亮"><i class="ri-mark-pen-line"></i> 操作高亮</button>
+                <button class="tooltip-btn" id="btn-hl-add-thought" type="button" title="为这段文字新建一条笔记"><i class="ri-sticky-note-line"></i> 添加笔记</button>
                 <span class="tooltip-divider"></span>
-                <button class="tooltip-btn" id="btn-hl-remove" style="color: #fca5a5;" title="移除此高亮"><i class="ri-delete-bin-line"></i> 移除</button>
+                <button class="tooltip-btn" id="btn-hl-remove" type="button" style="color: #fca5a5;" title="只移除黄色高亮"><i class="ri-delete-bin-line"></i> 删除高亮</button>
             </div>
         </section>
 
@@ -181,10 +218,6 @@
                     <i class="ri-quill-pen-line"></i>
                     <span>划线与笔记</span>
                     <span class="badge-count" id="count-highlights">0</span>
-                </button>
-                <button class="tab-btn" data-tab="tab-settings">
-                    <i class="ri-settings-3-line"></i>
-                    <span>设置与导出</span>
                 </button>
             </div>
 
@@ -218,42 +251,6 @@
                 </div>
             </div>
 
-            <!-- Tab Content 2: Settings & Export -->
-            <div class="tab-content" id="tab-settings">
-                <div class="settings-section">
-                    <h4><i class="ri-download-cloud-2-line"></i> 笔记导出</h4>
-                    <p class="section-desc">将书中的所有划线、高亮及用户笔记一键打包导出。</p>
-                    <div class="export-buttons">
-                        <button id="btn-export-markdown" class="btn btn-primary btn-block">
-                            <i class="ri-markdown-line"></i> 导出笔记摘要为 Markdown (.md)
-                        </button>
-                        <button id="btn-export-json" class="btn btn-outline btn-block">
-                            <i class="ri-code-s-slash-line"></i> 导出笔记为 JSON 数据
-                        </button>
-                        <button id="btn-export-chapter-zip" class="btn btn-outline btn-block" style="border-color: var(--primary); color: var(--primary);">
-                            <i class="ri-file-zip-line"></i> 📦 导出原版+笔记分章节 Zip (.zip)
-                        </button>
-                        <button id="btn-export-standalone-html" class="btn btn-primary btn-block" style="background: linear-gradient(135deg, #3b82f6, #6366f1); border: none;">
-                            <i class="ri-html5-line"></i> 🌐 导出双栏带标注 HTML 电子书 (.html)
-                        </button>
-                    </div>
-                </div>
-
-                <div class="settings-section" style="border: 1px solid #10b981; background: rgba(16, 185, 129, 0.04); border-radius: 8px;">
-                    <h4><i class="ri-save-3-line" style="color: #10b981;"></i> 📦 100% 本地迁移与全量备份包</h4>
-                    <p class="section-desc">一键打包导出全部图书文件、划线与随笔笔记（换电脑/浏览器时可 1 秒全量恢复）：</p>
-                    
-                    <div style="display: flex; gap: 8px; margin-top: 10px;">
-                        <button id="btn-export-full-backup" class="btn btn-primary btn-sm" style="flex: 1; background: #10b981; border: none;">
-                            <i class="ri-download-2-line"></i> 📥 导出全量备份包 (.aurabackup)
-                        </button>
-                        <button id="btn-import-full-backup" class="btn btn-outline-sm" style="flex: 1; border-color: #10b981; color: #059669;">
-                            <i class="ri-upload-2-line"></i> 📤 导入恢复备份包
-                        </button>
-                    </div>
-                    <input type="file" id="backup-file-input" accept=".aurabackup,.json" style="display: none;">
-                </div>
-            </div>
         </section>
     </main>
 
@@ -281,12 +278,12 @@
     <div class="modal-overlay" id="backup-select-modal">
         <div class="modal-card" style="max-width: 540px;">
             <div class="modal-header">
-                <h3><i class="ri-checkbox-multiple-line" style="color: #10b981;"></i> 选择需要打包备份的图书</h3>
+                <h3><i class="ri-checkbox-multiple-line" style="color: #10b981;"></i> 选择需要备份的图书</h3>
                 <button class="btn btn-icon-sm" id="btn-close-backup-modal"><i class="ri-close-line"></i></button>
             </div>
             <div class="modal-body" style="padding: 16px 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <span style="font-size: 0.88rem; color: var(--text-sub);">请勾选要打包进备份包的图书：</span>
+                    <span style="font-size: 0.88rem; color: var(--text-sub);">每本书生成一个独立文件，可勾选多本：</span>
                     <div>
                         <button class="btn btn-ghost-sm" id="btn-select-all-backup">全选</button>
                         <button class="btn btn-ghost-sm" id="btn-deselect-all-backup">取消全选</button>
@@ -300,16 +297,12 @@
                         <input type="checkbox" id="chk-backup-include-notes" checked>
                         <span>包含所选图书的划线与随笔笔记</span>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px;">
-                        <input type="checkbox" id="chk-backup-include-settings" checked>
-                        <span>包含阅读器排版偏好设置 (首行缩进/字体)</span>
-                    </label>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-ghost" id="btn-cancel-backup-modal">取消</button>
                 <button class="btn btn-primary" id="btn-confirm-export-backup" style="background: #10b981; border: none;">
-                    <i class="ri-download-2-line"></i> 导出选中图书备份 (.aurabackup)
+                    <i class="ri-download-2-line"></i> 按书分别导出 (.aurabackup)
                 </button>
             </div>
         </div>

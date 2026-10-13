@@ -4,8 +4,8 @@
    inline link interception, and smooth anchor scrolling.
    ========================================================================== */
 
-import { applyAllHighlightsToHtml } from '../../domain/annotationEngine.js';
 import { clearChapterFlow } from './chapterColumnView.js';
+import { renderAnnotationTokens } from './annotationRenderer.js';
 
 export function renderPaperSpread({
     elements,
@@ -103,29 +103,15 @@ export function renderPaperSpread({
     }
 }
 
-export function applyHighlightsToPaper(targetPaper, targetPage, notes = [], onMarkClick = null) {
+export function applyHighlightsToPaper(targetPaper, targetPage, notes = []) {
     if (!targetPaper) return;
 
-    const notesForPage = notes.filter(n => n.page === targetPage);
-    if (notesForPage.length > 0) {
-        try {
-            targetPaper.innerHTML = applyAllHighlightsToHtml(targetPaper.innerHTML, notesForPage);
-        } catch (e) {
-            console.error("高亮渲染异常:", e);
-        }
+    const notesForPage = (Array.isArray(notes) ? notes : []).filter(n => Number(n.page) === Number(targetPage));
+    try {
+        renderAnnotationTokens(targetPaper, notesForPage, targetPage);
+    } catch (e) {
+        console.error("高亮渲染异常:", e);
     }
-
-    // Attach click listeners to inline mark elements (0 modal confirm dialogs)
-    targetPaper.querySelectorAll('mark').forEach(mark => {
-        mark.addEventListener('click', function (e) {
-            e.stopPropagation();
-            const noteId = this.getAttribute('data-id');
-            const note = notes.find(n => n.id === noteId);
-            if (typeof onMarkClick === 'function') {
-                onMarkClick(this, note || { id: noteId, page: targetPage });
-            }
-        });
-    });
 }
 
 export function showHighlightActionTooltip(markEl, note, elements) {

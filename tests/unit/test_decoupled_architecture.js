@@ -104,6 +104,7 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
     assert.strictEqual(annot1.location.offset, 1250, "Annotation 必须包含 location.offset");
     assert.strictEqual(annot1.location.page, 2, "Annotation 必须包含 location.page");
     assert.strictEqual(annot1.color, 'green', "含随笔思考的标注应自动赋予 green 颜色");
+    assert.strictEqual(annot1.kind, 'note', "有评论的旧调用应迁移为 note");
 
     const pureAnnot = createAnnotationObject({
         bookId: 'book-1',
@@ -111,6 +112,7 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
         comment: ''
     });
     assert.strictEqual(pureAnnot.color, 'yellow', "纯划线标注应自动赋予 yellow 颜色");
+    assert.strictEqual(pureAnnot.kind, 'highlight', "无评论的旧调用应迁移为 highlight");
 
     const testNotes = [
         { id: 'n1', quote: '重要引文1', comment: '我的思考感悟', page: 1 },
@@ -139,6 +141,47 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
     const markedHtml = applyHighlightToHtml(rawHtml, { id: 'nh1', color: 'yellow', quote: crossQuote });
     assert.ok(markedHtml.includes('<mark class="hl-yellow" data-id="nh1">第一段文字很长</mark>'), "应成功拆分跨段落标记");
     assert.ok(markedHtml.includes('<mark class="hl-yellow" data-id="nh1">第二段文字接续</mark>'), "应成功拆分第二段标记");
+
+    const { normalizeAnnotation, isHighlight, isNote, findAnnotationsAtQuote, groupAnnotationsByRange } = await import(
+        '../../src/client/domain/annotationEngine.js'
+    );
+    const { findQuoteRange, buildSegments } = await import(
+        '../../src/client/domain/annotationRangeEngine.js'
+    );
+
+    const legacyNote = normalizeAnnotation({ id: 'legacy-note', comment: '旧笔记', quote: '原文', page: 1, color: 'green' });
+    const legacyHighlight = normalizeAnnotation({ id: 'legacy-hl', comment: '', quote: '原文', page: 1, color: 'yellow' });
+    const explicitNote = normalizeAnnotation({ id: 'kept-note', kind: 'note', comment: '', quote: '原文', page: 1 });
+    assert.strictEqual(legacyNote.kind, 'note', "无 kind 且有评论时应迁移为 note");
+    assert.strictEqual(legacyHighlight.kind, 'highlight', "无 kind 且无评论时应迁移为 highlight");
+    assert.strictEqual(explicitNote.kind, 'note', "已有 kind 必须保留，不能因空评论改成 highlight");
+    assert.strictEqual(isNote(legacyNote) && isHighlight(legacyHighlight), true);
+
+    const sameRange = findAnnotationsAtQuote([
+        { id: 'h1', kind: 'highlight', quote: '同一段', page: 3, comment: '' },
+        { id: 'n1', kind: 'note', quote: '同一段', page: 3, comment: '一' },
+        { id: 'n2', kind: 'note', quote: '同一段', page: 3, comment: '二' }
+    ], 3, '同一段');
+    assert.strictEqual(sameRange.length, 3, "同一文字上的高亮和多条笔记都要返回");
+
+    const groups = groupAnnotationsByRange(sameRange);
+    assert.strictEqual(groups.length, 1, "同一页同一 quote 只合成一个导出范围");
+    assert.strictEqual(groups[0].highlights.length, 1);
+    assert.strictEqual(groups[0].notes.length, 2, "同一范围的多条笔记分别保留");
+
+    const pageText = '前文这个文字片段后文';
+    const quoteRange = findQuoteRange(pageText, '这个文字片段');
+    assert.strictEqual(pageText.slice(quoteRange.start, quoteRange.end), '这个文字片段');
+    const segments = buildSegments([
+        { id: 'highlight-17', kind: 'highlight', start: quoteRange.start, end: quoteRange.end },
+        { id: 'note-31', kind: 'note', start: quoteRange.start + 2, end: quoteRange.end },
+        { id: 'note-44', kind: 'note', start: quoteRange.start + 2, end: quoteRange.end }
+    ]);
+    const overlap = segments.find(segment => segment.highlightIds.length > 0 && segment.noteIds.length > 0);
+    assert.ok(overlap, "交叉范围必须生成同时包含高亮和笔记的片段");
+    assert.deepStrictEqual(overlap.highlightIds, ['highlight-17']);
+    assert.deepStrictEqual(overlap.noteIds, ['note-31', 'note-44']);
+    assert.strictEqual(segments.filter(segment => segment.noteIds.length > 0).length >= 1, true);
     console.log("✅ AnnotationEngine 标注算法内核测试全部通过！");
 
     // 4. 测试 LayoutSystem 布局控制器与状态机
@@ -351,6 +394,22 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
     // 验证 Coordinator.jumpToAnnotation 委托至 ReaderController 而无 DOM 依赖侵入
     coord.jumpToAnnotation(notesInAnnot[0].id);
     assert.ok(toastMessage.includes('跳转至 P.2'), "jumpToAnnotation 提示通知正确触发");
+    assert.strictEqual(notesInAnnot[0].kind, 'highlight');
+
+    await testAnnotations.saveModalNote({
+        quote: '第2页核心引文',
+        comment: '独立笔记',
+        page: 2,
+        chapter: '第二章'
+    });
+    assert.strictEqual(testAnnotations.getNotes().length, 2, "同一范围的笔记必须独立于高亮");
+    const pairedHighlight = testAnnotations.getNotes().find(n => n.kind === 'highlight');
+    const pairedNote = testAnnotations.getNotes().find(n => n.kind === 'note');
+    assert.strictEqual(pairedHighlight.comment, '');
+    assert.strictEqual(pairedNote.comment, '独立笔记');
+    await testAnnotations.deleteNote(pairedNote.id);
+    assert.strictEqual(testAnnotations.getNotes().length, 1, "删除笔记后高亮仍然保留");
+    assert.strictEqual(testAnnotations.getNotes()[0].kind, 'highlight');
     console.log("✅ ReaderController 封装高亮跳转测试全部通过！");
 
     // 9. 测试 app.js 薄门面与 main.js 权威控制器单例统一（无裂脑状态）

@@ -12,6 +12,7 @@ import {
 } from '../infrastructure/bookRepository.js';
 
 import { parseEpub, parseTxt } from '../infrastructure/epubParser.js';
+import { isNote } from '../domain/annotationEngine.js';
 
 export class AppCoordinator {
     constructor({
@@ -111,19 +112,31 @@ export class AppCoordinator {
     async addAnnotation(data) {
         if (!data) return;
 
-        if (data.type === 'highlight' || data.quote && !data.comment) {
+        const page = data.page || this.reader.getCurrentPage();
+        const chapter = data.chapter || (this.reader.getLocation() ? this.reader.getLocation().chapter : '章节选区');
+
+        if (data.type === 'note') {
+            this.annotations.createNote({
+                quote: data.quote,
+                page,
+                chapter,
+                location: data.location || null
+            });
+        } else if (data.type === 'highlight' || (data.quote && !data.comment)) {
             await this.annotations.createHighlight({
                 quote: data.quote,
-                page: data.page || this.reader.getCurrentPage(),
-                chapter: data.chapter || (this.reader.getLocation() ? this.reader.getLocation().chapter : '章节选区'),
-                color: data.color || 'yellow'
+                page,
+                chapter,
+                color: data.color || 'yellow',
+                location: data.location || null
             });
         } else {
             await this.annotations.saveModalNote({
                 quote: data.quote,
                 comment: data.comment,
-                page: data.page || this.reader.getCurrentPage(),
-                chapter: data.chapter || (this.reader.getLocation() ? this.reader.getLocation().chapter : '章节选区')
+                page,
+                chapter,
+                location: data.location || null
             });
         }
 
@@ -134,14 +147,26 @@ export class AppCoordinator {
         }
     }
 
-    jumpToAnnotation(annotationId) {
+    jumpToAnnotation(annotationId, options = {}) {
         if (!this.annotations) return;
         const notes = this.annotations.getNotes();
         const note = notes.find(n => n.id === annotationId);
         if (!note) return;
 
+        const quote = (note.quote || '').trim();
+        if (!quote) {
+            if (isNote(note)) this.annotations.focusNotes([note.id]);
+            else this.annotations.focusHighlights([note.id]);
+            if (this.shell) this.shell.showToast('已定位到这条笔记');
+            return;
+        }
+
+        const showMenu = !!options.showMenu;
         if (this.reader && this.reader.isChapterFlow && this.reader.isChapterFlow()) {
-            this.reader.showQuote(note.page, note.quote, notes);
+            this.reader.showQuote(note.page, quote, notes);
+            if (this.selection && typeof this.selection.activateAnnotationId === 'function') {
+                setTimeout(() => this.selection.activateAnnotationId(note.id, { notify: false, showMenu }), 30);
+            }
             if (this.shell) this.shell.showToast(`跳转至第 ${note.page} 章原文所在位置`);
             return;
         }
@@ -166,10 +191,14 @@ export class AppCoordinator {
                 this.reader.renderPage(note.page, false, notes);
             }
 
-            if (typeof this.reader.scrollToHighlight === 'function') {
+            const scroll = this.reader.scrollToAnnotation || this.reader.scrollToHighlight;
+            if (typeof scroll === 'function') {
                 setTimeout(() => {
-                    this.reader.scrollToHighlight(note.id);
-                }, 120);
+                    scroll.call(this.reader, note.id);
+                    if (this.selection && typeof this.selection.activateAnnotationId === 'function') {
+                        this.selection.activateAnnotationId(note.id, { notify: false, showMenu });
+                    }
+                }, needsRender ? 120 : 30);
             }
         }
 

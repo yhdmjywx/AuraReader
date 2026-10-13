@@ -5,6 +5,12 @@
    ========================================================================== */
 
 import { getDB, getSeedNotes } from './bookRepository.js';
+import { normalizeAnnotation } from '../domain/annotationEngine.js';
+
+function normalizeList(list) {
+    if (!Array.isArray(list)) return [];
+    return list.map(item => normalizeAnnotation(item)).filter(Boolean);
+}
 
 export function saveNoteToDB(noteObj) {
     if (!noteObj || !noteObj.id) return Promise.resolve();
@@ -52,7 +58,7 @@ export function loadNotesFromDB(bookId) {
         const tx = db.transaction(["notes"], "readonly");
         const index = tx.objectStore("notes").index("bookId");
         const req = index.getAll(bookId);
-        req.onsuccess = () => resolve(req.result || []);
+        req.onsuccess = () => resolve(normalizeList(req.result || []));
         req.onerror = (e) => reject(e);
     });
 }
@@ -78,7 +84,7 @@ export async function getNotesForBooks(bookIds = []) {
         } else if (bookIds.includes('crisis-era')) {
             allNotes.push(...getSeedNotes());
         }
-        return allNotes;
+        return normalizeList(allNotes);
     }
 
     return new Promise((resolve, reject) => {
@@ -105,7 +111,7 @@ export async function getNotesForBooks(bookIds = []) {
                 }
             }
 
-            resolve(filtered);
+            resolve(normalizeList(filtered));
         };
         req.onerror = (e) => reject(e);
     });
@@ -125,7 +131,7 @@ export function loadNotesFromLocalStorage(bookId) {
     const raw = localStorage.getItem('aura_notes_' + bookId);
     if (!raw) return null;
     try {
-        return JSON.parse(raw);
+        return normalizeList(JSON.parse(raw));
     } catch (e) {
         return null;
     }
@@ -152,7 +158,7 @@ export async function loadNotesForBook(bookId) {
 
     // 3. Demo book fallback only for crisis-era
     if (bookId === 'crisis-era') {
-        return getSeedNotes();
+        return normalizeList(getSeedNotes());
     }
 
     // 4. Clean empty list (Never leak previous book notes!)

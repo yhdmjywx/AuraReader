@@ -110,6 +110,18 @@ export class LayoutController {
         return this.isCollapsed;
     }
 
+    ensureSidebarExpanded({ notify = false } = {}) {
+        if (!this.isCollapsed) return false;
+        this.isCollapsed = false;
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('aura_sidebar_collapsed', 'false');
+        }
+        if (this.callbacks.onSidebarChange) {
+            this.callbacks.onSidebarChange({ isCollapsed: false, notify });
+        }
+        return true;
+    }
+
     checkResponsiveLayout(availableWidth = 1200) {
         if (this.layoutMode !== 'double') {
             const hadDowngrade = this.isAutoDowngraded;

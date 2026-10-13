@@ -70,6 +70,7 @@ export const seedNotes = [
     {
         id: 'note-seed-1',
         bookId: 'crisis-era',
+        kind: 'note',
         quote: '当一个社会拼命借钱的时候，意味着这个社会存在着极为深刻（且不易解决）的结构性问题。',
         comment: '深刻分析了高债务杠杆背后的隐患，值得在研究宏观经济时作为风险指标。',
         color: 'green',
@@ -80,6 +81,7 @@ export const seedNotes = [
     {
         id: 'note-seed-2',
         bookId: 'crisis-era',
+        kind: 'note',
         quote: '我们需要建立的不是预测危机的水晶球，而是一套在危机中生存并繁衍的思维框架。',
         comment: '从单纯预测转向构建抗风险的韧性系统，这是反脆弱思维的核心。',
         color: 'green',

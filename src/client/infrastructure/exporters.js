@@ -1,10 +1,12 @@
 /* ==========================================================================
    Exporters - Document & Annotation Export / Backup Adapter (Infrastructure Layer)
-   Provides Markdown, JSON, Chapter-by-Chapter ZIP, Standalone Offline HTML,
-   and Selective .aurabackup package export & import deserialization.
+   Provides Markdown, Chapter-by-Chapter ZIP, Standalone Offline HTML,
+   and per-book .aurabackup export & import deserialization.
    ========================================================================== */
 
 import { ensureTocHierarchy } from '../domain/readingLocation.js';
+import { groupAnnotationsByRange, normalizeAnnotation } from '../domain/annotationEngine.js';
+import { renderAnnotationTokens } from '../features/reader/annotationRenderer.js';
 
 export function downloadFile(filename, data, type) {
     if (typeof window === 'undefined') return;
@@ -19,28 +21,21 @@ export function downloadFile(filename, data, type) {
 }
 
 export function exportMarkdown(bookTitle = '图书笔记', notes = []) {
+    const groups = groupAnnotationsByRange(notes);
     let md = `# 划线与随笔笔记：《${bookTitle}》\n\n`;
     md += `> 导出时间：${new Date().toLocaleString()}\n\n`;
     md += `## 划线与随笔精选 (${notes.length} 条)\n\n`;
 
-    notes.forEach((n, idx) => {
-        md += `### ${idx + 1}. P.${n.page} ${n.chapter || ''}\n`;
-        if (n.quote) md += `==${n.quote}==\n\n`;
-        if (n.comment) md += `> 💭 **随笔思考**：${n.comment}\n\n`;
+    groups.forEach((group, idx) => {
+        md += `### ${idx + 1}. P.${group.page} ${group.chapter || ''}\n`;
+        if (group.quote) md += `==${group.quote}==\n\n`;
+        group.notes.forEach(note => {
+            if (note.comment) md += `> 💭 **随笔思考**：${note.comment}\n\n`;
+        });
         md += `---\n\n`;
     });
 
     downloadFile(`${bookTitle}_划线随笔.md`, md, 'text/markdown');
-}
-
-export function exportJson(bookTitle = '图书笔记', notes = [], bookKey = 'book') {
-    const data = {
-        book: bookTitle,
-        bookKey,
-        exportDate: new Date().toISOString(),
-        notes
-    };
-    downloadFile(`notes_${bookKey}.json`, JSON.stringify(data, null, 2), 'application/json');
 }
 
 export async function exportChapterZip(book, notes = [], jszipLib) {
@@ -81,7 +76,8 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
         chapMd += `> 页码：P.${pageNum} | 本章划线数：${pageNotes.length}\n\n---\n\n`;
 
         const paragraphs = tempDiv.querySelectorAll('p, h1, h2, h3, blockquote, div');
-        const processedNoteIds = new Set();
+        const groups = groupAnnotationsByRange(pageNotes);
+        const processedGroupKeys = new Set();
 
         if (paragraphs.length > 0) {
             paragraphs.forEach(p => {
@@ -98,32 +94,35 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
                     let paragraphText = text;
                     const matchedComments = [];
 
-                    pageNotes.forEach(note => {
-                        if (!note.quote) return;
-                        const cleanQuote = note.quote.trim();
+                    groups.forEach((group, groupIndex) => {
+                        if (!group.quote) return;
+                        const cleanQuote = group.quote.trim();
                         const normP = paragraphText.replace(/[\s\u00a0]+/g, ' ');
                         const normQ = cleanQuote.replace(/[\s\u00a0]+/g, ' ');
+                        if (!paragraphText.includes(cleanQuote) && !normP.includes(normQ)) return;
 
-                        if (paragraphText.includes(cleanQuote) || normP.includes(normQ)) {
-                            processedNoteIds.add(note.id);
-                            if (!paragraphText.includes(`==${cleanQuote}==`)) {
-                                if (paragraphText.includes(cleanQuote)) {
-                                    paragraphText = paragraphText.replace(cleanQuote, `==${cleanQuote}==`);
-                                } else {
-                                    const firstWords = cleanQuote.slice(0, Math.min(8, cleanQuote.length));
-                                    const lastWords = cleanQuote.slice(Math.max(0, cleanQuote.length - 8));
-                                    const startIdx = paragraphText.indexOf(firstWords);
-                                    const endIdx = paragraphText.indexOf(lastWords);
-                                    if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
-                                        const matchedSegment = paragraphText.substring(startIdx, endIdx + lastWords.length);
+                        processedGroupKeys.add(groupIndex);
+                        if (!paragraphText.includes(`==${cleanQuote}==`)) {
+                            if (paragraphText.includes(cleanQuote)) {
+                                paragraphText = paragraphText.replace(cleanQuote, `==${cleanQuote}==`);
+                            } else {
+                                const firstWords = cleanQuote.slice(0, Math.min(8, cleanQuote.length));
+                                const lastWords = cleanQuote.slice(Math.max(0, cleanQuote.length - 8));
+                                const startIdx = paragraphText.indexOf(firstWords);
+                                const endIdx = paragraphText.indexOf(lastWords);
+                                if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
+                                    const matchedSegment = paragraphText.substring(startIdx, endIdx + lastWords.length);
+                                    if (!paragraphText.includes(`==${matchedSegment}==`)) {
                                         paragraphText = paragraphText.replace(matchedSegment, `==${matchedSegment}==`);
                                     }
                                 }
                             }
+                        }
+                        group.notes.forEach(note => {
                             if (note.comment && !matchedComments.includes(note.comment)) {
                                 matchedComments.push(note.comment);
                             }
-                        }
+                        });
                     });
 
                     chapMd += `${paragraphText}\n\n`;
@@ -137,10 +136,13 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
             chapMd += tempDiv.innerText.trim() + '\n\n';
         }
 
-        pageNotes.forEach(note => {
-            if (!processedNoteIds.has(note.id) && note.comment) {
-                chapMd += `> 💭 **[随笔思考 | P.${pageNum}]**：${note.comment}\n\n`;
-            }
+        groups.forEach((group, groupIndex) => {
+            if (processedGroupKeys.has(groupIndex)) return;
+            group.notes.forEach(note => {
+                if (note.comment) {
+                    chapMd += `> 💭 **[随笔思考 | P.${pageNum}]**：${note.comment}\n\n`;
+                }
+            });
         });
 
         const fileName = `${String(pageNum).padStart(2, '0')}_${chapTitle}.md`;
@@ -216,7 +218,14 @@ export function exportStandaloneHtml(book, notes = []) {
             padding: 20px;
             overflow-y: auto;
         }
-        mark.hl { background-color: #fef08a; padding: 2px 4px; border-radius: 3px; }
+        .annotation-token { user-select: text; }
+        .annotation-token.has-highlight { background: #fef08a; border-radius: 2px; }
+        .annotation-token.has-note {
+            text-decoration-line: underline;
+            text-decoration-color: #ef4444;
+            text-decoration-thickness: 2px;
+            text-underline-offset: 3px;
+        }
         .note-card {
             background: #ffffff;
             border: 1px solid var(--border);
@@ -243,15 +252,15 @@ export function exportStandaloneHtml(book, notes = []) {
     </div>
     <div class="main-workspace">
         <div class="reader-col" id="reader-canvas">
-            ${allPages.map((p, idx) => `<div id="page-${idx+1}" style="margin-bottom: 60px;">${p}</div>`).join('')}
+            ${allPages.map((p, idx) => `<div id="page-${idx+1}" style="margin-bottom: 60px;">${annotatePageHtml(p, allNotes.filter(n => Number(n.page) === idx + 1), idx + 1)}</div>`).join('')}
         </div>
         <div class="notes-col">
             <h3 style="font-size: 15px; margin-top: 0; color: var(--primary);">随笔标注卡片 (${allNotes.length})</h3>
-            ${allNotes.map(n => `
+            ${groupAnnotationsByRange(allNotes).map(group => `
                 <div class="note-card">
-                    <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">P.${n.page} | ${escapeHtml(n.chapter || '')}</div>
-                    ${n.quote ? `<div class="note-quote">“${escapeHtml(n.quote)}”</div>` : ''}
-                    ${n.comment ? `<div class="note-comment">💭 ${escapeHtml(n.comment)}</div>` : ''}
+                    <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">P.${group.page} | ${escapeHtml(group.chapter || '')}</div>
+                    ${group.quote ? `<div class="note-quote">“${escapeHtml(group.quote)}”</div>` : ''}
+                    ${group.notes.map(note => note.comment ? `<div class="note-comment">💭 ${escapeHtml(note.comment)}</div>` : '').join('')}
                 </div>
             `).join('')}
         </div>
@@ -268,21 +277,26 @@ export function exportStandaloneHtml(book, notes = []) {
     downloadFile(`${bookTitle}_带标注电子书.html`, standaloneHtml, 'text/html');
 }
 
-export function exportSelectiveBackup({ selectedBooks = [], notes = [], settings = {} }) {
-    const backupPayload = {
-        version: "1.0",
-        type: "aurareader_full_backup",
-        exportedAt: new Date().toISOString(),
-        notes,
-        settings,
-        books: selectedBooks
-    };
+export function exportSelectiveBackup({ selectedBooks = [], notes = [] }) {
+    const normalizedNotes = (notes || []).map(normalizeAnnotation).filter(Boolean);
+    const exportedAt = new Date().toISOString();
+    const yyyymmdd = exportedAt.slice(0, 10).replace(/-/g, '');
 
-    const jsonStr = JSON.stringify(backupPayload, null, 2);
-    const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const fileName = `AuraReader_Backup_${selectedBooks.length}本_${yyyymmdd}.aurabackup`;
+    selectedBooks.forEach(book => {
+        const backupPayload = {
+            version: "1.0",
+            // Keep the existing envelope for compatibility with earlier readers.
+            type: "aurareader_full_backup",
+            exportedAt,
+            books: [book],
+            notes: normalizedNotes.filter(note => note.bookId === book.id)
+        };
+        const bookTitle = String(book.title || book.id || '图书')
+            .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_');
+        const fileName = `AuraReader_Backup_${bookTitle}_${yyyymmdd}.aurabackup`;
 
-    downloadFile(fileName, jsonStr, 'application/json;charset=utf-8');
+        downloadFile(fileName, JSON.stringify(backupPayload, null, 2), 'application/json;charset=utf-8');
+    });
 }
 
 export function parseBackupFile(file) {
@@ -303,6 +317,15 @@ export function parseBackupFile(file) {
         reader.onerror = (e) => reject(e);
         reader.readAsText(file);
     });
+}
+
+function annotatePageHtml(html, notes, page) {
+    if (!html) return '';
+    if (typeof document === 'undefined' || !notes || notes.length === 0) return html;
+    const holder = document.createElement('div');
+    holder.innerHTML = html;
+    renderAnnotationTokens(holder, notes, page);
+    return holder.innerHTML;
 }
 
 function escapeHtml(str) {

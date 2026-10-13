@@ -45,12 +45,35 @@ export class AppShell {
         const button = this.elements && this.elements.btnAppearance;
         if (!panel) return;
         const open = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('open');
+        if (open) this.closeExportPanel();
         panel.classList.toggle('open', open);
         if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
 
     closeAppearance() {
         this.toggleAppearance(false);
+    }
+
+    toggleExportPanel(forceOpen) {
+        const panel = this.elements && this.elements.exportPanel;
+        const button = this.elements && this.elements.btnExportMenu;
+        if (!panel) return;
+        const open = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('open');
+        if (open) {
+            this.closeAppearance();
+            if (this.elements.exportBookTitle) {
+                this.elements.exportBookTitle.textContent = this.elements.currentBookTitle
+                    ? this.elements.currentBookTitle.textContent
+                    : '未打开书籍';
+            }
+        }
+        panel.classList.toggle('open', open);
+        panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+        if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    closeExportPanel() {
+        this.toggleExportPanel(false);
     }
 
     toggleFullscreen() {
@@ -99,6 +122,25 @@ export class AppShell {
             });
         }
 
+        if (elements.btnExportMenu && elements.exportPanel) {
+            elements.btnExportMenu.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleExportPanel();
+            });
+            elements.exportPanel.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (e.target.closest && e.target.closest('[data-export-action]')) {
+                    this.closeExportPanel();
+                }
+            });
+            document.addEventListener('click', (e) => {
+                if (!elements.exportPanel.classList.contains('open')) return;
+                const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+                if (path.includes(elements.exportPanel) || path.includes(elements.btnExportMenu)) return;
+                this.closeExportPanel();
+            }, true);
+        }
+
         // Fullscreen Button
         if (elements.btnFullscreen) {
             elements.btnFullscreen.addEventListener('click', () => {
@@ -134,6 +176,12 @@ export class AppShell {
 
         // Global Keyboard Shortcuts
         document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && elements.exportPanel && elements.exportPanel.classList.contains('open')) {
+                e.preventDefault();
+                this.closeExportPanel();
+                if (elements.btnExportMenu) elements.btnExportMenu.focus();
+                return;
+            }
             const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
             if (tag === 'input' || tag === 'textarea' || document.activeElement.isContentEditable) {
                 return;

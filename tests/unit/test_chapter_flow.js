@@ -44,7 +44,37 @@ console.log('=== AuraReader 章节纸条计算 ===');
     assert.strictEqual(columnFromScroll(800, 400, 5), 3);
     assert.strictEqual(columnFromScroll(9999, 400, 5), 5);
 
-    console.log('✅ 章节纸条计算通过');
+    const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
+    let rendered = 0;
+    const reader = new ReaderController({ callbacks: { onPageRendered: () => rendered++ } });
+    reader.setBook('chapter-merge-test', { format: 'EPUB', readerFlow: 'chapter', pages: ['<p>章节原文</p>'], toc: [] });
+    reader.paintChapter = () => {};
+    reader.layoutAndPlace = () => {};
+    reader.renderPage(1);
+    assert.strictEqual(rendered, 1, '章节分页渲染后必须触发 UI 分支的标注恢复回调');
+
+    const { AppCoordinator } = await import('../../src/client/app/appCoordinator.js');
+    const activated = [];
+    const shown = [];
+    const focused = [];
+    const notes = [
+        { id: 'chapter-note', kind: 'note', page: 2, quote: '章节原文', comment: '思考' },
+        { id: 'standalone-note', kind: 'note', page: 2, quote: '', comment: '独立笔记' }
+    ];
+    const coordinator = new AppCoordinator({
+        readerController: { isChapterFlow: () => true, showQuote: (...args) => shown.push(args) },
+        annotationController: { getNotes: () => notes, focusNotes: ids => focused.push(ids) },
+        selectionController: { activateAnnotationId: (...args) => activated.push(args) }
+    });
+    coordinator.jumpToAnnotation('chapter-note', { showMenu: true });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.deepStrictEqual(shown[0], [2, '章节原文', notes], '标注跳转必须继续使用章节位置');
+    assert.deepStrictEqual(activated[0], ['chapter-note', { notify: false, showMenu: true }], '章节跳转后必须保留 UI 标注操作菜单');
+    coordinator.jumpToAnnotation('standalone-note');
+    assert.deepStrictEqual(focused[0], ['standalone-note'], '无引文的独立笔记必须保留 UI 侧栏定位');
+    assert.strictEqual(shown.length, 1, '独立笔记不得触发空引文的章节跳转');
+
+    console.log('✅ 章节纸条计算、渲染回调与标注跳转兼容通过');
 })().catch((err) => {
     console.error(err);
     process.exit(1);
