@@ -1038,6 +1038,43 @@ body.theme-dark .spread-spine,
     user-select: text;
 }
 
+/* Centered paged reading surface. Scroll mode keeps its existing geometry. */
+.workspace-container:is(.layout-single, .layout-double) .reader-panel {
+    background-color: var(--bg-paper);
+}
+
+.workspace-container:is(.layout-single, .layout-double) .paper-container,
+.workspace-container:is(.layout-single, .layout-double) .book-paper {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.workspace-container.layout-single .paper-container {
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+.workspace-container.layout-double .paper-container {
+    max-width: 1192px;
+    margin: 0 auto;
+}
+
+.workspace-container:is(.layout-single, .layout-double) .book-paper {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* Legacy spreads use two elements; EPUB chapter flow uses CSS columns. */
+.workspace-container.layout-double .paper-container.spread-active {
+    gap: 72px;
+}
+
+.workspace-container:is(.layout-single, .layout-double) .spread-spine {
+    display: none !important;
+}
+
 .book-paper h1, .book-paper h2, .book-paper h3 {
     margin-bottom: 16px;
     line-height: 1.3;

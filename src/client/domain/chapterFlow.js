@@ -45,12 +45,8 @@ export function sentenceSlice(text, index) {
 export function columnMetrics(viewWidth, mode) {
     const width = Math.max(1, Math.floor(Number(viewWidth) || 1));
     const columns = mode === 'double' ? 2 : 1;
-    let gap = 0;
-    if (columns === 2) {
-        gap = Math.max(24, Math.floor(width / 24));
-        if (gap % 2) gap -= 1;
-        if (gap >= width) gap = 0;
-    }
+    let gap = columns === 2 ? 72 : 0;
+    if (gap >= width) gap = 0;
     const colWidth = Math.max(1, Math.floor((width - gap) / columns));
     const screenWidth = columns * colWidth + gap;
     return {

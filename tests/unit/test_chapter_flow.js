@@ -48,6 +48,29 @@ console.log('=== AuraReader 章节纸条计算 ===');
     assert.strictEqual(screenStartForColumn(16, spread), 7 * screenStep(spread));
     assert.strictEqual(screenStep(single), single.screenWidth);
 
+    const focusedSpread = columnMetrics(1192, 'double');
+    assert.strictEqual(focusedSpread.colWidth, 560);
+    assert.strictEqual(focusedSpread.gap, 72);
+    assert.strictEqual(focusedSpread.screenWidth, 1192);
+    assert.strictEqual(focusedSpread.stride, 632);
+    assert.strictEqual(screenStep(focusedSpread), 1264);
+    assert.strictEqual(screenStartForColumn(5, focusedSpread), 2528, '奇数末栏必须落在下一组双页左侧');
+    assert.strictEqual(countColumns(5 * focusedSpread.stride - focusedSpread.gap, focusedSpread.stride), 5);
+
+    const sidebarSpread = columnMetrics(1146, 'double');
+    assert.strictEqual(sidebarSpread.colWidth, 537);
+    assert.strictEqual(sidebarSpread.gap, 72);
+    assert.strictEqual(sidebarSpread.screenWidth, 1146);
+    assert.strictEqual(screenStep(sidebarSpread), 1218);
+    const roundedSpread = columnMetrics(1145, 'double');
+    assert.strictEqual(roundedSpread.colWidth, 536);
+    assert.strictEqual(roundedSpread.screenWidth, 1144, '奇数容器宽度取整后不得溢出');
+
+    const focusedSingle = columnMetrics(560, 'single');
+    assert.strictEqual(focusedSingle.colWidth, 560);
+    assert.strictEqual(focusedSingle.gap, 0);
+    assert.strictEqual(screenStep(focusedSingle), 560);
+
     assert.strictEqual(countColumns(1600, 800), 2);
     assert.strictEqual(countColumns(0, 800), 1);
     assert.strictEqual(columnFromScroll(0, 400, 5), 1);
