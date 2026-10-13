@@ -54,6 +54,9 @@ export function queryElements() {
         btnThemeToggle: document.getElementById('btn-theme-toggle'),
         btnAppearance: document.getElementById('btn-appearance'),
         appearancePanel: document.getElementById('appearance-panel'),
+        btnExportMenu: document.getElementById('btn-export-menu'),
+        exportPanel: document.getElementById('export-panel'),
+        exportBookTitle: document.getElementById('export-book-title'),
         btnFullscreen: document.getElementById('btn-fullscreen'),
         btnSwitchDemo: document.getElementById('btn-switch-demo'),
         fileInput: document.getElementById('file-input'),
@@ -87,7 +90,7 @@ export function queryElements() {
         quickNoteInput: document.getElementById('quick-note-input'),
         btnSaveQuickNote: document.getElementById('btn-save-quick-note'),
 
-        // Settings Tab / Exporters
+        // Header Export Panel / Backup
         btnExportMarkdown: document.getElementById('btn-export-markdown'),
         btnExportJson: document.getElementById('btn-export-json'),
         btnExportChapterZip: document.getElementById('btn-export-chapter-zip'),
