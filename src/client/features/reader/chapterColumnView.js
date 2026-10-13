@@ -7,7 +7,9 @@ import {
     columnMetrics,
     countColumns,
     columnFromScroll,
-    sentenceSlice
+    sentenceSlice,
+    screenStep,
+    screenStartForColumn
 } from '../../domain/chapterFlow.js';
 
 const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, figcaption';
@@ -73,13 +75,16 @@ export function layoutChapterStrip(elements, mode) {
 }
 
 export function readTopLeftSentence(root, viewport) {
-    if (!root || !viewport || typeof document === 'undefined') return '';
-    const view = viewport.getBoundingClientRect();
+    if (!root || typeof document === 'undefined') return '';
+    const view = root.getBoundingClientRect();
+    if (!view.width || !view.height) {
+        if (!viewport) return '';
+    }
     const probes = [
-        [16, 20],
-        [28, 36],
-        [48, 64],
-        [16, 96]
+        [56, 40],
+        [88, 52],
+        [56, 84],
+        [120, 40]
     ];
     for (const [dx, dy] of probes) {
         const x = Math.min(view.right - 4, view.left + dx);
@@ -110,12 +115,11 @@ export function placeSentenceAtTopLeft(root, viewport, sentence, mode) {
         root.scrollLeft = 0;
         return true;
     }
-    const marker = insertColumnBreak(pos.node, pos.offset);
-    if (!marker) return false;
+    const block = insertColumnBreak(root, pos.node, pos.offset);
+    if (!block) return false;
+    pushSentenceToLeftColumn(root, block, mode);
     balanceDoubleTail(root, mode);
-    const rect = marker.getBoundingClientRect();
-    const host = root.getBoundingClientRect();
-    root.scrollLeft += rect.left - host.left;
+    snapBlockToScreen(root, block, mode);
     return true;
 }
 
@@ -150,17 +154,16 @@ export function shiftStrip(elements, mode, direction) {
         viewport.scrollTop = Math.max(0, viewport.scrollTop - viewport.clientHeight);
         return 'moved';
     }
-    const max = Math.max(0, paper.scrollWidth - paper.clientWidth);
-    const step = paper.clientWidth || 1;
+    const frame = pagedFrame(paper, mode);
+    const index = Math.round(paper.scrollLeft / frame.step);
+    const lastIndex = Math.round(frame.maxStart / frame.step);
     if (direction > 0) {
-        const next = Math.min(max, paper.scrollLeft + step);
-        if (next <= paper.scrollLeft + 1) return 'edge';
-        paper.scrollLeft = next;
+        if (index >= lastIndex) return 'edge';
+        paper.scrollLeft = (index + 1) * frame.step;
         return 'moved';
     }
-    if (paper.scrollLeft <= 2) return 'edge';
-    const snapped = Math.floor((paper.scrollLeft - 1) / step) * step;
-    paper.scrollLeft = Math.max(0, snapped);
+    if (index <= 0) return 'edge';
+    paper.scrollLeft = (index - 1) * frame.step;
     return 'moved';
 }
 
@@ -183,7 +186,7 @@ export function scrollStripToEnd(elements, mode) {
         return;
     }
     if (!paper) return;
-    paper.scrollLeft = Math.max(0, paper.scrollWidth - paper.clientWidth);
+    paper.scrollLeft = pagedFrame(paper, mode).maxStart;
 }
 
 export function atStripStart(elements, mode) {
@@ -201,7 +204,8 @@ export function atStripEnd(elements, mode) {
         return viewport.scrollTop >= viewport.scrollHeight - viewport.clientHeight - 2;
     }
     if (!paper) return true;
-    return paper.scrollLeft >= paper.scrollWidth - paper.clientWidth - 2;
+    const frame = pagedFrame(paper, mode);
+    return Math.round(paper.scrollLeft / frame.step) >= Math.round(frame.maxStart / frame.step);
 }
 
 export function writeChapterIndicator(elements, mode) {
@@ -221,10 +225,9 @@ export function writeChapterIndicator(elements, mode) {
         if (elements.pageUnit) elements.pageUnit.textContent = '屏';
     } else if (paper) {
         const metrics = columnMetrics(paper.clientWidth, mode);
-        const measured = countColumns(paper.scrollWidth, metrics.stride);
-        const contentTotal = Number(paper.dataset.contentColumns) || measured;
+        const contentTotal = contentColumnCount(paper, metrics);
         total = contentTotal;
-        current = columnFromScroll(paper.scrollLeft, metrics.stride, measured);
+        current = columnFromScroll(paper.scrollLeft, metrics.stride, contentTotal);
         if (current > contentTotal) current = contentTotal;
         const right = current + metrics.columns - 1;
         label = (mode === 'double' && right > current && right <= contentTotal) ? `${current}–${right}` : String(current);
@@ -333,24 +336,94 @@ function isDocumentStart(root, node, offset) {
     return false;
 }
 
-function insertColumnBreak(node, offset) {
-    if (!node || node.nodeType !== Node.TEXT_NODE || !node.parentNode) return null;
+function contentColumnCount(paper, metrics) {
+    let total = countColumns(paper.scrollWidth, metrics.stride);
+    if (paper.querySelector('.flow-tail') && total > 1 && total % 2 === 0) total -= 1;
+    return Math.max(1, total);
+}
+
+function pagedFrame(paper, mode) {
+    const metrics = columnMetrics(paper.clientWidth, mode);
+    const step = screenStep(metrics);
+    const contentTotal = contentColumnCount(paper, metrics);
+    const maxStart = screenStartForColumn(contentTotal, metrics);
+    return { metrics, step, contentTotal, maxStart };
+}
+
+function insertColumnBreak(paper, node, offset) {
+    if (!paper || !node || node.nodeType !== Node.TEXT_NODE || !node.parentNode) return null;
     let target = node;
     let at = Math.max(0, Math.min(target.textContent.length, offset));
     if (at > 0 && at < target.textContent.length) {
         target = target.splitText(at);
         at = 0;
     }
-    const marker = document.createElement('div');
-    marker.className = 'flow-break';
-    marker.setAttribute('aria-hidden', 'true');
-    if (at === 0) target.parentNode.insertBefore(marker, target);
-    else target.parentNode.insertBefore(marker, target.nextSibling);
-    return marker;
+    if (at > 0) return null;
+    const block = liftToColumnChild(paper, target);
+    if (!block) return null;
+    block.classList.add('flow-start');
+    return block;
+}
+
+function liftToColumnChild(paper, textNode) {
+    let node = textNode;
+    while (node.parentNode && node.parentNode !== paper) {
+        const parent = node.parentNode;
+        if (node.previousSibling) {
+            const clone = parent.cloneNode(false);
+            if (clone.removeAttribute) clone.removeAttribute('id');
+            let sib = node;
+            while (sib) {
+                const next = sib.nextSibling;
+                clone.appendChild(sib);
+                sib = next;
+            }
+            if (!parent.parentNode) return null;
+            parent.parentNode.insertBefore(clone, parent.nextSibling);
+            node = clone;
+        } else {
+            node = parent;
+        }
+    }
+    if (!node.parentNode) return null;
+    if (node.nodeType === Node.TEXT_NODE) {
+        const wrap = document.createElement('div');
+        node.parentNode.insertBefore(wrap, node);
+        wrap.appendChild(node);
+        node = wrap;
+    }
+    return node;
+}
+
+function pushSentenceToLeftColumn(paper, block, mode) {
+    if (mode !== 'double' || !block || !block.parentNode) return;
+    const metrics = columnMetrics(paper.clientWidth, mode);
+    const stride = Math.max(1, metrics.stride);
+    const rect = block.getBoundingClientRect();
+    const host = paper.getBoundingClientRect();
+    const contentX = paper.scrollLeft + rect.left - host.left;
+    const zeroBased = Math.max(0, Math.round(contentX / stride));
+    if (zeroBased % 2 === 0) return;
+    if (block.previousElementSibling && block.previousElementSibling.classList.contains('flow-pad')) return;
+    const pad = document.createElement('div');
+    pad.className = 'flow-pad';
+    pad.setAttribute('aria-hidden', 'true');
+    block.parentNode.insertBefore(pad, block);
+}
+
+function snapBlockToScreen(paper, block, mode) {
+    const metrics = columnMetrics(paper.clientWidth, mode);
+    const stride = Math.max(1, metrics.stride);
+    const rect = block.getBoundingClientRect();
+    const host = paper.getBoundingClientRect();
+    const contentX = paper.scrollLeft + rect.left - host.left;
+    const columnNumber = Math.max(1, Math.round(contentX / stride) + 1);
+    paper.scrollLeft = screenStartForColumn(columnNumber, metrics);
 }
 
 function removeFlowBreak(root) {
-    root.querySelectorAll('.flow-break, .flow-tail').forEach(node => node.remove());
+    root.querySelectorAll('.flow-break, .flow-tail, .flow-pad').forEach(node => node.remove());
+    root.querySelectorAll('.flow-start').forEach(node => node.classList.remove('flow-start'));
 }
 
 function balanceDoubleTail(paper, mode) {

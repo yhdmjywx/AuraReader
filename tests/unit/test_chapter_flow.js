@@ -9,7 +9,9 @@ console.log('=== AuraReader 章节纸条计算 ===');
         sentenceSlice,
         columnMetrics,
         countColumns,
-        columnFromScroll
+        columnFromScroll,
+        screenStep,
+        screenStartForColumn
     } = await import('../../src/client/domain/chapterFlow.js');
 
     assert.strictEqual(isChapterFlowBook({ format: 'EPUB', readerFlow: 'chapter', pages: ['<p>a</p>'] }), true);
@@ -37,6 +39,14 @@ console.log('=== AuraReader 章节纸条计算 ===');
     assert.strictEqual(spread.gap % 2, 0);
     assert.strictEqual(spread.screenWidth, spread.colWidth * 2 + spread.gap);
     assert.ok(spread.screenWidth <= 840);
+    assert.strictEqual(screenStep(spread), spread.columns * spread.stride);
+    assert.strictEqual(screenStep(spread), spread.screenWidth + spread.gap);
+    assert.ok(screenStep(spread) > spread.screenWidth, '双页翻页步长必须比可见宽度多一个栏间距');
+    assert.strictEqual(screenStartForColumn(1, spread), 0);
+    assert.strictEqual(screenStartForColumn(2, spread), 0);
+    assert.strictEqual(screenStartForColumn(9, spread), 4 * screenStep(spread));
+    assert.strictEqual(screenStartForColumn(16, spread), 7 * screenStep(spread));
+    assert.strictEqual(screenStep(single), single.screenWidth);
 
     assert.strictEqual(countColumns(1600, 800), 2);
     assert.strictEqual(countColumns(0, 800), 1);

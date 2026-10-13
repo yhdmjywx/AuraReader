@@ -75,8 +75,18 @@ export function columnFromScroll(scrollLeft, stride, total) {
     return Math.max(1, Math.min(max, index));
 }
 
-export function screenStartForColumn(columnIndex, columnsPerScreen, screenWidth) {
-    const per = Math.max(1, columnsPerScreen || 1);
-    const screenIndex = Math.floor((Math.max(1, columnIndex) - 1) / per);
-    return screenIndex * (Number(screenWidth) || 0);
+// One screen shows `columns` columns, but the next screen starts after the gap
+// that follows the right column. That step is columns*stride, which is one gap
+// wider than the visible width. Scrolling by the visible width walks into the
+// middle of a column and shows a clipped third column.
+export function screenStep(metrics) {
+    const columns = Math.max(1, Number(metrics && metrics.columns) || 1);
+    const stride = Math.max(1, Number(metrics && metrics.stride) || 1);
+    return columns * stride;
+}
+
+export function screenStartForColumn(columnIndex, metrics) {
+    const per = Math.max(1, Number(metrics && metrics.columns) || 1);
+    const screenIndex = Math.floor((Math.max(1, Number(columnIndex) || 1) - 1) / per);
+    return screenIndex * screenStep(metrics);
 }

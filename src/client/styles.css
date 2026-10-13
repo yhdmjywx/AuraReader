@@ -841,8 +841,15 @@ body.theme-dark .export-backup-action i {
     overflow: visible;
 }
 .flow-break,
-.flow-tail {
+.flow-tail,
+.flow-pad,
+.flow-start {
     break-before: column;
+    -webkit-column-break-before: always;
+}
+.flow-break,
+.flow-tail,
+.flow-pad {
     display: block;
     width: 0;
     margin: 0;
@@ -852,7 +859,8 @@ body.theme-dark .export-backup-action i {
 .flow-break {
     height: 0;
 }
-.flow-tail {
+.flow-tail,
+.flow-pad {
     height: 100%;
 }
 

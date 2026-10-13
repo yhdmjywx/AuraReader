@@ -265,6 +265,7 @@ export function bootstrapApp() {
         if (reader.isChapterFlow()) reader.refitChapter(notes);
         else reader.renderPage(reader.getCurrentPage(), true, notes);
     };
+    layout.callbacks.beforeGeometryChange = () => reader.rememberAnchor();
     layout.callbacks.onLayoutChange = (res) => {
         syncReaderLayout();
         if (appShell) {
