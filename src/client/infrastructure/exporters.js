@@ -1,6 +1,6 @@
 /* ==========================================================================
    Exporters - Document & Annotation Export / Backup Adapter (Infrastructure Layer)
-   Provides Markdown, JSON, Chapter-by-Chapter ZIP, Standalone Offline HTML,
+   Provides Markdown, Chapter-by-Chapter ZIP, Standalone Offline HTML,
    and per-book .aurabackup export & import deserialization.
    ========================================================================== */
 
@@ -36,16 +36,6 @@ export function exportMarkdown(bookTitle = '图书笔记', notes = []) {
     });
 
     downloadFile(`${bookTitle}_划线随笔.md`, md, 'text/markdown');
-}
-
-export function exportJson(bookTitle = '图书笔记', notes = [], bookKey = 'book') {
-    const data = {
-        book: bookTitle,
-        bookKey,
-        exportDate: new Date().toISOString(),
-        notes: (notes || []).map(normalizeAnnotation).filter(Boolean)
-    };
-    downloadFile(`notes_${bookKey}.json`, JSON.stringify(data, null, 2), 'application/json');
 }
 
 export async function exportChapterZip(book, notes = [], jszipLib) {

@@ -19,7 +19,6 @@ import { normalizeAnnotation } from '../../domain/annotationEngine.js';
 
 import {
     exportMarkdown as adapterExportMarkdown,
-    exportJson as adapterExportJson,
     exportChapterZip as adapterExportChapterZip,
     exportStandaloneHtml as adapterExportStandaloneHtml,
     exportSelectiveBackup as adapterExportSelectiveBackup,
@@ -168,11 +167,6 @@ export class BackupController {
         if (this.callbacks.showToast) this.callbacks.showToast('已导出高亮与随笔 Markdown 文件');
     }
 
-    exportJson(bookTitle, notes, bookKey) {
-        adapterExportJson(bookTitle, notes, bookKey);
-        if (this.callbacks.showToast) this.callbacks.showToast('已导出 JSON 结构化数据');
-    }
-
     async exportChapterZip(book, notes) {
         try {
             if (this.callbacks.showToast) this.callbacks.showToast('正在生成分章节 Zip 压缩包...');
@@ -201,14 +195,6 @@ export class BackupController {
                 const book = this.callbacks.getCurrentBook ? this.callbacks.getCurrentBook() : { title: '图书' };
                 const notes = this.callbacks.getCurrentNotes ? this.callbacks.getCurrentNotes() : [];
                 this.exportMarkdown(book ? book.title : '图书', notes);
-            });
-        }
-
-        if (elements.btnExportJson) {
-            elements.btnExportJson.addEventListener('click', () => {
-                const book = this.callbacks.getCurrentBook ? this.callbacks.getCurrentBook() : { title: '图书', id: 'book' };
-                const notes = this.callbacks.getCurrentNotes ? this.callbacks.getCurrentNotes() : [];
-                this.exportJson(book ? book.title : '图书', notes, book ? book.id : 'book');
             });
         }
 

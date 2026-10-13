@@ -90,7 +90,7 @@ const path = require('path');
         assert.ok(header.indexOf('id="btn-appearance"') < header.indexOf('id="btn-export-menu"'));
         assert.ok(header.indexOf('id="btn-export-menu"') < header.indexOf('id="btn-fullscreen"'));
         const panel = html.slice(html.indexOf('<section id="export-panel"'), html.indexOf('<!-- Main Workspace'));
-        for (const id of ['btn-export-markdown', 'btn-export-json', 'btn-export-chapter-zip', 'btn-export-standalone-html', 'btn-export-full-backup', 'btn-import-full-backup', 'backup-file-input']) {
+        for (const id of ['btn-export-markdown', 'btn-export-chapter-zip', 'btn-export-standalone-html', 'btn-export-full-backup', 'btn-import-full-backup', 'backup-file-input']) {
             assert.strictEqual(html.split(`id="${id}"`).length - 1, 1, `${id} 必须保持唯一，避免重复绑定`);
             assert.ok(panel.includes(`id="${id}"`), `${id} 必须迁入顶栏面板`);
         }

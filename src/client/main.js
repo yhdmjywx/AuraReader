@@ -92,7 +92,6 @@ export function queryElements() {
 
         // Header Export Panel / Backup
         btnExportMarkdown: document.getElementById('btn-export-markdown'),
-        btnExportJson: document.getElementById('btn-export-json'),
         btnExportChapterZip: document.getElementById('btn-export-chapter-zip'),
         btnExportStandaloneHtml: document.getElementById('btn-export-standalone-html'),
         btnExportFullBackup: document.getElementById('btn-export-full-backup'),
