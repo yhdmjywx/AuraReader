@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <!-- JSZip & Stylesheet -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=12">
+    <link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body class="theme-light">
     <!-- Single navigation bar -->
@@ -81,10 +81,13 @@
         </div>
         <div class="appearance-row">
             <span>版式</span>
-            <button id="btn-page-mode" class="btn btn-icon-sm" type="button" title="切换单页 / 双页阅读模式 (快捷键: D)">
-                <i class="ri-book-read-line" id="icon-page-mode"></i>
-                <span id="text-page-mode">单页</span>
-            </button>
+            <div class="reader-mode-group">
+                <button id="btn-mode-scroll" class="btn btn-icon-sm mode-choice" type="button" title="连续滚动">滚动</button>
+                <button id="btn-page-mode" class="btn btn-icon-sm mode-choice" type="button" title="切换单页 / 双页阅读模式 (快捷键: D)">
+                    <i class="ri-book-read-line" id="icon-page-mode"></i>
+                    <span id="text-page-mode">单页</span>
+                </button>
+            </div>
         </div>
         <div class="appearance-row">
             <span>界面明暗</span>
@@ -131,7 +134,7 @@
             <nav class="reader-pagination" aria-label="翻页">
                 <button id="btn-prev-page" class="page-turn-btn" type="button" title="上一页 (←)">‹</button>
                 <span class="page-indicator">
-                    <span id="current-page">1</span> / <span id="total-pages">1</span> 页
+                    <span id="current-page">1</span> / <span id="total-pages">1</span> <span id="page-unit">页</span>
                 </span>
                 <button id="btn-next-page" class="page-turn-btn" type="button" title="下一页 (→)">›</button>
             </nav>
@@ -341,6 +344,6 @@
     <!-- Notification Toast -->
     <div class="toast" id="toast-msg"></div>
 
-    <script type="module" src="main.js?v=11"></script>
+    <script type="module" src="main.js?v=12"></script>
 </body>
 </html>

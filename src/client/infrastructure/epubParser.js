@@ -440,6 +440,7 @@ export async function parseEpub(arrayBuffer, fileName, jszipLib) {
         id: bookId,
         title: fileName.replace(/\.(epub|equb)$/i, ''),
         format: 'EPUB',
+        readerFlow: 'chapter',
         toc,
         pages,
         hrefToPageMap,

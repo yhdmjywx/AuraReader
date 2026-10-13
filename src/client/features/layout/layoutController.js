@@ -1,6 +1,6 @@
 /* ==========================================================================
    LayoutController - UI Layout & Viewport Mode Feature Controller
-   Authority owner of: layoutMode ('single' | 'double'), isCollapsed,
+   Authority owner of: layoutMode ('scroll' | 'single' | 'double'), isCollapsed,
    readerWidthPercent, isAutoDowngraded.
    Manages spread layout, sidebar toggles, resizer dragging, and 760px responsive rules.
    ========================================================================== */
@@ -10,7 +10,10 @@ export const DOUBLE_PAGE_MIN_WIDTH = 760;
 export class LayoutController {
     constructor(callbacks = {}) {
         const storage = (typeof localStorage !== 'undefined') ? localStorage : null;
-        this.layoutMode = (storage && storage.getItem('aura_layout_mode')) || 'single';
+        const storedMode = storage && storage.getItem('aura_layout_mode');
+        this.layoutMode = (storedMode === 'scroll' || storedMode === 'double' || storedMode === 'single')
+            ? storedMode
+            : 'single';
         this.isCollapsed = storage ? (storage.getItem('aura_sidebar_collapsed') === 'true') : false;
         this.readerWidthPercent = storage ? (parseFloat(storage.getItem('aura_reader_width')) || 75) : 75;
         this.isAutoDowngraded = false;
@@ -21,6 +24,11 @@ export class LayoutController {
 
     isDoublePageEffective() {
         return this.layoutMode === 'double' && !this.isAutoDowngraded;
+    }
+
+    getEffectiveReaderMode() {
+        if (this.layoutMode === 'scroll') return 'scroll';
+        return this.isDoublePageEffective() ? 'double' : 'single';
     }
 
     getLayoutMode() {
@@ -50,13 +58,15 @@ export class LayoutController {
     }
 
     setPageMode(mode, availableWidth = 1200) {
-        this.layoutMode = mode;
+        if (this.callbacks.beforeGeometryChange) this.callbacks.beforeGeometryChange();
+        const nextMode = (mode === 'scroll' || mode === 'double' || mode === 'single') ? mode : 'single';
+        this.layoutMode = nextMode;
         if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('aura_layout_mode', mode);
+            localStorage.setItem('aura_layout_mode', nextMode);
         }
 
         let downgraded = false;
-        if (mode === 'double' && availableWidth < DOUBLE_PAGE_MIN_WIDTH) {
+        if (nextMode === 'double' && availableWidth < DOUBLE_PAGE_MIN_WIDTH) {
             this.isAutoDowngraded = true;
             downgraded = true;
         } else {
@@ -77,7 +87,7 @@ export class LayoutController {
     }
 
     togglePageMode(availableWidth) {
-        const nextMode = (this.layoutMode === 'double') ? 'single' : 'double';
+        const nextMode = (this.layoutMode === 'single') ? 'double' : 'single';
         const width = (availableWidth !== undefined && availableWidth > 0)
             ? availableWidth
             : ((this.elements && this.elements.readerPanel && this.elements.readerPanel.clientWidth > 0)
@@ -87,6 +97,7 @@ export class LayoutController {
     }
 
     toggleSidebar(notify = true) {
+        if (this.callbacks.beforeGeometryChange) this.callbacks.beforeGeometryChange();
         this.isCollapsed = !this.isCollapsed;
         if (typeof localStorage !== 'undefined') {
             localStorage.setItem('aura_sidebar_collapsed', this.isCollapsed ? 'true' : 'false');
@@ -134,13 +145,10 @@ export class LayoutController {
         }
 
         const isDouble = this.isDoublePageEffective();
-        if (isDouble) {
-            el.workspaceContainer.classList.add('layout-double');
-            el.workspaceContainer.classList.remove('layout-single');
-        } else {
-            el.workspaceContainer.classList.add('layout-single');
-            el.workspaceContainer.classList.remove('layout-double');
-        }
+        const isScroll = this.layoutMode === 'scroll';
+        el.workspaceContainer.classList[isDouble ? 'add' : 'remove']('layout-double');
+        el.workspaceContainer.classList[isScroll ? 'add' : 'remove']('layout-scroll');
+        el.workspaceContainer.classList[!isDouble && !isScroll ? 'add' : 'remove']('layout-single');
 
         this.updatePageModeButtonUI(el);
         this.updateSidebarButtonsUI(el);
@@ -150,7 +158,16 @@ export class LayoutController {
         const el = elements || this.elements;
         if (!el || !el.btnPageMode) return;
 
-        if (this.layoutMode === 'double') {
+        if (el.btnModeScroll) {
+            el.btnModeScroll.classList[this.layoutMode === 'scroll' ? 'add' : 'remove']('active');
+        }
+
+        if (this.layoutMode === 'scroll') {
+            el.btnPageMode.classList.remove('active', 'auto-downgraded');
+            if (el.textPageMode) el.textPageMode.textContent = '滚动';
+            el.btnPageMode.title = '切换为单页模式 (快捷键: D)';
+            if (el.iconPageMode) el.iconPageMode.className = 'ri-scroll-to-bottom-line';
+        } else if (this.layoutMode === 'double') {
             el.btnPageMode.classList.add('active');
             if (this.isAutoDowngraded) {
                 el.btnPageMode.classList.add('auto-downgraded');
@@ -234,6 +251,20 @@ export class LayoutController {
             });
         }
 
+        if (elements.btnModeScroll) {
+            elements.btnModeScroll.addEventListener('click', (e) => {
+                if (e && typeof e.preventDefault === 'function') e.preventDefault();
+                const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
+                    ? elements.readerPanel.clientWidth
+                    : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
+                const next = this.layoutMode === 'scroll' ? 'single' : 'scroll';
+                this.setPageMode(next, availWidth);
+                if (!this.callbacks || !this.callbacks.onLayoutChange) {
+                    this.updateLayoutClasses(elements);
+                }
+            });
+        }
+
         if (elements.btnToggleSidebar) {
             elements.btnToggleSidebar.addEventListener('click', (e) => {
                 if (e && typeof e.preventDefault === 'function') e.preventDefault();
@@ -278,7 +309,8 @@ export class LayoutController {
 
         let isDragging = false;
 
-        el.resizerHandle.addEventListener('mousedown', function () {
+        el.resizerHandle.addEventListener('mousedown', () => {
+            if (this.callbacks.beforeGeometryChange) this.callbacks.beforeGeometryChange();
             isDragging = true;
             el.resizerHandle.classList.add('dragging');
             document.body.style.cursor = 'col-resize';

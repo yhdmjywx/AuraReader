@@ -5,6 +5,7 @@
    ========================================================================== */
 
 import { applyAllHighlightsToHtml } from '../../domain/annotationEngine.js';
+import { clearChapterFlow } from './chapterColumnView.js';
 
 export function renderPaperSpread({
     elements,
@@ -17,6 +18,8 @@ export function renderPaperSpread({
     onLinkClick = null
 }) {
     if (!elements || !readerEngine || !readerEngine.hasBook()) return;
+
+    clearChapterFlow(elements);
 
     const viewport = document.getElementById('reader-viewport');
     const savedScrollTop = (viewport && preserveScroll) ? viewport.scrollTop : 0;
@@ -31,6 +34,7 @@ export function renderPaperSpread({
         // SINGLE PAGE MODE
         if (elements.currentPageSpan) elements.currentPageSpan.textContent = currentPage;
         if (elements.totalPagesSpan) elements.totalPagesSpan.textContent = totalPages;
+        if (elements.pageUnit) elements.pageUnit.textContent = '页';
 
         if (elements.bookPaperRight) elements.bookPaperRight.style.display = 'none';
         if (elements.spreadSpine) elements.spreadSpine.style.display = 'none';
@@ -56,6 +60,7 @@ export function renderPaperSpread({
             elements.currentPageSpan.textContent = String(spread.label).replace('-', '–');
         }
         if (elements.totalPagesSpan) elements.totalPagesSpan.textContent = totalPages;
+        if (elements.pageUnit) elements.pageUnit.textContent = '页';
 
         if (elements.paperContainer) elements.paperContainer.classList.add('spread-active');
         if (elements.spreadSpine) elements.spreadSpine.style.display = 'block';

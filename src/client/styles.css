@@ -414,6 +414,15 @@ body.theme-dark .book-nav-btn.is-open {
     align-items: center;
     gap: 6px;
 }
+.reader-mode-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.mode-choice.active {
+    background-color: var(--primary-light);
+    color: var(--primary);
+}
 
 /* --------------------------------------------------------------------------
    4. Main Workspace Layout (75:25 Split Container)
@@ -689,6 +698,60 @@ body.theme-dark .book-nav-btn.is-open {
     display: flex;
     justify-content: center;
     align-items: flex-start;
+}
+.reader-viewport.chapter-paged {
+    overflow: hidden;
+    align-items: stretch;
+}
+.reader-viewport.chapter-scroll {
+    overflow-x: hidden;
+    overflow-y: auto;
+    align-items: stretch;
+}
+.paper-container.chapter-flow {
+    max-width: none;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    background-color: var(--bg-paper);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    display: block;
+}
+.reader-viewport.chapter-paged .paper-container.chapter-flow {
+    height: 100%;
+    overflow: hidden;
+}
+.reader-viewport.chapter-scroll .paper-container.chapter-flow {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+}
+.book-paper.chapter-flow {
+    max-width: none;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    background: transparent;
+}
+.book-paper.chapter-flow.mode-scroll {
+    height: auto;
+    overflow: visible;
+}
+.flow-break,
+.flow-tail {
+    break-before: column;
+    display: block;
+    width: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+.flow-break {
+    height: 0;
+}
+.flow-tail {
+    height: 100%;
 }
 
 .reader-pagination {

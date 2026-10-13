@@ -140,6 +140,12 @@ export class AppCoordinator {
         const note = notes.find(n => n.id === annotationId);
         if (!note) return;
 
+        if (this.reader && this.reader.isChapterFlow && this.reader.isChapterFlow()) {
+            this.reader.showQuote(note.page, note.quote, notes);
+            if (this.shell) this.shell.showToast(`跳转至第 ${note.page} 章原文所在位置`);
+            return;
+        }
+
         const isDouble = this.layout ? this.layout.isDoublePageEffective() : false;
         let needsRender = false;
 

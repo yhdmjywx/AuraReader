@@ -77,7 +77,9 @@ export class SelectionController {
         if (rect.width === 0 && rect.height === 0) return;
 
         const ctx = this.callbacks.getReadingContext ? this.callbacks.getReadingContext() : { currentPage: 1 };
-        const effectivePage = isInRight ? (ctx.currentRightPage || (ctx.currentPage + 1)) : (ctx.currentLeftPage || ctx.currentPage);
+        const effectivePage = ctx.chapterFlow
+            ? (ctx.currentPage || 1)
+            : (isInRight ? (ctx.currentRightPage || (ctx.currentPage + 1)) : (ctx.currentLeftPage || ctx.currentPage));
 
         this.pendingSelection = {
             text: selectedText,

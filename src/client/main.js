@@ -35,6 +35,8 @@ export function queryElements() {
         currentBookTag: document.getElementById('current-book-tag'),
         currentPageSpan: document.getElementById('current-page'),
         totalPagesSpan: document.getElementById('total-pages'),
+        pageUnit: document.getElementById('page-unit'),
+        btnModeScroll: document.getElementById('btn-mode-scroll'),
         btnPrevPage: document.getElementById('btn-prev-page'),
         btnNextPage: document.getElementById('btn-next-page'),
         btnPageMode: document.getElementById('btn-page-mode'),
@@ -148,6 +150,7 @@ export function bootstrapApp() {
                 currentLeftPage: reader.getCurrentLeftPage(),
                 currentRightPage: reader.getCurrentRightPage(),
                 currentPage: reader.getCurrentPage(),
+                chapterFlow: reader.isChapterFlow(),
                 notes: annotations.getNotes()
             })
         }
@@ -240,11 +243,18 @@ export function bootstrapApp() {
         appShell.showToast(`🎉 成功从备份恢复！已为您自动打开《${activeTitle}》，加载 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
     };
 
-    layout.callbacks.onLayoutChange = (res) => {
+    const syncReaderLayout = () => {
         layout.updateLayoutClasses(elements);
-        reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+        const notes = annotations.getNotes();
+        if (reader.isChapterFlow()) reader.refitChapter(notes);
+        else reader.renderPage(reader.getCurrentPage(), true, notes);
+    };
+    layout.callbacks.onLayoutChange = (res) => {
+        syncReaderLayout();
         if (appShell) {
-            if (res.layoutMode === 'double' && res.isAutoDowngraded) {
+            if (res.layoutMode === 'scroll') {
+                appShell.showToast('已切换为连续滚动');
+            } else if (res.layoutMode === 'double' && res.isAutoDowngraded) {
                 appShell.showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
             } else {
                 appShell.showToast(res.layoutMode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
@@ -252,8 +262,7 @@ export function bootstrapApp() {
         }
     };
     layout.callbacks.onResponsiveChange = (res) => {
-        layout.updateLayoutClasses(elements);
-        reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+        syncReaderLayout();
         if (res.isAutoDowngraded) {
             appShell.showToast('可用空间不足，已自适应降级为单页展示');
         } else {
@@ -268,7 +277,7 @@ export function bootstrapApp() {
             : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
         const resp = layout.checkResponsiveLayout(availWidth);
         if (!resp || !resp.changed) {
-            reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+            syncReaderLayout();
         }
         if (notify) {
             appShell.showToast(isCollapsed ? '已进入 100% 全屏专注阅读模式' : `已展开 ${Math.round(100 - layout.getReaderWidthPercent())}% 笔记工作台`);
@@ -290,7 +299,7 @@ export function bootstrapApp() {
                 : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
             const resp = layout.checkResponsiveLayout(availWidth);
             if (!resp || !resp.changed) {
-                reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+                syncReaderLayout();
             }
         }, () => {
             layout.toggleSidebar(true);
@@ -317,7 +326,7 @@ export function bootstrapApp() {
                     : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
                 const resp = layout.checkResponsiveLayout(availWidth);
                 if (!resp || !resp.changed) {
-                    reader.renderPage(reader.getCurrentPage(), true, annotations.getNotes());
+                    syncReaderLayout();
                 }
             }
         });
