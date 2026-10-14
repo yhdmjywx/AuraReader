@@ -22,7 +22,7 @@ npm ci
 npm start
 ```
 
-在浏览器中访问 **http://localhost:8095/**。使用期间保持终端和本地服务运行；在终端按 `Ctrl+C` 停止服务。
+在浏览器中访问 [http://localhost:8095/](http://localhost:8095/)。使用期间保持终端和本地服务运行；在终端按 `Ctrl+C` 停止服务。
 
 如果默认端口被占用，可以在 PowerShell 中指定其他端口：
 
