@@ -31,7 +31,7 @@ export function exportMarkdown(bookTitle = '图书笔记', notes = []) {
         md += `### ${idx + 1}. P.${group.page} ${group.chapter || ''}\n`;
         if (group.quote) md += `==${group.quote}==\n\n`;
         group.notes.forEach(note => {
-            if (note.comment) md += `> 💭 **随笔思考**：${note.comment}\n\n`;
+            if (note.comment) md += note.comment.split(/\r?\n/).map(line => `> ${line}`).join('\n') + '\n\n';
         });
         md += `---\n\n`;
     });
@@ -62,6 +62,7 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
     indexMd += `- 笔记数：${annotations.filter(isNote).length}\n`;
     indexMd += `- 导出时间：${new Date().toLocaleString()}\n\n`;
     indexMd += `## 目录结构\n`;
+    let unmatchedHighlights = 0;
 
     book.pages.forEach((pageHtml, idx) => {
         const pageNum = idx + 1;
@@ -87,6 +88,7 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
             const range = resolveAnnotationRange(text, note);
             return range ? { ...note, quote: text.slice(range.start, range.end) } : note;
         });
+        unmatchedHighlights += exportNotes.filter(isHighlight).filter(note => !resolveAnnotationRange(text, note)).length;
         renderAnnotationTokens(tempDiv, exportNotes, pageNum);
 
         let chapMd = `# ${escapeMarkdownText(chapTitle)}\n\n`;
@@ -96,11 +98,14 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
         folder.file(fileName, chapMd);
     });
 
-    const unassigned = annotations.filter(note => !Number.isInteger(note.page) || note.page < 1 || note.page > book.pages.length);
+    const invalidPage = note => !Number.isInteger(note.page) || note.page < 1 || note.page > book.pages.length;
+    const unassigned = annotations.filter(isNote).filter(invalidPage);
     if (unassigned.length) {
-        folder.file('未归属标注.md', '# 未归属标注\n\n以下标注的章节位置无效，保留引用与笔记以避免遗漏。\n\n' + chapterAnnotationMarkdown(unassigned));
-        indexMd += '\n[未归属标注](./未归属标注.md)\n';
+        folder.file('未归属笔记.md', '# 未归属笔记\n\n以下笔记的章节位置无效，保留引用与笔记内容以避免遗漏。\n\n' + chapterAnnotationMarkdown(unassigned));
+        indexMd += '\n[未归属笔记](./未归属笔记.md)\n';
     }
+    unmatchedHighlights += annotations.filter(isHighlight).filter(invalidPage).length;
+    if (unmatchedHighlights) indexMd += `\n> 有 ${unmatchedHighlights} 条高亮未能定位到正文，未生成正文标记。原始标注仍保留在书库及书籍备份中。\n`;
     folder.file('00_目录概览.md', indexMd);
 
     const blob = await zip.generateAsync({ type: 'blob' });
@@ -108,17 +113,18 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
 }
 
 function chapterAnnotationMarkdown(notes) {
-    if (!notes.length) return '';
-    let md = '## 本章笔记与划线\n\n';
-    notes.forEach((note, idx) => {
-        md += `### ${idx + 1}. ${isHighlight(note) ? '划线' : '笔记'} | P.${note.page}\n\n`;
+    const thoughts = notes.filter(isNote);
+    if (!thoughts.length) return '';
+    let md = '## 本章笔记\n\n';
+    thoughts.forEach((note, idx) => {
+        md += `### ${idx + 1}. 笔记 | P.${note.page}\n\n`;
         if (note.quote.trim()) {
             md += '> **原文引用**\n';
             md += note.quote.trim().split(/\r?\n/).map(line => `> ${escapeMarkdownText(line)}`).join('\n') + '\n\n';
         } else {
             md += '> 独立随笔（未绑定原文）\n\n';
         }
-        if (isNote(note) && note.comment.trim()) md += `**随笔思考**\n\n${note.comment}\n\n`;
+        if (note.comment.trim()) md += `${note.comment}\n\n`;
     });
     return md;
 }
