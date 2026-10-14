@@ -13,7 +13,7 @@ AuraReader 是一个本地阅读与笔记工作台：通过 Node.js 在本机启
   - 想保留书籍内容并在 AuraReader 中备份、恢复，选择 **“导出书籍备份”（`.aurabackup`）**。每本书生成一个备份文件，包含书籍正文、目录以及高亮和笔记。
   - 想保存为 Markdown、放入知识库或直接提供给 AI，选择 **“分章节正文与笔记”（`.zip`）**。压缩包按章节保存 Markdown：高亮直接标记在正文中，笔记附原文引用与笔记内容，并放在对应原文段落之后。
 
-  下图展示了分章节 Markdown 在笔记应用中的效果。若只想导出笔记摘要，也可以单独选择 **“笔记摘要”（`.md`）**。
+  下图左侧展示了导出 `.aurabackup` 并在 AuraReader 中恢复后的效果，右侧展示了导出 Markdown 后在 Obsidian 等支持 Markdown 的编辑器中的效果。若只想导出笔记摘要，也可以单独选择 **“笔记摘要”（`.md`）**。
 
   ![分章节 Markdown 导出效果：正文高亮与对应段落的笔记原文引用](src/client/assets/screenshots/markdown-export.png)
 
