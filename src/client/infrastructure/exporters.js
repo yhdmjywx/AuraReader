@@ -5,7 +5,8 @@
    ========================================================================== */
 
 import { ensureTocHierarchy } from '../domain/readingLocation.js';
-import { groupAnnotationsByRange, normalizeAnnotation } from '../domain/annotationEngine.js';
+import { groupAnnotationsByRange, normalizeAnnotation, isHighlight, isNote } from '../domain/annotationEngine.js';
+import { resolveAnnotationRange } from '../domain/annotationRangeEngine.js';
 import { renderAnnotationTokens } from '../features/reader/annotationRenderer.js';
 
 export function downloadFile(filename, data, type) {
@@ -47,112 +48,135 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
     }
 
     const zip = new jszipLib();
-    const folderName = `${book.title}_分章节笔记包`;
+    const bookTitle = String(book.title || '图书').replace(/[\\/:*?"<>|\r\n]/g, '_');
+    const folderName = `${bookTitle}_分章节笔记包`;
     const folder = zip.folder(folderName);
+    const annotations = (Array.isArray(notes) ? notes : []).map(normalizeAnnotation).filter(Boolean)
+        .filter(note => !book.id || !note.bookId || note.bookId === book.id)
+        .map((note, idx) => ({ ...note, id: note.id || `export-${idx}` }));
 
     let indexMd = `# 《${book.title}》 导读书册与笔记全览\n\n`;
     indexMd += `- 格式：${book.format || 'EPUB'}\n`;
     indexMd += `- 总章节数：${book.pages.length}\n`;
-    indexMd += `- 划线随笔数：${notes.length}\n`;
+    indexMd += `- 划线数：${annotations.filter(isHighlight).length}\n`;
+    indexMd += `- 笔记数：${annotations.filter(isNote).length}\n`;
     indexMd += `- 导出时间：${new Date().toLocaleString()}\n\n`;
     indexMd += `## 目录结构\n`;
 
     book.pages.forEach((pageHtml, idx) => {
         const pageNum = idx + 1;
-        const pageNotes = notes.filter(n => n.page === pageNum);
-
-        let chapTitle = `第${pageNum}章`;
-        if (book.toc && book.toc[idx]) {
-            chapTitle = book.toc[idx].title || chapTitle;
-        }
-        chapTitle = chapTitle.replace(/[\\/:*?"<>|]/g, '_');
-
-        indexMd += `${pageNum}. [${chapTitle}](./${String(pageNum).padStart(2, '0')}_${chapTitle}.md)\n`;
-
+        const pageNotes = annotations.filter(n => n.page === pageNum);
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = pageHtml;
 
-        let chapMd = `# ${chapTitle}\n\n`;
-        chapMd += `> 页码：P.${pageNum} | 本章划线数：${pageNotes.length}\n\n---\n\n`;
-
-        const paragraphs = tempDiv.querySelectorAll('p, h1, h2, h3, blockquote, div');
-        const groups = groupAnnotationsByRange(pageNotes);
-        const processedGroupKeys = new Set();
-
-        if (paragraphs.length > 0) {
-            paragraphs.forEach(p => {
-                if (p.children.length > 0 && p.querySelector('p, h1, h2, h3, blockquote')) return;
-
-                const text = p.innerText.trim();
-                if (!text) return;
-
-                if (p.tagName.startsWith('H')) {
-                    chapMd += `## ${text}\n\n`;
-                } else if (p.tagName === 'BLOCKQUOTE') {
-                    chapMd += `> ${text}\n\n`;
-                } else {
-                    let paragraphText = text;
-                    const matchedComments = [];
-
-                    groups.forEach((group, groupIndex) => {
-                        if (!group.quote) return;
-                        const cleanQuote = group.quote.trim();
-                        const normP = paragraphText.replace(/[\s\u00a0]+/g, ' ');
-                        const normQ = cleanQuote.replace(/[\s\u00a0]+/g, ' ');
-                        if (!paragraphText.includes(cleanQuote) && !normP.includes(normQ)) return;
-
-                        processedGroupKeys.add(groupIndex);
-                        if (!paragraphText.includes(`==${cleanQuote}==`)) {
-                            if (paragraphText.includes(cleanQuote)) {
-                                paragraphText = paragraphText.replace(cleanQuote, `==${cleanQuote}==`);
-                            } else {
-                                const firstWords = cleanQuote.slice(0, Math.min(8, cleanQuote.length));
-                                const lastWords = cleanQuote.slice(Math.max(0, cleanQuote.length - 8));
-                                const startIdx = paragraphText.indexOf(firstWords);
-                                const endIdx = paragraphText.indexOf(lastWords);
-                                if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
-                                    const matchedSegment = paragraphText.substring(startIdx, endIdx + lastWords.length);
-                                    if (!paragraphText.includes(`==${matchedSegment}==`)) {
-                                        paragraphText = paragraphText.replace(matchedSegment, `==${matchedSegment}==`);
-                                    }
-                                }
-                            }
-                        }
-                        group.notes.forEach(note => {
-                            if (note.comment && !matchedComments.includes(note.comment)) {
-                                matchedComments.push(note.comment);
-                            }
-                        });
-                    });
-
-                    chapMd += `${paragraphText}\n\n`;
-
-                    matchedComments.forEach(comment => {
-                        chapMd += `> 💭 **[随笔思考 | P.${pageNum}]**：${comment}\n\n`;
-                    });
-                }
-            });
-        } else {
-            chapMd += tempDiv.innerText.trim() + '\n\n';
-        }
-
-        groups.forEach((group, groupIndex) => {
-            if (processedGroupKeys.has(groupIndex)) return;
-            group.notes.forEach(note => {
-                if (note.comment) {
-                    chapMd += `> 💭 **[随笔思考 | P.${pageNum}]**：${note.comment}\n\n`;
-                }
-            });
-        });
-
+        let chapTitle = `第${pageNum}章`;
+        const tocEntry = (book.toc || []).find(item => Number(item.page) === pageNum);
+        const legacyEntry = book.toc && book.toc[idx];
+        chapTitle = tocEntry?.title || (legacyEntry && legacyEntry.page == null ? legacyEntry.title : '')
+            || tempDiv.querySelector('h1, h2, h3')?.textContent.trim() || chapTitle;
+        chapTitle = chapTitle.replace(/[\\/:*?"<>|\r\n]/g, '_');
         const fileName = `${String(pageNum).padStart(2, '0')}_${chapTitle}.md`;
+
+        indexMd += `${pageNum}. [${escapeMarkdownText(chapTitle)}](./${encodeURIComponent(fileName)})\n`;
+
+        // Offsets are chapter-relative, as in the reader. Recover a quote only
+        // when a record supplies a valid text range; quick notes have none.
+        const text = tempDiv.textContent;
+        const exportNotes = pageNotes.map(note => {
+            if (note.quote.trim()) return note;
+            const range = resolveAnnotationRange(text, note);
+            return range ? { ...note, quote: text.slice(range.start, range.end) } : note;
+        });
+        renderAnnotationTokens(tempDiv, exportNotes, pageNum);
+
+        let chapMd = `# ${escapeMarkdownText(chapTitle)}\n\n`;
+        chapMd += `> 本章划线：${pageNotes.filter(isHighlight).length} 条 | 笔记：${pageNotes.filter(isNote).length} 条\n\n---\n\n`;
+        chapMd += chapterBodyMarkdown(tempDiv) + '\n\n';
+        chapMd += chapterAnnotationMarkdown(exportNotes);
         folder.file(fileName, chapMd);
     });
 
+    const unassigned = annotations.filter(note => !Number.isInteger(note.page) || note.page < 1 || note.page > book.pages.length);
+    if (unassigned.length) {
+        folder.file('未归属标注.md', '# 未归属标注\n\n以下标注的章节位置无效，保留引用与笔记以避免遗漏。\n\n' + chapterAnnotationMarkdown(unassigned));
+        indexMd += '\n[未归属标注](./未归属标注.md)\n';
+    }
     folder.file('00_目录概览.md', indexMd);
 
     const blob = await zip.generateAsync({ type: 'blob' });
-    downloadFile(`${book.title}_分章节笔记包.zip`, blob, 'application/zip');
+    downloadFile(`${bookTitle}_分章节笔记包.zip`, blob, 'application/zip');
+}
+
+function chapterAnnotationMarkdown(notes) {
+    if (!notes.length) return '';
+    let md = '## 本章笔记与划线\n\n';
+    notes.forEach((note, idx) => {
+        md += `### ${idx + 1}. ${isHighlight(note) ? '划线' : '笔记'} | P.${note.page}\n\n`;
+        if (note.quote.trim()) {
+            md += '> **原文引用**\n';
+            md += note.quote.trim().split(/\r?\n/).map(line => `> ${escapeMarkdownText(line)}`).join('\n') + '\n\n';
+        } else {
+            md += '> 独立随笔（未绑定原文）\n\n';
+        }
+        if (isNote(note) && note.comment.trim()) md += `**随笔思考**\n\n${note.comment}\n\n`;
+    });
+    return md;
+}
+
+function escapeMarkdownText(text) {
+    return String(text).replace(/[\\`*_{}\[\]<>]/g, '\\$&');
+}
+
+// Serialize annotated text in document order. Adjacent inline tokens share
+// one marker; paragraph boundaries close it. No quote matching is repeated.
+function chapterBodyMarkdown(root) {
+    const blockSelector = 'p,h1,h2,h3,h4,h5,h6,blockquote,div,section,article,li,ul,ol,table,thead,tbody,tfoot,tr,td,th,pre,figure';
+    function inline(nodes) {
+        let result = '';
+        let highlighted = false;
+        function write(text, marked) {
+            if (!text) return;
+            if (highlighted !== marked) result += '==';
+            highlighted = marked;
+            result += escapeMarkdownText(text);
+        }
+        function visit(node, marked = false) {
+            if (node.nodeType === 3) { write(node.textContent, marked); return; }
+            if (node.nodeType !== 1 || node.matches('script,style')) return;
+            if (node.tagName === 'BR') { write('\n', false); return; }
+            const isMarked = marked || node.classList.contains('has-highlight');
+            node.childNodes.forEach(child => visit(child, isMarked));
+        }
+        nodes.forEach(node => visit(node));
+        if (highlighted) result += '==';
+        return result.trim();
+    }
+    function children(element) {
+        let result = '';
+        let buffer = [];
+        function flush() {
+            const text = inline(buffer);
+            if (text) result += text + '\n\n';
+            buffer = [];
+        }
+        element.childNodes.forEach(node => {
+            if (node.nodeType === 1 && (node.matches(blockSelector) || node.querySelector(blockSelector))) {
+                flush();
+                result += block(node);
+            } else buffer.push(node);
+        });
+        flush();
+        return result;
+    }
+    function block(element) {
+        if (element.matches('script,style')) return '';
+        if (/^H[1-6]$/.test(element.tagName)) return `${'#'.repeat(Math.min(Number(element.tagName[1]) + 1, 6))} ${inline([element])}\n\n`;
+        if (element.tagName === 'BLOCKQUOTE') return children(element).trim().split('\n').map(line => `> ${line}`).join('\n') + '\n\n';
+        if (element.querySelector(blockSelector)) return children(element);
+        const text = inline([element]);
+        return text ? text + '\n\n' : '';
+    }
+    return children(root).trim();
 }
 
 export function exportStandaloneHtml(book, notes = []) {
