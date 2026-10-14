@@ -6,10 +6,12 @@
     <title>AuraReader Workstation | 智能阅读与笔记工作台</title>
     <!-- Remix Icons -->
     <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet">
-    <!-- Google Fonts -->
+    <!-- Offline reader fonts -->
+    <link rel="stylesheet" href="assets/fonts/fonts.css">
+    <!-- Retain the existing interface fonts; reading fonts above are local. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <!-- JSZip & Stylesheet -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <link rel="stylesheet" href="styles.css?v=16">
@@ -52,11 +54,38 @@
     <div id="appearance-panel" class="appearance-panel" role="dialog" aria-label="视觉偏好">
         <div class="appearance-row">
             <label for="font-family-select">字体</label>
-            <select id="font-family-select" class="select-sm" title="字体切换">
-                <option value="'Noto Serif SC', serif">宋体/衬线</option>
-                <option value="'Inter', sans-serif" selected>黑体/无衬线</option>
-                <option value="system-ui">系统默认</option>
-            </select>
+            <div id="font-picker" class="font-picker">
+                <button id="font-family-select" class="font-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="font-menu" title="字体：自动选择">
+                    <span id="font-choice-label">自动选择</span><span aria-hidden="true">⌄</span>
+                </button>
+                <div id="font-menu" class="font-menu" role="menu" aria-label="字体" hidden>
+                    <div id="font-main-view">
+                        <div id="font-current-custom" hidden></div>
+                        <p class="font-group-label">基础</p>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="true" data-font-choice="auto">自动选择</button>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" disabled title="原书字体恢复将在后续支持">原书字体<span class="font-option-note">暂未启用</span></button>
+                        <p class="font-group-label">中文</p>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="sarasa">更纱黑体</button>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="source-han-serif">思源宋体</button>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="wenkai">霞鹜文楷</button>
+                        <p class="font-group-label">英文</p>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="literata">Literata</button>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="source-serif">Source Serif 4</button>
+                        <button id="btn-more-fonts" class="font-more-entry" type="button" role="menuitem">更多字体…<span aria-hidden="true">›</span></button>
+                    </div>
+                    <div id="font-more-view" hidden>
+                        <button id="btn-font-back" class="font-back" type="button">‹ 返回字体列表</button>
+                        <input id="font-search" class="font-search" type="search" maxlength="160" placeholder="搜索字体" aria-label="搜索字体">
+                        <div class="font-browser-actions">
+                            <button id="btn-read-system-fonts" type="button">读取本机字体</button>
+                            <button id="btn-import-font" type="button">导入字体文件</button>
+                        </div>
+                        <input id="font-file-input" type="file" accept=".ttf,.otf,.woff2" hidden>
+                        <p id="font-status" class="font-status" role="status" aria-live="polite"></p>
+                        <div id="font-browser-list" class="font-browser-list" role="group" aria-label="更多字体"></div>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="appearance-row">
             <span>字号</span>

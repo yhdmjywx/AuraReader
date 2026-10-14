@@ -6,6 +6,7 @@
    ========================================================================== */
 
 import { ReaderEngine } from '../../domain/readerEngine.js';
+import { FontController } from './fontController.js';
 import { resolveTargetPage, ensureTocHierarchy } from '../../domain/readingLocation.js';
 import { isChapterFlowBook } from '../../domain/chapterFlow.js';
 import {
@@ -56,6 +57,16 @@ export class ReaderController {
         this.elements = null;
         this.flowAnchorText = '';
         this._flowPage = 0;
+        this.fonts = new FontController({
+            getBook: () => this.getCurrentBook(),
+            beforeChange: () => this.rememberAnchor(),
+            onChange: () => { this.applyTypography(); this.refitAfterTypography(); },
+            onReady: () => {
+                if (this.isChapterFlow() && !this._flowPage) { this.applyTypography(); return; }
+                this.rememberAnchor(); this.applyTypography(); this.refitAfterTypography();
+            },
+            notify: message => this.callbacks.showToast?.(message)
+        });
     }
 
     setLayoutController(controller) {
@@ -79,6 +90,7 @@ export class ReaderController {
         }
 
         this.renderTOC(bookObj.toc || []);
+        this.fonts.prepareForBook();
         return loc;
     }
 
@@ -161,6 +173,7 @@ export class ReaderController {
                 }
             });
 
+            this.applyTypography();
             if (this.layoutController && typeof this.layoutController.updateLayoutClasses === 'function') {
                 this.layoutController.updateLayoutClasses(this.elements);
             }
@@ -284,14 +297,7 @@ export class ReaderController {
         }
 
         // Font Controls
-        if (elements.fontFamilySelect) {
-            elements.fontFamilySelect.addEventListener('change', (e) => {
-                this.rememberAnchor();
-                this.fontFamily = e.target.value;
-                this.applyTypography();
-                this.refitAfterTypography();
-            });
-        }
+        this.fonts.initUI(elements);
 
         if (elements.btnFontDec) {
             elements.btnFontDec.addEventListener('click', () => {
@@ -386,7 +392,8 @@ export class ReaderController {
         papers.forEach(paper => {
             if (!paper) return;
             paper.style.fontSize = `${this.fontSize}px`;
-            paper.style.fontFamily = this.fontFamily;
+            this.fonts.apply(paper);
+            this.fontFamily = this.fonts.resolved().family;
             paper.style.setProperty('--book-text-indent', this.textIndent);
         });
     }

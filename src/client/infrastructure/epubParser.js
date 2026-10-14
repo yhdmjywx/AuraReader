@@ -377,6 +377,7 @@ export async function parseEpub(arrayBuffer, fileName, jszipLib) {
     const opfXmlText = await opfFile.async("string");
     const opfDoc = parser.parseFromString(opfXmlText, "text/xml");
     const opfDir = rootfilePath.includes('/') ? rootfilePath.substring(0, rootfilePath.lastIndexOf('/') + 1) : '';
+    let language = opfDoc.getElementsByTagNameNS('*', 'language')[0]?.textContent.trim() || '';
 
     // 3. Build href to page mapping
     const manifestItems = {};
@@ -399,6 +400,10 @@ export async function parseEpub(arrayBuffer, fileName, jszipLib) {
         if (chapterFile) {
             const chapterHtmlText = await chapterFile.async("string");
             const chapDoc = parser.parseFromString(chapterHtmlText, "text/html");
+            if (!language) {
+                const tagged = chapDoc.querySelector('[lang], [xml\\:lang]');
+                language = tagged?.getAttribute('lang') || tagged?.getAttribute('xml:lang') || '';
+            }
 
             chapDoc.querySelectorAll("script, style, link").forEach(el => el.remove());
             chapDoc.querySelectorAll("[style]").forEach(el => el.removeAttribute("style"));
@@ -440,6 +445,7 @@ export async function parseEpub(arrayBuffer, fileName, jszipLib) {
         id: bookId,
         title: fileName.replace(/\.(epub|equb)$/i, ''),
         format: 'EPUB',
+        language,
         readerFlow: 'chapter',
         toc,
         pages,

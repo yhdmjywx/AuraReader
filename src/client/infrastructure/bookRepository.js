@@ -8,6 +8,7 @@ let dbInstance = null;
 // Built-in Demo Books Database
 export const demoBooks = {
     'crisis-era': {
+        language: 'zh-CN',
         title: '危机时代（罗杰斯·思考与洞察）',
         format: 'EPUB',
         toc: [
@@ -46,6 +47,7 @@ export const demoBooks = {
         ]
     },
     'deep-work': {
+        language: 'zh-CN',
         title: '深度工作（Cal Newport）',
         format: 'PDF',
         toc: [

@@ -1,6 +1,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { createFontStore, listSystemFonts, MAX_FONT_BYTES } = require('./fontStore');
+const fontStore = createFontStore(path.resolve(__dirname, '../../data/fonts'));
 
 const PORT = process.env.PORT || 8095;
 
@@ -16,7 +18,10 @@ const MIME_TYPES = {
     '.svg': 'image/svg+xml',
     '.ico': 'image/x-icon',
     '.md': 'text/markdown; charset=utf-8',
-    '.epub': 'application/epub+zip'
+    '.epub': 'application/epub+zip',
+    '.ttf': 'font/ttf',
+    '.otf': 'font/otf',
+    '.woff2': 'font/woff2'
 };
 
 const server = http.createServer((req, res) => {
@@ -90,6 +95,14 @@ const server = http.createServer((req, res) => {
 });
 
 function handleApiRequest(req, res, pathname, parsedUrl) {
+    if (pathname.startsWith('/api/fonts')) {
+        handleFontRequest(req, res, pathname, parsedUrl).catch(error => {
+            if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ error: '字体资源暂时不可用' }));
+            console.error('Font API:', error.message);
+        });
+        return;
+    }
     // Health Probe (Docker & monitoring probe)
     if (pathname === '/api/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -99,6 +112,52 @@ function handleApiRequest(req, res, pathname, parsedUrl) {
 
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: false, error: '未知 API 路径' }));
+}
+
+async function handleFontRequest(req, res, pathname, parsedUrl) {
+    const origin = req.headers.origin;
+    res.removeHeader('Access-Control-Allow-Origin');
+    const reply = (status, data) => {
+        res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify(data));
+    };
+    // Other websites must not enumerate this PC's fonts or write font files.
+    if (origin && origin !== `http://${req.headers.host}` && origin !== `https://${req.headers.host}`) {
+        return reply(403, { error: '只允许从阅读器内访问字体资源' });
+    }
+    if (req.method === 'GET' && pathname === '/api/fonts') return reply(200, { fonts: await fontStore.list() });
+    if (req.method === 'GET' && pathname === '/api/fonts/system') {
+        const loopback = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+        if (!loopback || !['localhost', '127.0.0.1', '[::1]'].includes(parsedUrl.hostname)) {
+            return reply(200, { supported: false, fonts: [] });
+        }
+        try { return reply(200, await listSystemFonts()); }
+        catch (_) { return reply(200, { supported: false, fonts: [] }); }
+    }
+    if (req.method === 'POST' && pathname === '/api/fonts/import') {
+        const filename = parsedUrl.searchParams.get('name') || '';
+        if (!/\.(ttf|otf|woff2)$/i.test(filename)) return reply(400, { error: '请选择 TTF、OTF 或 WOFF2 文件' });
+        let length = 0;
+        const chunks = [];
+        for await (const chunk of req) {
+            length += chunk.length;
+            if (length > MAX_FONT_BYTES) return reply(413, { error: '字体文件超过 64MB' });
+            chunks.push(chunk);
+        }
+        try { return reply(200, { font: await fontStore.import(Buffer.concat(chunks), filename) }); }
+        catch (error) { return reply(400, { error: error.message }); }
+    }
+    if (req.method === 'GET' && pathname.startsWith('/api/fonts/files/')) {
+        const file = fontStore.file(pathname.slice('/api/fonts/files/'.length));
+        if (!file) return reply(404, { error: '字体不存在' });
+        try {
+            const bytes = await fs.promises.readFile(file.path);
+            res.writeHead(200, { 'Content-Type': file.mime, 'Content-Length': bytes.length, 'Cache-Control': 'no-cache' });
+            res.end(bytes);
+        } catch (_) { reply(404, { error: '字体文件已缺失' }); }
+        return;
+    }
+    reply(404, { error: '未知字体请求' });
 }
 
 server.listen(PORT, () => {

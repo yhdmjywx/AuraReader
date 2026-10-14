@@ -48,6 +48,19 @@ export function queryElements() {
         textToggleSidebar: document.getElementById('text-toggle-sidebar'),
         iconToggleSidebar: document.getElementById('icon-toggle-sidebar'),
         fontFamilySelect: document.getElementById('font-family-select'),
+        fontPicker: document.getElementById('font-picker'),
+        fontMenu: document.getElementById('font-menu'),
+        fontChoiceLabel: document.getElementById('font-choice-label'),
+        fontMainView: document.getElementById('font-main-view'),
+        fontMoreView: document.getElementById('font-more-view'),
+        btnMoreFonts: document.getElementById('btn-more-fonts'),
+        btnFontBack: document.getElementById('btn-font-back'),
+        fontSearch: document.getElementById('font-search'),
+        btnReadSystemFonts: document.getElementById('btn-read-system-fonts'),
+        btnImportFont: document.getElementById('btn-import-font'),
+        fontFileInput: document.getElementById('font-file-input'),
+        fontStatus: document.getElementById('font-status'),
+        fontBrowserList: document.getElementById('font-browser-list'),
         indentSelect: document.getElementById('indent-select'),
         fontSizeLabel: document.getElementById('font-size-label'),
         btnFontDec: document.getElementById('btn-font-dec'),
@@ -400,6 +413,7 @@ export async function startApp() {
     }
 
     await initDB();
+    await appInstance.reader.fonts.ready;
     await appInstance.coordinator.openBook('crisis-era');
     return appInstance;
 }
