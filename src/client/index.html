@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraReader Workstation | 智能阅读与笔记工作台</title>
+    <!-- Remix Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet">
+    <!-- Offline reader fonts -->
+    <link rel="stylesheet" href="assets/fonts/fonts.css">
+    <!-- Retain the existing interface fonts; reading fonts above are local. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- JSZip & Stylesheet -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <link rel="stylesheet" href="styles.css?v=16">
+</head>
+<body class="theme-light">
+    <!-- Single navigation bar -->
+    <header class="app-header">
+        <div class="header-side header-brand">
+            <div class="brand">
+                <i class="ri-book-open-fill brand-icon"></i>
+                <span class="brand-name">AuraReader</span>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <button id="btn-toc" class="book-nav-btn" type="button" title="打开章节目录" aria-expanded="false" aria-controls="toc-drawer">
+                <i class="ri-list-unordered"></i>
+                <span id="current-book-title" class="book-nav-title">未打开书籍</span>
+                <i class="ri-arrow-down-s-line book-nav-caret"></i>
+            </button>
+        </div>
+
+        <div class="header-side header-actions">
+            <button id="btn-shelf" class="btn btn-icon nav-icon" type="button" title="我的书库">
+                <i class="ri-book-shelf-line"></i>
+                <span class="badge-count" id="shelf-book-count" hidden>0</span>
+            </button>
+            <button id="btn-appearance" class="btn btn-icon nav-icon" type="button" title="视觉偏好" aria-expanded="false" aria-controls="appearance-panel">
+                <i class="ri-palette-line"></i>
+            </button>
+            <button id="btn-export-menu" class="btn btn-icon nav-icon" type="button" title="导出与备份" aria-label="导出与备份" aria-expanded="false" aria-controls="export-panel">
+                <i class="ri-download-line" aria-hidden="true"></i>
+            </button>
+            <button id="btn-fullscreen" class="btn btn-icon nav-icon" type="button" title="全屏阅读">
+                <i class="ri-fullscreen-line"></i>
+            </button>
+        </div>
+    </header>
+
+    <div id="appearance-panel" class="appearance-panel" role="dialog" aria-label="视觉偏好">
+        <div class="appearance-row">
+            <label for="font-family-select">字体</label>
+            <div id="font-picker" class="font-picker">
+                <button id="font-family-select" class="font-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="font-menu" title="字体：自动选择">
+                    <span id="font-choice-label">自动选择</span><span aria-hidden="true">⌄</span>
+                </button>
+                <div id="font-menu" class="font-menu" role="menu" aria-label="字体" hidden>
+                    <div id="font-main-view">
+                        <div id="font-current-custom" hidden></div>
+                        <p class="font-group-label">基础</p>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="true" data-font-choice="auto">自动选择</button>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" disabled title="原书字体恢复将在后续支持">原书字体<span class="font-option-note">暂未启用</span></button>
+                        <p class="font-group-label">中文</p>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="sarasa">更纱黑体</button>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="source-han-serif">思源宋体</button>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="wenkai">霞鹜文楷</button>
+                        <p class="font-group-label">英文</p>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="literata">Literata</button>
+                        <button class="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="source-serif">Source Serif 4</button>
+                        <button id="btn-more-fonts" class="font-more-entry" type="button" role="menuitem">更多字体…<span aria-hidden="true">›</span></button>
+                    </div>
+                    <div id="font-more-view" hidden>
+                        <button id="btn-font-back" class="font-back" type="button">‹ 返回字体列表</button>
+                        <input id="font-search" class="font-search" type="search" maxlength="160" placeholder="搜索字体" aria-label="搜索字体">
+                        <div class="font-browser-actions">
+                            <button id="btn-read-system-fonts" type="button">读取本机字体</button>
+                            <button id="btn-import-font" type="button">导入字体文件</button>
+                        </div>
+                        <input id="font-file-input" type="file" accept=".ttf,.otf,.woff2" hidden>
+                        <p id="font-status" class="font-status" role="status" aria-live="polite"></p>
+                        <div id="font-browser-list" class="font-browser-list" role="group" aria-label="更多字体"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="appearance-row">
+            <span>字号</span>
+            <div class="appearance-stepper">
+                <button id="btn-font-dec" class="btn btn-icon-sm" type="button" title="减小字号">A-</button>
+                <span id="font-size-label" class="font-size-text">18px</span>
+                <button id="btn-font-inc" class="btn btn-icon-sm" type="button" title="增大字号">A+</button>
+            </div>
+        </div>
+        <div class="appearance-row">
+            <label for="indent-select">段落缩进</label>
+            <select id="indent-select" class="select-sm" title="首行缩进模式">
+                <option value="0em">无</option>
+                <option value="2em" selected>2字</option>
+                <option value="3em">3字</option>
+            </select>
+        </div>
+        <div class="appearance-row">
+            <span>阅读背景</span>
+            <div class="paper-themes">
+                <button class="paper-btn paper-white active" type="button" data-paper="white" title="纯白"></button>
+                <button class="paper-btn paper-sepia" type="button" data-paper="sepia" title="护眼羊皮纸"></button>
+                <button class="paper-btn paper-dark" type="button" data-paper="dark" title="夜间墨黑"></button>
+            </div>
+        </div>
+        <div class="appearance-row">
+            <span>版式</span>
+            <div class="reader-mode-group">
+                <button id="btn-mode-scroll" class="btn btn-icon-sm mode-choice" type="button" title="连续滚动">滚动</button>
+                <button id="btn-page-mode" class="btn btn-icon-sm mode-choice" type="button" title="切换单页 / 双页阅读模式 (快捷键: D)">
+                    <i class="ri-book-read-line" id="icon-page-mode"></i>
+                    <span id="text-page-mode">单页</span>
+                </button>
+            </div>
+        </div>
+        <div class="appearance-row">
+            <span>界面明暗</span>
+            <button id="btn-theme-toggle" class="btn btn-icon-sm" type="button" title="切换主题">
+                <i class="ri-sun-line"></i>
+            </button>
+        </div>
+    </div>
+
+    <section id="export-panel" class="export-panel" role="dialog" aria-labelledby="export-panel-title" aria-hidden="true">
+        <div class="export-panel-heading">
+            <h2 id="export-panel-title">导出与备份</h2>
+            <p>当前书籍 · <span id="export-book-title">未打开书籍</span></p>
+        </div>
+        <h3 class="export-section-title">导出</h3>
+        <button id="btn-export-markdown" class="export-menu-action" type="button" data-export-action>
+            <i class="ri-file-text-line" aria-hidden="true"></i>
+            <span class="export-action-label">笔记摘要</span><span class="export-extension">.md</span>
+        </button>
+        <button id="btn-export-chapter-zip" class="export-menu-action" type="button" data-export-action>
+            <i class="ri-file-zip-line" aria-hidden="true"></i>
+            <span class="export-action-label">分章节正文与笔记</span><span class="export-extension">.zip</span>
+        </button>
+        <button id="btn-export-standalone-html" class="export-menu-action" type="button" data-export-action>
+            <i class="ri-book-open-line" aria-hidden="true"></i>
+            <span class="export-action-label">带标注离线电子书</span><span class="export-extension">.html</span>
+        </button>
+        <hr class="export-panel-divider">
+        <h3 class="export-section-title">书籍备份与恢复</h3>
+        <button id="btn-export-full-backup" class="export-menu-action export-backup-action" type="button" data-export-action>
+            <i class="ri-archive-line" aria-hidden="true"></i>
+            <span class="export-action-label">导出书籍备份</span><span class="export-extension">.aurabackup</span>
+        </button>
+        <button id="btn-import-full-backup" class="export-menu-action export-backup-action" type="button" data-export-action>
+            <i class="ri-upload-line" aria-hidden="true"></i>
+            <span class="export-action-label">从备份恢复书籍</span>
+        </button>
+        <p class="export-panel-note">每本书一个备份文件 · 包含高亮与笔记</p>
+        <input type="file" id="backup-file-input" accept=".aurabackup,.json" hidden>
+    </section>
+
+    <!-- Main Workspace (75:25 Split Layout) -->
+    <main class="workspace-container" id="workspace-container">
+        <!-- Left Panel: Reader (75%) -->
+        <section class="reader-panel" id="reader-panel">
+            <!-- Table of Contents Drawer (Collapsible) -->
+            <aside class="toc-drawer" id="toc-drawer">
+                <div class="toc-header">
+                    <h4><i class="ri-list-check"></i> 书籍目录</h4>
+                    <button id="btn-close-toc" class="btn btn-icon-sm"><i class="ri-close-line"></i></button>
+                </div>
+                <ul class="toc-list" id="toc-list">
+                    <!-- Dynamic Toc Items -->
+                </ul>
+            </aside>
+
+            <!-- Book Content Viewport -->
+            <div class="reader-viewport" id="reader-viewport">
+                <!-- Book Paper Container (supports Single Page and Double Page Spread) -->
+                <div class="paper-container" id="paper-container">
+                    <!-- Left / Primary Book Page Paper Canvas -->
+                    <article class="book-paper book-paper-left" id="book-paper">
+                        <!-- Content populated dynamically by JS -->
+                    </article>
+
+                    <!-- Spread spine divider between left & right pages -->
+                    <div class="spread-spine" id="spread-spine"></div>
+
+                    <!-- Right / Secondary Book Page Paper Canvas (Double Page Spread) -->
+                    <article class="book-paper book-paper-right" id="book-paper-right">
+                        <!-- Content populated dynamically by JS -->
+                    </article>
+                </div>
+            </div>
+
+            <nav class="reader-pagination" aria-label="翻页">
+                <button id="btn-prev-page" class="page-turn-btn" type="button" title="上一页 (←)">‹</button>
+                <span class="page-indicator">
+                    <span id="current-page">1</span> / <span id="total-pages">1</span> <span id="page-unit">页</span>
+                </span>
+                <button id="btn-next-page" class="page-turn-btn" type="button" title="下一页 (→)">›</button>
+            </nav>
+
+            <button id="btn-toggle-sidebar" class="sidebar-toggle-proxy" type="button" hidden title="收起/展开笔记侧边栏 (快捷键: B)">
+                <i class="ri-side-bar-line" id="icon-toggle-sidebar"></i>
+                <span id="text-toggle-sidebar">笔记栏</span>
+            </button>
+
+            <!-- Floating Sidebar Recall Handle (visible when sidebar is collapsed) -->
+            <button id="btn-sidebar-recall" class="sidebar-recall-handle" title="展开笔记侧边栏 (快捷键: B)">
+                <i class="ri-arrow-left-s-line"></i>
+                <span>笔记</span>
+            </button>
+
+            <!-- Floating Selection Toolbar (Highlight / Add Note) -->
+            <div class="selection-tooltip" id="selection-tooltip">
+                <button class="tooltip-btn hl-yellow" data-color="yellow" title="高亮标记"><i class="ri-mark-pen-line"></i> 高亮</button>
+                <button class="tooltip-btn" id="btn-add-note" title="添加随笔"><i class="ri-sticky-note-line"></i> 笔记</button>
+            </div>
+
+            <!-- Annotation context menu. Note edit and delete stay on the note cards. -->
+            <div class="selection-tooltip" id="highlight-action-tooltip">
+                <button class="tooltip-btn" id="btn-hl-view-notes" type="button" title="在笔记区查看这个位置的笔记"><i class="ri-chat-1-line"></i> 查看笔记（0）</button>
+                <button class="tooltip-btn" id="btn-hl-operate" type="button" title="在笔记区定位高亮"><i class="ri-mark-pen-line"></i> 操作高亮</button>
+                <button class="tooltip-btn" id="btn-hl-add-thought" type="button" title="为这段文字新建一条笔记"><i class="ri-sticky-note-line"></i> 添加笔记</button>
+                <span class="tooltip-divider"></span>
+                <button class="tooltip-btn" id="btn-hl-remove" type="button" style="color: #fca5a5;" title="只移除黄色高亮"><i class="ri-delete-bin-line"></i> 删除高亮</button>
+            </div>
+        </section>
+
+        <!-- Resizer Handle -->
+        <div class="resizer-handle" id="resizer-handle" title="按住拖拽调整 75:25 比例，双击折叠/展开笔记栏">
+            <div class="resizer-line"></div>
+        </div>
+
+        <!-- Right Panel: Notes & Workbench (25%) -->
+        <section class="notes-panel" id="notes-panel">
+            <button id="btn-collapse-sidebar" class="sidebar-collapse-handle" type="button" title="收起笔记侧边栏 (快捷键: B)">
+                <i class="ri-arrow-right-s-line"></i>
+                <span>收起</span>
+            </button>
+            <!-- Tabs Header -->
+            <div class="tabs-header">
+                <button class="tab-btn active" data-tab="tab-highlights">
+                    <i class="ri-quill-pen-line"></i>
+                    <span>划线与笔记</span>
+                    <span class="badge-count" id="count-highlights">0</span>
+                </button>
+            </div>
+
+            <!-- Tab Content 1: Highlights & User Notes -->
+            <div class="tab-content active" id="tab-highlights">
+                <div class="notes-toolbar">
+                    <span class="notes-count-text"><strong id="notes-total-count">0</strong> 条随笔</span>
+                    <div class="notes-actions" style="display: flex; gap: 6px; align-items: center;">
+                        <button id="btn-toggle-show-highlights" class="btn btn-outline-sm" style="font-size: 0.78rem; padding: 3px 8px;" title="点击切换是否在笔记区显示纯划线">
+                            <i class="ri-eye-line"></i> 显示划线 (<span id="count-pure-highlights">0</span>)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input box for adding standalone note -->
+                <div class="quick-note-box">
+                    <textarea id="quick-note-input" placeholder="写下您的读书感悟或思考..." rows="2"></textarea>
+                    <div class="quick-note-footer">
+                        <span class="hint-text">支持 Markdown 语法</span>
+                        <button id="btn-save-quick-note" class="btn btn-outline-sm"><i class="ri-add-line"></i> 保存笔记</button>
+                    </div>
+                </div>
+
+                <!-- Notes Feed List -->
+                <div class="notes-list" id="notes-list">
+                    <div class="empty-state" id="empty-notes-state">
+                        <i class="ri-draft-line"></i>
+                        <p>暂无划线或笔记</p>
+                        <small>在左侧图书中选中文本即可高亮或添加笔记</small>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Modal: Add Note Dialog -->
+    <div class="modal-overlay" id="note-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="ri-sticky-note-add-line"></i> 添加随笔</h3>
+                <button class="btn btn-icon-sm" id="btn-close-modal"><i class="ri-close-line"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="quote-preview" id="modal-quote-preview">
+                    <!-- Highlighted Text Quote -->
+                </div>
+                <textarea id="modal-note-textarea" placeholder="记录关于这段内容的联想、疑问或心得..." rows="4"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="btn-cancel-modal">取消</button>
+                <button class="btn btn-primary" id="btn-confirm-modal">保存划线笔记</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Selective Book Backup Dialog -->
+    <div class="modal-overlay" id="backup-select-modal">
+        <div class="modal-card" style="max-width: 540px;">
+            <div class="modal-header">
+                <h3><i class="ri-checkbox-multiple-line" style="color: #10b981;"></i> 选择需要备份的图书</h3>
+                <button class="btn btn-icon-sm" id="btn-close-backup-modal"><i class="ri-close-line"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <span style="font-size: 0.88rem; color: var(--text-sub);">每本书生成一个独立文件，可勾选多本：</span>
+                    <div>
+                        <button class="btn btn-ghost-sm" id="btn-select-all-backup">全选</button>
+                        <button class="btn btn-ghost-sm" id="btn-deselect-all-backup">取消全选</button>
+                    </div>
+                </div>
+                <div id="backup-book-checkbox-list" style="max-height: 240px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px;">
+                    <!-- Dynamic Book Checkboxes -->
+                </div>
+                <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 0.85rem;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="chk-backup-include-notes" checked>
+                        <span>包含所选图书的划线与随笔笔记</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="btn-cancel-backup-modal">取消</button>
+                <button class="btn btn-primary" id="btn-confirm-export-backup" style="background: #10b981; border: none;">
+                    <i class="ri-download-2-line"></i> 按书分别导出 (.aurabackup)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shelf Drawer Modal -->
+    <div class="shelf-overlay" id="shelf-overlay">
+        <aside class="shelf-drawer">
+            <div class="shelf-header">
+                <h3><i class="ri-book-shelf-line"></i> 我的本地书库 (IndexedDB 永久离线存储)</h3>
+                <button id="btn-close-shelf" class="btn btn-icon-sm"><i class="ri-close-line"></i></button>
+            </div>
+            <div class="shelf-body">
+                <div class="shelf-actions">
+                    <label for="file-input" class="btn btn-primary" title="打开本地 EPUB / PDF / TXT">
+                        <i class="ri-folder-open-line"></i>
+                        <span>导入书籍</span>
+                    </label>
+                    <input type="file" id="file-input" accept=".epub,.pdf,.txt" hidden>
+                    <button id="btn-switch-demo" class="btn btn-outline" type="button" title="切换示例图书">
+                        <i class="ri-swap-line"></i> 示例图书
+                    </button>
+                </div>
+                <p class="shelf-hint"><i class="ri-shield-flash-line"></i> 所有已导入的书籍与其划线笔记均保存在您浏览器的 IndexedDB 数据库中，免联网、无限容量、全自动持久化。</p>
+                <div class="shelf-grid" id="shelf-grid">
+                    <!-- Dynamic Book Cards -->
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="toast-msg"></div>
+
+    <script type="module" src="main.js?v=13"></script>
+</body>
+</html>
