@@ -163,15 +163,17 @@ function elementStub(tag) {
     const zip = await JSZip.loadAsync(fs.readFileSync(epubPath));
     const ncxKey = Object.keys(zip.files).find(file => file.toLowerCase().endsWith('.ncx'));
     const fixtureItems = parseNcxNavPoints(await zip.files[ncxKey].async('string'));
-    assert.strictEqual(fixtureItems.length, 132, '测试 EPUB 仍应解析出 132 条目录');
-    assert.ok(fixtureItems.some(item => item.level === 1), '测试 EPUB 的子章节必须有层级');
-    const prefaceIndex = fixtureItems.findIndex(item => item.title === '前言');
-    assert.ok(prefaceIndex >= 0);
-    assert.strictEqual(fixtureItems[prefaceIndex].level, 0);
-    assert.strictEqual(fixtureItems[prefaceIndex + 1].level, 1);
-    assert.strictEqual(fixtureItems[fixtureItems.length - 1].title, '译后记');
-    assert.strictEqual(fixtureItems[fixtureItems.length - 1].level, 0);
-    console.log('✅ 测试 EPUB 的 132 条 NCX 目录保留原有嵌套');
+    assert.strictEqual(fixtureItems.length, 16, 'Alice EPUB 应解析出 16 条目录');
+    assert.ok(fixtureItems.every(item => item.level === 0 && !item.hasChildren), '平级目录不应被误判为嵌套目录');
+    const chapters = fixtureItems.filter(item => item.title.startsWith('CHAPTER '));
+    assert.strictEqual(chapters.length, 12, '十二章正文都应出现在目录中');
+    assert.strictEqual(chapters[0].title, 'CHAPTER I. Down the Rabbit-Hole');
+    assert.strictEqual(chapters[11].title, 'CHAPTER XII. Alice’s Evidence');
+    assert.strictEqual(chapters[0].anchor, 'pgepubid00003');
+    assert.ok(fixtureItems[15].title.includes('PROJECT GUTENBERG'), '保留书内许可条目');
+    const navItemsFromFixture = parseNavTocDocument(await zip.file('OEBPS/toc.xhtml').async('string'));
+    assert.deepStrictEqual(navItemsFromFixture, fixtureItems, '同一书籍的 EPUB3 nav 和 NCX 目录应一致');
+    console.log('✅ Alice EPUB 的 16 条目录、十二章正文及 EPUB3 nav / NCX 一致性');
 
     globalThis.document = { createElement: elementStub };
     const { renderTOC } = await import('../../src/client/features/reader/tocUI.js');

@@ -14,8 +14,7 @@
   },
   "devDependencies": {
     "jsdom": "^30.1.2",
-    "jszip": "^3.10.1",
-    "ssh2": "^1.17.0"
+    "jszip": "^3.10.1"
   },
   "keywords": [
     "reader",

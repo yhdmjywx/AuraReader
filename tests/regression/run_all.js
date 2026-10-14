@@ -8,7 +8,7 @@ console.log('====================================================\n');
 
 const regDir = __dirname;
 const allFiles = fs.readdirSync(regDir)
-    .filter(f => f.endsWith('.js') && f !== 'run_all.js' && f !== 'inspect_vps_status.js')
+    .filter(f => f.endsWith('.js') && f !== 'run_all.js')
     .sort();
 
 let total = allFiles.length;

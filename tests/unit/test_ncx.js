@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const JSZip = require('jszip');
+const assert = require('assert');
 
 async function testNcxParser() {
     const epubPath = path.resolve(__dirname, '../fixtures/test.epub');
@@ -9,10 +10,7 @@ async function testNcxParser() {
     
     // Find toc.ncx
     const ncxEntry = Object.keys(zip.files).find(f => f.endsWith('.ncx'));
-    if (!ncxEntry) {
-        console.log("No NCX file found!");
-        return;
-    }
+    assert.ok(ncxEntry, '测试书籍必须包含 NCX 目录');
 
     const ncxXmlText = await zip.files[ncxEntry].async("string");
     console.log("NCX Path:", ncxEntry);
@@ -27,8 +25,13 @@ async function testNcxParser() {
         tocItems.push({ title, src });
     }
 
+    assert.strictEqual(tocItems.length, 16, 'Alice EPUB 应有 16 条目录');
+    assert.strictEqual(tocItems.filter(item => item.title.startsWith('CHAPTER ')).length, 12);
     console.log(`Parsed ${tocItems.length} TOC items from NCX:`);
     console.log(tocItems.slice(0, 15));
 }
 
-testNcxParser();
+testNcxParser().catch(err => {
+    console.error(err);
+    process.exit(1);
+});

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const JSZip = require('jszip');
+const assert = require('assert');
 
 async function testFullNcx() {
     const epubPath = path.resolve(__dirname, '../fixtures/test.epub');
@@ -17,10 +18,12 @@ async function testFullNcx() {
 
     // Build hrefToPageMap from spine
     const manifestItems = {};
-    const manifestRegex = /<item[^>]*id="([^"]*)"[^>]*href="([^"]*)"/gi;
+    const manifestRegex = /<item\b[^>]*>/gi;
     let match;
     while ((match = manifestRegex.exec(opfXmlText)) !== null) {
-        manifestItems[match[1]] = match[2];
+        const id = match[0].match(/\bid=["']([^"']+)["']/);
+        const href = match[0].match(/\bhref=["']([^"']+)["']/);
+        if (id && href) manifestItems[id[1]] = href[1];
     }
     
     const spineRegex = /<itemref[^>]*idref="([^"]*)"/gi;
@@ -29,6 +32,7 @@ async function testFullNcx() {
     while ((match = spineRegex.exec(opfXmlText)) !== null) {
         const idref = match[1];
         const href = manifestItems[idref];
+        assert.ok(href, `spine 引用必须对应 manifest: ${idref}`);
         if (href) {
             hrefToPageMap[href] = pageNum;
             hrefToPageMap[opfDir + href] = pageNum;
@@ -51,7 +55,8 @@ async function testFullNcx() {
         const [srcPath, anchor] = contentSrc.split('#');
         const cleanPath = srcPath.replace(/^\/+/, '');
         
-        const mappedPage = hrefToPageMap[cleanPath] || hrefToPageMap[opfDir + cleanPath] || hrefToPageMap[cleanPath.split('/').pop()] || 1;
+        const mappedPage = hrefToPageMap[cleanPath] || hrefToPageMap[opfDir + cleanPath] || hrefToPageMap[cleanPath.split('/').pop()];
+        assert.ok(mappedPage, `目录目标必须对应 spine: ${cleanPath}`);
         
         tocItems.push({
             title: labelText,
@@ -61,9 +66,16 @@ async function testFullNcx() {
         });
     }
 
+    assert.strictEqual(tocItems.length, 16);
+    const chapters = tocItems.filter(item => item.title.startsWith('CHAPTER '));
+    assert.strictEqual(new Set(chapters.map(item => item.page)).size, 12, '十二章应映射到各自的正文文件');
+    assert.ok(chapters.every(item => item.anchor), '正文目录应保留锚点');
     console.log(`Successfully parsed ${tocItems.length} TOC items from NCX.`);
     console.log("Sample items with page numbers & anchors:");
     console.log(tocItems.slice(0, 8));
 }
 
-testFullNcx().catch(err => console.error(err));
+testFullNcx().catch(err => {
+    console.error(err);
+    process.exit(1);
+});
