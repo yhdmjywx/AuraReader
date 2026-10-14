@@ -83,4 +83,4 @@ npm run test:syntax      # JavaScript 语法检查
 - 内置正文精选字体可由本地服务提供，但界面图标、界面字体和浏览器端 JSZip 仍引用外部 CDN。首次加载及部分功能依赖这些资源可用，当前不能保证完整离线启动。
 - 排版改动主要针对当前默认窗口验证，其他窗口尺寸和复杂 EPUB 尚需进一步测试。
 - 重新加载页面时，当前不会自动恢复上次打开的书籍和阅读位置；书库中的书籍和笔记仍可重新打开。
-- `package.json` 当前声明代码许可证为 MIT；正式公开发布前仍需补齐根目录 `LICENSE` 和实际版权信息。内置字体遵循各自许可证，来源与原文见 [字体资源说明](src/client/assets/fonts/README.md) 和其 `licenses/` 目录。测试书籍的原始声明与许可保留在 EPUB 内。
+- 项目代码采用 [Apache License 2.0](LICENSE)，版权声明为 Copyright © 2026 yhdmjywx。内置字体遵循各自许可证，来源与原文见 [字体资源说明](src/client/assets/fonts/README.md) 和其 `licenses/` 目录；第三方依赖遵循其各自许可证。测试书籍的原始声明与许可保留在 EPUB 内，不纳入项目代码的 Apache-2.0 许可范围。
