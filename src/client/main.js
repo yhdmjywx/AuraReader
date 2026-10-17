@@ -102,8 +102,6 @@ export function queryElements() {
         notesTotalCount: document.getElementById('notes-total-count'),
         btnToggleShowHighlights: document.getElementById('btn-toggle-show-highlights'),
         countPureHighlights: document.getElementById('count-pure-highlights'),
-        quickNoteInput: document.getElementById('quick-note-input'),
-        btnSaveQuickNote: document.getElementById('btn-save-quick-note'),
 
         // Header Export Panel / Backup
         btnExportMarkdown: document.getElementById('btn-export-markdown'),
@@ -202,7 +200,12 @@ export function bootstrapApp() {
 
     // 3. Connect Cross-Module Callbacks
     reader.callbacks.getNotes = () => annotations.getNotes();
-    reader.callbacks.onPageRendered = () => selection.restoreActiveTokens();
+    reader.callbacks.onPageRendered = () => {
+        selection.restoreActiveTokens();
+        annotations.refreshVisibleNotes();
+    };
+    reader.callbacks.onViewportChange = () => annotations.refreshVisibleNotes();
+    annotations.callbacks.getVisibleAnnotationIds = () => reader.getVisibleAnnotationIds();
 
     annotations.callbacks.onNotesChanged = (notes) => {
         reader.renderPage(reader.getCurrentPage(), true, notes);

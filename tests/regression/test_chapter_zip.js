@@ -55,7 +55,10 @@ const { JSDOM } = require('jsdom');
         controller.openNoteModal(edited.quote, edited.id, 1);
         await controller.saveModalNote({ comment: '已编辑的跨段笔记\n第二行思考' });
         await controller.saveModalNote({ quote: '引述内容', comment: '引用段落的思考', page: 1 });
-        await controller.saveQuickNote('无选区独立随笔', 1);
+        // Old backups may contain unquoted notes. Keep them exportable without
+        // re-enabling the now-disabled user action for creating these records.
+        controller.notes.unshift({ id: 'legacy-quick', kind: 'note', bookId: book.id, quote: '', comment: '无选区独立随笔', page: 1 });
+        controller.persistNotes();
         await controller.saveModalNote({ quote: '重复句。', comment: '将被删除的笔记', page: 1, location });
         await controller.deleteNote(controller.getNotes().find(note => note.comment === '将被删除的笔记').id);
         assert.ok(controller.getNotes().some(note => note.id === highlight.id), '删除同位置笔记不应删除高亮');

@@ -10,6 +10,7 @@ import { filterNotes, isHighlight, isNote } from '../../domain/annotationEngine.
 export function renderNotesList({
     elements,
     notes = [],
+    notesScope = 'page',
     showHighlightsInSidebar = false,
     focusedNoteIds = [],
     focusedHighlightIds = [],
@@ -20,6 +21,7 @@ export function renderNotesList({
     if (!elements || !elements.notesList) return;
 
     elements.notesList.innerHTML = '';
+    if (elements.emptyNotesState) elements.notesList.appendChild(elements.emptyNotesState);
 
     const { displayedNotes, pureCount } = filterNotes(notes, showHighlightsInSidebar);
 
@@ -50,7 +52,8 @@ export function renderNotesList({
             elements.emptyNotesState.style.display = 'block';
             const emptyText = elements.emptyNotesState.querySelector('p');
             if (emptyText) {
-                emptyText.textContent = showHighlightsInSidebar ? '暂无划线与笔记' : '暂无笔记';
+                const scope = notesScope === 'book' ? '全书' : '当前页';
+                emptyText.textContent = showHighlightsInSidebar ? `${scope}暂无划线与笔记` : `${scope}暂无笔记`;
             }
         }
         return;

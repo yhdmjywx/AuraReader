@@ -410,6 +410,10 @@ export function renderNotesList() {
     annotationController.renderNotesUI();
 }
 
+export function setNotesScope(scope = 'page') {
+    return annotationController.setNotesScope(scope);
+}
+
 export function jumpToNoteLocation(note) {
     appCoordinator.jumpToAnnotation(note.id);
 }
@@ -494,23 +498,6 @@ function setupCompatibilityListeners() {
     if (elements.btnCloseToc) {
         elements.btnCloseToc.addEventListener('click', () => {});
     }
-    if (elements.btnSaveQuickNote) {
-        elements.btnSaveQuickNote.addEventListener('click', () => {
-            const text = elements.quickNoteInput ? elements.quickNoteInput.value.trim() : '';
-            if (!text) return;
-            const newNote = createAnnotationObject({
-                kind: 'note',
-                bookId: state.currentBook,
-                quote: '',
-                comment: text,
-                color: 'green',
-                page: state.currentPage,
-                chapter: '独立思考'
-            });
-            saveNoteToDB(newNote);
-        });
-    }
-
     // Keyboard shortcuts & window resize compatibility patterns
     document.addEventListener('keydown', (e) => {
         if (e.key === 'b' || e.key === 'B') {
