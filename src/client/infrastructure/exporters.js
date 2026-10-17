@@ -6,7 +6,7 @@
 
 import { ensureTocHierarchy } from '../domain/readingLocation.js';
 import { groupAnnotationsByRange, normalizeAnnotation, isHighlight, isNote } from '../domain/annotationEngine.js';
-import { resolveAnnotationRange } from '../domain/annotationRangeEngine.js';
+import { compactWithMap, resolveAnnotationRange } from '../domain/annotationRangeEngine.js';
 import { renderAnnotationTokens } from '../features/reader/annotationRenderer.js';
 
 export function downloadFile(filename, data, type) {
@@ -29,7 +29,7 @@ export function exportMarkdown(bookTitle = '图书笔记', notes = []) {
 
     groups.forEach((group, idx) => {
         md += `### ${idx + 1}. P.${group.page} ${group.chapter || ''}\n`;
-        if (group.quote) md += `==${group.quote}==\n\n`;
+        if (group.quote) md += `${highlightMarkdown(group.quote)}\n\n`;
         group.notes.forEach(note => {
             if (note.comment) md += note.comment.split(/\r?\n/).map(line => `> ${line}`).join('\n') + '\n\n';
         });
@@ -80,21 +80,26 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
 
         indexMd += `${pageNum}. [${escapeMarkdownText(chapTitle)}](./${encodeURIComponent(fileName)})\n`;
 
-        // Offsets are chapter-relative, as in the reader. Recover a quote only
-        // when a record supplies a valid text range; quick notes have none.
+        // Offsets are chapter-relative, as in the reader. Saved note ranges
+        // recover the exact source quote; legacy notes fall back to quote search.
         const text = tempDiv.textContent;
         const exportNotes = pageNotes.map(note => {
-            if (note.quote.trim()) return note;
-            const range = resolveAnnotationRange(text, note);
-            return range ? { ...note, quote: text.slice(range.start, range.end) } : note;
+            if (!isNote(note)) return note;
+            const range = resolveNoteRange(text, note);
+            if (!range) return note;
+            const sourceQuote = text.slice(range.start, range.end);
+            const savedQuote = compactWithMap(note.quote).compact;
+            const resolvedQuote = compactWithMap(sourceQuote).compact;
+            return savedQuote === resolvedQuote ? note : { ...note, quote: sourceQuote };
         });
         unmatchedHighlights += exportNotes.filter(isHighlight).filter(note => !resolveAnnotationRange(text, note)).length;
         renderAnnotationTokens(tempDiv, exportNotes, pageNum);
 
         let chapMd = `# ${escapeMarkdownText(chapTitle)}\n\n`;
         chapMd += `> 本章划线：${pageNotes.filter(isHighlight).length} 条 | 笔记：${pageNotes.filter(isNote).length} 条\n\n---\n\n`;
-        chapMd += chapterBodyMarkdown(tempDiv) + '\n\n';
-        chapMd += chapterAnnotationMarkdown(exportNotes);
+        const chapterBody = chapterBodyMarkdown(tempDiv, exportNotes.filter(isNote));
+        chapMd += chapterBody.markdown + '\n\n';
+        chapMd += chapterAnnotationMarkdown(chapterBody.unplacedNotes);
         folder.file(fileName, chapMd);
     });
 
@@ -112,39 +117,101 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
     downloadFile(`${bookTitle}_分章节笔记包.zip`, blob, 'application/zip');
 }
 
+function resolveNoteRange(text, note) {
+    const location = note.location || {};
+    const start = Number(location.start);
+    const end = Number(location.end);
+    const locationPage = Number(location.page);
+    if (Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end > start && end <= text.length
+        && (!locationPage || locationPage === Number(note.page))) {
+        // A valid saved selection range is the strongest link to the source.
+        // Use its text to repair stale or shortened quote strings before the
+        // renderer locates the note in the chapter.
+        return { start, end };
+    }
+    return resolveAnnotationRange(text, note);
+}
+
 function chapterAnnotationMarkdown(notes) {
     const thoughts = notes.filter(isNote);
     if (!thoughts.length) return '';
     let md = '## 本章笔记\n\n';
     thoughts.forEach((note, idx) => {
         md += `### ${idx + 1}. 笔记 | P.${note.page}\n\n`;
-        if (note.quote.trim()) {
-            md += '> **原文引用**\n';
-            md += note.quote.trim().split(/\r?\n/).map(line => `> ${escapeMarkdownText(line)}`).join('\n') + '\n\n';
-        } else {
-            md += '> 独立随笔（未绑定原文）\n\n';
-        }
-        if (note.comment.trim()) md += `${note.comment}\n\n`;
+        md += chapterNoteContent(note);
     });
     return md;
 }
 
+function chapterNoteContent(note) {
+    let md = '';
+    if (note.quote.trim()) {
+        md += '> **原文引用**\n';
+        md += note.quote.trim().split(/\r?\n/).map(line => `> ${escapeMarkdownText(line)}`).join('\n') + '\n';
+        md += '>\n';
+    } else {
+        md += '> 独立随笔（未绑定原文）\n';
+        md += '>\n';
+    }
+    if (note.comment.trim()) {
+        md += note.comment.split(/\r?\n/).map(line => `> ${line}`).join('\n') + '\n\n';
+    } else {
+        md += '\n';
+    }
+    return md;
+}
+
 function escapeMarkdownText(text) {
-    return String(text).replace(/[\\`*_{}\[\]<>]/g, '\\$&');
+    return String(text).replace(/&/g, '&amp;').replace(/[\\`*_{}\[\]<>]/g, '\\$&');
+}
+
+function highlightMarkdown(text) {
+    // Source HTML often contains soft-wrapped lines and indentation. Leave
+    // whitespace outside marks and never emit a mark for a blank line.
+    return String(text).split(/(\r\n|\r|\n)/).map(line => {
+        const match = line.match(/^(\s*)([\s\S]*?\S)(\s*)$/);
+        if (!match) return line;
+        // Encode Markdown delimiters as well as HTML characters so the
+        // highlighted source stays literal in both HTML and Markdown readers.
+        const content = escapeHtml(match[2]).replace(/[\\`*_{}\[\]~=]/g, character => `&#${character.charCodeAt(0)};`);
+        return `${match[1]}<mark>${content}</mark>${match[3]}`;
+    }).join('');
 }
 
 // Serialize annotated text in document order. Adjacent inline tokens share
-// one marker; paragraph boundaries close it. No quote matching is repeated.
-function chapterBodyMarkdown(root) {
+// one run; paragraph and line boundaries close marks. No quote matching is repeated.
+function chapterBodyMarkdown(root, notes = []) {
     const blockSelector = 'p,h1,h2,h3,h4,h5,h6,blockquote,div,section,article,li,ul,ol,table,thead,tbody,tfoot,tr,td,th,pre,figure';
+    const noteTokens = new Map();
+    root.querySelectorAll('.annotation-token.has-note').forEach(token => {
+        (token.getAttribute('data-note-ids') || '').split(/\s+/).filter(Boolean).forEach(id => noteTokens.set(id, token));
+    });
+    const notesAfterBlock = new Map();
+    const unplacedNotes = [];
+    notes.forEach(note => {
+        const token = noteTokens.get(String(note.id));
+        let paragraph = token?.closest('p,h1,h2,h3,h4,h5,h6,blockquote,li,pre,td,th,figure,div,section,article');
+        if (paragraph?.tagName !== 'BLOCKQUOTE') {
+            paragraph = token?.closest('blockquote') || paragraph;
+        }
+        if (!paragraph || paragraph === root || !root.contains(paragraph)) {
+            unplacedNotes.push(note);
+            return;
+        }
+        if (!notesAfterBlock.has(paragraph)) notesAfterBlock.set(paragraph, []);
+        notesAfterBlock.get(paragraph).push(note);
+    });
+
+    function renderNotesAfter(element) {
+        return (notesAfterBlock.get(element) || []).map(chapterNoteContent).join('');
+    }
     function inline(nodes) {
-        let result = '';
-        let highlighted = false;
+        const runs = [];
         function write(text, marked) {
             if (!text) return;
-            if (highlighted !== marked) result += '==';
-            highlighted = marked;
-            result += escapeMarkdownText(text);
+            const previous = runs[runs.length - 1];
+            if (previous && previous.marked === marked) previous.text += text;
+            else runs.push({ text, marked });
         }
         function visit(node, marked = false) {
             if (node.nodeType === 3) { write(node.textContent, marked); return; }
@@ -154,8 +221,7 @@ function chapterBodyMarkdown(root) {
             node.childNodes.forEach(child => visit(child, isMarked));
         }
         nodes.forEach(node => visit(node));
-        if (highlighted) result += '==';
-        return result.trim();
+        return runs.map(run => run.marked ? highlightMarkdown(run.text) : escapeMarkdownText(run.text)).join('').trim();
     }
     function children(element) {
         let result = '';
@@ -176,13 +242,17 @@ function chapterBodyMarkdown(root) {
     }
     function block(element) {
         if (element.matches('script,style')) return '';
-        if (/^H[1-6]$/.test(element.tagName)) return `${'#'.repeat(Math.min(Number(element.tagName[1]) + 1, 6))} ${inline([element])}\n\n`;
-        if (element.tagName === 'BLOCKQUOTE') return children(element).trim().split('\n').map(line => `> ${line}`).join('\n') + '\n\n';
-        if (element.querySelector(blockSelector)) return children(element);
-        const text = inline([element]);
-        return text ? text + '\n\n' : '';
+        let rendered = '';
+        if (/^H[1-6]$/.test(element.tagName)) rendered = `${'#'.repeat(Math.min(Number(element.tagName[1]) + 1, 6))} ${inline([element])}\n\n`;
+        else if (element.tagName === 'BLOCKQUOTE') rendered = children(element).trim().split('\n').map(line => `> ${line}`).join('\n') + '\n\n';
+        else if (element.querySelector(blockSelector)) rendered = children(element);
+        else {
+            const text = inline([element]);
+            rendered = text ? text + '\n\n' : '';
+        }
+        return rendered + renderNotesAfter(element);
     }
-    return children(root).trim();
+    return { markdown: children(root).trim(), unplacedNotes };
 }
 
 export function exportStandaloneHtml(book, notes = []) {
