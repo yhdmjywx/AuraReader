@@ -366,6 +366,7 @@ export class ReaderController {
             // Capture scrolls from both the vertical viewport and its paged
             // chapter strip (horizontal scroll events do not bubble).
             viewport.addEventListener('scroll', () => this.scheduleViewportChange(), { capture: true, passive: true });
+            viewport.addEventListener('load', () => this.scheduleViewportChange(), { capture: true });
             viewport.addEventListener('scroll', () => {
                 if (!this.isChapterFlow() || this.effectiveReaderMode() !== 'scroll') return;
                 this.syncChapterChrome();
@@ -384,6 +385,7 @@ export class ReaderController {
                     if (elements.readerPanel) {
                         elements.readerPanel.className = `reader-panel paper-${this.paperTheme}`;
                     }
+                    this.scheduleViewportChange();
                 });
             });
         }

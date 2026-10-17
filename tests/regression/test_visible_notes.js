@@ -47,11 +47,18 @@ const { JSDOM } = require('jsdom');
         token('union-only', [rect(-120, 180, 80, 20), rect(1200, 180, 80, 20)]);
         token('below', [rect(30, 600, 80, 20)]);
         token('boundary', [rect(560, 200, 80, 20)]);
+        // Reproduces Chrome at a fractional zoom/DPI: a previous-column line
+        // ends 0.000008px inside the next page even though it is fully clipped.
+        token('rounding-left', [rect(-560, 330, 560.000008, 20)]);
+        token('rounding-right', [rect(559.999992, 360, 80, 20)]);
+        token('rounding-top', [rect(40, -20, 80, 20.000008)]);
+        token('rounding-bottom', [rect(40, 499.999992, 80, 20)]);
+        token('partial-visible', [rect(-79.75, 420, 80, 20)]);
         token('blank', [rect(40, 240, 80, 20)], { text: ' \n ' });
         token('highlight', [rect(30, 280, 100, 20)], { highlight: true });
         token('hidden-right', [rect(650, 80, 150, 20)], { right: true });
         const getVisible = () => collectVisibleAnnotationIds([paper, right], viewport);
-        assert.deepEqual([...getVisible()].sort(), ['cross', 'highlight', 'left'], '单页只包含有实际文字片段相交的标注，不用跨屏联合包围盒判断');
+        assert.deepEqual([...getVisible()].sort(), ['cross', 'highlight', 'left', 'partial-visible'], '只接受真实文字片段交集，排除页边浮点误差，并保留真实的部分可见引用');
 
         viewportRect = rect(0, 0, 1000, 500);
         assert.ok(getVisible().has('right-page'), '双页范围包含右页');

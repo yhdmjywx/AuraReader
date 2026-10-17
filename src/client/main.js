@@ -8,6 +8,7 @@
 import { initDB } from './infrastructure/bookRepository.js';
 import { Session } from './app/session.js';
 import { LayoutController } from './features/layout/layoutController.js';
+import { positionMarginNotes } from './features/layout/marginNotesLayout.js';
 import { ReaderEngine, readerEngine } from './domain/readerEngine.js';
 import { ReaderController } from './features/reader/readerController.js';
 import { AnnotationController } from './features/annotations/annotationController.js';
@@ -203,8 +204,12 @@ export function bootstrapApp() {
     reader.callbacks.onPageRendered = () => {
         selection.restoreActiveTokens();
         annotations.refreshVisibleNotes();
+        positionMarginNotes(elements);
     };
-    reader.callbacks.onViewportChange = () => annotations.refreshVisibleNotes();
+    reader.callbacks.onViewportChange = () => {
+        annotations.refreshVisibleNotes();
+        positionMarginNotes(elements);
+    };
     annotations.callbacks.getVisibleAnnotationIds = () => reader.getVisibleAnnotationIds();
 
     annotations.callbacks.onNotesChanged = (notes) => {
