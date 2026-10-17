@@ -161,8 +161,8 @@
         <input type="file" id="backup-file-input" accept=".aurabackup,.json" hidden>
     </section>
 
-    <!-- Main Workspace (75:25 Split Layout) -->
-    <main class="workspace-container" id="workspace-container">
+    <!-- Reading surface with always-visible margin notes. -->
+    <main class="workspace-container immersive-notes" id="workspace-container">
         <!-- Left Panel: Reader (75%) -->
         <section class="reader-panel" id="reader-panel">
             <!-- Table of Contents Drawer (Collapsible) -->
@@ -230,7 +230,8 @@
             </div>
         </section>
 
-        <!-- Resizer Handle -->
+        <!-- Legacy handles remain mounted for facade compatibility; the
+             immersive layout hides them and disables split/collapse actions. -->
         <div class="resizer-handle" id="resizer-handle" title="按住拖拽调整 75:25 比例，双击折叠/展开笔记栏">
             <div class="resizer-line"></div>
         </div>
@@ -253,20 +254,11 @@
             <!-- Tab Content 1: Highlights & User Notes -->
             <div class="tab-content active" id="tab-highlights">
                 <div class="notes-toolbar">
-                    <span class="notes-count-text"><strong id="notes-total-count">0</strong> 条随笔</span>
+                    <span class="notes-count-text"><strong id="notes-total-count">0</strong> 条笔记</span>
                     <div class="notes-actions" style="display: flex; gap: 6px; align-items: center;">
                         <button id="btn-toggle-show-highlights" class="btn btn-outline-sm" style="font-size: 0.78rem; padding: 3px 8px;" title="点击切换是否在笔记区显示纯划线">
                             <i class="ri-eye-line"></i> 显示划线 (<span id="count-pure-highlights">0</span>)
                         </button>
-                    </div>
-                </div>
-
-                <!-- Input box for adding standalone note -->
-                <div class="quick-note-box">
-                    <textarea id="quick-note-input" placeholder="写下您的读书感悟或思考..." rows="2"></textarea>
-                    <div class="quick-note-footer">
-                        <span class="hint-text">支持 Markdown 语法</span>
-                        <button id="btn-save-quick-note" class="btn btn-outline-sm"><i class="ri-add-line"></i> 保存笔记</button>
                     </div>
                 </div>
 

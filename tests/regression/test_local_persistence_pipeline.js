@@ -25,8 +25,8 @@ const checks = [
         pass: jsContent.includes("function saveModalNote") && jsContent.includes("repoSaveNote(this.notes[noteIndex])") && jsContent.includes("repoSaveNote(newNote)")
     },
     {
-        name: "独立随笔写入 IndexedDB (saveNoteToDB 附带 bookId)",
-        pass: jsContent.includes("elements.btnSaveQuickNote") && jsContent.includes("bookId: state.currentBook") && jsContent.includes("saveNoteToDB(newNote);")
+        name: "停用独立随笔创建，引用笔记仍保留持久化管道",
+        pass: !jsContent.includes("elements.btnSaveQuickNote") && controllerJs.includes('this.requireQuote(quote)') && controllerJs.includes('repoSaveNote(newNote)')
     },
     {
         name: "笔记/高亮删除同步物理删除 IndexedDB (deleteNoteFromDB)",

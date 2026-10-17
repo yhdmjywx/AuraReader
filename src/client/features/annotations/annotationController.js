@@ -34,6 +34,8 @@ export class AnnotationController {
         this.notes = [];
         this.editingNoteId = null;
         this.showHighlightsInSidebar = false;
+        this.notesScope = 'page';
+        this._renderedSidebarIds = null;
         this.activeTab = 'tab-highlights';
         this.focusedNoteIds = [];
         this.focusedHighlightIds = [];
@@ -48,6 +50,34 @@ export class AnnotationController {
         return this.notes;
     }
 
+    // This changes presentation only. getNotes() continues to return the full
+    // collection for rendering, persistence, and book-wide exports.
+    setNotesScope(scope = 'page') {
+        if (scope !== 'page' && scope !== 'book') throw new Error('笔记范围只能是 page 或 book');
+        this.notesScope = scope;
+        this.renderNotesUI();
+        return scope;
+    }
+
+    getSidebarNotes() {
+        const quoted = this.notes.filter(note => String(note.quote || '').trim());
+        if (this.notesScope === 'book') return quoted;
+        const visible = this.callbacks.getVisibleAnnotationIds?.() || new Set();
+        return quoted.filter(note => visible.has(String(note.id)));
+    }
+
+    refreshVisibleNotes() {
+        if (this.notesScope !== 'page') return;
+        const key = JSON.stringify(this.getSidebarNotes().map(note => note.id));
+        if (key !== this._renderedSidebarIds) this.renderNotesUI();
+    }
+
+    requireQuote(quote) {
+        if (String(quote || '').trim()) return true;
+        this.callbacks.showToast?.('请先在正文中选择需要引用的文字');
+        return false;
+    }
+
     getEditingNoteId() {
         return this.editingNoteId;
     }
@@ -57,6 +87,7 @@ export class AnnotationController {
     }
 
     async loadNotesForBook(bookId) {
+        this.notesScope = 'page';
         if (!bookId) {
             this.notes = [];
             this.renderNotesUI();
@@ -88,6 +119,7 @@ export class AnnotationController {
     async addOrUpdateNote(noteObj) {
         const normalized = normalizeAnnotation(noteObj);
         if (!normalized) return;
+        if (isNote(normalized) && !this.requireQuote(normalized.quote)) return;
         const idx = this.notes.findIndex(n => n.id === normalized.id);
         if (idx !== -1) {
             this.notes[idx] = normalized;
@@ -141,8 +173,10 @@ export class AnnotationController {
 
     createNote({ quote = '', page = 1, chapter = null, location = null } = {}) {
         const pending = this.callbacks.getPendingSelection ? this.callbacks.getPendingSelection() : null;
+        const selectedQuote = quote || (pending ? pending.text : '');
+        if (!this.requireQuote(selectedQuote)) return;
         this.editingNoteId = null;
-        this.modalQuote = quote || (pending ? pending.text : '');
+        this.modalQuote = selectedQuote;
         this.modalPage = Number(page || (pending ? pending.page : 1)) || 1;
         this.modalChapter = chapter || null;
         this.modalLocation = location || (pending ? pending.location : null);
@@ -174,6 +208,8 @@ export class AnnotationController {
                 return;
             }
 
+            if (!this.requireQuote(current.quote)) return;
+
             this.notes[noteIndex].comment = cleanComment;
             this.notes[noteIndex].kind = 'note';
             this.notes[noteIndex].color = this.notes[noteIndex].color || 'green';
@@ -182,6 +218,7 @@ export class AnnotationController {
             this.persistNotes();
             if (this.callbacks.showToast) this.callbacks.showToast('笔记已更新');
         } else {
+            if (!this.requireQuote(quote)) return;
             if (!cleanComment) {
                 if (this.callbacks.showToast) this.callbacks.showToast('请输入笔记内容');
                 return;
@@ -212,36 +249,10 @@ export class AnnotationController {
         }
     }
 
-    async saveQuickNote(comment, page = 1, chapter = '独立思考') {
-        const text = (comment || '').trim();
-        if (!text) {
-            if (this.callbacks.showToast) this.callbacks.showToast('请输入笔记内容');
-            return;
-        }
-
-        const newNote = createAnnotationObject({
-            kind: 'note',
-            bookId: this.getBookId(),
-            quote: '',
-            comment: text,
-            color: 'green',
-            page: Number(page) || 1,
-            chapter
-        });
-
-        this.notes.unshift(newNote);
-        await repoSaveNote(newNote);
-        this.persistNotes();
-        this.renderNotesUI();
-
-        if (this.elements && this.elements.quickNoteInput) {
-            this.elements.quickNoteInput.value = '';
-        }
-
-        if (this.callbacks.showToast) this.callbacks.showToast('已保存独立笔记');
-        if (this.callbacks.onNotesChanged) {
-            this.callbacks.onNotesChanged(this.notes);
-        }
+    async saveQuickNote() {
+        // Keep the old callable entry safe without creating unquoted notes.
+        this.requireQuote('');
+        return false;
     }
 
     async deleteHighlight(id) {
@@ -340,7 +351,7 @@ export class AnnotationController {
         this.showHighlightsInSidebar = !this.showHighlightsInSidebar;
         this.renderNotesUI();
         if (this.callbacks.showToast) {
-            this.callbacks.showToast(this.showHighlightsInSidebar ? '已开启：笔记区显示全部划线' : '已恢复：笔记区仅显示笔记');
+            this.callbacks.showToast(this.showHighlightsInSidebar ? '已开启：笔记区同时显示划线' : '已恢复：笔记区仅显示笔记');
         }
     }
 
@@ -406,9 +417,12 @@ export class AnnotationController {
 
     renderNotesUI() {
         if (!this.elements) return;
+        const sidebarNotes = this.getSidebarNotes();
+        this._renderedSidebarIds = JSON.stringify(sidebarNotes.map(note => note.id));
         renderNotesList({
             elements: this.elements,
-            notes: this.notes,
+            notes: sidebarNotes,
+            notesScope: this.notesScope,
             showHighlightsInSidebar: this.showHighlightsInSidebar,
             focusedNoteIds: this.focusedNoteIds,
             focusedHighlightIds: this.focusedHighlightIds,
@@ -445,15 +459,6 @@ export class AnnotationController {
         if (elements.btnToggleShowHighlights) {
             elements.btnToggleShowHighlights.addEventListener('click', () => {
                 this.toggleShowHighlightsInSidebar();
-            });
-        }
-
-        // Quick Note Save
-        if (elements.btnSaveQuickNote) {
-            elements.btnSaveQuickNote.addEventListener('click', () => {
-                const comment = elements.quickNoteInput ? elements.quickNoteInput.value : '';
-                const ctx = this.callbacks.getReadingContext ? this.callbacks.getReadingContext() : { page: 1, chapter: '独立思考' };
-                this.saveQuickNote(comment, ctx.page, ctx.chapter);
             });
         }
 

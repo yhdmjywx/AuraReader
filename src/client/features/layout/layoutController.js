@@ -5,6 +5,8 @@
    Manages spread layout, sidebar toggles, resizer dragging, and 760px responsive rules.
    ========================================================================== */
 
+import { applyMarginGeometry, isImmersiveNotes } from './marginNotesLayout.js';
+
 export const DOUBLE_PAGE_MIN_WIDTH = 760;
 
 export class LayoutController {
@@ -66,7 +68,7 @@ export class LayoutController {
         }
 
         let downgraded = false;
-        if (nextMode === 'double' && availableWidth < DOUBLE_PAGE_MIN_WIDTH) {
+        if (nextMode === 'double' && availableWidth < this.minimumDoubleWidth()) {
             this.isAutoDowngraded = true;
             downgraded = true;
         } else {
@@ -97,6 +99,7 @@ export class LayoutController {
     }
 
     toggleSidebar(notify = true) {
+        if (isImmersiveNotes(this.elements)) return false;
         if (this.callbacks.beforeGeometryChange) this.callbacks.beforeGeometryChange();
         this.isCollapsed = !this.isCollapsed;
         if (typeof localStorage !== 'undefined') {
@@ -111,6 +114,7 @@ export class LayoutController {
     }
 
     ensureSidebarExpanded({ notify = false } = {}) {
+        if (isImmersiveNotes(this.elements)) return false;
         if (!this.isCollapsed) return false;
         this.isCollapsed = false;
         if (typeof localStorage !== 'undefined') {
@@ -129,7 +133,7 @@ export class LayoutController {
             return { changed: hadDowngrade, isAutoDowngraded: false, reason: 'not_double' };
         }
 
-        const shouldDowngrade = availableWidth < DOUBLE_PAGE_MIN_WIDTH;
+        const shouldDowngrade = availableWidth < this.minimumDoubleWidth();
         if (shouldDowngrade !== this.isAutoDowngraded) {
             this.isAutoDowngraded = shouldDowngrade;
             const res = {
@@ -150,6 +154,8 @@ export class LayoutController {
         const el = elements || this.elements;
         if (!el || !el.workspaceContainer) return;
 
+        if (isImmersiveNotes(el)) this.isCollapsed = false;
+
         if (this.isCollapsed) {
             el.workspaceContainer.classList.add('sidebar-collapsed');
         } else {
@@ -161,6 +167,8 @@ export class LayoutController {
         el.workspaceContainer.classList[isDouble ? 'add' : 'remove']('layout-double');
         el.workspaceContainer.classList[isScroll ? 'add' : 'remove']('layout-scroll');
         el.workspaceContainer.classList[!isDouble && !isScroll ? 'add' : 'remove']('layout-single');
+
+        applyMarginGeometry(el, this.getEffectiveReaderMode());
 
         this.updatePageModeButtonUI(el);
         this.updateSidebarButtonsUI(el);
@@ -184,7 +192,9 @@ export class LayoutController {
             if (this.isAutoDowngraded) {
                 el.btnPageMode.classList.add('auto-downgraded');
                 if (el.textPageMode) el.textPageMode.textContent = '双页(自适应)';
-                el.btnPageMode.title = '双页模式（因宽度受限临时单页展示，展开窗口或收起侧栏后将自动恢复）';
+                el.btnPageMode.title = isImmersiveNotes(el)
+                    ? '当前窗口放不下固定行宽的双页，扩大窗口后将自动恢复'
+                    : '双页模式（因宽度受限临时单页展示，展开窗口或收起侧栏后将自动恢复）';
             } else {
                 el.btnPageMode.classList.remove('auto-downgraded');
                 if (el.textPageMode) el.textPageMode.textContent = '双页';
@@ -225,6 +235,16 @@ export class LayoutController {
     applySidebarState(elements) {
         const el = elements || this.elements;
         if (!el) return;
+
+        if (isImmersiveNotes(el)) {
+            this.isCollapsed = false;
+            el.workspaceContainer.classList.remove('sidebar-collapsed');
+            if (el.readerPanel) el.readerPanel.style.width = '100%';
+            if (el.notesPanel) el.notesPanel.style.display = 'block';
+            if (el.resizerHandle) el.resizerHandle.style.display = 'none';
+            applyMarginGeometry(el, this.getEffectiveReaderMode());
+            return;
+        }
 
         if (this.isCollapsed) {
             if (el.workspaceContainer) el.workspaceContainer.classList.add('sidebar-collapsed');
@@ -317,6 +337,7 @@ export class LayoutController {
 
     initResizer(elements, onWidthChange, onToggleSidebar) {
         const el = elements || this.elements;
+        if (isImmersiveNotes(el)) return;
         if (!el || !el.resizerHandle) return;
 
         let isDragging = false;
@@ -366,6 +387,11 @@ export class LayoutController {
                 onToggleSidebar();
             }
         });
+    }
+
+    minimumDoubleWidth() {
+        // Two 560px columns + 72px gap + 16px outer margins.
+        return isImmersiveNotes(this.elements) ? 1224 : DOUBLE_PAGE_MIN_WIDTH;
     }
 }
 

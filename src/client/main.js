@@ -8,6 +8,7 @@
 import { initDB } from './infrastructure/bookRepository.js';
 import { Session } from './app/session.js';
 import { LayoutController } from './features/layout/layoutController.js';
+import { positionMarginNotes } from './features/layout/marginNotesLayout.js';
 import { ReaderEngine, readerEngine } from './domain/readerEngine.js';
 import { ReaderController } from './features/reader/readerController.js';
 import { AnnotationController } from './features/annotations/annotationController.js';
@@ -102,8 +103,6 @@ export function queryElements() {
         notesTotalCount: document.getElementById('notes-total-count'),
         btnToggleShowHighlights: document.getElementById('btn-toggle-show-highlights'),
         countPureHighlights: document.getElementById('count-pure-highlights'),
-        quickNoteInput: document.getElementById('quick-note-input'),
-        btnSaveQuickNote: document.getElementById('btn-save-quick-note'),
 
         // Header Export Panel / Backup
         btnExportMarkdown: document.getElementById('btn-export-markdown'),
@@ -202,7 +201,16 @@ export function bootstrapApp() {
 
     // 3. Connect Cross-Module Callbacks
     reader.callbacks.getNotes = () => annotations.getNotes();
-    reader.callbacks.onPageRendered = () => selection.restoreActiveTokens();
+    reader.callbacks.onPageRendered = () => {
+        selection.restoreActiveTokens();
+        annotations.refreshVisibleNotes();
+        positionMarginNotes(elements);
+    };
+    reader.callbacks.onViewportChange = () => {
+        annotations.refreshVisibleNotes();
+        positionMarginNotes(elements);
+    };
+    annotations.callbacks.getVisibleAnnotationIds = () => reader.getVisibleAnnotationIds();
 
     annotations.callbacks.onNotesChanged = (notes) => {
         reader.renderPage(reader.getCurrentPage(), true, notes);

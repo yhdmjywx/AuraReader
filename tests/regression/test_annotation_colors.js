@@ -30,7 +30,7 @@ console.log("✅ 种子笔记颜色校验通过（含感悟的种子标注均为
 // 3. 应用层与标注内核逻辑检测
 console.log("\n[步骤 3: 静态检测 app.js 与 annotationEngine.js 颜色分配]");
 assert.ok(annotEngineContent.includes("comment && comment.trim() !== '' ? 'green' : 'yellow'"), "annotationEngine 必须根据 comment 存在性动态推导 green/yellow");
-assert.ok(appContent.includes("btnSaveQuickNote"), "app.js 必须包含独立随笔保存绑定");
+assert.ok(!appContent.includes("btnSaveQuickNote"), "app.js 不得保留独立随笔保存绑定");
 assert.ok(appContent.includes("createHighlight(color = 'yellow')"), "createHighlight 默认应为 yellow 纯高亮");
 console.log("✅ 应用层代码逻辑静态检查通过！");
 

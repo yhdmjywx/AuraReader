@@ -6,10 +6,12 @@
    ========================================================================== */
 
 import { filterNotes, isHighlight, isNote } from '../../domain/annotationEngine.js';
+import { isImmersiveNotes, positionMarginNotes } from '../layout/marginNotesLayout.js';
 
 export function renderNotesList({
     elements,
     notes = [],
+    notesScope = 'page',
     showHighlightsInSidebar = false,
     focusedNoteIds = [],
     focusedHighlightIds = [],
@@ -20,6 +22,7 @@ export function renderNotesList({
     if (!elements || !elements.notesList) return;
 
     elements.notesList.innerHTML = '';
+    if (elements.emptyNotesState) elements.notesList.appendChild(elements.emptyNotesState);
 
     const { displayedNotes, pureCount } = filterNotes(notes, showHighlightsInSidebar);
 
@@ -50,7 +53,8 @@ export function renderNotesList({
             elements.emptyNotesState.style.display = 'block';
             const emptyText = elements.emptyNotesState.querySelector('p');
             if (emptyText) {
-                emptyText.textContent = showHighlightsInSidebar ? '暂无划线与笔记' : '暂无笔记';
+                const scope = notesScope === 'book' ? '全书' : '当前页';
+                emptyText.textContent = showHighlightsInSidebar ? `${scope}暂无划线与笔记` : `${scope}暂无笔记`;
             }
         }
         return;
@@ -98,6 +102,23 @@ export function renderNotesList({
             </div>
         `;
 
+        if (isImmersiveNotes(elements)) {
+            // The quote still belongs to the annotation and the existing edit
+            // dialog/export. The margin only presents the user's own words.
+            card.querySelector('.note-card-header')?.remove();
+            card.querySelector('.note-quote-text')?.remove();
+            const comment = card.querySelector('.note-comment-text');
+            if (comment) comment.textContent = note.comment;
+            else if (highlight) {
+                const label = document.createElement('span');
+                label.className = 'margin-highlight-label';
+                label.textContent = '划线';
+                card.prepend(label);
+            }
+            card.setAttribute('role', 'group');
+            card.setAttribute('aria-label', highlight ? '高亮操作' : '关联正文的笔记');
+        }
+
         card.addEventListener('click', (e) => {
             if (e.target.closest('.btn-delete-note') || e.target.closest('.btn-edit-note')) return;
             if (typeof onJump === 'function') onJump(note);
@@ -121,6 +142,7 @@ export function renderNotesList({
 
         elements.notesList.appendChild(card);
     });
+    positionMarginNotes(elements);
 }
 
 export function highlightNoteCard(noteId) {

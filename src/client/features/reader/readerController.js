@@ -7,6 +7,7 @@
 
 import { ReaderEngine } from '../../domain/readerEngine.js';
 import { FontController } from './fontController.js';
+import { collectVisibleAnnotationIds } from './visibleAnnotations.js';
 import { resolveTargetPage, ensureTocHierarchy } from '../../domain/readingLocation.js';
 import { isChapterFlowBook } from '../../domain/chapterFlow.js';
 import {
@@ -118,6 +119,26 @@ export class ReaderController {
         return this.engine.getLocation();
     }
 
+    getVisibleAnnotationIds() {
+        const elements = this.elements;
+        if (!elements || typeof document === 'undefined') return new Set();
+        return collectVisibleAnnotationIds(
+            [elements.bookPaper, elements.bookPaperRight],
+            document.getElementById('reader-viewport')
+        );
+    }
+
+    scheduleViewportChange() {
+        if (this._viewportUpdatePending || !this.callbacks.onViewportChange) return;
+        this._viewportUpdatePending = true;
+        const update = () => {
+            this._viewportUpdatePending = false;
+            this.callbacks.onViewportChange?.();
+        };
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(update);
+        else setTimeout(update, 0);
+    }
+
     isChapterFlow() {
         return isChapterFlowBook(this.getCurrentBook());
     }
@@ -185,6 +206,7 @@ export class ReaderController {
         if (this.callbacks.onPageRendered) {
             this.callbacks.onPageRendered();
         }
+        this.scheduleViewportChange();
 
         return loc;
     }
@@ -341,6 +363,10 @@ export class ReaderController {
 
         const viewport = document.getElementById('reader-viewport');
         if (viewport) {
+            // Capture scrolls from both the vertical viewport and its paged
+            // chapter strip (horizontal scroll events do not bubble).
+            viewport.addEventListener('scroll', () => this.scheduleViewportChange(), { capture: true, passive: true });
+            viewport.addEventListener('load', () => this.scheduleViewportChange(), { capture: true });
             viewport.addEventListener('scroll', () => {
                 if (!this.isChapterFlow() || this.effectiveReaderMode() !== 'scroll') return;
                 this.syncChapterChrome();
@@ -359,6 +385,7 @@ export class ReaderController {
                     if (elements.readerPanel) {
                         elements.readerPanel.className = `reader-panel paper-${this.paperTheme}`;
                     }
+                    this.scheduleViewportChange();
                 });
             });
         }
@@ -399,7 +426,10 @@ export class ReaderController {
     }
 
     refitAfterTypography() {
-        if (!this.isChapterFlow()) return;
+        if (!this.isChapterFlow()) {
+            this.scheduleViewportChange();
+            return;
+        }
         this.refitChapter(this.callbacks.getNotes ? this.callbacks.getNotes() : []);
     }
 
@@ -513,6 +543,7 @@ export class ReaderController {
         if (this.layoutController && typeof this.layoutController.updateLayoutClasses === 'function') {
             this.layoutController.updateLayoutClasses(elements);
         }
+        this.scheduleViewportChange();
     }
 }
 

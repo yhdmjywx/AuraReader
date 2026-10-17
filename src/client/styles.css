@@ -1758,3 +1758,122 @@ mark.hl-active {
     margin-top: 4px;
 }
 
+/* Immersive notes share the reading surface; legacy split controls remain
+   mounted only for compatibility with the application facade. */
+.workspace-container.immersive-notes {
+    display: block;
+    --reading-width: 560px;
+    --reading-left: max(16px, calc((100% - 560px) / 2));
+    --reading-right: var(--reading-left);
+    --note-band-height: 0px;
+}
+.immersive-notes .reader-panel {
+    width: 100% !important;
+    height: 100%;
+    background: var(--bg-paper);
+}
+.immersive-notes .reader-viewport {
+    padding: 32px var(--reading-right) 32px var(--reading-left);
+    margin-bottom: var(--note-band-height);
+    overflow-x: hidden;
+}
+.immersive-notes .paper-container,
+.immersive-notes.layout-scroll .paper-container {
+    width: var(--reading-width);
+    min-width: var(--reading-width);
+    max-width: var(--reading-width);
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+}
+.immersive-notes.layout-scroll .book-paper {
+    padding: 28px 0 32px;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+.immersive-notes .reader-pagination { border-top: none; background: var(--bg-paper); }
+.immersive-notes .resizer-handle,
+.immersive-notes .sidebar-toggle-proxy,
+.immersive-notes .sidebar-recall-handle,
+.immersive-notes .sidebar-collapse-handle,
+.immersive-notes .tabs-header,
+.immersive-notes .notes-toolbar,
+.immersive-notes .empty-state { display: none !important; }
+.immersive-notes .notes-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    pointer-events: none;
+    overflow: hidden;
+}
+.immersive-notes .tab-content.active,
+.immersive-notes .notes-list {
+    position: absolute;
+    inset: 0;
+    display: block;
+    padding: 0;
+    overflow: visible;
+}
+.immersive-notes .margin-notes-lane {
+    position: absolute;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+    pointer-events: auto;
+}
+.immersive-notes .note-card {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    padding: 0 6px;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    color: var(--margin-note-color, var(--text-secondary));
+    transform: none;
+    transition: color .15s;
+    overflow-wrap: anywhere;
+}
+.immersive-notes .note-card:hover {
+    box-shadow: none;
+    transform: none;
+    background: transparent;
+}
+.immersive-notes .note-card.is-focused {
+    outline: none;
+    color: var(--primary);
+}
+.immersive-notes .note-comment-text {
+    color: inherit;
+    font-size: 14px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+}
+.immersive-notes .note-card-actions { margin-top: 8px; gap: 8px; }
+.immersive-notes .note-card-actions button { color: var(--text-muted); }
+.immersive-notes .note-card-actions button:hover,
+.immersive-notes .note-card-actions button:focus-visible { color: var(--primary); }
+.immersive-notes .margin-highlight-label { font-size: 12px; color: var(--text-muted); }
+.immersive-notes[data-notes-placement="bottom"] .margin-notes-lane {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    overflow: auto;
+}
+.immersive-notes[data-notes-placement="bottom"] .note-card {
+    position: relative;
+    top: 0 !important;
+    flex: 0 0 min(350px, 100%);
+    width: min(350px, 100%);
+}
+
