@@ -14,7 +14,9 @@ function store(key, value) {
 export class FontController {
     constructor(callbacks = {}) {
         this.callbacks = callbacks;
-        this.choice = normalizeFontChoice(readStored(PREFERENCE_KEY, null));
+        const savedChoice = readStored(PREFERENCE_KEY, null);
+        this.choice = normalizeFontChoice(savedChoice);
+        if (savedChoice?.kind === 'builtin' && this.choice.kind === 'auto') store(PREFERENCE_KEY, this.choice);
         this.imported = [];
         this.systemFamilies = [];
         this.recent = readStored(RECENT_KEY, []).filter?.(name => typeof name === 'string') || [];

@@ -7,11 +7,14 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
 
 (async () => {
     const { CURATED_FONTS, automaticFont, normalizeFontChoice, resolveFont } = await import('../../src/client/domain/fontCatalog.js');
-    assert.equal(CURATED_FONTS.length, 5);
+    assert.deepEqual(CURATED_FONTS.map(font => font.id), ['sarasa', 'literata']);
     const fontDirectory = path.resolve('src/client/assets/fonts');
     const css = await fs.readFile(path.join(fontDirectory, 'fonts.css'), 'utf8');
     const resources = [...new Set([...css.matchAll(/url\('\.\/([^']+)'\)/g)].map(match => match[1]))];
     const inventory = JSON.parse(await fs.readFile(path.join(fontDirectory, 'inventory.json'), 'utf8'));
+    assert.equal(resources.length, 6, '保留更纱四种字形和 Literata 常规／斜体字库');
+    assert.deepEqual(resources.slice().sort(), inventory.map(item => item.filename).sort());
+    assert.deepEqual((await fs.readdir(fontDirectory)).filter(name => name.endsWith('.woff2')).sort(), resources.slice().sort(), '不得残留其他内置字库');
     const crypto = require('node:crypto');
     for (const resource of resources) {
         const bytes = await fs.readFile(path.join(fontDirectory, resource));
@@ -27,14 +30,32 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
     assert.equal(automaticFont({}), null);
     assert.deepEqual(normalizeFontChoice({ kind: 'publisher' }), { kind: 'auto' });
     assert.deepEqual(normalizeFontChoice({ kind: 'builtin', id: 'missing' }), { kind: 'auto' });
-    assert.match(resolveFont({ kind: 'builtin', id: 'literata' }, {}).family, /Literata.*Noto Serif SC/);
-    assert.match(resolveFont({ kind: 'builtin', id: 'source-serif' }, {}).family, /Source Serif 4.*Noto Serif SC/);
+    for (const id of ['source-han-serif', 'wenkai', 'source-serif']) {
+        assert.deepEqual(normalizeFontChoice({ kind: 'builtin', id }), { kind: 'auto' });
+        assert.match(resolveFont({ kind: 'builtin', id }, { language: 'en' }).family, /Literata/);
+        assert.match(resolveFont({ kind: 'builtin', id }, { language: 'zh-CN' }).family, /Sarasa Gothic SC/);
+    }
+    const english = resolveFont({ kind: 'builtin', id: 'literata' }, {});
+    assert.match(english.family, /Literata.*Sarasa Gothic SC/);
+    assert.deepEqual(english.loadFamilies, ['Literata', 'Sarasa Gothic SC']);
     assert.match(resolveFont({ kind: 'auto' }, { language: 'zh-CN' }).family, /Sarasa Gothic SC/);
     assert.match(resolveFont({ kind: 'auto' }, { language: 'en' }).family, /Literata/);
     assert.match(resolveFont({ kind: 'auto' }, {}).family, /system-ui/);
     assert.match(resolveFont({ kind: 'system', family: 'Microsoft YaHei' }, {}).systemAlias, /^AuraSystem_[a-f0-9_]+$/, '含空格的本机字体也必须获得合法的字体别名');
+    assert.match(resolveFont({ kind: 'system', family: 'Arial' }, {}).family, /Arial.*Sarasa Gothic SC/);
+    const custom = { id: 'a'.repeat(64), name: 'My Font' };
+    const importedChoice = { kind: 'imported', ...custom };
+    assert.match(resolveFont(importedChoice, {}, [custom]).family, /AuraImported_.*Sarasa Gothic SC/);
+    assert.deepEqual(resolveFont(importedChoice, {}, [custom]).loadFamilies, ['Sarasa Gothic SC']);
 
-    const fontBytes = await fs.readFile(path.resolve('src/client/assets/fonts/source-serif-4.woff2'));
+    const fontBytes = await fs.readFile(path.join(fontDirectory, 'literata.woff2'));
+    const fontkit = require('fontkit');
+    const latinFont = fontkit.create(fontBytes);
+    const fallbackFont = fontkit.create(await fs.readFile(path.join(fontDirectory, 'sarasa-regular.woff2')));
+    for (const character of '阅读笔记高亮') {
+        assert.equal(latinFont.hasGlyphForCodePoint(character.codePointAt(0)), false);
+        assert.equal(fallbackFont.hasGlyphForCodePoint(character.codePointAt(0)), true, '更纱黑体必须补齐 Literata 缺失的常用中文字形');
+    }
     assert.equal(inspectFont(fontBytes, 'font.woff2').type, 'woff2');
     assert.throws(() => inspectFont(Buffer.from('not a font'), 'fake.ttf'));
     assert.throws(() => inspectFont(fontBytes, 'mismatch.ttf'));
@@ -82,12 +103,21 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
         const elements = Object.fromEntries(Object.entries(ids).map(([key, id]) => [key, document.getElementById(id)]));
         const panel = elements.appearancePanel;
         assert.equal(panel.querySelectorAll('.appearance-row').length, 6, '字体功能不得增加设置行');
-        assert.equal(elements.fontMenu.querySelectorAll('[data-font-choice]').length, 6, '一个自动选项与五款精选字体');
+        assert.equal(elements.fontMenu.querySelectorAll('[data-font-choice]').length, 3, '一个自动选项与两款精选字体');
         assert.equal(elements.fontMenu.querySelectorAll('button:disabled').length, 1, '原书字体暂缓并标记未启用');
         let applied = 0;
+        for (const id of ['source-han-serif', 'wenkai', 'source-serif']) {
+            localStorage.setItem('aura_font_preference', JSON.stringify({ kind: 'builtin', id }));
+            const migrated = new FontController({ getBook: () => ({ language: 'en' }) });
+            assert.deepEqual(migrated.choice, { kind: 'auto' });
+            assert.deepEqual(JSON.parse(localStorage.getItem('aura_font_preference')), { kind: 'auto' }, '移除字体后的自动选择必须持久化');
+            assert.match(migrated.resolved().family, /Literata/);
+        }
         const fonts = new FontController({ getBook: () => ({ language: 'en' }), onChange: () => applied++ });
         fonts.initUI(elements);
         await fonts.ready;
+        assert.equal(elements.fontChoiceLabel.textContent, '自动选择');
+        assert.equal(elements.fontMenu.querySelector('[data-font-choice="auto"]').getAttribute('aria-checked'), 'true');
         elements.fontFamilySelect.click();
         assert.equal(elements.fontMenu.hidden, false);
         await fonts.choose({ kind: 'builtin', id: 'literata' });
@@ -112,7 +142,7 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
         assert.match(paper.style.getPropertyValue('--reader-font-family'), /Arial/);
         assert.ok(paper.classList.contains('reader-font-override'));
         fonts.ensure = async () => { throw new Error('missing file'); };
-        await fonts.choose({ kind: 'builtin', id: 'wenkai' });
+        await fonts.choose({ kind: 'builtin', id: 'sarasa' });
         assert.match(fonts.resolved().family, /system-ui/, '字体加载失败必须回退并继续阅读');
         assert.ok(applied > 0);
 
