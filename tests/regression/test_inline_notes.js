@@ -28,6 +28,8 @@ const { JSDOM } = require('jsdom');
         elements.bookPaper.getBoundingClientRect = () => box(210, 0, 1192, 760);
         applyMarginGeometry(elements, 'double');
         const session = new Session('inline-a');
+        const focusFrames = [];
+        window.requestAnimationFrame = callback => { focusFrames.push(callback); return focusFrames.length; };
         let paints = 0;
         const controller = new AnnotationController({ callbacks: {
             getCurrentBookId: () => session.getCurrentBookId(),
@@ -44,6 +46,9 @@ const { JSDOM } = require('jsdom');
                 });
                 controller.refreshVisibleNotes();
                 positionMarginNotes(elements);
+                if (controller.inlineEdit?.opening) {
+                    assert.notEqual(document.activeElement, elements.notesList.querySelector('.note-editor'), '正文和页边完成重绘前不提前交接焦点');
+                }
             }
         } });
         controller.initUI(elements);
@@ -62,9 +67,17 @@ const { JSDOM } = require('jsdom');
 
         // Exercise the actual selection-button path: no second click or dialog.
         const button = document.createElement('button'); document.body.appendChild(button);
-        const selection = new SelectionController({ callbacks: { onCreateNote: data => controller.createNote(data) } });
+        const selection = new SelectionController({ callbacks: { onCreateNote: data => {
+            assert.equal(window.getSelection().rangeCount, 0, '正文选区必须在创建并聚焦编辑框之前清除');
+            assert.equal(selection.pendingSelection, null);
+            controller.createNote(data);
+        } } });
         selection.initUI({ btnAddNote: button });
+        elements.bookPaper.textContent = '关联的原文';
+        const range = document.createRange(); range.selectNodeContents(elements.bookPaper);
+        window.getSelection().addRange(range);
         selection.pendingSelection = { text: '关联的原文', page: 1, location };
+        button.focus();
         button.click();
         const draftId = controller.editingNoteId;
         assert.equal(document.activeElement, editor(), '点击记笔记后直接获得焦点');
@@ -99,6 +112,9 @@ const { JSDOM } = require('jsdom');
         }
         key('Escape');
         await controller.finishInlineEdit();
+        byId('outside').focus();
+        focusFrames.splice(0).forEach(callback => callback());
+        assert.equal(document.activeElement, byId('outside'), '下一帧的聚焦检查不能抢回已退出笔记的焦点');
         assert.equal(editor(), null);
         assert.equal(controller.getNotes()[0].id, draftId);
         assert.deepEqual(controller.getNotes()[0].location.start, location.start);

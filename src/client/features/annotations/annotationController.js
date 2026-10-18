@@ -21,6 +21,7 @@ import {
 
 import {
     renderNotesList,
+    focusInlineEditor,
     highlightNoteCard as domHighlightNoteCard
 } from './notesUI.js';
 
@@ -193,11 +194,22 @@ export class AnnotationController {
         if (this.editingNoteId === note.id && this.inlineEdit) return;
         this.finishInlineEdit();
         this.editingNoteId = note.id;
-        this.inlineEdit = { note };
+        this.inlineEdit = { note, opening: true };
+        const editSession = this.inlineEdit;
         this.renderNotesUI();
         // Include unsaved drafts only in the reading surface, never in exports
         // or storage. This also gives the new editor its existing margin anchor.
         this.callbacks.onNotesChanged?.(this.getRenderingNotes());
+        if (this.inlineEdit !== editSession) return;
+        editSession.opening = false;
+        // The body and margin lanes are now mounted in their final positions.
+        focusInlineEditor(this.elements, note.id);
+        const win = this.elements?.notesList?.ownerDocument.defaultView;
+        win?.requestAnimationFrame?.(() => {
+            if (this.inlineEdit !== editSession) return;
+            const editor = this.elements.notesList.querySelector('.note-editor');
+            if (editor && editor.ownerDocument.activeElement !== editor) focusInlineEditor(this.elements, note.id);
+        });
     }
 
     updateInlineNote(id, comment) {
@@ -518,6 +530,7 @@ export class AnnotationController {
             if (!event.target.closest?.('.note-editor')) this.finishInlineEdit();
         }, true);
         document.addEventListener('focusin', event => {
+            if (this.inlineEdit?.opening) return;
             if (!event.target.closest?.('.note-editor')) this.finishInlineEdit();
         });
         window.addEventListener('pagehide', () => this.finishInlineEdit());

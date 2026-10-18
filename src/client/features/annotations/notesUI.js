@@ -180,6 +180,19 @@ export function highlightNoteCard(noteId) {
     }
 }
 
+export function focusInlineEditor(elements, noteId) {
+    const card = [...(elements?.notesList?.querySelectorAll('.note-card') || [])]
+        .find(node => node.dataset.annotationId === String(noteId));
+    const editor = card?.querySelector('.note-editor');
+    if (!editor?.isConnected) return;
+    editor.focus({ preventScroll: true });
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+    const lane = card.closest('.margin-notes-lane');
+    if (lane && card.offsetTop + card.offsetHeight > lane.scrollTop + lane.clientHeight) {
+        lane.scrollTop = Math.max(0, card.offsetTop + card.offsetHeight - lane.clientHeight);
+    }
+}
+
 function startInlineEditor({ card, note, elements, onInput, onFinish }) {
     const text = card.querySelector('.note-comment-text');
     const editor = document.createElement('textarea');
@@ -218,13 +231,6 @@ function startInlineEditor({ card, note, elements, onInput, onFinish }) {
         if (!editor.dataset.repositioning) onFinish?.();
     });
     resize();
-    editor.focus({ preventScroll: true });
-    editor.setSelectionRange(editor.value.length, editor.value.length);
-    // Scroll only the note lane, leaving the reading position untouched.
-    const lane = card.closest('.margin-notes-lane');
-    if (lane && card.offsetTop + card.offsetHeight > lane.scrollTop + lane.clientHeight) {
-        lane.scrollTop = Math.max(0, card.offsetTop + card.offsetHeight - lane.clientHeight);
-    }
 }
 
 function escapeHtml(str) {
