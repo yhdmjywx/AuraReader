@@ -1,12 +1,12 @@
 /* ==========================================================================
    NotesUI - Sidebar Notes & Annotations Presentation (Feature Layer)
    Pure UI presentation. Renders note cards, toggles pure-highlight visibility,
-   handles modal inputs, and exposes interaction callbacks.
+   handles inline inputs, and exposes interaction callbacks.
    Zero direct database persistence calls.
    ========================================================================== */
 
 import { filterNotes, isHighlight, isNote } from '../../domain/annotationEngine.js';
-import { isImmersiveNotes, positionMarginNotes } from '../layout/marginNotesLayout.js';
+import { isImmersiveNotes, positionMarginNotes, moveNoteCard } from '../layout/marginNotesLayout.js';
 
 export function renderNotesList({
     elements,
@@ -17,14 +17,27 @@ export function renderNotesList({
     focusedHighlightIds = [],
     onJump = null,
     onEdit = null,
-    onDelete = null
+    onDelete = null,
+    editingNoteId = null,
+    onInput = null,
+    onFinish = null
 }) {
     if (!elements || !elements.notesList) return;
 
-    elements.notesList.innerHTML = '';
-    if (elements.emptyNotesState) elements.notesList.appendChild(elements.emptyNotesState);
-
+    // Never detach the active textarea: autosave and reader refreshes must not
+    // reset its caret, scroll position, or an ongoing IME composition.
     const { displayedNotes, pureCount } = filterNotes(notes, showHighlightsInSidebar);
+    const focusedIds = new Set([...(focusedNoteIds || []), ...(focusedHighlightIds || [])]);
+    const keys = new Map(displayedNotes.map(note => [String(note.id), JSON.stringify([note, focusedIds.has(note.id)])]));
+    const retained = new Map();
+    elements.notesList.querySelectorAll('.note-card').forEach(card => {
+        const id = card.dataset.annotationId;
+        const editor = card.querySelector('.note-editor');
+        if (keys.has(id) && ((id === String(editingNoteId) && editor)
+            || (card._noteRenderKey === keys.get(id) && !editor))) retained.set(id, card);
+        else card.remove();
+    });
+    if (elements.emptyNotesState && !elements.notesList.contains(elements.emptyNotesState)) elements.notesList.appendChild(elements.emptyNotesState);
 
     // Update counts
     if (elements.countPureHighlights) {
@@ -57,6 +70,7 @@ export function renderNotesList({
                 emptyText.textContent = showHighlightsInSidebar ? `${scope}暂无划线与笔记` : `${scope}暂无笔记`;
             }
         }
+        positionMarginNotes(elements);
         return;
     }
 
@@ -64,24 +78,26 @@ export function renderNotesList({
         elements.emptyNotesState.style.display = 'none';
     }
 
-    const focusedIds = new Set([...(focusedNoteIds || []), ...(focusedHighlightIds || [])]);
-
     displayedNotes.forEach(note => {
+        const existingCard = retained.get(String(note.id));
+        if (existingCard) {
+            if (note.id === editingNoteId && !existingCard.querySelector('.note-editor')) {
+                startInlineEditor({ card: existingCard, note, elements, onInput, onFinish });
+            }
+            return;
+        }
         const highlight = isHighlight(note);
         const noteKind = isNote(note);
         const card = document.createElement('div');
         card.className = `note-card${noteKind ? ' hl-green-card' : ''}${highlight ? ' pure-highlight-card' : ''}${focusedIds.has(note.id) ? ' is-focused' : ''}`;
         card.id = `card-${note.id}`;
         card.setAttribute('data-annotation-id', note.id);
+        card._noteRenderKey = keys.get(String(note.id));
 
         const chapterLabel = note.chapter ? escapeHtml(note.chapter) : '章节选区';
         const typeBadge = highlight ?
             `<span class="note-loc-tag" style="background: rgba(245,158,11,0.1); color: #d97706; font-weight: 500;"><i class="ri-sparkling-line"></i> 划线</span>` :
             `<span class="note-loc-tag" style="background: rgba(16,185,129,0.1); color: var(--accent-color); font-weight: 500;"><i class="ri-chat-1-line"></i> 笔记</span>`;
-        const editButton = noteKind ? `
-                <button class="btn btn-ghost-sm btn-edit-note" data-id="${note.id}" title="编辑这条笔记">
-                    <i class="ri-edit-line"></i>
-                </button>` : '';
 
         card.innerHTML = `
             <div class="note-card-header">
@@ -93,9 +109,8 @@ export function renderNotesList({
                 <span style="font-size: 0.76rem; color: var(--text-sub);">${note.timestamp || ''}</span>
             </div>
             ${note.quote ? `<div class="note-quote-text">“${escapeHtml(note.quote)}”</div>` : ''}
-            ${note.comment ? `<div class="note-comment-text">💭 ${escapeHtml(note.comment)}</div>` : ''}
+            ${noteKind ? `<div class="note-comment-text">${escapeHtml(note.comment || '')}</div>` : ''}
             <div class="note-card-actions">
-                ${editButton}
                 <button class="btn btn-ghost-sm btn-delete-note" data-id="${note.id}" title="${highlight ? '删除高亮' : '删除这条笔记'}">
                     <i class="ri-delete-bin-line"></i>
                 </button>
@@ -103,8 +118,8 @@ export function renderNotesList({
         `;
 
         if (isImmersiveNotes(elements)) {
-            // The quote still belongs to the annotation and the existing edit
-            // dialog/export. The margin only presents the user's own words.
+            // References remain in the annotation/export; the margin presents
+            // only the user's words, in both reading and editing states.
             card.querySelector('.note-card-header')?.remove();
             card.querySelector('.note-quote-text')?.remove();
             const comment = card.querySelector('.note-comment-text');
@@ -120,15 +135,17 @@ export function renderNotesList({
         }
 
         card.addEventListener('click', (e) => {
-            if (e.target.closest('.btn-delete-note') || e.target.closest('.btn-edit-note')) return;
-            if (typeof onJump === 'function') onJump(note);
+            if (e.target.closest('.btn-delete-note') || e.target.closest('.note-editor')) return;
+            if (noteKind && typeof onEdit === 'function') onEdit(note);
+            else if (typeof onJump === 'function') onJump(note);
         });
-
-        const editBtn = card.querySelector('.btn-edit-note');
-        if (editBtn) {
-            editBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (typeof onEdit === 'function') onEdit(note);
+        if (noteKind) {
+            card.tabIndex = 0;
+            card.addEventListener('keydown', event => {
+                if (event.target === card && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault();
+                    onEdit?.(note);
+                }
             });
         }
 
@@ -141,7 +158,16 @@ export function renderNotesList({
         }
 
         elements.notesList.appendChild(card);
+        if (note.id === editingNoteId) startInlineEditor({ card, note, elements, onInput, onFinish });
     });
+    if (!isImmersiveNotes(elements)) {
+        let before = null;
+        for (const note of displayedNotes.slice().reverse()) {
+            const card = [...elements.notesList.querySelectorAll('.note-card')].find(node => node.dataset.annotationId === String(note.id));
+            moveNoteCard(card, elements.notesList, before);
+            before = card;
+        }
+    }
     positionMarginNotes(elements);
 }
 
@@ -154,31 +180,50 @@ export function highlightNoteCard(noteId) {
     }
 }
 
-export function openNoteModal({ elements, quote = '', existingNote = null }) {
-    if (!elements || !elements.noteModal) return;
-
-    const modalTitle = elements.noteModal.querySelector('h3');
-    const confirmBtn = elements.btnConfirmModal;
-
-    if (existingNote) {
-        if (elements.modalQuotePreview) elements.modalQuotePreview.textContent = `“${existingNote.quote || quote}”`;
-        if (elements.modalNoteTextarea) elements.modalNoteTextarea.value = existingNote.comment || '';
-        if (modalTitle) modalTitle.innerHTML = '<i class="ri-edit-line"></i> 编辑笔记';
-        if (confirmBtn) confirmBtn.textContent = '更新笔记';
-    } else {
-        if (elements.modalQuotePreview) elements.modalQuotePreview.textContent = `“${quote}”`;
-        if (elements.modalNoteTextarea) elements.modalNoteTextarea.value = '';
-        if (modalTitle) modalTitle.innerHTML = '<i class="ri-sticky-note-add-line"></i> 添加笔记';
-        if (confirmBtn) confirmBtn.textContent = '保存笔记';
-    }
-
-    elements.noteModal.classList.add('active');
-    if (elements.modalNoteTextarea) elements.modalNoteTextarea.focus();
-}
-
-export function closeNoteModal(elements) {
-    if (elements && elements.noteModal) {
-        elements.noteModal.classList.remove('active');
+function startInlineEditor({ card, note, elements, onInput, onFinish }) {
+    const text = card.querySelector('.note-comment-text');
+    const editor = document.createElement('textarea');
+    editor.className = 'note-editor';
+    editor.setAttribute('aria-label', '笔记内容');
+    editor.setAttribute('aria-keyshortcuts', 'Escape Control+Enter Meta+Enter');
+    editor.rows = 1;
+    editor.value = note.comment || '';
+    text.replaceChildren(editor);
+    card.querySelector('.note-card-actions').hidden = true;
+    const resize = () => {
+        editor.style.height = '0px';
+        editor.style.height = `${Math.max(editor.scrollHeight, 25.2)}px`;
+        positionMarginNotes(elements);
+    };
+    let composing = false;
+    editor.addEventListener('compositionstart', () => { composing = true; });
+    editor.addEventListener('compositionend', () => {
+        composing = false;
+        onInput?.(note.id, editor.value);
+        resize();
+    });
+    editor.addEventListener('input', () => {
+        onInput?.(note.id, editor.value);
+        resize();
+    });
+    editor.addEventListener('keydown', event => {
+        event.stopPropagation();
+        if (composing || event.isComposing || event.keyCode === 229) return;
+        if (event.key === 'Escape' || (event.key === 'Enter' && (event.ctrlKey || event.metaKey))) {
+            event.preventDefault();
+            onFinish?.();
+        }
+    });
+    editor.addEventListener('blur', () => {
+        if (!editor.dataset.repositioning) onFinish?.();
+    });
+    resize();
+    editor.focus({ preventScroll: true });
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+    // Scroll only the note lane, leaving the reading position untouched.
+    const lane = card.closest('.margin-notes-lane');
+    if (lane && card.offsetTop + card.offsetHeight > lane.scrollTop + lane.clientHeight) {
+        lane.scrollTop = Math.max(0, card.offsetTop + card.offsetHeight - lane.clientHeight);
     }
 }
 

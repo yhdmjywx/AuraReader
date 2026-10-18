@@ -1863,6 +1863,29 @@ mark.hl-active {
 .immersive-notes .note-card-actions button { color: var(--text-muted); }
 .immersive-notes .note-card-actions button:hover,
 .immersive-notes .note-card-actions button:focus-visible { color: var(--primary); }
+.note-editor {
+    display: block;
+    width: 100%;
+    min-height: 1.8em;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    outline: none;
+    box-shadow: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: inherit;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    overflow: hidden;
+    resize: none;
+    caret-color: #d95353;
+}
+.note-card-actions[hidden] { display: none; }
 .immersive-notes .margin-highlight-label { font-size: 12px; color: var(--text-muted); }
 .immersive-notes[data-notes-placement="bottom"] .margin-notes-lane {
     display: flex;

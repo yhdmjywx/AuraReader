@@ -51,6 +51,23 @@ export function applyMarginGeometry(elements, mode) {
     workspace._marginGeometry = geometry;
 }
 
+export function moveNoteCard(card, target, before = null) {
+    if (card.parentElement === target && card.nextSibling === before) return;
+    if (typeof target.moveBefore === 'function' && card.isConnected) target.moveBefore(card, before);
+    else {
+        const editor = card.querySelector('.note-editor');
+        const active = editor && card.ownerDocument.activeElement === editor;
+        const start = editor?.selectionStart, end = editor?.selectionEnd;
+        if (active) editor.dataset.repositioning = 'true';
+        target.insertBefore(card, before);
+        if (active) {
+            editor.focus({ preventScroll: true });
+            editor.setSelectionRange(start, end);
+            delete editor.dataset.repositioning;
+        }
+    }
+}
+
 export function positionMarginNotes(elements) {
     if (!isImmersiveNotes(elements) || !elements.notesList) return;
     const workspace = elements.workspaceContainer;
@@ -97,7 +114,7 @@ export function positionMarginNotes(elements) {
         const anchor = anchors.get(card.dataset.annotationId);
         const side = geometry.placement === 'flanks' && anchor?.side === 'left' ? 'left' : 'right';
         const target = lane(side);
-        if (card.parentElement !== target) target.appendChild(card);
+        if (card.parentElement !== target) moveNoteCard(card, target);
         if (!groups.has(target)) groups.set(target, []);
         groups.get(target).push({ card, y: anchor ? anchor.top - bounds.top - top : 0 });
     });

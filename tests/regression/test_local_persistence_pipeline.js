@@ -21,7 +21,7 @@ const checks = [
         pass: jsContent.includes("function createHighlight") && jsContent.includes("repoSaveNote(newNote)")
     },
     {
-        name: "随笔弹窗新建/更新保存至 IndexedDB (saveNoteToDB)",
+        name: "引用笔记新建/更新保存至 IndexedDB (saveNoteToDB)",
         pass: jsContent.includes("function saveModalNote") && jsContent.includes("repoSaveNote(this.notes[noteIndex])") && jsContent.includes("repoSaveNote(newNote)")
     },
     {

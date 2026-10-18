@@ -21,9 +21,7 @@ import {
 
 import {
     renderNotesList,
-    highlightNoteCard as domHighlightNoteCard,
-    openNoteModal as domOpenNoteModal,
-    closeNoteModal as domCloseNoteModal
+    highlightNoteCard as domHighlightNoteCard
 } from './notesUI.js';
 
 export class AnnotationController {
@@ -33,21 +31,24 @@ export class AnnotationController {
         this.callbacks = callbacks; // onNotesChanged, onJump, showToast, getCurrentBookId, ensureSidebarExpanded
         this.notes = [];
         this.editingNoteId = null;
+        this.inlineEdit = null;
+        this._inlineWrites = Promise.resolve();
         this.showHighlightsInSidebar = false;
         this.notesScope = 'page';
         this._renderedSidebarIds = null;
         this.activeTab = 'tab-highlights';
         this.focusedNoteIds = [];
         this.focusedHighlightIds = [];
-        this.modalQuote = null;
-        this.modalPage = null;
-        this.modalChapter = null;
-        this.modalLocation = null;
         this.elements = null;
     }
 
     getNotes() {
         return this.notes;
+    }
+
+    getRenderingNotes() {
+        const draft = this.inlineEdit?.note;
+        return draft && !this.notes.some(note => note.id === draft.id) ? [draft, ...this.notes] : this.notes;
     }
 
     // This changes presentation only. getNotes() continues to return the full
@@ -60,14 +61,17 @@ export class AnnotationController {
     }
 
     getSidebarNotes() {
-        const quoted = this.notes.filter(note => String(note.quote || '').trim());
+        const quoted = this.getRenderingNotes().filter(note => String(note.quote || '').trim());
         if (this.notesScope === 'book') return quoted;
         const visible = this.callbacks.getVisibleAnnotationIds?.() || new Set();
-        return quoted.filter(note => visible.has(String(note.id)));
+        return quoted.filter(note => note.id === this.editingNoteId || visible.has(String(note.id)));
     }
 
-    refreshVisibleNotes() {
+    refreshVisibleNotes(finishHiddenEditor = false) {
         if (this.notesScope !== 'page') return;
+        if (finishHiddenEditor && this.inlineEdit && !this.callbacks.getVisibleAnnotationIds?.().has(String(this.editingNoteId))) {
+            this.finishInlineEdit();
+        }
         const key = JSON.stringify(this.getSidebarNotes().map(note => note.id));
         if (key !== this._renderedSidebarIds) this.renderNotesUI();
     }
@@ -87,6 +91,7 @@ export class AnnotationController {
     }
 
     async loadNotesForBook(bookId) {
+        await this.finishInlineEdit();
         this.notesScope = 'page';
         if (!bookId) {
             this.notes = [];
@@ -106,9 +111,7 @@ export class AnnotationController {
 
     persistNotes(bookId = this.getBookId()) {
         if (!bookId) return;
-        if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('aura_notes_' + bookId, JSON.stringify(this.notes));
-        }
+        // A full/disabled local cache must not prevent the IndexedDB write.
         persistNotesToLocalStorage(bookId, this.notes);
     }
 
@@ -175,22 +178,86 @@ export class AnnotationController {
         const pending = this.callbacks.getPendingSelection ? this.callbacks.getPendingSelection() : null;
         const selectedQuote = quote || (pending ? pending.text : '');
         if (!this.requireQuote(selectedQuote)) return;
-        this.editingNoteId = null;
-        this.modalQuote = selectedQuote;
-        this.modalPage = Number(page || (pending ? pending.page : 1)) || 1;
-        this.modalChapter = chapter || null;
-        this.modalLocation = location || (pending ? pending.location : null);
+        this.finishInlineEdit();
+        const note = createAnnotationObject({
+            kind: 'note', bookId: this.getBookId(), quote: selectedQuote, comment: '', color: 'green',
+            page: Number(page || pending?.page) || 1,
+            chapter: chapter || this.callbacks.getCurrentChapter?.() || '章节选区',
+            location: location || pending?.location || null
+        });
+        this.beginInlineEdit(note);
+        return note;
+    }
 
-        if (this.elements) {
-            domOpenNoteModal({
-                elements: this.elements,
-                quote: this.modalQuote,
-                existingNote: null
-            });
+    beginInlineEdit(note) {
+        if (this.editingNoteId === note.id && this.inlineEdit) return;
+        this.finishInlineEdit();
+        this.editingNoteId = note.id;
+        this.inlineEdit = { note };
+        this.renderNotesUI();
+        // Include unsaved drafts only in the reading surface, never in exports
+        // or storage. This also gives the new editor its existing margin anchor.
+        this.callbacks.onNotesChanged?.(this.getRenderingNotes());
+    }
+
+    updateInlineNote(id, comment) {
+        const note = this.inlineEdit?.note;
+        if (!note || id !== note.id || note.comment === comment) return;
+        note.comment = comment;
+        note.timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
+        const exists = this.notes.some(item => item.id === id);
+        if (!exists && !comment.trim()) return;
+        if (!exists) this.notes.unshift(note);
+        // Save the raw input, including trailing newlines. No list or body
+        // rerender is needed when only a note's own words have changed.
+        this.persistNotes(note.bookId);
+        this.writeInlineNote(note);
+    }
+
+    writeInlineNote(note, remove = false) {
+        const snapshot = JSON.parse(JSON.stringify(note));
+        // Start transactions immediately, in input order. The repository must
+        // not mirror an older completed transaction over newer local input.
+        const write = remove
+            ? repoDeleteNote(snapshot.id, snapshot.bookId, { syncLocal: false })
+            : repoSaveNote(snapshot, { syncLocal: false });
+        this._inlineWrites = Promise.all([this._inlineWrites, write]).then(() => undefined).catch(error => {
+            console.error('笔记持久化失败', error);
+            this.callbacks.showToast?.('笔记已保留在本机缓存，数据库暂时无法写入');
+        });
+    }
+
+    finishInlineEdit() {
+        const session = this.inlineEdit;
+        if (!session) return this._inlineWrites;
+        const editor = this.elements?.notesList?.querySelector('.note-editor');
+        if (editor) this.updateInlineNote(session.note.id, editor.value);
+        this.inlineEdit = null;
+        this.editingNoteId = null;
+        const note = session.note;
+        const blank = !note.comment.trim();
+        if (blank) {
+            const existed = this.notes.some(item => item.id === note.id);
+            this.notes = this.notes.filter(item => item.id !== note.id);
+            if (existed) {
+                this.persistNotes(note.bookId);
+                this.writeInlineNote(note, true);
+            }
         }
+        this.renderNotesUI();
+        if (blank) this.callbacks.onNotesChanged?.(this.notes);
+        return this._inlineWrites;
     }
 
     async saveModalNote({ quote = '', comment = '', page = 1, chapter = '章节选区', location = null } = {}) {
+        // Compatibility for programmatic callers; the UI uses inline autosave.
+        if (this.inlineEdit) {
+            const editor = this.elements?.notesList?.querySelector('.note-editor');
+            if (editor) editor.value = comment;
+            this.updateInlineNote(this.editingNoteId, comment);
+            await this.finishInlineEdit();
+            return;
+        }
         const cleanComment = (comment || '').trim();
 
         if (this.editingNoteId) {
@@ -288,6 +355,7 @@ export class AnnotationController {
 
     async deleteAnnotation(id, toastMessage = '已删除标注') {
         if (!id) return;
+        if (this.editingNoteId === id) await this.finishInlineEdit();
         const existed = this.notes.some(n => n.id === id);
         if (!existed) return;
 
@@ -321,30 +389,11 @@ export class AnnotationController {
             return;
         }
 
-        this.editingNoteId = existingNoteId;
-        this.modalQuote = existingNote.quote || quote || '';
-        this.modalPage = Number(targetPage || existingNote.page) || 1;
-        this.modalChapter = existingNote.chapter || null;
-        this.modalLocation = existingNote.location || null;
-
-        if (this.elements) {
-            domOpenNoteModal({
-                elements: this.elements,
-                quote: this.modalQuote,
-                existingNote
-            });
-        }
+        this.beginInlineEdit(existingNote);
     }
 
     closeNoteModal() {
-        this.editingNoteId = null;
-        this.modalQuote = null;
-        this.modalPage = null;
-        this.modalChapter = null;
-        this.modalLocation = null;
-        if (this.elements) {
-            domCloseNoteModal(this.elements);
-        }
+        return this.finishInlineEdit();
     }
 
     toggleShowHighlightsInSidebar() {
@@ -426,6 +475,9 @@ export class AnnotationController {
             showHighlightsInSidebar: this.showHighlightsInSidebar,
             focusedNoteIds: this.focusedNoteIds,
             focusedHighlightIds: this.focusedHighlightIds,
+            editingNoteId: this.editingNoteId,
+            onInput: (id, comment) => this.updateInlineNote(id, comment),
+            onFinish: () => this.finishInlineEdit(),
             onJump: (note) => {
                 if (this.callbacks.onJump) {
                     this.callbacks.onJump(note);
@@ -462,32 +514,13 @@ export class AnnotationController {
             });
         }
 
-        // Note Modal Controls
-        if (elements.btnCloseModal) {
-            elements.btnCloseModal.addEventListener('click', () => this.closeNoteModal());
-        }
-        if (elements.btnCancelModal) {
-            elements.btnCancelModal.addEventListener('click', () => this.closeNoteModal());
-        }
-        if (elements.noteModal) {
-            elements.noteModal.addEventListener('click', (e) => {
-                if (e.target === elements.noteModal) {
-                    this.closeNoteModal();
-                }
-            });
-        }
-        if (elements.btnConfirmModal) {
-            elements.btnConfirmModal.addEventListener('click', () => {
-                const comment = elements.modalNoteTextarea ? elements.modalNoteTextarea.value : '';
-                const pending = this.callbacks.getPendingSelection ? this.callbacks.getPendingSelection() : null;
-                const quote = this.modalQuote || (pending ? pending.text : '');
-                const page = this.modalPage || (pending ? pending.page : (this.callbacks.getCurrentPage ? this.callbacks.getCurrentPage() : 1));
-                const chapter = this.modalChapter || (this.callbacks.getCurrentChapter ? this.callbacks.getCurrentChapter() : '章节选区');
-                const location = this.modalLocation || (pending ? pending.location : null);
-                this.saveModalNote({ quote, comment, page, chapter, location });
-                if (window.getSelection) window.getSelection().removeAllRanges();
-            });
-        }
+        document.addEventListener('pointerdown', event => {
+            if (!event.target.closest?.('.note-editor')) this.finishInlineEdit();
+        }, true);
+        document.addEventListener('focusin', event => {
+            if (!event.target.closest?.('.note-editor')) this.finishInlineEdit();
+        });
+        window.addEventListener('pagehide', () => this.finishInlineEdit());
     }
 }
 

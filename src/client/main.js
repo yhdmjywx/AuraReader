@@ -126,12 +126,6 @@ export function queryElements() {
         btnCloseShelf: document.getElementById('btn-close-shelf'),
         shelfGrid: document.getElementById('shelf-grid'),
         shelfBookCount: document.getElementById('shelf-book-count'),
-        noteModal: document.getElementById('note-modal'),
-        modalQuotePreview: document.getElementById('modal-quote-preview'),
-        modalNoteTextarea: document.getElementById('modal-note-textarea'),
-        btnCloseModal: document.getElementById('btn-close-modal'),
-        btnCancelModal: document.getElementById('btn-cancel-modal'),
-        btnConfirmModal: document.getElementById('btn-confirm-modal'),
         toastMsg: document.getElementById('toast-msg')
     };
 }
@@ -200,14 +194,18 @@ export function bootstrapApp() {
     });
 
     // 3. Connect Cross-Module Callbacks
-    reader.callbacks.getNotes = () => annotations.getNotes();
+    reader.callbacks.getNotes = () => annotations.getRenderingNotes();
+    reader.callbacks.beforeNavigate = () => {
+        annotations.finishInlineEdit();
+        return annotations.getRenderingNotes();
+    };
     reader.callbacks.onPageRendered = () => {
         selection.restoreActiveTokens();
         annotations.refreshVisibleNotes();
         positionMarginNotes(elements);
     };
     reader.callbacks.onViewportChange = () => {
-        annotations.refreshVisibleNotes();
+        annotations.refreshVisibleNotes(true);
         positionMarginNotes(elements);
     };
     annotations.callbacks.getVisibleAnnotationIds = () => reader.getVisibleAnnotationIds();
