@@ -308,12 +308,7 @@ export async function loadBook(bookKey) {
 
     renderTOC(book.toc || []);
 
-    const dbNotes = await loadNotesFromDB(bookKey);
-    if (dbNotes && dbNotes.length > 0) {
-        state.notes = dbNotes;
-    } else {
-        state.notes = await repoLoadNotesForBook(bookKey);
-    }
+    state.notes = await repoLoadNotesForBook(bookKey);
 
     renderNotesList();
     renderPage(1);

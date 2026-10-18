@@ -37,8 +37,9 @@ const checks = [
         pass: jsContent.includes("function persistNotes()") && jsContent.includes("localStorage.setItem('aura_notes_' + state.currentBook,")
     },
     {
-        name: "书籍加载时优先从 IndexedDB 恢复笔记 (loadNotesFromDB)",
-        pass: jsContent.includes("const dbNotes = await loadNotesFromDB(bookKey);")
+        name: "书籍加载通过统一入口恢复笔记及未完成写入",
+        pass: appJs.includes('state.notes = await repoLoadNotesForBook(bookKey);')
+            && controllerJs.includes('const loaded = await repoLoadNotesForBook(bookId);')
     }
 ];
 
