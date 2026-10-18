@@ -3,6 +3,8 @@ const path = require('path');
 
 console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
 
+const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+
 (async () => {
     // 1. 测试 ReadingLocation 模型与转换
     console.log("\n--- [测试 1: ReadingLocation 定位模型] ---");
@@ -331,6 +333,14 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
 
     // 7. 测试 AppCoordinator 跨模块协作与独立 Feature Controllers
     console.log("\n--- [测试 7: AppCoordinator 跨模块协调与 Feature Controllers 隔离] ---");
+    // These integration calls save real annotations. Provide working storage
+    // rather than treating an environment with no database or cache as saved.
+    const saved = new Map();
+    globalThis.localStorage = {
+        getItem: key => saved.get(key) ?? null,
+        setItem: (key, value) => saved.set(key, String(value)),
+        removeItem: key => saved.delete(key)
+    };
     const { AppCoordinator } = await import('../../src/client/app/appCoordinator.js');
     const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
     const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
@@ -430,5 +440,8 @@ console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
     console.log("✅ app.js 与 main.js 架构实例统一性测试全部通过！");
 
     console.log("\n🎉 全部解耦架构单元测试 100% 成功！");
-})();
+})().finally(() => {
+    if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
+    else delete globalThis.localStorage;
+});
 

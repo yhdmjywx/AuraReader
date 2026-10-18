@@ -6,6 +6,7 @@
 
 import { getDB, getSeedNotes } from './bookRepository.js';
 import { normalizeAnnotation } from '../domain/annotationEngine.js';
+import { pendingNoteWrites, pendingNoteBookIds, recordNoteWrite, acknowledgeNoteWrite } from './annotationRecovery.js';
 
 function normalizeList(list) {
     if (!Array.isArray(list)) return [];
@@ -14,38 +15,45 @@ function normalizeList(list) {
 
 export function saveNoteToDB(noteObj, { syncLocal = true } = {}) {
     if (!noteObj || !noteObj.id) return Promise.resolve();
-    const db = getDB();
-    if (!db) {
-        if (syncLocal) syncNoteToLocalStorage(noteObj);
-        return Promise.resolve();
-    }
-
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(["notes"], "readwrite");
-        tx.objectStore("notes").put(noteObj);
-        tx.oncomplete = () => {
-            if (syncLocal) syncNoteToLocalStorage(noteObj);
-            resolve();
-        };
-        tx.onerror = (e) => reject(e);
-    });
+    const entry = recordNoteWrite({ id: noteObj.id, bookId: noteObj.bookId, operation: 'save', note: noteObj });
+    if (syncLocal) syncNoteToLocalStorage(noteObj);
+    return commitNoteWrite(entry);
 }
 
 export function deleteNoteFromDB(noteId, bookId = null, { syncLocal = true } = {}) {
     if (!noteId) return Promise.resolve();
-    const db = getDB();
+    const entry = recordNoteWrite({ id: noteId, bookId, operation: 'delete' });
 
     if (bookId && syncLocal) {
         removeNoteFromLocalStorage(bookId, noteId);
     }
 
-    if (!db) return Promise.resolve();
+    return commitNoteWrite(entry);
+}
 
+function commitNoteWrite(entry) {
+    const db = getDB();
+    if (!db) {
+        // With neither storage available, do not claim the input is safe.
+        if (entry.durable === false) {
+            const error = new Error('笔记存储暂时不可用');
+            error.recoveryAvailable = false;
+            return Promise.reject(error);
+        }
+        return Promise.resolve(); // Keep the journal for a later retry.
+    }
     return new Promise((resolve, reject) => {
         const tx = db.transaction(["notes"], "readwrite");
-        tx.objectStore("notes").delete(noteId);
-        tx.oncomplete = () => resolve();
-        tx.onerror = (e) => reject(e);
+        const store = tx.objectStore("notes");
+        if (entry.operation === 'delete') store.delete(entry.id);
+        else store.put(entry.note);
+        tx.oncomplete = () => { acknowledgeNoteWrite(entry); resolve(); };
+        tx.onerror = event => reject(tx.error || event);
+        tx.onabort = event => reject(tx.error || event);
+    }).catch(cause => {
+        const error = new Error('笔记数据库写入失败', { cause });
+        error.recoveryAvailable = entry.durable !== false;
+        throw error;
     });
 }
 
@@ -60,61 +68,28 @@ export function loadNotesFromDB(bookId) {
         const req = index.getAll(bookId);
         req.onsuccess = () => resolve(normalizeList(req.result || []));
         req.onerror = (e) => reject(e);
+        tx.onabort = (e) => reject(e);
     });
 }
 
 export async function getNotesForBooks(bookIds = []) {
     const db = getDB();
-    if (!db) {
-        // Fallback to localStorage
-        const allNotes = [];
-        if (typeof localStorage !== 'undefined') {
-            for (const bId of bookIds) {
-                const raw = localStorage.getItem('aura_notes_' + bId);
-                if (raw) {
-                    try {
-                        allNotes.push(...JSON.parse(raw));
-                    } catch (e) {
-                        // ignore
-                    }
-                } else if (bId === 'crisis-era') {
-                    allNotes.push(...getSeedNotes());
-                }
-            }
-        } else if (bookIds.includes('crisis-era')) {
-            allNotes.push(...getSeedNotes());
-        }
-        return normalizeList(allNotes);
+    let all = [];
+    if (db) {
+        try {
+            all = await new Promise((resolve, reject) => {
+                const tx = db.transaction(["notes"], "readonly");
+                const req = tx.objectStore("notes").getAll();
+                req.onsuccess = () => resolve(normalizeList(req.result || []));
+                req.onerror = reject;
+                tx.onabort = reject;
+            });
+        } catch (error) { console.warn('读取备份标注失败，尝试本机缓存', error); }
     }
-
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(["notes"], "readonly");
-        const store = tx.objectStore("notes");
-        const req = store.getAll();
-        req.onsuccess = () => {
-            let all = req.result || [];
-            if (!bookIds || bookIds.length === 0) {
-                resolve(all);
-                return;
-            }
-            const idSet = new Set(bookIds);
-            let filtered = all.filter(n => idSet.has(n.bookId));
-
-            for (const bId of bookIds) {
-                if (!filtered.some(n => n.bookId === bId)) {
-                    const localNotes = loadNotesFromLocalStorage(bId);
-                    if (localNotes && localNotes.length > 0) {
-                        filtered.push(...localNotes);
-                    } else if (bId === 'crisis-era') {
-                        filtered.push(...getSeedNotes());
-                    }
-                }
-            }
-
-            resolve(normalizeList(filtered));
-        };
-        req.onerror = (e) => reject(e);
-    });
+    const ids = bookIds?.length ? [...new Set(bookIds)]
+        : [...new Set([...all.map(note => note.bookId), ...pendingNoteBookIds()])];
+    const books = await Promise.all(ids.map(id => recoverBookNotes(id, all.filter(note => note.bookId === id))));
+    return books.flat();
 }
 
 export function persistNotesToLocalStorage(bookId, notes) {
@@ -128,10 +103,11 @@ export function persistNotesToLocalStorage(bookId, notes) {
 
 export function loadNotesFromLocalStorage(bookId) {
     if (!bookId || typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem('aura_notes_' + bookId);
-    if (!raw) return null;
     try {
-        return normalizeList(JSON.parse(raw));
+        const raw = localStorage.getItem('aura_notes_' + bookId);
+        if (!raw) return null;
+        const notes = JSON.parse(raw);
+        return Array.isArray(notes) ? normalizeList(notes) : null;
     } catch (e) {
         return null;
     }
@@ -139,30 +115,43 @@ export function loadNotesFromLocalStorage(bookId) {
 
 export async function loadNotesForBook(bookId) {
     if (!bookId) return [];
-
-    // 1. Try IndexedDB
+    let dbNotes = [];
     try {
-        const dbNotes = await loadNotesFromDB(bookId);
-        if (dbNotes && dbNotes.length > 0) {
-            return dbNotes;
-        }
+        dbNotes = await loadNotesFromDB(bookId);
     } catch (e) {
         console.warn("读取 IndexedDB 笔记异常:", e);
     }
 
-    // 2. Try LocalStorage
+    return recoverBookNotes(bookId, dbNotes);
+}
+
+async function recoverBookNotes(bookId, dbNotes) {
     const localNotes = loadNotesFromLocalStorage(bookId);
-    if (localNotes && localNotes.length > 0) {
-        return localNotes;
+    const base = dbNotes.length ? dbNotes : localNotes
+        ?? (bookId === 'crisis-era' ? normalizeList(getSeedNotes()) : []);
+    const pending = pendingNoteWrites(bookId);
+    const recovered = overlayPending(base, pending);
+    if (getDB() && pending.length) {
+        // A failed retry leaves its durable entry intact. Do not require a
+        // working database to reopen the latest user input or export a backup.
+        await Promise.all(pending.map(async entry => {
+            if (!pendingNoteWrites(bookId).some(item => item.id === entry.id && item.version === entry.version)) return;
+            try { await commitNoteWrite(entry); }
+            catch (error) { console.warn('补写笔记数据库失败，继续使用恢复内容', error); }
+        }));
     }
+    const latest = overlayPending(recovered, pendingNoteWrites(bookId));
+    if (pending.length) persistNotesToLocalStorage(bookId, latest);
+    return latest;
+}
 
-    // 3. Demo book fallback only for crisis-era
-    if (bookId === 'crisis-era') {
-        return normalizeList(getSeedNotes());
+function overlayPending(notes, pending) {
+    const byId = new Map(notes.map(note => [note.id, note]));
+    for (const entry of pending) {
+        if (entry.operation === 'delete') byId.delete(entry.id);
+        else byId.set(entry.id, normalizeAnnotation(entry.note));
     }
-
-    // 4. Clean empty list (Never leak previous book notes!)
-    return [];
+    return [...byId.values()];
 }
 
 function syncNoteToLocalStorage(noteObj) {

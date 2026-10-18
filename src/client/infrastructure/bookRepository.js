@@ -3,6 +3,8 @@
    Zero UI dependencies. Manages IndexedDB "books" store & demo books memory cache.
    ========================================================================== */
 
+import { clearStoredBookNotes } from './annotationRecovery.js';
+
 let dbInstance = null;
 
 // Built-in Demo Books Database
@@ -185,7 +187,10 @@ export function getAllBooksFromDB() {
 
 export function deleteBookFromDB(bookId) {
     delete demoBooks[bookId];
-    if (!dbInstance) return Promise.resolve();
+    if (!dbInstance) {
+        clearStoredBookNotes(bookId);
+        return Promise.resolve();
+    }
 
     return new Promise((resolve, reject) => {
         const tx = dbInstance.transaction(["books", "notes"], "readwrite");
@@ -200,7 +205,7 @@ export function deleteBookFromDB(bookId) {
             keys.forEach(k => notesStore.delete(k));
         };
 
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = () => { clearStoredBookNotes(bookId); resolve(); };
         tx.onerror = (e) => reject(e);
     });
 }

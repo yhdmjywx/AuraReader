@@ -8,7 +8,6 @@ import {
     saveNoteToDB as repoSaveNote,
     deleteNoteFromDB as repoDeleteNote,
     loadNotesForBook as repoLoadNotesForBook,
-    loadNotesFromDB as repoLoadNotesFromDB,
     persistNotesToLocalStorage
 } from '../../infrastructure/annotationRepository.js';
 
@@ -100,10 +99,7 @@ export class AnnotationController {
             return [];
         }
 
-        let loaded = await repoLoadNotesFromDB(bookId);
-        if (!loaded || loaded.length === 0) {
-            loaded = await repoLoadNotesForBook(bookId);
-        }
+        const loaded = await repoLoadNotesForBook(bookId);
 
         this.notes = normalizeList(loaded);
         this.renderNotesUI();
@@ -235,7 +231,9 @@ export class AnnotationController {
             : repoSaveNote(snapshot, { syncLocal: false });
         this._inlineWrites = Promise.all([this._inlineWrites, write]).then(() => undefined).catch(error => {
             console.error('笔记持久化失败', error);
-            this.callbacks.showToast?.('笔记已保留在本机缓存，数据库暂时无法写入');
+            this.callbacks.showToast?.(error.recoveryAvailable === false
+                ? '笔记尚未可靠保存，请暂勿关闭页面'
+                : '笔记已保留在本机缓存，数据库暂时无法写入');
         });
     }
 
