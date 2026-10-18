@@ -87,10 +87,8 @@ export function queryElements() {
         selectionTooltip: document.getElementById('selection-tooltip'),
         btnAddNote: document.getElementById('btn-add-note'),
         highlightActionTooltip: document.getElementById('highlight-action-tooltip'),
-        btnHlViewNotes: document.getElementById('btn-hl-view-notes'),
-        btnHlOperate: document.getElementById('btn-hl-operate'),
-        btnHlAddThought: document.getElementById('btn-hl-add-thought'),
         btnHlRemove: document.getElementById('btn-hl-remove'),
+        btnNoteRemove: document.getElementById('btn-note-remove'),
 
         // Tabs
         tabBtns: document.querySelectorAll('.tab-btn'),
@@ -252,8 +250,9 @@ export function bootstrapApp() {
     selection.callbacks.onDeleteHighlight = async (ids) => {
         await annotations.deleteHighlights(ids);
     };
-    selection.callbacks.onViewNotes = (noteIds) => annotations.focusNotes(noteIds);
-    selection.callbacks.onOperateHighlights = (highlightIds) => annotations.focusHighlights(highlightIds);
+    selection.callbacks.onDeleteNotes = async (ids) => {
+        await Promise.all(ids.map(id => annotations.deleteNote(id)));
+    };
     selection.callbacks.onAnnotationActivated = (ctx) => {
         if (ctx.noteIds && ctx.noteIds.length) annotations.focusNotes(ctx.noteIds);
         else annotations.clearFocusedAnnotations();

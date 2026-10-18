@@ -76,10 +76,7 @@ export class SelectionController {
             quote: note.quote || '',
             location: note.location || null
         };
-        this.menuOpen = true;
-        if (this.elements) {
-            showHighlightActionTooltip(this.elements, targetEl, this.activeAnnotationContext);
-        }
+        this.showMenuForContext();
     }
 
     hideHighlightAction() {
@@ -172,6 +169,10 @@ export class SelectionController {
 
     showMenuForContext() {
         if (!this.activeAnnotationContext || !this.elements) return;
+        if (!this.activeAnnotationContext.highlightIds.length && !this.activeAnnotationContext.noteIds.length) {
+            this.hideMenu();
+            return;
+        }
         const target = this.activeAnnotationContext.targetElement || findTokensByKey(this.activeAnnotationContext.key)[0];
         if (!target) return;
         this.activeAnnotationContext.targetElement = target;
@@ -299,41 +300,6 @@ export class SelectionController {
             });
         }
 
-        if (elements.btnHlViewNotes) {
-            elements.btnHlViewNotes.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const ctx = this.activeAnnotationContext;
-                if (!ctx || !ctx.noteIds.length) return;
-                if (this.callbacks.onViewNotes) this.callbacks.onViewNotes(ctx.noteIds);
-            });
-        }
-
-        if (elements.btnHlOperate) {
-            elements.btnHlOperate.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const ctx = this.activeAnnotationContext;
-                if (!ctx || !ctx.highlightIds.length) return;
-                if (this.callbacks.onOperateHighlights) this.callbacks.onOperateHighlights(ctx.highlightIds);
-            });
-        }
-
-        if (elements.btnHlAddThought) {
-            elements.btnHlAddThought.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const ctx = this.activeAnnotationContext;
-                if (!ctx) return;
-                this.hideMenu();
-                this.clearSelection();
-                if (this.callbacks.onCreateNote) {
-                    this.callbacks.onCreateNote({
-                        quote: ctx.quote,
-                        page: ctx.page,
-                        location: ctx.location
-                    });
-                }
-            });
-        }
-
         if (elements.btnHlRemove) {
             elements.btnHlRemove.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -342,6 +308,17 @@ export class SelectionController {
                 const ids = ctx.highlightIds.slice();
                 this.clearAnnotationContext();
                 if (this.callbacks.onDeleteHighlight) this.callbacks.onDeleteHighlight(ids);
+            });
+        }
+
+        if (elements.btnNoteRemove) {
+            elements.btnNoteRemove.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const ctx = this.activeAnnotationContext;
+                if (!ctx || !ctx.noteIds.length) return;
+                const ids = ctx.noteIds.slice();
+                this.clearAnnotationContext();
+                this.callbacks.onDeleteNotes?.(ids);
             });
         }
 
