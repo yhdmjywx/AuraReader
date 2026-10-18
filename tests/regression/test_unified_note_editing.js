@@ -4,19 +4,21 @@ const path = require('path');
 console.log("=== AuraReader 高亮与随笔合并绑定及原地编辑自动化测试 ===");
 
 const jsContent = fs.readFileSync(path.resolve(__dirname, '../../src/client/app.js'), 'utf8');
+const controllerContent = fs.readFileSync(path.resolve(__dirname, '../../src/client/features/annotations/annotationController.js'), 'utf8');
+const notesContent = fs.readFileSync(path.resolve(__dirname, '../../src/client/features/annotations/notesUI.js'), 'utf8');
 
 // 1. 静态检测核心逻辑
-const hasEditingNoteIdInState = jsContent.includes('editingNoteId: null');
+const hasEditingNoteIdInState = controllerContent.includes('this.editingNoteId = null');
 const hasOpenNoteModalEditParam = jsContent.includes('function openNoteModal(quote, existingNoteId = null)');
-const hasInPlaceSave = jsContent.includes('if (state.editingNoteId)');
-const hasEditButtonInCard = jsContent.includes('btn-edit-note');
+const hasInPlaceSave = controllerContent.includes('updateInlineNote(id, comment)');
+const hasDirectEditInCard = notesContent.includes('onEdit(note)') && !notesContent.includes('btn-edit-note');
 const openBody = jsContent.slice(jsContent.indexOf('function openNoteModal'), jsContent.indexOf('function closeNoteModal'));
 const hasNoAutoMerge = openBody.length > 0 && !openBody.includes('findOverlappingNote');
 
 console.log(`[静态检查 1] state.editingNoteId 状态追踪: ${hasEditingNoteIdInState ? 'PASSED' : 'FAILED'}`);
 console.log(`[静态检查 2] openNoteModal 编辑模式支持: ${hasOpenNoteModalEditParam ? 'PASSED' : 'FAILED'}`);
-console.log(`[静态检查 3] saveModalNote 原地更新逻辑: ${hasInPlaceSave ? 'PASSED' : 'FAILED'}`);
-console.log(`[静态检查 4] 笔记卡片【编辑】按钮配置: ${hasEditButtonInCard ? 'PASSED' : 'FAILED'}`);
+console.log(`[静态检查 3] 原位输入自动保存: ${hasInPlaceSave ? 'PASSED' : 'FAILED'}`);
+console.log(`[静态检查 4] 点击笔记内容直接编辑: ${hasDirectEditInCard ? 'PASSED' : 'FAILED'}`);
 console.log(`[静态检查 5] 新建笔记不再自动改写已有高亮: ${hasNoAutoMerge ? 'PASSED' : 'FAILED'}`);
 
 // 2. 交互仿真测试 (Mock Interactive Lifecycle)

@@ -352,7 +352,7 @@ export class SelectionController {
 
             if (this.pointerMoved || hasActiveSelection) return;
             if (e.target.closest('#highlight-action-tooltip') || e.target.closest('.annotation-token')) return;
-            if (e.target.closest('#notes-panel') || e.target.closest('#note-modal')) return;
+            if (e.target.closest('#notes-panel')) return;
             this.hideHighlightAction();
         });
     }

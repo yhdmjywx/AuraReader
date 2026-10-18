@@ -9,7 +9,7 @@ const { JSDOM } = require('jsdom');
         for (const key of keys) globalThis[key] = dom.window[key];
         const { marginGeometry, applyMarginGeometry, positionMarginNotes } = await import('../../src/client/features/layout/marginNotesLayout.js');
         const { LayoutController } = await import('../../src/client/features/layout/layoutController.js');
-        const { renderNotesList, openNoteModal } = await import('../../src/client/features/annotations/notesUI.js');
+        const { renderNotesList } = await import('../../src/client/features/annotations/notesUI.js');
         for (const width of [1224, 1366, 1424, 1440, 1612, 1613, 1920]) {
             const g = marginGeometry(width, 'double');
             assert.equal(g.readingWidth, 1192, `${width}px 窗口不能压缩双页正文`);
@@ -67,12 +67,10 @@ const { JSDOM } = require('jsdom');
         const leftLane = elements.notesList.querySelector('[data-margin-side="left"]');
         assert.deepEqual([...leftLane.children].map(card => card.dataset.annotationId), ['left', 'cross'], '跨栏引用仍归于可见的左侧起点');
         const card = byId('card-left');
-        card.querySelector('.btn-edit-note').click(); assert.equal(edited.quote, notes[0].quote);
-        card.click(); assert.equal(jumped.location.start, notes[0].location.start);
+        card.click(); assert.equal(edited.quote, notes[0].quote);
+        assert.equal(jumped, undefined, '点击笔记进入原位编辑，不再跳动正文');
         card.querySelector('.btn-delete-note').click(); assert.equal(deleted.id, notes[0].id);
-        openNoteModal({ elements, existingNote: notes[0] });
-        assert.equal(elements.modalQuotePreview.textContent, '“引用-left”', '原来的编辑弹窗仍使用原文引用');
-        assert.equal(elements.modalNoteTextarea.value, notes[0].comment);
+        assert.equal(card.querySelector('.btn-edit-note'), null, '点击文字即可编辑，不增加编辑按钮');
 
         for (const node of elements.notesList.querySelectorAll('.note-card')) Object.defineProperty(node, 'offsetHeight', { value: 180 });
         width = 1440; applyMarginGeometry(elements, 'double'); positionMarginNotes(elements);

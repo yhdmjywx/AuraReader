@@ -48,6 +48,7 @@ export class AppCoordinator {
         }
 
         // 1. Session updates active book
+        await this.annotations.finishInlineEdit?.();
         this.session.setCurrentBookId(bookId);
 
         // 2. Reader engine and UI load book

@@ -435,14 +435,12 @@ export function deleteAnnotation(id) {
 }
 
 export function openNoteModal(quote, existingNoteId = null) {
-    // btn-edit-note
+    // Retain the exported name for integrations; editing is now inline.
     const page = (state.pendingSelection && state.pendingSelection.page) ? state.pendingSelection.page : state.currentPage;
     if (existingNoteId) {
-        state.editingNoteId = existingNoteId;
         annotationController.openNoteModal(quote, existingNoteId, page);
         return;
     }
-    state.editingNoteId = null;
     annotationController.createNote({
         quote,
         page,
@@ -451,26 +449,11 @@ export function openNoteModal(quote, existingNoteId = null) {
 }
 
 export function closeNoteModal() {
-    state.editingNoteId = null;
-    annotationController.closeNoteModal();
+    return annotationController.closeNoteModal();
 }
 
 export function saveModalNote() {
-    const comment = elements.modalNoteTextarea ? elements.modalNoteTextarea.value.trim() : '';
-    const pending = state.pendingSelection;
-
-    if (state.editingNoteId) {
-        annotationController.editingNoteId = state.editingNoteId;
-    }
-
-    annotationController.saveModalNote({
-        quote: annotationController.modalQuote || (pending ? pending.text : ''),
-        comment,
-        page: annotationController.modalPage || (pending ? pending.page : state.currentPage),
-        chapter: annotationController.modalChapter || readerController.getLocation().chapter,
-        location: annotationController.modalLocation || (pending ? pending.location : null)
-    });
-    if (window.getSelection) window.getSelection().removeAllRanges();
+    return annotationController.finishInlineEdit();
 }
 
 // --------------------------------------------------------------------------

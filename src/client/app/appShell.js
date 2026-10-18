@@ -187,7 +187,6 @@ export class AppShell {
                 return;
             }
 
-            if (elements.noteModal && elements.noteModal.classList.contains('active')) return;
             if (elements.backupSelectModal && elements.backupSelectModal.classList.contains('active')) return;
             if (elements.shelfOverlay && elements.shelfOverlay.classList.contains('active')) return;
 

@@ -12,11 +12,11 @@ function normalizeList(list) {
     return list.map(item => normalizeAnnotation(item)).filter(Boolean);
 }
 
-export function saveNoteToDB(noteObj) {
+export function saveNoteToDB(noteObj, { syncLocal = true } = {}) {
     if (!noteObj || !noteObj.id) return Promise.resolve();
     const db = getDB();
     if (!db) {
-        syncNoteToLocalStorage(noteObj);
+        if (syncLocal) syncNoteToLocalStorage(noteObj);
         return Promise.resolve();
     }
 
@@ -24,18 +24,18 @@ export function saveNoteToDB(noteObj) {
         const tx = db.transaction(["notes"], "readwrite");
         tx.objectStore("notes").put(noteObj);
         tx.oncomplete = () => {
-            syncNoteToLocalStorage(noteObj);
+            if (syncLocal) syncNoteToLocalStorage(noteObj);
             resolve();
         };
         tx.onerror = (e) => reject(e);
     });
 }
 
-export function deleteNoteFromDB(noteId, bookId = null) {
+export function deleteNoteFromDB(noteId, bookId = null, { syncLocal = true } = {}) {
     if (!noteId) return Promise.resolve();
     const db = getDB();
 
-    if (bookId) {
+    if (bookId && syncLocal) {
         removeNoteFromLocalStorage(bookId, noteId);
     }
 

@@ -162,6 +162,7 @@ export class ReaderController {
         if (this.isChapterFlow()) {
             return this.renderChapterPage(pageNum, preserveScroll, notes, options);
         }
+        if (!preserveScroll) notes = this.callbacks.beforeNavigate?.() || notes;
         const loc = this.engine.goToPage(pageNum);
         this.currentPage = loc.page;
         this.currentLeftPage = loc.page;
@@ -452,6 +453,7 @@ export class ReaderController {
     }
 
     renderChapterPage(pageNum, preserveScroll = false, notes = [], options = {}) {
+        if (!preserveScroll) notes = this.callbacks.beforeNavigate?.() || notes;
         const loc = this.engine.goToPage(pageNum);
         this.currentPage = loc.page;
         this.currentLeftPage = loc.page;
@@ -514,6 +516,7 @@ export class ReaderController {
     }
 
     stepChapter(direction, notes = []) {
+        notes = this.callbacks.beforeNavigate?.() || notes;
         const mode = this.effectiveReaderMode();
         const moved = shiftStrip(this.elements, mode, direction);
         if (moved === 'moved') {
