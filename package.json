@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "AuraReader Workstation - Smart Reading & Notes Workstation",
   "main": "src/server/server.js",
+  "engines": { "node": ">=24.15.0" },
   "scripts": {
     "start": "node src/server/server.js",
     "dev": "node src/server/server.js",
