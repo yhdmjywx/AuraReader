@@ -20,7 +20,19 @@ export function hideSelectionTooltip(elements) {
 export function showHighlightActionTooltip(elements, targetEl, context) {
     if (!elements || !elements.highlightActionTooltip || !elements.readerPanel || !targetEl) return;
     const tooltip = elements.highlightActionTooltip;
-    updateContextMenu(tooltip, context);
+    const highlightCount = context?.highlightIds?.length || 0;
+    const noteCount = context?.noteIds?.length || 0;
+    if (!highlightCount && !noteCount) {
+        hideHighlightActionTooltip(elements);
+        return;
+    }
+    const highlightButton = tooltip.querySelector('#btn-hl-remove');
+    const noteButton = tooltip.querySelector('#btn-note-remove');
+    if (highlightButton) highlightButton.hidden = !highlightCount;
+    if (noteButton) {
+        noteButton.hidden = !noteCount;
+        noteButton.querySelector('span').textContent = noteCount > 1 ? `删除笔记（${noteCount}）` : '删除笔记';
+    }
 
     const markRect = targetEl.getBoundingClientRect();
     const readerRect = elements.readerPanel.getBoundingClientRect();
@@ -33,24 +45,4 @@ export function hideHighlightActionTooltip(elements) {
     if (elements && elements.highlightActionTooltip) {
         elements.highlightActionTooltip.style.display = 'none';
     }
-}
-
-function updateContextMenu(tooltip, context) {
-    const noteCount = context && Array.isArray(context.noteIds) ? context.noteIds.length : 0;
-    const highlightCount = context && Array.isArray(context.highlightIds) ? context.highlightIds.length : 0;
-
-    const viewBtn = tooltip.querySelector('#btn-hl-view-notes');
-    const operateBtn = tooltip.querySelector('#btn-hl-operate');
-    const addBtn = tooltip.querySelector('#btn-hl-add-thought');
-    const removeBtn = tooltip.querySelector('#btn-hl-remove');
-
-    if (viewBtn) {
-        viewBtn.hidden = noteCount === 0;
-        viewBtn.innerHTML = `<i class="ri-chat-1-line"></i> 查看笔记（${noteCount}）`;
-    }
-    if (operateBtn) operateBtn.hidden = highlightCount === 0;
-    if (addBtn) addBtn.hidden = false;
-    if (removeBtn) removeBtn.hidden = highlightCount === 0;
-    const divider = tooltip.querySelector('.tooltip-divider');
-    if (divider) divider.hidden = highlightCount === 0;
 }

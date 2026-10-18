@@ -217,13 +217,10 @@
                 <button class="tooltip-btn" id="btn-add-note" title="添加随笔"><i class="ri-sticky-note-line"></i> 笔记</button>
             </div>
 
-            <!-- Annotation context menu. Note edit and delete stay on the note cards. -->
+            <!-- Existing annotations expose only their independent delete actions. -->
             <div class="selection-tooltip" id="highlight-action-tooltip">
-                <button class="tooltip-btn" id="btn-hl-view-notes" type="button" title="在笔记区查看这个位置的笔记"><i class="ri-chat-1-line"></i> 查看笔记（0）</button>
-                <button class="tooltip-btn" id="btn-hl-operate" type="button" title="在笔记区定位高亮"><i class="ri-mark-pen-line"></i> 操作高亮</button>
-                <button class="tooltip-btn" id="btn-hl-add-thought" type="button" title="为这段文字新建一条笔记"><i class="ri-sticky-note-line"></i> 添加笔记</button>
-                <span class="tooltip-divider"></span>
                 <button class="tooltip-btn" id="btn-hl-remove" type="button" style="color: #fca5a5;" title="只移除黄色高亮"><i class="ri-delete-bin-line"></i> 删除高亮</button>
+                <button class="tooltip-btn" id="btn-note-remove" type="button" style="color: #fca5a5;" title="只删除此处关联的笔记"><i class="ri-delete-bin-line"></i> <span>删除笔记</span></button>
             </div>
         </section>
 
