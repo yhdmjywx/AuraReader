@@ -40,7 +40,8 @@ export class AppCoordinator {
 
         let book = await loadBookFromDB(bookId);
         if (!book && demoBooks[bookId]) {
-            book = demoBooks[bookId];
+            book = { id: bookId, ...demoBooks[bookId] };
+            await saveBookToDB(book);
         }
         if (!book) {
             if (this.shell) this.shell.showToast("未能载入图书，请重新导入");
@@ -210,6 +211,7 @@ export class AppCoordinator {
 
     async deleteBook(bookId) {
         if (!bookId) return;
+        if (this.session.getCurrentBookId() === bookId) await this.annotations.finishInlineEdit?.();
         await deleteBookFromDB(bookId);
         if (this.shelf) {
             await this.shelf.refreshShelf();

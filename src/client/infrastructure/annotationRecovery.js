@@ -1,5 +1,5 @@
 // A small durable journal distinguishes uncommitted edits from ordinary caches.
-// Entries are removed only when the matching IndexedDB transaction completes.
+// Entries are removed only after SQLite acknowledges the matching operation.
 const PREFIX = 'aura_notes_pending_';
 
 export function pendingNoteWrites(bookId) {
@@ -23,13 +23,16 @@ function storePending(bookId, entries) {
     } catch (_) { return false; }
 }
 
-export function recordNoteWrite({ id, bookId, operation, note }) {
+export function recordNoteWrite({ id, bookId, operation, note, command, version, preserveNewer = false }) {
     const entry = {
         id, bookId, operation,
-        version: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
+        version: version || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
     };
     if (note) entry.note = JSON.parse(JSON.stringify(note));
-    const entries = pendingNoteWrites(bookId).filter(item => item.id !== id);
+    if (command) entry.command = command;
+    const current = pendingNoteWrites(bookId);
+    if (preserveNewer && current.some(item => item.id === id && item.version !== entry.version)) return { ...entry, durable: true };
+    const entries = current.filter(item => item.id !== id);
     return { ...entry, durable: storePending(bookId, [...entries, entry]) };
 }
 

@@ -211,7 +211,6 @@ export async function loadNotesFromDB(bookId) {
 
 export function persistNotes() {
     if (!state.currentBook) return;
-    localStorage.setItem('aura_notes_' + state.currentBook, JSON.stringify(state.notes));
     persistNotesToLocalStorage(state.currentBook, state.notes);
 }
 

@@ -1,5 +1,6 @@
 const { randomUUID } = require('node:crypto');
 const { StorageError } = require('./dataStore');
+const { createMigration } = require('./migration');
 
 const MAX_JSON_BYTES = 256 * 1024 * 1024;
 function localRequest(req) {
@@ -23,6 +24,7 @@ async function readJson(req) {
 }
 function createStorageApi(store) {
     const token = randomUUID();
+    const migration = createMigration(store);
     return async (req, res, url) => {
         const reply = (status, body) => {
             res.removeHeader('Access-Control-Allow-Origin');
@@ -33,6 +35,12 @@ function createStorageApi(store) {
             if (!localRequest(req)) throw new StorageError('只允许本机阅读器访问数据库', 403);
             if (req.method === 'GET' && url.pathname === '/api/storage/session') return reply(200, { token });
             if (req.headers['x-aura-token'] !== token) throw new StorageError('无效的数据库会话', 403);
+            const source = req.headers['x-aura-source'];
+            if (typeof source !== 'string' || !source || source.length > 200) throw new StorageError('缺少迁移来源', 400);
+            if (req.method === 'GET' && url.pathname === '/api/storage/migration/status') return reply(200, migration.status(source));
+            if (req.method === 'POST' && url.pathname === '/api/storage/migration/snapshot') return reply(200, migration.snapshot(source, await readJson(req)));
+            if (req.method === 'POST' && url.pathname === '/api/storage/migration/commit') return reply(200, migration.commit(source, (await readJson(req)).snapshotId));
+            if (!migration.status(source).completed) throw new StorageError('旧数据尚未迁移，请先完成迁移校验', 423);
             if (req.method === 'GET' && url.pathname === '/api/storage/books') return reply(200, { records: store.books() });
             if (req.method === 'POST') {
                 const body = await readJson(req);

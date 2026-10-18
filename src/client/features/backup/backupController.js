@@ -16,6 +16,7 @@ import {
 } from '../../infrastructure/annotationRepository.js';
 
 import { normalizeAnnotation } from '../../domain/annotationEngine.js';
+import { restoreRecords } from '../../infrastructure/storageClient.js';
 
 import {
     exportMarkdown as adapterExportMarkdown,
@@ -115,17 +116,20 @@ export class BackupController {
         if (!file) return;
 
         try {
+            await this.callbacks.beforeRestore?.();
             const data = await parseBackupFile(file);
             let importedBooksCount = 0;
             let importedNotesCount = 0;
 
-            // 1. Restore all books
+            const booksToRestore = [];
+            const notesToRestore = [];
+            // Validate/prepare everything before a single atomic restore.
             if (Array.isArray(data.books) && data.books.length > 0) {
                 for (const b of data.books) {
                     if (b && (b.id || b.title)) {
                         const bId = b.id || ('custom_' + Date.now());
                         b.id = bId;
-                        await repoSaveBook(b);
+                        booksToRestore.push(b);
                         importedBooksCount++;
                     }
                 }
@@ -141,11 +145,13 @@ export class BackupController {
                             bookId: n.bookId || defaultBookId
                         });
                         if (!normalized) continue;
-                        await repoSaveNote(normalized);
+                        notesToRestore.push(normalized);
                         importedNotesCount++;
                     }
                 }
             }
+
+            await restoreRecords(booksToRestore, notesToRestore);
 
             if (this.callbacks.onRestoreBackup) {
                 await this.callbacks.onRestoreBackup({
