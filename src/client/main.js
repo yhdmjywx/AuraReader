@@ -276,6 +276,7 @@ export function bootstrapApp() {
         const activeTitle = reader.getCurrentBook() ? reader.getCurrentBook().title : '恢复图书';
         appShell.showToast(`🎉 成功从备份恢复！已为您自动打开《${activeTitle}》，加载 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
     };
+    backup.callbacks.beforeRestore = () => annotations.finishInlineEdit();
 
     const syncReaderLayout = () => {
         layout.updateLayoutClasses(elements);
@@ -417,7 +418,13 @@ export async function startApp() {
         // ignore
     }
 
-    await initDB();
+    try { await initDB(); }
+    catch (error) {
+        isStarted = false;
+        appInstance.appShell.showToast(error.message || '数据库迁移未完成，旧数据已保留');
+        console.error('数据库启动／迁移停止', error);
+        throw error;
+    }
     await appInstance.reader.fonts.ready;
     await appInstance.coordinator.openBook('crisis-era');
     return appInstance;
@@ -428,10 +435,10 @@ if (typeof document !== 'undefined') {
         window.__AURA_BOOTSTRAPPED__ = true;
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', async () => {
-                await startApp();
+                await startApp().catch(() => {});
             });
         } else {
-            startApp();
+            startApp().catch(() => {});
         }
     }
 }

@@ -108,7 +108,7 @@ export class AnnotationController {
 
     persistNotes(bookId = this.getBookId()) {
         if (!bookId) return;
-        // A full/disabled local cache must not prevent the IndexedDB write.
+        // Compatibility hook; each mutation owns its short-lived recovery entry.
         persistNotesToLocalStorage(bookId, this.notes);
     }
 
@@ -233,7 +233,8 @@ export class AnnotationController {
             console.error('笔记持久化失败', error);
             this.callbacks.showToast?.(error.recoveryAvailable === false
                 ? '笔记尚未可靠保存，请暂勿关闭页面'
-                : '笔记已保留在本机缓存，数据库暂时无法写入');
+                : error.status === 409 ? '笔记保存存在冲突，输入已保留在本机，请勿关闭页面'
+                    : '笔记已保留在本机缓存，数据库暂时无法写入');
         });
     }
 
