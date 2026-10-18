@@ -288,12 +288,14 @@ export class SelectionController {
                 const page = this.pendingSelection.page;
                 const location = this.pendingSelection.location;
                 this.hideSelectionTooltip();
+                // Clear the body selection before handing focus to the editor.
+                // Removing it afterwards can disturb the native input caret.
+                this.clearSelection();
                 if (this.callbacks.onCreateNote) {
                     this.callbacks.onCreateNote({ quote: text, page, location });
                 } else if (this.callbacks.onOpenNoteModal) {
                     this.callbacks.onOpenNoteModal(text, null, page);
                 }
-                this.clearSelection();
             });
         }
 
@@ -321,6 +323,7 @@ export class SelectionController {
                 const ctx = this.activeAnnotationContext;
                 if (!ctx) return;
                 this.hideMenu();
+                this.clearSelection();
                 if (this.callbacks.onCreateNote) {
                     this.callbacks.onCreateNote({
                         quote: ctx.quote,
