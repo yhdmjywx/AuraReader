@@ -1,6 +1,10 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
+if (nodeMajor < 24 || (nodeMajor === 24 && nodeMinor < 15)) throw new Error('AuraReader 需要 Node.js >= 24.15.0');
+const { createDataStore } = require('./dataStore');
+const { createStorageApi } = require('./storageApi');
 const { createFontStore, listSystemFonts, MAX_FONT_BYTES } = require('./fontStore');
 const fontStore = createFontStore(path.resolve(__dirname, '../../data/fonts'));
 
@@ -24,6 +28,9 @@ const MIME_TYPES = {
     '.woff2': 'font/woff2'
 };
 
+function createServer({ dataDirectory = path.resolve(__dirname, '../../data') } = {}) {
+const store = createDataStore(dataDirectory);
+const storageApi = createStorageApi(store);
 const server = http.createServer((req, res) => {
     // CORS Headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -38,6 +45,11 @@ const server = http.createServer((req, res) => {
 
     const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = parsedUrl.pathname;
+
+    if (pathname.startsWith('/api/storage/')) {
+        storageApi(req, res, parsedUrl);
+        return;
+    }
 
     // --------------------------------------------------------------------------
     // API Routes
@@ -93,6 +105,9 @@ const server = http.createServer((req, res) => {
         stream.pipe(res);
     });
 });
+server.on('close', () => store.close());
+return server;
+}
 
 function handleApiRequest(req, res, pathname, parsedUrl) {
     if (pathname.startsWith('/api/fonts')) {
@@ -160,9 +175,10 @@ async function handleFontRequest(req, res, pathname, parsedUrl) {
     reply(404, { error: '未知字体请求' });
 }
 
-server.listen(PORT, () => {
+if (require.main === module) createServer().listen(PORT, '127.0.0.1', () => {
     console.log(`==================================================`);
     console.log(`🚀 AuraReader Workstation Node.js Web Server Live!`);
     console.log(`🌐 访问地址: http://localhost:${PORT}`);
     console.log(`==================================================`);
 });
+module.exports = { createServer };
