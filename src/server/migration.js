@@ -64,9 +64,17 @@ function createMigration(store) {
         }
         const builtins = input.builtins.books;
         const seed = input.builtins.notes;
+        const hasExistingLibrary = !!store.one('SELECT 1 AS present FROM migrations LIMIT 1');
+        const hasLegacyBook = id => books.has(id) || [...rawNotes.values()].some(n => n.bookId === id)
+            || Object.hasOwn(input.caches, id) || Object.hasOwn(input.pending, id);
         if (!Array.isArray(builtins) || !Array.isArray(seed)) fail('示例数据损坏');
-        else builtins.forEach(book => { if (!books.has(book.id)) add(books, book, bookRecord, '示例书'); });
-        const ids = new Set([...books.keys(), ...rawNotes.values().map(n => n.bookId), ...Object.keys(input.caches), ...Object.keys(input.pending)]);
+        else builtins.forEach(book => {
+            // A fresh browser joining this PC's existing library must not
+            // re-import factory seed notes over the user's edited examples.
+            if (hasExistingLibrary && !hasLegacyBook(book.id)) return;
+            if (!books.has(book.id)) add(books, book, bookRecord, '示例书');
+        });
+        const ids = new Set([...books.keys(), ...[...rawNotes.values()].map(n => n.bookId), ...Object.keys(input.caches), ...Object.keys(input.pending)]);
         function parse(raw, label, bookId) {
             if (raw == null) return null;
             try {
@@ -77,8 +85,8 @@ function createMigration(store) {
         }
         for (const bookId of ids) {
             const dbNotes = [...rawNotes.values()].filter(n => n.bookId === bookId);
-            const cached = parse(input.caches[bookId], '标注缓存', bookId);
-            const pending = parse(input.pending[bookId], '待写记录', bookId) || [];
+            const cached = parse(Object.hasOwn(input.caches, bookId) ? input.caches[bookId] : null, '标注缓存', bookId);
+            const pending = parse(Object.hasOwn(input.pending, bookId) ? input.pending[bookId] : null, '待写记录', bookId) || [];
             const pendingIds = new Set(pending.map(e => e?.id));
             if (cached) {
                 const seen = new Map();
@@ -96,7 +104,10 @@ function createMigration(store) {
                 if (!entry || typeof entry.id !== 'string' || entry.bookId !== bookId || typeof entry.version !== 'string'
                     || !['save', 'delete'].includes(entry.operation) || seenPending.has(entry.id)) { fail('待写操作无效或重复', entry); continue; }
                 seenPending.add(entry.id);
-                if (entry.operation === 'delete') { notes.delete(entry.id); deletes.set(entry.id, bookId); }
+                if (entry.operation === 'delete') {
+                    if (rawNotes.has(entry.id) && rawNotes.get(entry.id).bookId !== bookId) fail('待删除 ID 属于另一书籍', entry);
+                    notes.delete(entry.id); deletes.set(entry.id, bookId);
+                }
                 else {
                     try {
                         noteRecord(entry.note);
@@ -109,6 +120,7 @@ function createMigration(store) {
             }
         }
         for (const n of notes.values()) if (!books.has(n.bookId)) fail('标注找不到关联书籍', n);
+        for (const [id] of deletes) if (notes.has(id)) fail('同一标注同时属于有效数据和删除记录', id);
         for (const [id, bookId] of deletes) if (!books.has(bookId)) fail('待删除标注找不到关联书籍', { id, bookId });
         function rejectConflicts() {
             if (conflicts.length) {
@@ -119,7 +131,8 @@ function createMigration(store) {
         }
         rejectConflicts();
         const values = { books: [...books.values()].sort((a, b) => a.id.localeCompare(b.id)), notes: [...notes.values()].sort((a, b) => a.id.localeCompare(b.id)), deleted: [...deletes].sort() };
-        const manifest = { books: books.size, notes: notes.size, deleted: deletes.size, hash: digest(values), ignoredCaches, snapshotId };
+        const cleanup = Object.fromEntries(['caches', 'pending'].map(key => [key, Object.fromEntries(Object.entries(input[key]).map(([id, raw]) => [id, digest(raw)]))]));
+        const manifest = { books: books.size, notes: notes.size, deleted: deletes.size, hash: digest(values), ignoredCaches, snapshotId, cleanup };
         return store.transaction(() => {
             for (const b of books.values()) {
                 const existing = store.one('SELECT * FROM books WHERE id=?', b.id);
@@ -140,7 +153,12 @@ function createMigration(store) {
             // Read back every complete object, not just counts.
             const actual = {
                 books: values.books.map(b => JSON.parse(store.one('SELECT payload FROM books WHERE id=?', b.id).payload)),
-                notes: values.notes.map(n => JSON.parse(store.one('SELECT payload FROM annotations WHERE id=?', n.id).payload)), deleted: values.deleted
+                notes: values.notes.map(n => JSON.parse(store.one('SELECT payload FROM annotations WHERE id=?', n.id).payload)),
+                deleted: values.deleted.map(([id, bookId]) => {
+                    const row = store.one('SELECT * FROM annotations WHERE id=?', id);
+                    if (!row || !row.deleted || row.book_id !== bookId) throw new StorageError('迁移删除记录校验失败', 500);
+                    return [id, row.book_id];
+                })
             };
             if (digest(actual) !== manifest.hash) throw new StorageError('迁移内容验证失败', 500);
             store.check();

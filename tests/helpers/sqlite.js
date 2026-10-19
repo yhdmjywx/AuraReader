@@ -9,7 +9,15 @@ async function sqliteServer({ bootstrap = true } = {}) {
     let server; let base; let token;
     async function start() {
         server = createServer({ dataDirectory: directory });
-        server.listen(0, '127.0.0.1'); await once(server, 'listening');
+        // Windows can assign ephemeral ports forbidden by Fetch (e.g. 10080).
+        // Ask the OS again without making that unrelated port policy a failure.
+        const forbidden = new Set([2049, 3659, 4045, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6697, 10080]);
+        do {
+            server.listen(0, '127.0.0.1'); await once(server, 'listening');
+            if (!forbidden.has(server.address().port)) break;
+            const closed = once(server, 'close'); server.close(); await closed;
+            server = createServer({ dataDirectory: directory });
+        } while (true);
         base = `http://127.0.0.1:${server.address().port}`;
         token = (await (await fetch(base + '/api/storage/session')).json()).token;
     }

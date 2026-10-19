@@ -8,6 +8,7 @@ const { JSDOM } = require('jsdom');
     const dom = new JSDOM('<!doctype html><body></body>', { url: 'http://localhost:8095/' });
     const keys = ['window', 'document', 'NodeFilter', 'DOMParser', 'localStorage'];
     const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+    let storage;
     const originalCreate = URL.createObjectURL;
     const originalRevoke = URL.revokeObjectURL;
     const blobs = new Map();
@@ -25,10 +26,11 @@ const { JSDOM } = require('jsdom');
         };
         const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
         const { BackupController } = await import('../../src/client/features/backup/backupController.js');
-        const { exportChapterZip, exportMarkdown } = await import('../../src/client/infrastructure/exporters.js');
+        const { exportChapterZip, exportMarkdown, exportStandaloneHtml } = await import('../../src/client/infrastructure/exporters.js');
         const { parseEpub } = await import('../../src/client/infrastructure/epubParser.js');
-        const { setDB } = await import('../../src/client/infrastructure/bookRepository.js');
-        setDB(null);
+        const { saveBookToDB } = await import('../../src/client/infrastructure/bookRepository.js');
+        const { saveNoteToDB } = await import('../../src/client/infrastructure/annotationRepository.js');
+        storage = await require('../helpers/sqlite').clientStorage();
         const book = {
             id: 'zip-integration', title: '导出验证', format: 'EPUB',
             pages: [
@@ -39,6 +41,7 @@ const { JSDOM } = require('jsdom');
             toc: [{ title: '第一章', page: 1 }, { title: '同章锚点', page: 1 }, { title: '第二章', page: 2 }]
         };
         const holder = document.createElement('div');
+        await saveBookToDB(book);
         holder.innerHTML = book.pages[0];
         const source = holder.textContent;
         const start = source.lastIndexOf('重复句。');
@@ -58,7 +61,7 @@ const { JSDOM } = require('jsdom');
         // Old backups may contain unquoted notes. Keep them exportable without
         // re-enabling the now-disabled user action for creating these records.
         controller.notes.unshift({ id: 'legacy-quick', kind: 'note', bookId: book.id, quote: '', comment: '无选区独立随笔', page: 1 });
-        controller.persistNotes();
+        await saveNoteToDB(controller.notes[0]);
         await controller.saveModalNote({ quote: '重复句。', comment: '将被删除的笔记', page: 1, location });
         await controller.deleteNote(controller.getNotes().find(note => note.comment === '将被删除的笔记').id);
         assert.ok(controller.getNotes().some(note => note.id === highlight.id), '删除同位置笔记不应删除高亮');
@@ -210,8 +213,19 @@ const { JSDOM } = require('jsdom');
         exportMarkdown('跨行摘要', [{ kind: 'highlight', page: 1, quote: '  first\n\n second  ' }]);
         const multilineSummary = await downloads[5].blob.text();
         assert.ok(multilineSummary.includes('  <mark>first</mark>\n\n <mark>second</mark>  '), '摘要中的空行和边界空白也不得被高亮');
+        exportStandaloneHtml(book, await persisted.loadNotesForBook(book.id));
+        const standalone = new JSDOM(await downloads.at(-1).blob.text());
+        try {
+            assert.equal(standalone.window.document.querySelectorAll('[id^="page-"]').length, book.pages.length);
+            assert.ok(standalone.window.document.querySelector('[data-highlight-ids]'), 'HTML 导出包含恢复后的正文高亮');
+            assert.ok(standalone.window.document.querySelector('[data-note-ids]'), 'HTML 导出包含恢复后的笔记关联');
+            assert.ok(standalone.window.document.body.textContent.includes('已编辑的跨段笔记'));
+            assert.ok(!standalone.window.document.body.textContent.includes('将被删除的笔记'));
+        } finally { standalone.window.close(); }
         console.log('✅ ZIP 实际下载与解压验证：创建、编辑、删除、持久化、引用、高亮、跨段、重叠位置、章节归属及真实 EPUB 全部通过');
     } finally {
+        await storage?.drain();
+        await storage?.close();
         URL.createObjectURL = originalCreate;
         URL.revokeObjectURL = originalRevoke;
         for (const [key, descriptor] of originals) {

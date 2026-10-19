@@ -23,23 +23,36 @@ function storePending(bookId, entries) {
     } catch (_) { return false; }
 }
 
-export function recordNoteWrite({ id, bookId, operation, note, command, version, preserveNewer = false }) {
+export function recordNoteWrite({ id, bookId, operation, note }) {
     const entry = {
         id, bookId, operation,
-        version: version || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
+        version: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
     };
     if (note) entry.note = JSON.parse(JSON.stringify(note));
-    if (command) entry.command = command;
     const current = pendingNoteWrites(bookId);
-    if (preserveNewer && current.some(item => item.id === id && item.version !== entry.version)) return { ...entry, durable: true };
+    const previous = current.find(item => item.id === id);
+    entry.prerequisites = [...(previous?.prerequisites || [])];
+    if (previous?.command) entry.prerequisites.push({ version: previous.version, operation: previous.operation, command: previous.command });
     const entries = current.filter(item => item.id !== id);
     return { ...entry, durable: storePending(bookId, [...entries, entry]) };
 }
 
+export function attachNoteCommand(entry, command) {
+    const entries = pendingNoteWrites(entry.bookId);
+    const current = entries.find(item => item.id === entry.id);
+    if (!current) return { ...entry, command, durable: false };
+    if (current.version === entry.version) current.command = command;
+    else if (!(current.prerequisites || []).some(item => item.version === entry.version)) {
+        current.prerequisites = [...(current.prerequisites || []), { version: entry.version, operation: entry.operation, command }];
+    }
+    return { ...entry, command, durable: storePending(entry.bookId, entries) };
+}
+
 export function acknowledgeNoteWrite(entry) {
     const entries = pendingNoteWrites(entry.bookId);
-    if (!entries.some(item => item.id === entry.id && item.version === entry.version)) return;
-    storePending(entry.bookId, entries.filter(item => item.id !== entry.id));
+    const remaining = entries.filter(item => item.id !== entry.id || item.version !== entry.version);
+    remaining.forEach(item => { item.prerequisites = (item.prerequisites || []).filter(prior => prior.version !== entry.version); });
+    storePending(entry.bookId, remaining);
 }
 
 export function pendingNoteBookIds() {
@@ -49,7 +62,7 @@ export function pendingNoteBookIds() {
             const key = localStorage.key(index);
             if (key?.startsWith(PREFIX)) ids.push(key.slice(PREFIX.length));
         }
-    } catch (_) { /* Storage may be unavailable. IndexedDB can still work. */ }
+    } catch (_) { /* SQLite can still work when the recovery buffer is unavailable. */ }
     return ids;
 }
 

@@ -4,6 +4,7 @@ const path = require('path');
 console.log("=== AuraReader 解耦架构核心模块单元测试 ===");
 
 const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+let storage;
 
 (async () => {
     // 1. 测试 ReadingLocation 模型与转换
@@ -296,6 +297,7 @@ const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorag
 
     // 5. 测试核心解耦缺陷排查（验证跨书隔离与多书备份可靠性）
     console.log("\n--- [测试 5: 数据边界隔离与跨书防串线验证] ---");
+    storage = await require('../helpers/sqlite').clientStorage([{ id: 'another-book', pages: ['正文'] }]);
     const { loadNotesForBook, getNotesForBooks } = await import(
         '../../src/client/repositories/annotationRepository.js'
     );
@@ -440,7 +442,8 @@ const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorag
     console.log("✅ app.js 与 main.js 架构实例统一性测试全部通过！");
 
     console.log("\n🎉 全部解耦架构单元测试 100% 成功！");
-})().finally(() => {
+})().finally(async () => {
+    await storage?.close();
     if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
     else delete globalThis.localStorage;
 });

@@ -11,13 +11,13 @@ const { JSDOM } = require('jsdom');
     </body>`, { url: 'http://localhost:8095/' });
     const keys = ['window', 'document', 'localStorage', 'NodeFilter'];
     const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+    let storage;
     try {
         for (const key of keys) globalThis[key] = dom.window[key];
         const { collectVisibleAnnotationIds } = await import('../../src/client/features/reader/visibleAnnotations.js');
         const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
         const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
-        const { setDB } = await import('../../src/client/infrastructure/bookRepository.js');
-        setDB(null);
+        storage = await require('../helpers/sqlite').clientStorage([{ id: 'visibility-test', pages: ['可见正文'] }]);
         const byId = id => document.getElementById(id);
         const viewport = byId('reader-viewport');
         const paper = byId('paper');
@@ -155,6 +155,8 @@ const { JSDOM } = require('jsdom');
         assert.ok(!html.includes('id="quick-note-input"') && !html.includes('id="btn-save-quick-note"'), '页面不再提供独立随笔输入框');
         console.log('✅ 当前屏幕笔记：单双页、跨屏/跨行片段、滚动、范围切换、全书数据保留及引用约束全部通过');
     } finally {
+        await storage?.drain();
+        await storage?.close();
         for (const [key, descriptor] of originals) {
             if (descriptor) Object.defineProperty(globalThis, key, descriptor);
             else delete globalThis[key];

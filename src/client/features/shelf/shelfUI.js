@@ -23,7 +23,7 @@ export function renderShelf({
         elements.shelfGrid.innerHTML = `
             <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 40px 0; color: var(--text-muted);">
                 <i class="ri-book-shelf-line" style="font-size: 42px; color: var(--border-color);"></i>
-                <p style="margin-top: 10px; font-weight: 500;">本地 IndexedDB 书库暂无离线图书</p>
+                <p style="margin-top: 10px; font-weight: 500;">本地书库暂无图书</p>
                 <small>使用上方「导入书籍」添加 EPUB、PDF 或 TXT，书籍会保存在这里</small>
             </div>
         `;

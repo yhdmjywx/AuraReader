@@ -7,7 +7,7 @@ console.log("=== AuraReader 划线与随笔颜色规范回归测试 (Yellow vs G
 const clientDir = path.resolve(__dirname, '../../src/client');
 const cssContent = fs.readFileSync(path.join(clientDir, 'styles.css'), 'utf8');
 const appContent = fs.readFileSync(path.join(clientDir, 'app.js'), 'utf8');
-const bookRepoContent = fs.readFileSync(path.join(clientDir, 'repositories/bookRepository.js'), 'utf8');
+const bookRepoContent = fs.readFileSync(path.join(clientDir, 'infrastructure/demoData.js'), 'utf8');
 const annotEngineContent = fs.readFileSync(path.join(clientDir, 'core/annotationEngine.js'), 'utf8');
 
 // 1. CSS 样式规范验证

@@ -3,7 +3,7 @@ import { storageRequest } from './storageClient.js';
 import { demoBooks, getSeedNotes } from './demoData.js';
 
 function cacheSnapshot() {
-    const caches = {}; const pending = {};
+    const caches = Object.create(null); const pending = Object.create(null);
     if (typeof localStorage === 'undefined') return { caches, pending };
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -46,12 +46,12 @@ function jsonSafe(value) {
     if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
     if (typeof value === 'number' && Number.isFinite(value)) return;
     if (Array.isArray(value)) { value.forEach(jsonSafe); return; }
-    if (value && Object.getPrototypeOf(value) === Object.prototype) { Object.values(value).forEach(jsonSafe); return; }
+    if (value && [Object.prototype, null].includes(Object.getPrototypeOf(value))) { Object.values(value).forEach(jsonSafe); return; }
     throw new Error('旧数据含有无法无损转为 JSON 的字段，迁移已停止；IndexedDB 原始数据仍保留');
 }
 export async function migrateLegacyStorage() {
     const status = await storageRequest('migration/status');
-    if (status.completed) return status;
+    if (status.completed) { await cleanupLegacyBuffers(status.manifest); return status; }
     const capture = async () => ({
         origin: typeof location === 'undefined' ? '' : location.origin,
         indexedDB: await readLegacyDatabase(), ...cacheSnapshot(),
@@ -62,12 +62,25 @@ export async function migrateLegacyStorage() {
         const archived = await storageRequest('migration/snapshot', snapshot);
         if (JSON.stringify(snapshot) !== JSON.stringify(await capture())) throw new Error('旧书库在迁移中发生变化，请关闭其他标签页后重试；原始快照已保留');
         const result = await storageRequest('migration/commit', archived);
-        try {
-            for (const [bookId, raw] of Object.entries(snapshot.caches)) if (localStorage.getItem('aura_notes_' + bookId) === raw) localStorage.removeItem('aura_notes_' + bookId);
-            for (const [bookId, raw] of Object.entries(snapshot.pending)) if (localStorage.getItem('aura_notes_pending_' + bookId) === raw) localStorage.removeItem('aura_notes_pending_' + bookId);
-        } catch (_) { /* SQLite and original snapshots already contain these records. */ }
+        await cleanupLegacyBuffers(result.manifest);
         return result;
     };
     if (typeof navigator !== 'undefined' && navigator.locks) return navigator.locks.request('aurareader-sqlite-migration', perform);
     return perform();
+}
+
+async function cleanupLegacyBuffers(manifest) {
+    // Restart-safe cleanup: only remove the exact bytes included in the
+    // verified snapshot, never a newly entered note's pending operation.
+    try {
+        for (const [kind, prefix] of [['caches', 'aura_notes_'], ['pending', 'aura_notes_pending_']]) {
+            for (const [bookId, hash] of Object.entries(manifest?.cleanup?.[kind] || {})) {
+                const raw = localStorage.getItem(prefix + bookId);
+                if (raw == null) continue;
+                const bytes = new TextEncoder().encode(JSON.stringify(raw));
+                const actual = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
+                if (hash === actual && localStorage.getItem(prefix + bookId) === raw) localStorage.removeItem(prefix + bookId);
+            }
+        }
+    } catch (_) { /* No old cache is read as a SQLite primary data source. */ }
 }

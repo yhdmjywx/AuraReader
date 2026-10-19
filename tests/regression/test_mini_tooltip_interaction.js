@@ -6,11 +6,10 @@ const { JSDOM } = require('jsdom');
     const dom = new JSDOM(fs.readFileSync('src/client/index.html', 'utf8'), { url: 'http://localhost/' });
     const globals = ['window', 'document', 'localStorage', 'NodeFilter'];
     const originals = new Map(globals.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
-    let setDB;
+    let storage;
     try {
         globals.forEach(key => { globalThis[key] = dom.window[key]; });
-        ({ setDB } = await import('../../src/client/infrastructure/bookRepository.js'));
-        setDB(null);
+        storage = await require('../helpers/sqlite').clientStorage([{ id: 'menu-test', pages: ['同一段正文，后续内容。'] }]);
         const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
         const { SelectionController } = await import('../../src/client/features/annotations/selectionController.js');
         const { applyHighlightsToPaper } = await import('../../src/client/features/reader/paperRenderer.js');
@@ -66,7 +65,7 @@ const { JSDOM } = require('jsdom');
         assert.equal(tooltip.style.display, 'none');
         assert.equal(selection.getActiveAnnotationContext(), null);
         assert.deepEqual(annotations.getNotes().map(item => item.id), [note.id], '删除重叠高亮不会连带删除笔记');
-        assert.deepEqual(JSON.parse(localStorage.getItem('aura_notes_menu-test')).map(item => item.id), [note.id]);
+        assert.deepEqual(storage.read('annotations').filter(n => n.bookId === 'menu-test').map(item => item.id), [note.id]);
 
         const noteOnly = elements.bookPaper.querySelector('.annotation-token');
         selection.activateToken(noteOnly, 1, { force: true });
@@ -80,7 +79,7 @@ const { JSDOM } = require('jsdom');
         elements.btnNoteRemove.click(); await deletion;
         assert.equal(annotations.getNotes().length, 0);
         assert.equal(elements.bookPaper.querySelector('.annotation-token'), null, '删除笔记同步移除红色下划线');
-        assert.deepEqual(JSON.parse(localStorage.getItem('aura_notes_menu-test')), []);
+        assert.deepEqual(storage.read('annotations').filter(n => n.bookId === 'menu-test'), []);
 
         const remainingHighlight = await annotations.createHighlight({ quote: '同一段正文', location });
         await annotations.saveModalNote({ quote: '同一段正文', comment: '此处第一条笔记', location });
@@ -91,7 +90,7 @@ const { JSDOM } = require('jsdom');
         assert.deepEqual(annotations.getNotes().map(item => item.id), [remainingHighlight.id], '删除重叠笔记不会连带删除高亮');
         assert.ok(elements.bookPaper.querySelector('.annotation-token').getAttribute('data-highlight-ids'));
         assert.equal(elements.bookPaper.querySelector('.annotation-token').getAttribute('data-note-ids'), null);
-        assert.deepEqual(JSON.parse(localStorage.getItem('aura_notes_menu-test')).map(item => item.id), [remainingHighlight.id]);
+        assert.deepEqual(storage.read('annotations').filter(n => n.bookId === 'menu-test').map(item => item.id), [remainingHighlight.id]);
 
         await annotations.saveModalNote({ quote: '同一段正文', comment: '从页边删除的笔记', location });
         const marginNote = annotations.getNotes().find(item => item.kind === 'note');
@@ -108,7 +107,8 @@ const { JSDOM } = require('jsdom');
         assert.deepEqual(creations.map(item => item.type), ['note', 'highlight'], '划选正文后仍可新建笔记和高亮');
         console.log('✅ 标注删除菜单：纯高亮、纯笔记、重叠标注独立删除、多条笔记计数及页边删除与创建入口正常');
     } finally {
-        setDB?.(null);
+        await storage?.drain();
+        await storage?.close();
         dom.window.close();
         for (const [key, descriptor] of originals) {
             if (descriptor) Object.defineProperty(globalThis, key, descriptor);
