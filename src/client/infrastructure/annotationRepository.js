@@ -1,5 +1,5 @@
 import { normalizeAnnotation } from '../domain/annotationEngine.js';
-import { pendingNoteWrites, pendingNoteBookIds, recordNoteWrite, acknowledgeNoteWrite } from './annotationRecovery.js';
+import { pendingNoteWrites, pendingNoteBookIds, recordNoteWrite, acknowledgeNoteWrite, attachNoteCommand } from './annotationRecovery.js';
 import { initializeStorage, readNotes, enqueue, bookVersion, noteVersion, acceptNote, storageRequest } from './storageClient.js';
 
 const normalize = notes => notes.map(normalizeAnnotation).filter(Boolean);
@@ -12,10 +12,19 @@ export function deleteNoteFromDB(id, bookId) {
     if (!id) return Promise.resolve();
     return submit(recordNoteWrite({ id, bookId, operation: 'delete' }));
 }
-function submit(entry) {
+function submit(entry, retry = false) {
     return enqueue(entry.bookId, async () => {
         try {
             await initializeStorage();
+            const latest = pendingNoteWrites(entry.bookId).find(item => item.id === entry.id);
+            if (retry && latest?.version !== entry.version) return;
+            for (const prior of latest?.prerequisites || entry.prerequisites || []) {
+                if (prior.version === entry.version) continue;
+                const result = await storageRequest(prior.operation === 'save' ? 'notes/save' : 'notes/delete', prior.command);
+                acceptNote(entry.id, entry.bookId, result, prior.operation === 'delete');
+                acknowledgeNoteWrite({ ...entry, version: prior.version });
+                commands.delete(prior.version);
+            }
             let command = entry.command || commands.get(entry.version);
             if (!command) {
                 const book = await bookVersion(entry.bookId);
@@ -24,8 +33,8 @@ function submit(entry) {
                 if (entry.operation === 'save') command.note = entry.note;
                 else Object.assign(command, { id: entry.id, bookId: entry.bookId });
                 commands.set(entry.version, command);
-                entry = recordNoteWrite({ ...entry, command, version: entry.version, preserveNewer: true });
             }
+            entry = attachNoteCommand(entry, command);
             const result = await storageRequest(entry.operation === 'save' ? 'notes/save' : 'notes/delete', command);
             acceptNote(entry.id, entry.bookId, result, entry.operation === 'delete');
             acknowledgeNoteWrite(entry); commands.delete(entry.version);
@@ -45,7 +54,7 @@ export async function loadNotesForBook(bookId) {
     let notes = await loadNotesFromDB(bookId);
     const pending = pendingNoteWrites(bookId);
     for (const entry of pending) {
-        try { await submit(entry); }
+        try { await submit(entry, true); }
         catch (error) { console.warn('笔记补写失败，保留本机恢复内容', error); }
     }
     if (pending.length) notes = await loadNotesFromDB(bookId);

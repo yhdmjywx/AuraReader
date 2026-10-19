@@ -35,7 +35,14 @@ function createDataStore(directory) {
     const root = path.resolve(directory);
     fs.mkdirSync(root, { recursive: true });
     const filename = path.join(root, 'aurareader.sqlite');
+    const installed = path.join(root, 'storage-installed.json');
+    if (fs.existsSync(installed) && (!fs.existsSync(filename) || fs.statSync(filename).size === 0)) {
+        throw new StorageError('SQLite 文件丢失或为空；请保留 data 目录并从已验证备份恢复，禁止自动新建空书库', 500);
+    }
     const db = new DatabaseSync(filename, { timeout: 5000 });
+    if (db.prepare('PRAGMA user_version').get().user_version > 1) {
+        db.close(); throw new StorageError('数据库版本高于本应用，禁止降级覆盖', 409);
+    }
     db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
         CREATE TABLE IF NOT EXISTS books(id TEXT PRIMARY KEY, payload TEXT, revision INTEGER NOT NULL, generation TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS annotations(id TEXT PRIMARY KEY, book_id TEXT NOT NULL REFERENCES books(id), payload TEXT, revision INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
@@ -43,6 +50,7 @@ function createDataStore(directory) {
         CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, hash TEXT NOT NULL, result TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS migrations(source_id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, manifest TEXT NOT NULL);
         PRAGMA user_version=1;`);
+    if (!fs.existsSync(installed)) fs.writeFileSync(installed, JSON.stringify({ format: 1, database: 'aurareader.sqlite' }), { flag: 'wx' });
     const one = (sql, ...args) => db.prepare(sql).get(...args);
     const all = (sql, ...args) => db.prepare(sql).all(...args);
     const run = (sql, ...args) => db.prepare(sql).run(...args);
@@ -113,7 +121,11 @@ function createDataStore(directory) {
         deleteBook(c) {
             return mutate(c, () => {
                 id(c.id); const row = one('SELECT * FROM books WHERE id=?', c.id); expected(row, c.expected);
-                if (!row || row.deleted) return { revision: row?.revision || 0 };
+                if (!row) {
+                    run('INSERT INTO books VALUES(?,NULL,1,?,1)', c.id, randomUUID());
+                    return { revision: 1 };
+                }
+                if (row.deleted) return { revision: row.revision };
                 run('UPDATE annotations SET payload=NULL, deleted=1, revision=revision+1 WHERE book_id=?', c.id);
                 run('UPDATE books SET payload=NULL, deleted=1, revision=revision+1 WHERE id=?', c.id);
                 return { revision: row.revision + 1 };

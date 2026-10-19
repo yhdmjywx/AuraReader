@@ -19,7 +19,11 @@ async function readJson(req) {
         if (size > MAX_JSON_BYTES) throw new StorageError('数据超过单次 256MB 上限，请保留原数据并分批迁移', 413);
         chunks.push(chunk);
     }
-    try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+    try {
+        const value = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
+        return value;
+    }
     catch (_) { throw new StorageError('无效 JSON'); }
 }
 function createStorageApi(store) {

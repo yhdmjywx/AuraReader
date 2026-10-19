@@ -6,10 +6,10 @@ const { JSDOM } = require('jsdom');
     const dom = new JSDOM(`<body><main class="immersive-notes"><div id="reader-viewport"><article id="paper"></article></div><section id="notes-panel"><div id="list"><div id="empty"><p></p></div></div></section></main><button id="outside">继续阅读</button></body>`, { url: 'http://localhost/' });
     const globals = ['window', 'document', 'localStorage'];
     const originals = new Map(globals.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
-    let setDB;
+    let storage;
     try {
         globals.forEach(key => { globalThis[key] = dom.window[key]; });
-        ({ setDB } = await import('../../src/client/infrastructure/bookRepository.js'));
+        storage = await require('../helpers/sqlite').clientStorage([{ id: 'inline-a', pages: ['关联的原文'] }]);
         const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
         const { SelectionController } = await import('../../src/client/features/annotations/selectionController.js');
         const { applyMarginGeometry, positionMarginNotes } = await import('../../src/client/features/layout/marginNotesLayout.js');
@@ -17,7 +17,6 @@ const { JSDOM } = require('jsdom');
         const { AppCoordinator } = await import('../../src/client/app/appCoordinator.js');
         const { Session } = await import('../../src/client/app/session.js');
         const { saveBookToDB } = await import('../../src/client/infrastructure/bookRepository.js');
-        setDB(null);
         const byId = id => document.getElementById(id);
         const elements = { notesList: byId('list'), emptyNotesState: byId('empty'), workspaceContainer: document.querySelector('main'), bookPaper: byId('paper'), notesPanel: byId('notes-panel') };
         const box = (left, top, width, height) => ({ left, top, right: left + width, bottom: top + height, width, height });
@@ -62,7 +61,7 @@ const { JSDOM } = require('jsdom');
             const event = new window.KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true, ...options });
             editor().dispatchEvent(event); return event;
         };
-        const stored = book => JSON.parse(localStorage.getItem(`aura_notes_${book}`) || '[]');
+        const stored = book => storage.bufferedNotes(book);
         const location = { page: 1, sectionId: 'chapter-1', start: 2, end: 9 };
 
         // Exercise the actual selection-button path: no second click or dialog.
@@ -146,21 +145,12 @@ const { JSDOM } = require('jsdom');
         assert.ok(controller.getNotes().some(note => note.id === draftId));
         assert.ok(controller.getNotes().some(note => note.id === highlight.id && note.kind === 'highlight'));
 
-        // Out-of-date async DB completion cannot overwrite the latest local input.
-        const transactions = [];
-        setDB({ transaction: () => {
-            const tx = { objectStore: () => ({ put: note => { tx.snapshot = note; }, delete: id => { tx.removed = id; } }) };
-            transactions.push(tx); return tx;
-        } });
+        // Actual SQLite/API writes must retain the newest input.
         byId(`card-${draftId}`).click();
         input('旧版本'); input('新版本');
-        transactions[0].oncomplete(); await Promise.resolve();
         assert.equal(stored('inline-a').find(note => note.id === draftId).comment, '新版本');
-        transactions[1].oncomplete();
         await controller.finishInlineEdit();
-        assert.equal(transactions[0].snapshot.comment, '旧版本');
-        assert.equal(transactions[1].snapshot.comment, '新版本');
-        setDB(null);
+        assert.equal(storage.read('annotations', draftId).comment, '新版本');
 
         // Book switches await outstanding writes while the source book is active.
         await saveBookToDB({ id: 'inline-b', title: '第二本书', pages: ['正文'] });
@@ -186,7 +176,8 @@ const { JSDOM } = require('jsdom');
         assert.match(fs.readFileSync('src/client/styles.css', 'utf8'), /caret-color:\s*#d95353/);
         console.log('✅ 原位笔记：自动聚焦、即时持久化、换行、IME、退出、空笔记、焦点与光标稳定、布局重排、异步写入隔离及换书翻页通过');
     } finally {
-        setDB?.(null);
+        await storage?.drain();
+        await storage?.close();
         dom.window.close();
         for (const [key, descriptor] of originals) {
             if (descriptor) Object.defineProperty(globalThis, key, descriptor);

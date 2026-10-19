@@ -4,7 +4,8 @@ const assert = require('assert');
     const { exportSelectiveBackup, parseBackupFile } = await import('../../src/client/infrastructure/exporters.js');
     const { BackupController } = await import('../../src/client/features/backup/backupController.js');
     const { getIncludeOptions } = await import('../../src/client/features/backup/backupModalUI.js');
-    const { setDB, demoBooks } = await import('../../src/client/infrastructure/bookRepository.js');
+    const { demoBooks } = await import('../../src/client/infrastructure/bookRepository.js');
+    const { saveNoteToDB } = await import('../../src/client/infrastructure/annotationRepository.js');
 
     const downloads = [];
     const blobs = new Map();
@@ -21,7 +22,11 @@ const assert = require('assert');
         { id: 'backup-test-note', bookId: bookB.id, kind: 'note', quote: '书籍B', comment: '我的笔记', page: 1 },
         { id: 'backup-test-other', bookId: 'another-book', quote: '其他书', page: 1 }
     ];
-    const stores = { books: new Map([[bookB.id, bookB]]), notes: new Map(notes.map(note => [note.id, note])) };
+    let storage;
+    const stores = {
+        books: { get: id => storage.read('books', id) },
+        notes: { get: id => storage.read('annotations', id), set: async (_id, note) => saveNoteToDB(note) }
+    };
 
     try {
         globalThis.window = {};
@@ -47,26 +52,8 @@ const assert = require('assert');
             getItem: key => localData.get(key) ?? null,
             setItem: (key, value) => localData.set(key, String(value))
         };
-        setDB({
-            transaction() {
-                const tx = {};
-                tx.objectStore = name => ({
-                    put(value) {
-                        stores[name].set(value.id, structuredClone(value));
-                        queueMicrotask(() => tx.oncomplete());
-                    },
-                    getAll() {
-                        const request = {};
-                        queueMicrotask(() => {
-                            request.result = Array.from(stores[name].values());
-                            request.onsuccess();
-                        });
-                        return request;
-                    }
-                });
-                return tx;
-            }
-        });
+        storage = await require('../helpers/sqlite').clientStorage([bookA, bookB, { id: 'another-book', pages: ['其他书'] }]);
+        for (const note of notes) await saveNoteToDB(note);
 
         exportSelectiveBackup({ selectedBooks: [bookA, bookB], notes, settings: { fontSize: 24, appTheme: 'dark' } });
         assert.strictEqual(downloads.length, 2, '选中两本书必须下载两个独立文件');
@@ -113,7 +100,7 @@ const assert = require('assert');
             assert.ok(!Object.hasOwn(payload, 'settings'));
         });
 
-        stores.notes.set(notes[0].id, { ...notes[0], quote: '过时的标注' });
+        await stores.notes.set(notes[0].id, { ...notes[0], quote: '过时的标注' });
         await controller.importFullBackup(downloads[0].blob);
         assert.deepStrictEqual(stores.books.get(bookA.id), bookA, '新格式必须能通过真实恢复控制器写回书籍');
         assert.strictEqual(stores.notes.get(notes[0].id).quote, '书籍A', '相同 ID 的标注应恢复为备份内容');
@@ -121,7 +108,8 @@ const assert = require('assert');
         assert.strictEqual(stores.notes.get(notes[1].id).comment, '我的笔记');
         assert.strictEqual(restored[0].importedBooksCount, 1);
         assert.strictEqual(restored[0].importedNotesCount, 1);
-        assert.strictEqual(JSON.parse(localData.get('aura_notes_' + bookA.id))[0].id, notes[0].id);
+        assert.strictEqual(storage.read('annotations', notes[0].id).id, notes[0].id);
+        assert.equal(localData.has('aura_notes_' + bookA.id), false, '恢复后不创建长期 localStorage 副本');
 
         localData.set('aura_font_size', '18');
         const legacyBackup = new Blob([JSON.stringify({
@@ -135,7 +123,7 @@ const assert = require('assert');
         assert.ok(!messages.some(message => message.includes('恢复失败')));
         console.log('PASS: 每书一文件、标注隔离、无应用设置、真实导出与恢复、旧备份兼容');
     } finally {
-        setDB(null);
+        await storage?.close();
         delete demoBooks[bookA.id];
         delete demoBooks[bookB.id];
         URL.createObjectURL = originalCreateUrl;

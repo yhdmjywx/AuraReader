@@ -22,7 +22,7 @@ function sourceId() {
     return source;
 }
 async function session() {
-    const response = await transport(base + '/session');
+    const response = await transport(base + '/session', { signal: globalThis.AbortSignal?.timeout?.(15000) });
     if (!response.ok) throw new Error('本地数据库服务不可用');
     token = (await response.json()).token;
 }
@@ -33,6 +33,7 @@ export async function storageRequest(route, body, retried = false) {
         response = await transport(base + '/' + route, {
             method: body === undefined ? 'GET' : 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Aura-Token': token, 'X-Aura-Source': sourceId() },
+            signal: globalThis.AbortSignal?.timeout?.(15000),
             body: body === undefined ? undefined : JSON.stringify(body)
         });
     } catch (error) {
@@ -40,7 +41,12 @@ export async function storageRequest(route, body, retried = false) {
         throw error;
     }
     if (response.status === 403 && !retried) { token = null; return storageRequest(route, body, true); }
-    const result = await response.json();
+    let result;
+    try { result = await response.json(); }
+    catch (error) {
+        if (!retried) return storageRequest(route, body, true);
+        throw error;
+    }
     if (!response.ok) {
         const error = new Error(result.error || '数据库请求失败');
         error.status = response.status; error.details = result.details;
@@ -55,13 +61,13 @@ export function initializeStorage() {
 export async function readBooks() {
     await initializeStorage();
     const { records } = await storageRequest('books');
-    records.forEach(row => bookVersions.set(row.id, row));
+    records.forEach(row => { if ((bookVersions.get(row.id)?.revision || 0) <= row.revision) bookVersions.set(row.id, row); });
     return records;
 }
 export async function readNotes(bookIds = []) {
     await initializeStorage();
     const { records } = await storageRequest('notes/query', { bookIds });
-    records.forEach(row => noteVersions.set(row.id, row));
+    records.forEach(row => { if ((noteVersions.get(row.id)?.revision || 0) <= row.revision) noteVersions.set(row.id, row); });
     return records;
 }
 export function enqueue(bookId, task) {

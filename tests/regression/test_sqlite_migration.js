@@ -60,6 +60,33 @@ const { sqliteServer } = require('../helpers/sqlite');
         await conflict({ ...snapshot, caches: { legacy: JSON.stringify([{ ...note, id: 'cache-only' }]) } }, 'uncertain-cache');
         await conflict({ ...snapshot, pending: { legacy: '{broken' } }, 'damaged-buffer');
         assert.deepEqual((await server.request('books')).records.find(r => r.id === book.id).value, book, '冲突不能改变已迁移书库');
+        await server.request('restore', { opId: require('node:crypto').randomUUID(), books: [], notes: [{ ...snapshot.builtins.notes[0], comment: '用户已经修改示例笔记' }] });
+        const freshHeaders = { 'X-Aura-Source': 'fresh-browser' };
+        const fresh = { ...snapshot, indexedDB: { books: [], notes: [] }, caches: {}, pending: {} };
+        const freshSaved = await server.request('migration/snapshot', fresh, freshHeaders);
+        assert.equal((await server.request('migration/commit', { snapshotId: freshSaved.snapshotId }, freshHeaders)).status, 200);
+        assert.equal((await server.request('notes/query', { bookIds: ['crisis-era'] }, freshHeaders)).records[0].value.comment, '用户已经修改示例笔记', '空新浏览器不能用默认示例覆盖现有书库');
+        const { JSDOM } = require('jsdom');
+        const dom = new JSDOM('', { url: 'http://localhost/' });
+        const globals = new Map(['window', 'localStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+        try {
+            globalThis.localStorage = dom.window.localStorage;
+            globalThis.window = { get indexedDB() { throw new Error('已迁移来源不得再访问 IndexedDB'); } };
+            localStorage.setItem('aura_notes_legacy', snapshot.caches.legacy);
+            localStorage.setItem('aura_notes_pending_legacy', snapshot.pending.legacy);
+            const client = await import('../../src/client/infrastructure/storageClient.js');
+            const configure = () => client.configureStorage({ baseUrl: server.base + '/api/storage', sourceId: 'test-source' });
+            configure(); await client.initializeStorage();
+            assert.equal(localStorage.getItem('aura_notes_legacy'), null);
+            assert.equal(localStorage.getItem('aura_notes_pending_legacy'), null, '提交后崩溃，重启仍能清理已归档待写记录');
+            const newInput = JSON.stringify([{ id: 'note', bookId: 'legacy', version: 'new-input', operation: 'save', note: { ...latest, comment: '迁移后新输入' } }]);
+            localStorage.setItem('aura_notes_pending_legacy', newInput);
+            configure(); await client.initializeStorage();
+            assert.equal(localStorage.getItem('aura_notes_pending_legacy'), newInput, '不能清除迁移后的新输入');
+        } finally {
+            dom.window.close();
+            for (const [key, descriptor] of globals) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; }
+        }
         console.log('✅ SQLite 迁移：独立原始快照、完整对象／章节、待写覆盖／删除、旧随笔、示例关联、中断重试与冲突阻断通过');
     } finally { await server.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

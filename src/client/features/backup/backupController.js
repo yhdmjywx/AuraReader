@@ -6,13 +6,11 @@
 
 import {
     getAllBooksFromDB,
-    saveBookToDB as repoSaveBook,
     demoBooks
 } from '../../infrastructure/bookRepository.js';
 
 import {
-    getNotesForBooks as repoGetNotesForBooks,
-    saveNoteToDB as repoSaveNote
+    getNotesForBooks as repoGetNotesForBooks
 } from '../../infrastructure/annotationRepository.js';
 
 import { normalizeAnnotation } from '../../domain/annotationEngine.js';
