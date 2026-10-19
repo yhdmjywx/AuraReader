@@ -113,8 +113,7 @@ function wrapTextNode(textNode, segment, start, end, page) {
 
 function buildTextIndex(root) {
     const nodes = [];
-    const doc = root.ownerDocument;
-    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const walker = sourceTextWalker(root);
     let offset = 0;
     let current = walker.nextNode();
     while (current) {
@@ -157,7 +156,7 @@ function boundaryOffset(root, container, offset) {
 }
 
 function textNodeOffset(root, targetNode, nodeOffset) {
-    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const walker = sourceTextWalker(root);
     let count = 0;
     let current = walker.nextNode();
     while (current) {
@@ -173,13 +172,13 @@ function textNodeOffset(root, targetNode, nodeOffset) {
 
 function firstTextNode(element) {
     if (!element || element.nodeType !== 1) return null;
-    const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    const walker = sourceTextWalker(element);
     return walker.nextNode();
 }
 
 function lastTextNode(element) {
     if (!element || element.nodeType !== 1) return null;
-    const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    const walker = sourceTextWalker(element);
     let last = null;
     let current = walker.nextNode();
     while (current) {
@@ -190,7 +189,7 @@ function lastTextNode(element) {
 }
 
 function textBeforeElement(root, element) {
-    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const walker = sourceTextWalker(root);
     let count = 0;
     let current = walker.nextNode();
     while (current) {
@@ -201,4 +200,15 @@ function textBeforeElement(root, element) {
         current = walker.nextNode();
     }
     return count;
+}
+
+function sourceTextWalker(root) {
+    // The prepended divider has its own original page/offset coordinate space.
+    // It must not shift the first chapter's existing or newly selected ranges.
+    return root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+            const divider = node.parentElement?.closest('[data-volume-title-page]');
+            return divider && !divider.contains(root) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+        }
+    });
 }
