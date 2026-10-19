@@ -27,7 +27,7 @@ export class AnnotationController {
     constructor({
         callbacks = {}
     } = {}) {
-        this.callbacks = callbacks; // onNotesChanged, onJump, showToast, getCurrentBookId, ensureSidebarExpanded
+        this.callbacks = callbacks; // onNotesChanged, onJump, showToast, getCurrentBookId
         this.notes = [];
         this.editingNoteId = null;
         this.inlineEdit = null;
@@ -420,9 +420,6 @@ export class AnnotationController {
         const ids = uniqueIds(noteIds);
         if (ids.length === 0) return;
         this.switchTab('tab-highlights');
-        if (this.callbacks.ensureSidebarExpanded) {
-            this.callbacks.ensureSidebarExpanded();
-        }
         this.focusedNoteIds = ids;
         this.focusedHighlightIds = [];
         this.renderNotesUI();

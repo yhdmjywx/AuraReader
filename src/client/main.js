@@ -25,7 +25,6 @@ export function queryElements() {
         workspaceContainer: document.getElementById('workspace-container'),
         readerPanel: document.getElementById('reader-panel'),
         notesPanel: document.getElementById('notes-panel'),
-        resizerHandle: document.getElementById('resizer-handle'),
 
         // Reader Controls
         bookPaper: document.getElementById('book-paper'),
@@ -42,11 +41,6 @@ export function queryElements() {
         btnPageMode: document.getElementById('btn-page-mode'),
         textPageMode: document.getElementById('text-page-mode'),
         iconPageMode: document.getElementById('icon-page-mode'),
-        btnToggleSidebar: document.getElementById('btn-toggle-sidebar'),
-        btnCollapseSidebar: document.getElementById('btn-collapse-sidebar'),
-        btnSidebarRecall: document.getElementById('btn-sidebar-recall'),
-        textToggleSidebar: document.getElementById('text-toggle-sidebar'),
-        iconToggleSidebar: document.getElementById('icon-toggle-sidebar'),
         fontFamilySelect: document.getElementById('font-family-select'),
         fontPicker: document.getElementById('font-picker'),
         fontMenu: document.getElementById('font-menu'),
@@ -220,7 +214,6 @@ export function bootstrapApp() {
     annotations.callbacks.getPendingSelection = () => selection.getPendingSelection();
     annotations.callbacks.getCurrentPage = () => reader.getCurrentPage();
     annotations.callbacks.getCurrentChapter = () => reader.getLocation().chapter;
-    annotations.callbacks.ensureSidebarExpanded = () => layout.ensureSidebarExpanded({ notify: false });
     annotations.callbacks.onFocusAnnotation = (record) => {
         coordinator.jumpToAnnotation(record.id, { showMenu: true });
     };
@@ -304,21 +297,6 @@ export function bootstrapApp() {
             appShell.showToast('可用空间充足，已自动恢复双页展开模式');
         }
     };
-    layout.callbacks.onSidebarChange = ({ isCollapsed, notify }) => {
-        layout.applySidebarState(elements);
-        layout.updateLayoutClasses(elements);
-        const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
-            ? elements.readerPanel.clientWidth
-            : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
-        const resp = layout.checkResponsiveLayout(availWidth);
-        if (!resp || !resp.changed) {
-            syncReaderLayout();
-        }
-        if (notify) {
-            appShell.showToast(isCollapsed ? '已进入 100% 全屏专注阅读模式' : `已展开 ${Math.round(100 - layout.getReaderWidthPercent())}% 笔记工作台`);
-        }
-    };
-
     // 4. Initialize UI Listeners (Browser DOM only)
     if (typeof document !== 'undefined') {
         reader.initUI(elements);
@@ -328,22 +306,9 @@ export function bootstrapApp() {
         backup.initUI(elements);
         layout.initUI(elements);
 
-        layout.initResizer(elements, (percent) => {
-            const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
-                ? elements.readerPanel.clientWidth
-                : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
-            const resp = layout.checkResponsiveLayout(availWidth);
-            if (!resp || !resp.changed) {
-                syncReaderLayout();
-            }
-        }, () => {
-            layout.toggleSidebar(true);
-        });
-
         appShell.init(elements, {
             onPrevPage: () => reader.prevPage(annotations.getNotes()),
             onNextPage: () => reader.nextPage(annotations.getNotes()),
-            onToggleSidebar: (notify) => layout.toggleSidebar(notify),
             onTogglePageMode: () => {
                 const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
                     ? elements.readerPanel.clientWidth
@@ -367,7 +332,6 @@ export function bootstrapApp() {
         });
 
         // 5. Initial Execution & Mounting
-        layout.applySidebarState(elements);
         layout.updateLayoutClasses(elements);
         const initWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
             ? elements.readerPanel.clientWidth
