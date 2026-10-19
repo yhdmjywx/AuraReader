@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ShelfController - Book Shelf Drawer Feature Controller
+   ShelfController - Library Popover Feature Controller
    Coordinates BookRepository and ShelfUI presentation.
    ========================================================================== */
 
@@ -52,8 +52,9 @@ export class ShelfController {
 
     openShelf() {
         if (this.elements) {
-            this.refreshShelf();
+            this.callbacks.onOpen?.();
             domOpenShelf(this.elements);
+            this.refreshShelf().catch(error => this.callbacks.showToast?.(error.message || '书库读取失败'));
         }
     }
 
@@ -69,7 +70,8 @@ export class ShelfController {
 
         if (elements.btnShelf) {
             elements.btnShelf.addEventListener('click', () => {
-                this.openShelf();
+                if (elements.shelfPanel?.classList.contains('open')) this.closeShelf();
+                else this.openShelf();
             });
         }
 
@@ -79,12 +81,21 @@ export class ShelfController {
             });
         }
 
-        if (elements.shelfOverlay) {
-            elements.shelfOverlay.addEventListener('click', (e) => {
-                if (e.target === elements.shelfOverlay) {
-                    this.closeShelf();
-                }
-            });
-        }
+        document.addEventListener('click', event => {
+            if (!elements.shelfPanel?.classList.contains('open')) return;
+            const path = event.composedPath();
+            if (!path.includes(elements.shelfPanel) && !path.includes(elements.btnShelf)) this.closeShelf();
+        }, true);
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || !elements.shelfPanel?.classList.contains('open')) return;
+            event.preventDefault();
+            this.closeShelf();
+            elements.btnShelf?.focus();
+        });
+        elements.btnImportBook?.addEventListener('click', () => elements.fileInput?.click());
+        elements.fileInput?.addEventListener('change', () => {
+            if (elements.fileInput.files?.length) this.closeShelf();
+        });
+        elements.btnSwitchDemo?.addEventListener('click', () => this.closeShelf());
     }
 }
