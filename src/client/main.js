@@ -113,9 +113,10 @@ export function queryElements() {
 
         // Modal, Shelf & Toast
         btnShelf: document.getElementById('btn-shelf'),
-        shelfOverlay: document.getElementById('shelf-overlay'),
+        shelfPanel: document.getElementById('shelf-panel'),
+        btnImportBook: document.getElementById('btn-import-book'),
         btnCloseShelf: document.getElementById('btn-close-shelf'),
-        shelfGrid: document.getElementById('shelf-grid'),
+        shelfList: document.getElementById('shelf-list'),
         shelfBookCount: document.getElementById('shelf-book-count'),
         toastMsg: document.getElementById('toast-msg')
     };
@@ -251,6 +252,10 @@ export function bootstrapApp() {
     };
     selection.callbacks.onClearFocus = () => annotations.clearFocusedAnnotations();
 
+    shelf.callbacks.onOpen = () => {
+        appShell.closeAppearance();
+        appShell.closeExportPanel();
+    };
     shelf.callbacks.onOpenBook = async (bookId) => {
         await coordinator.openBook(bookId);
     };
@@ -307,6 +312,7 @@ export function bootstrapApp() {
         layout.initUI(elements);
 
         appShell.init(elements, {
+            onOpenPanel: () => shelf.closeShelf(),
             onPrevPage: () => reader.prevPage(annotations.getNotes()),
             onNextPage: () => reader.nextPage(annotations.getNotes()),
             onTogglePageMode: () => {

@@ -45,7 +45,10 @@ export class AppShell {
         const button = this.elements && this.elements.btnAppearance;
         if (!panel) return;
         const open = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('open');
-        if (open) this.closeExportPanel();
+        if (open) {
+            this.closeExportPanel();
+            this.callbacks.onOpenPanel?.();
+        }
         panel.classList.toggle('open', open);
         if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
@@ -61,6 +64,7 @@ export class AppShell {
         const open = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('open');
         if (open) {
             this.closeAppearance();
+            this.callbacks.onOpenPanel?.();
             if (this.elements.exportBookTitle) {
                 this.elements.exportBookTitle.textContent = this.elements.currentBookTitle
                     ? this.elements.currentBookTitle.textContent
@@ -188,7 +192,7 @@ export class AppShell {
             }
 
             if (elements.backupSelectModal && elements.backupSelectModal.classList.contains('active')) return;
-            if (elements.shelfOverlay && elements.shelfOverlay.classList.contains('active')) return;
+            if (elements.shelfPanel?.classList.contains('open')) return;
 
             if (e.key === 'Escape' && elements.appearancePanel && elements.appearancePanel.classList.contains('open')) {
                 e.preventDefault();

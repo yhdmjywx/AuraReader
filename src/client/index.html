@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <!-- JSZip & Stylesheet -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=16">
+    <link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body class="theme-light">
     <!-- Single navigation bar -->
@@ -35,7 +35,7 @@
         </div>
 
         <div class="header-side header-actions">
-            <button id="btn-shelf" class="btn btn-icon nav-icon" type="button" title="我的书库">
+            <button id="btn-shelf" class="btn btn-icon nav-icon" type="button" title="我的书库" aria-expanded="false" aria-controls="shelf-panel" aria-haspopup="dialog">
                 <i class="ri-book-shelf-line"></i>
                 <span class="badge-count" id="shelf-book-count" hidden>0</span>
             </button>
@@ -282,35 +282,23 @@
         </div>
     </div>
 
-    <!-- Shelf Drawer Modal -->
-    <div class="shelf-overlay" id="shelf-overlay">
-        <aside class="shelf-drawer">
-            <div class="shelf-header">
-                <h3><i class="ri-book-shelf-line"></i> 我的本地书库</h3>
-                <button id="btn-close-shelf" class="btn btn-icon-sm"><i class="ri-close-line"></i></button>
-            </div>
-            <div class="shelf-body">
-                <div class="shelf-actions">
-                    <label for="file-input" class="btn btn-primary" title="打开本地 EPUB / PDF / TXT">
-                        <i class="ri-folder-open-line"></i>
-                        <span>导入书籍</span>
-                    </label>
-                    <input type="file" id="file-input" accept=".epub,.pdf,.txt" hidden>
-                    <button id="btn-switch-demo" class="btn btn-outline" type="button" title="切换示例图书">
-                        <i class="ri-swap-line"></i> 示例图书
-                    </button>
-                </div>
-                <p class="shelf-hint"><i class="ri-shield-flash-line"></i> 书籍、高亮和笔记保存在本机。请定期备份阅读成果，并保持本地服务运行。</p>
-                <div class="shelf-grid" id="shelf-grid">
-                    <!-- Dynamic Book Cards -->
-                </div>
-            </div>
-        </aside>
-    </div>
+    <section id="shelf-panel" class="appearance-panel shelf-panel" role="dialog" aria-modal="false" aria-labelledby="shelf-panel-title" aria-hidden="true">
+        <div class="shelf-header">
+            <h2 id="shelf-panel-title">本地书库</h2>
+            <button id="btn-close-shelf" class="btn btn-icon-sm" type="button" aria-label="关闭书库" title="关闭书库"><i class="ri-close-line" aria-hidden="true"></i></button>
+        </div>
+        <div class="shelf-actions">
+            <button id="btn-import-book" class="btn btn-ghost-sm" type="button" title="打开本地 EPUB / PDF / TXT">导入书籍</button>
+            <button id="btn-switch-demo" class="btn btn-ghost-sm" type="button" title="切换示例图书">示例图书</button>
+            <input type="file" id="file-input" accept=".epub,.pdf,.txt" hidden>
+        </div>
+        <ul class="shelf-list" id="shelf-list" aria-label="本地书籍"></ul>
+        <p class="shelf-hint">书籍与标注保存在本机。请定期备份阅读成果，并保持本地服务运行。</p>
+    </section>
 
     <!-- Notification Toast -->
     <div class="toast" id="toast-msg"></div>
 
-    <script type="module" src="main.js?v=13"></script>
+    <script type="module" src="main.js?v=15"></script>
 </body>
 </html>
