@@ -200,17 +200,6 @@
                 <button id="btn-next-page" class="page-turn-btn" type="button" title="下一页 (→)">›</button>
             </nav>
 
-            <button id="btn-toggle-sidebar" class="sidebar-toggle-proxy" type="button" hidden title="收起/展开笔记侧边栏 (快捷键: B)">
-                <i class="ri-side-bar-line" id="icon-toggle-sidebar"></i>
-                <span id="text-toggle-sidebar">笔记栏</span>
-            </button>
-
-            <!-- Floating Sidebar Recall Handle (visible when sidebar is collapsed) -->
-            <button id="btn-sidebar-recall" class="sidebar-recall-handle" title="展开笔记侧边栏 (快捷键: B)">
-                <i class="ri-arrow-left-s-line"></i>
-                <span>笔记</span>
-            </button>
-
             <!-- Floating Selection Toolbar (Highlight / Add Note) -->
             <div class="selection-tooltip" id="selection-tooltip">
                 <button class="tooltip-btn hl-yellow" data-color="yellow" title="高亮标记"><i class="ri-mark-pen-line"></i> 高亮</button>
@@ -224,18 +213,8 @@
             </div>
         </section>
 
-        <!-- Legacy handles remain mounted for facade compatibility; the
-             immersive layout hides them and disables split/collapse actions. -->
-        <div class="resizer-handle" id="resizer-handle" title="按住拖拽调整 75:25 比例，双击折叠/展开笔记栏">
-            <div class="resizer-line"></div>
-        </div>
-
-        <!-- Right Panel: Notes & Workbench (25%) -->
+        <!-- Immersive notes on the reading surface -->
         <section class="notes-panel" id="notes-panel">
-            <button id="btn-collapse-sidebar" class="sidebar-collapse-handle" type="button" title="收起笔记侧边栏 (快捷键: B)">
-                <i class="ri-arrow-right-s-line"></i>
-                <span>收起</span>
-            </button>
             <!-- Tabs Header -->
             <div class="tabs-header">
                 <button class="tab-btn active" data-tab="tab-highlights">

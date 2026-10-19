@@ -187,113 +187,21 @@ let storage;
     assert.strictEqual(segments.filter(segment => segment.noteIds.length > 0).length >= 1, true);
     console.log("✅ AnnotationEngine 标注算法内核测试全部通过！");
 
-    // 4. 测试 LayoutSystem 布局控制器与状态机
-    console.log("\n--- [测试 4: LayoutSystem 布局控制器] ---");
-    const { LayoutSystem, DOUBLE_PAGE_MIN_WIDTH } = await import('../../src/client/ui/layoutSystem.js');
-    const layout = new LayoutSystem();
-
-    layout.setPageMode('double', 1000);
-    assert.strictEqual(layout.isDoublePageEffective(), true, "宽度 1000px 时双页模式生效");
-    const lState = layout.getLayoutState();
-    assert.strictEqual(lState.pageMode, 'double', "getLayoutState 应返回当前 pageMode");
-    assert.strictEqual(typeof lState.sidebarOpen, 'boolean', "getLayoutState 应返回 sidebarOpen 状态");
-    assert.strictEqual(typeof lState.splitRatio, 'number', "getLayoutState 应返回 splitRatio");
-
-    // 模拟视口变窄降级
-    const resp1 = layout.checkResponsiveLayout(600);
-    assert.strictEqual(resp1.changed, true);
-    assert.strictEqual(layout.isDoublePageEffective(), false, "宽度 600px < 760px 时应自适应降级为单页");
-    assert.strictEqual(layout.getLayoutMode(), 'double', "基础偏好仍保持 double");
-
-    // 模拟视口恢复
-    const resp2 = layout.checkResponsiveLayout(900);
-    assert.strictEqual(resp2.changed, true);
-    assert.strictEqual(layout.isDoublePageEffective(), true, "宽度恢复后应自动恢复双页展开");
-
-    // 测试 LayoutSystem.initUI 事件监听与按钮点击响应
-    function createMockElement(id) {
-        const listeners = {};
-        const classes = new Set();
-        return {
-            id,
-            classList: {
-                add: (...cls) => cls.forEach(c => classes.add(c)),
-                remove: (...cls) => cls.forEach(c => classes.delete(c)),
-                contains: (c) => classes.has(c)
-            },
-            style: {},
-            textContent: '',
-            title: '',
-            className: '',
-            addEventListener: (event, cb) => {
-                listeners[event] = listeners[event] || [];
-                listeners[event].push(cb);
-            },
-            click: () => {
-                if (listeners['click']) {
-                    listeners['click'].forEach(cb => cb({ preventDefault: () => {} }));
-                }
-            }
-        };
-    }
-
-    const mockElements = {
-        workspaceContainer: createMockElement('workspace-container'),
-        readerPanel: { ...createMockElement('reader-panel'), clientWidth: 1000 },
-        notesPanel: createMockElement('notes-panel'),
-        resizerHandle: createMockElement('resizer-handle'),
-        btnPageMode: createMockElement('btn-page-mode'),
-        textPageMode: createMockElement('text-page-mode'),
-        iconPageMode: createMockElement('icon-page-mode'),
-        btnToggleSidebar: createMockElement('btn-toggle-sidebar'),
-        btnCollapseSidebar: createMockElement('btn-collapse-sidebar'),
-        btnSidebarRecall: createMockElement('btn-sidebar-recall'),
-        textToggleSidebar: createMockElement('text-toggle-sidebar'),
-        iconToggleSidebar: createMockElement('icon-toggle-sidebar')
-    };
-
-    layout.initUI(mockElements);
-
-    // 4.1 点击 btnPageMode 切换单/双页
-    assert.strictEqual(layout.getLayoutMode(), 'double');
-    mockElements.btnPageMode.click();
-    assert.strictEqual(layout.getLayoutMode(), 'single', "点击 btnPageMode 应从 double 切换为 single");
-    assert.strictEqual(mockElements.textPageMode.textContent, '单页');
-
-    mockElements.btnPageMode.click();
-    assert.strictEqual(layout.getLayoutMode(), 'double', "再次点击 btnPageMode 应恢复为 double");
-    assert.strictEqual(mockElements.textPageMode.textContent, '双页');
-
-    // 4.2 点击 btnToggleSidebar 收起/展开笔记侧边栏
-    assert.strictEqual(layout.getIsCollapsed(), false);
-    mockElements.btnToggleSidebar.click();
-    assert.strictEqual(layout.getIsCollapsed(), true, "点击 btnToggleSidebar 应收起笔记侧边栏");
-    assert.strictEqual(mockElements.workspaceContainer.classList.contains('sidebar-collapsed'), true);
-
-    mockElements.btnToggleSidebar.click();
-    assert.strictEqual(layout.getIsCollapsed(), false, "再次点击 btnToggleSidebar 应展开笔记侧边栏");
-    assert.strictEqual(mockElements.workspaceContainer.classList.contains('sidebar-collapsed'), false);
-
-    // 4.3 点击 btnCollapseSidebar 收起侧边栏
-    mockElements.btnCollapseSidebar.click();
-    assert.strictEqual(layout.getIsCollapsed(), true, "点击 btnCollapseSidebar 应收起侧边栏");
-
-    // 4.4 点击 btnSidebarRecall 展开侧边栏
-    mockElements.btnSidebarRecall.click();
-    assert.strictEqual(layout.getIsCollapsed(), false, "点击 btnSidebarRecall 应展开侧边栏");
-
-    // 4.5 测试宽度为 0 时的安全回退防误降级
-    const zeroWidthLayout = new LayoutSystem();
-    zeroWidthLayout.initUI({
-        ...mockElements,
-        readerPanel: { ...mockElements.readerPanel, clientWidth: 0 }
-    });
-    // 初始为 single，切换为 double 时，clientWidth 虽为 0，但不应误判为狭窄降级，而应回退至 1200px 正常展开
-    const zeroRes = zeroWidthLayout.togglePageMode();
-    assert.strictEqual(zeroRes.layoutMode, 'double');
-    assert.strictEqual(zeroRes.isAutoDowngraded, false, "clientWidth 为 0 时应回退兜底宽度，不应误触发 autoDowngraded");
-
-    console.log("✅ LayoutSystem 布局控制器与 initUI 按钮交互测试全部通过！");
+    // 4. Current fixed-column mode state; DOM buttons are exercised by
+    // test_page_layout_system.js using the actual controller and jsdom.
+    const { LayoutController, DOUBLE_PAGE_MIN_WIDTH } = await import('../../src/client/features/layout/layoutController.js');
+    const layout = new LayoutController();
+    layout.setPageMode('double', 1613);
+    assert.strictEqual(layout.getEffectiveReaderMode(), 'double');
+    assert.strictEqual(layout.checkResponsiveLayout(DOUBLE_PAGE_MIN_WIDTH - 1).changed, true);
+    assert.strictEqual(layout.getEffectiveReaderMode(), 'single');
+    assert.strictEqual(layout.getLayoutMode(), 'double', '窄窗口不能覆盖双页偏好');
+    assert.strictEqual(layout.checkResponsiveLayout(1613).changed, true);
+    assert.strictEqual(layout.getEffectiveReaderMode(), 'double');
+    layout.setPageMode('scroll', 1613);
+    assert.strictEqual(layout.getEffectiveReaderMode(), 'scroll');
+    assert.strictEqual(layout.checkResponsiveLayout(600).isAutoDowngraded, false);
+    console.log('✅ 当前模式状态与固定行宽降级恢复通过');
 
     // 5. 测试核心解耦缺陷排查（验证跨书隔离与多书备份可靠性）
     console.log("\n--- [测试 5: 数据边界隔离与跨书防串线验证] ---");
@@ -346,7 +254,6 @@ let storage;
     const { AppCoordinator } = await import('../../src/client/app/appCoordinator.js');
     const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
     const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
-    const { LayoutController } = await import('../../src/client/features/layout/layoutController.js');
 
     const testEngine = new ReaderEngine();
     testEngine.setBook('book-abc', mockBook);

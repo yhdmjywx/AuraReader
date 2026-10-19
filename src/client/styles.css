@@ -1,6 +1,6 @@
 /* ==========================================================================
    AuraReader Workstation - Styles & Design System
-   75:25 Flexible Split Reader & Note Workspace
+   Immersive Reader & Margin Note Workspace
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -41,7 +41,6 @@
     --header-height: 52px;
     --nav-pill-bg: #f2f3f5;
     --pagination-height: 44px;
-    --reader-width-percent: 75%;
 }
 
 /* Dark Theme Variables */
@@ -620,7 +619,7 @@ body.theme-dark .export-backup-action i {
 }
 
 /* --------------------------------------------------------------------------
-   4. Main Workspace Layout (75:25 Split Container)
+   4. Main Workspace Layout
    -------------------------------------------------------------------------- */
 .workspace-container {
     flex: 1;
@@ -628,102 +627,6 @@ body.theme-dark .export-backup-action i {
     height: calc(100vh - var(--header-height));
     overflow: hidden;
     position: relative;
-}
-
-/* Sidebar Collapsed State */
-.workspace-container.sidebar-collapsed .notes-panel {
-    display: none !important;
-}
-.workspace-container.sidebar-collapsed .resizer-handle {
-    display: none !important;
-}
-.workspace-container.sidebar-collapsed .reader-panel {
-    width: 100% !important;
-}
-.workspace-container.sidebar-collapsed .sidebar-recall-handle {
-    display: flex;
-}
-
-/* Sidebar Recall Handle (召回把手) */
-.sidebar-recall-handle {
-    position: absolute;
-    right: 0;
-    top: calc(50% - (var(--pagination-height) / 2));
-    transform: translateY(-50%);
-    z-index: 25;
-    display: none;
-    align-items: center;
-    gap: 4px;
-    padding: 12px 6px 12px 8px;
-    background-color: var(--bg-panel);
-    border: 1px solid var(--border-color);
-    border-right: none;
-    border-radius: 8px 0 0 8px;
-    box-shadow: -2px 4px 12px rgba(0, 0, 0, 0.08);
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-secondary);
-    transition: var(--transition-fast);
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    letter-spacing: 2px;
-    user-select: none;
-}
-
-.sidebar-recall-handle:hover {
-    background-color: var(--primary);
-    color: #ffffff;
-    border-color: var(--primary);
-    box-shadow: -3px 6px 14px rgba(59, 130, 246, 0.3);
-    padding-left: 12px;
-}
-
-.sidebar-recall-handle i {
-    font-size: 14px;
-    margin-bottom: 4px;
-    writing-mode: horizontal-tb;
-    display: inline-block;
-}
-
-/* Expanded-state collapse handle: same tag as the recall handle, on the notes panel's left edge. */
-.sidebar-collapse-handle {
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 25;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 12px 8px 12px 6px;
-    background-color: var(--bg-panel);
-    border: 1px solid var(--border-color);
-    border-left: none;
-    border-radius: 0 8px 8px 0;
-    box-shadow: 2px 4px 12px rgba(0, 0, 0, 0.08);
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-secondary);
-    transition: var(--transition-fast);
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    letter-spacing: 2px;
-    user-select: none;
-}
-.sidebar-collapse-handle:hover {
-    background-color: var(--primary);
-    color: #ffffff;
-    border-color: var(--primary);
-    box-shadow: 3px 6px 14px rgba(59, 130, 246, 0.3);
-    padding-right: 12px;
-}
-.sidebar-collapse-handle i {
-    font-size: 14px;
-    margin-bottom: 4px;
-    writing-mode: horizontal-tb;
-    display: inline-block;
 }
 
 @media (max-width: 680px) {
@@ -739,9 +642,9 @@ body.theme-dark .export-backup-action i {
     }
 }
 
-/* Left Panel: Reader Panel (Initial 75%) */
+/* Reader surface */
 .reader-panel {
-    width: var(--reader-width-percent);
+    width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -1268,41 +1171,6 @@ mark.hl-active {
 .selection-tooltip [hidden] {
     display: none;
 }
-/* Resizer Handle (Divider) */
-.resizer-handle {
-    width: 8px;
-    background-color: var(--border-color);
-    cursor: col-resize;
-    position: relative;
-    z-index: 20;
-    transition: background-color 0.15s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.resizer-handle:hover, .resizer-handle.dragging {
-    background-color: var(--primary);
-}
-.resizer-line {
-    width: 2px;
-    height: 24px;
-    background-color: rgba(0, 0, 0, 0.2);
-    border-radius: 2px;
-}
-
-/* Right Panel: Notes & Workbench (Remaining 25%) */
-.notes-panel {
-    flex: 1;
-    height: 100%;
-    background-color: var(--bg-panel);
-    border-left: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 220px;
-    position: relative;
-}
-
 /* Tabs Header */
 .tabs-header {
     display: flex;
@@ -1752,8 +1620,7 @@ mark.hl-active {
     margin-top: 4px;
 }
 
-/* Immersive notes share the reading surface; legacy split controls remain
-   mounted only for compatibility with the application facade. */
+/* Immersive notes share the reading surface. */
 .workspace-container.immersive-notes {
     display: block;
     --reading-width: 560px;
@@ -1789,14 +1656,11 @@ mark.hl-active {
     box-shadow: none;
 }
 .immersive-notes .reader-pagination { border-top: none; background: var(--bg-paper); }
-.immersive-notes .resizer-handle,
-.immersive-notes .sidebar-toggle-proxy,
-.immersive-notes .sidebar-recall-handle,
-.immersive-notes .sidebar-collapse-handle,
 .immersive-notes .tabs-header,
 .immersive-notes .notes-toolbar,
 .immersive-notes .empty-state { display: none !important; }
 .immersive-notes .notes-panel {
+    display: block;
     position: absolute;
     inset: 0;
     z-index: 10;

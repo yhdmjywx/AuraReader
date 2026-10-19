@@ -39,7 +39,7 @@ import {
     applyAllHighlightsToHtml
 } from './domain/annotationEngine.js';
 
-import { DOUBLE_PAGE_MIN_WIDTH, LayoutSystem, layoutSystem } from './features/layout/layoutController.js';
+import { DOUBLE_PAGE_MIN_WIDTH, LayoutController } from './features/layout/layoutController.js';
 import { ReaderController } from './features/reader/readerController.js';
 import { AnnotationController } from './features/annotations/annotationController.js';
 import { SelectionController } from './features/annotations/selectionController.js';
@@ -97,8 +97,7 @@ export {
     queryElements,
     bootstrapApp,
     startApp,
-    LayoutSystem,
-    layoutSystem,
+    LayoutController,
     ReaderController,
     AnnotationController,
     SelectionController,
@@ -138,10 +137,6 @@ export const state = {
     // Layout state
     get layoutMode() { return layoutController.getLayoutMode(); },
     set layoutMode(val) { layoutController.layoutMode = val; },
-    get isCollapsed() { return layoutController.getIsCollapsed(); },
-    set isCollapsed(val) { layoutController.isCollapsed = val; },
-    get readerWidthPercent() { return layoutController.getReaderWidthPercent(); },
-    set readerWidthPercent(val) { layoutController.readerWidthPercent = val; },
     get isAutoDowngraded() { return layoutController.getIsAutoDowngraded(); },
     set isAutoDowngraded(val) { layoutController.isAutoDowngraded = val; },
 
@@ -251,25 +246,6 @@ export function setPageMode(mode) {
         renderPage(state.currentPage, true);
     }
     return res;
-}
-
-export function toggleSidebar(notify = true) {
-    const isCollapsed = layoutController.toggleSidebar(notify);
-    if (!layoutController.callbacks || !layoutController.callbacks.onSidebarChange) {
-        applySidebarState(notify);
-    }
-    return isCollapsed;
-}
-
-export function applySidebarState(notify = false) {
-    layoutController.applySidebarState(elements);
-    if (state.isCollapsed) {
-        if (notify) showToast('已进入 100% 全屏专注阅读模式');
-    } else {
-        if (notify) showToast(`已展开 ${Math.round(100 - layoutController.getReaderWidthPercent())}% 笔记工作台`);
-    }
-    updateLayoutClasses();
-    checkResponsiveLayout(notify);
 }
 
 export function updateLayoutClasses() {
@@ -420,4 +396,3 @@ export async function refreshShelfUI() {
 export function showToast(msg) {
     appShell.showToast(msg);
 }
-
