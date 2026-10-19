@@ -34,7 +34,9 @@ function createMigration(store) {
         write(path.join(dir, 'source.json'), { source, snapshotId, origin: input.origin || '', format: 1 });
         return { snapshotId };
     }
-    function commit(source, snapshotId) {
+    // Explicit local maintenance decisions only; the HTTP API cannot supply
+    // recoveries. Each approval is tied to one immutable snapshot record.
+    function commit(source, snapshotId, { cacheRecoveries = [] } = {}) {
         const prior = status(source);
         if (prior.completed) {
             if (prior.snapshotId !== snapshotId) throw new StorageError('该来源已经迁移，请勿重复覆盖', 409);
@@ -74,6 +76,31 @@ function createMigration(store) {
             if (hasExistingLibrary && !hasLegacyBook(book.id)) return;
             if (!books.has(book.id)) add(books, book, bookRecord, '示例书');
         });
+        const recovered = new Map();
+        if (!Array.isArray(cacheRecoveries)) throw new StorageError('缓存恢复决定必须为列表');
+        for (const decision of cacheRecoveries) {
+            const { cacheBookId, targetBookId, id, recordHash } = decision || {};
+            try {
+                if (typeof cacheBookId !== 'string' || typeof targetBookId !== 'string' || typeof id !== 'string'
+                    || recovered.has(id) || cacheBookId === targetBookId || !books.has(targetBookId)) throw new Error('恢复决定的书籍或标注 ID 无效');
+                const raw = input.caches[cacheBookId];
+                const cached = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                const matches = Array.isArray(cached) ? cached.filter(n => n?.id === id) : [];
+                if (matches.length !== 1 || matches[0].bookId !== targetBookId || digest(matches[0]) !== recordHash) throw new Error('待恢复记录与用户确认的快照不一致');
+                noteRecord(matches[0]);
+                if (rawNotes.has(id)) throw new Error('待恢复记录在 IndexedDB 中已有副本，需要重新核对');
+                for (const [key, raw] of Object.entries(input.caches)) {
+                    if (key === cacheBookId) continue;
+                    const other = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                    if (!Array.isArray(other) || other.some(n => n?.id === id)) throw new Error('待恢复记录在其他缓存中存在副本或缓存无效');
+                }
+                for (const raw of Object.values(input.pending)) {
+                    const pending = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                    if (!Array.isArray(pending) || pending.some(entry => entry?.id === id)) throw new Error('待恢复记录涉及未完成写入或删除，需要重新核对');
+                }
+                recovered.set(id, { cacheBookId, note: matches[0] });
+            } catch (error) { fail('缓存恢复决定无效: ' + error.message, decision); }
+        }
         const ids = new Set([...books.keys(), ...[...rawNotes.values()].map(n => n.bookId), ...Object.keys(input.caches), ...Object.keys(input.pending)]);
         function parse(raw, label, bookId) {
             if (raw == null) return null;
@@ -85,7 +112,8 @@ function createMigration(store) {
         }
         for (const bookId of ids) {
             const dbNotes = [...rawNotes.values()].filter(n => n.bookId === bookId);
-            const cached = parse(Object.hasOwn(input.caches, bookId) ? input.caches[bookId] : null, '标注缓存', bookId);
+            const cached = parse(Object.hasOwn(input.caches, bookId) ? input.caches[bookId] : null, '标注缓存', bookId)
+                ?.filter(n => recovered.get(n?.id)?.cacheBookId !== bookId) ?? null;
             const pending = parse(Object.hasOwn(input.pending, bookId) ? input.pending[bookId] : null, '待写记录', bookId) || [];
             const pendingIds = new Set(pending.map(e => e?.id));
             if (cached) {
@@ -119,6 +147,10 @@ function createMigration(store) {
                 }
             }
         }
+        for (const { note } of recovered.values()) {
+            if (notes.has(note.id) || deletes.has(note.id)) fail('待恢复记录与有效标注或删除记录冲突', note.id);
+            else notes.set(note.id, note);
+        }
         for (const n of notes.values()) if (!books.has(n.bookId)) fail('标注找不到关联书籍', n);
         for (const [id] of deletes) if (notes.has(id)) fail('同一标注同时属于有效数据和删除记录', id);
         for (const [id, bookId] of deletes) if (!books.has(bookId)) fail('待删除标注找不到关联书籍', { id, bookId });
@@ -130,9 +162,11 @@ function createMigration(store) {
             }
         }
         rejectConflicts();
+        if (cacheRecoveries.length) write(path.join(dir, 'resolution.json'), { format: 1, source, snapshotId, cacheRecoveries });
         const values = { books: [...books.values()].sort((a, b) => a.id.localeCompare(b.id)), notes: [...notes.values()].sort((a, b) => a.id.localeCompare(b.id)), deleted: [...deletes].sort() };
         const cleanup = Object.fromEntries(['caches', 'pending'].map(key => [key, Object.fromEntries(Object.entries(input[key]).map(([id, raw]) => [id, digest(raw)]))]));
         const manifest = { books: books.size, notes: notes.size, deleted: deletes.size, hash: digest(values), ignoredCaches, snapshotId, cleanup };
+        if (cacheRecoveries.length) manifest.cacheRecoveries = cacheRecoveries;
         return store.transaction(() => {
             for (const b of books.values()) {
                 const existing = store.one('SELECT * FROM books WHERE id=?', b.id);
