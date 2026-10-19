@@ -72,6 +72,10 @@ export function findChapterForPage(toc = [], page = 1) {
 const VOLUME_TITLE_RE = /^(?:第\s*[0-9０-９一二三四五六七八九十百千万零两]+\s*[卷部篇集册]|卷\s*之?\s*[0-9０-９一二三四五六七八九十百千万零两]+|(?:volume|part|book)\s+[0-9ivxlcdm]+)/i;
 const STANDALONE_TITLE_RE = /^(?:作者原序|原序|自序|代序|序言|序|前言|引言|楔子|后记|跋|附录|译后记|译者序|译序|出版说明|版权信息|目录|简介|内容简介|献辞|致谢)$/;
 
+export function isVolumeTitle(title) {
+    return VOLUME_TITLE_RE.test(String(title || '').trim());
+}
+
 export function ensureTocHierarchy(items) {
     const list = Array.isArray(items)
         ? items.map(item => ({ ...item, level: Math.max(0, Number(item.level) || 0) }))
@@ -79,12 +83,12 @@ export function ensureTocHierarchy(items) {
     if (!list.length) return list;
 
     const hasExplicitDepth = list.some(item => item.level > 0);
-    const hasVolume = list.some(item => VOLUME_TITLE_RE.test(String(item.title || '').trim()));
+    const hasVolume = list.some(item => isVolumeTitle(item.title));
     if (!hasExplicitDepth && hasVolume) {
         let insideVolume = false;
         for (const item of list) {
             const title = String(item.title || '').trim();
-            if (VOLUME_TITLE_RE.test(title)) {
+            if (isVolumeTitle(title)) {
                 insideVolume = true;
                 item.level = 0;
             } else if (STANDALONE_TITLE_RE.test(title)) {

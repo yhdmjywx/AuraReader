@@ -10,6 +10,7 @@ import { Session } from './app/session.js';
 import { LayoutController } from './features/layout/layoutController.js';
 import { positionMarginNotes } from './features/layout/marginNotesLayout.js';
 import { ReaderEngine, readerEngine } from './domain/readerEngine.js';
+import { findChapterForPage } from './domain/readingLocation.js';
 import { ReaderController } from './features/reader/readerController.js';
 import { AnnotationController } from './features/annotations/annotationController.js';
 import { SelectionController } from './features/annotations/selectionController.js';
@@ -224,7 +225,7 @@ export function bootstrapApp() {
             type: 'highlight',
             quote: pending.text,
             page: pending.page,
-            chapter: reader.getLocation().chapter,
+            chapter: reader.isChapterFlow() ? findChapterForPage(reader.getCurrentBook()?.toc, pending.page) : reader.getLocation().chapter,
             color,
             location: pending.location || null
         });
@@ -233,7 +234,7 @@ export function bootstrapApp() {
         annotations.createNote({
             quote,
             page,
-            chapter: reader.getLocation().chapter,
+            chapter: reader.isChapterFlow() ? findChapterForPage(reader.getCurrentBook()?.toc, page) : reader.getLocation().chapter,
             location
         });
     };

@@ -112,12 +112,13 @@ export class SelectionController {
             return false;
         }
 
-        const root = token.closest('.book-paper') || token.parentElement;
+        const root = token.closest('[data-volume-title-page]') || token.closest('.book-paper') || token.parentElement;
         const quoteInfo = collectTokenQuote(root, token);
         const reading = this.callbacks.getReadingContext ? this.callbacks.getReadingContext() : {};
         const resolvedPage = Number(page) || Number(token.dataset.page) || 1;
         if (quoteInfo.location) {
-            quoteInfo.location.sectionId = reading.sectionId || quoteInfo.location.sectionId;
+            quoteInfo.location.sectionId = token.closest('[data-volume-title-page]')
+                ? `chapter-${resolvedPage}` : (reading.sectionId || quoteInfo.location.sectionId);
             quoteInfo.location.page = resolvedPage;
         }
 
@@ -193,7 +194,7 @@ export class SelectionController {
         }
 
         event.stopPropagation();
-        const page = Number(paper.dataset.annotationPage) || Number(token.dataset.page) || 1;
+        const page = Number(token.dataset.page) || Number(paper.dataset.annotationPage) || 1;
         const changed = this.activateToken(token, page);
         if (!changed) return;
     }
@@ -221,16 +222,31 @@ export class SelectionController {
         if (rect.width === 0 && rect.height === 0) return;
 
         const ctx = this.callbacks.getReadingContext ? this.callbacks.getReadingContext() : { currentPage: 1 };
-        const effectivePage = ctx.chapterFlow
+        let effectivePage = ctx.chapterFlow
             ? (ctx.currentPage || 1)
             : (isInRight ? (ctx.currentRightPage || (ctx.currentPage + 1)) : (ctx.currentLeftPage || ctx.currentPage));
-        const root = isInRight ? this.elements.bookPaperRight : this.elements.bookPaper;
+        let root = isInRight ? this.elements.bookPaperRight : this.elements.bookPaper;
+        const dividerAt = node => (node.nodeType === 1 ? node : node.parentElement)?.closest('[data-volume-title-page]');
+        const startDivider = dividerAt(range.startContainer);
+        const endDivider = dividerAt(range.endContainer);
+        // Cross-spine selections were never a single annotation. Keep the
+        // original per-document coordinates instead of inventing a new range.
+        if (startDivider !== endDivider || (!startDivider && [...root.querySelectorAll('[data-volume-title-page]')]
+            .some(divider => range.intersectsNode(divider)))) {
+            this.pendingSelection = null;
+            this.hideSelectionTooltip();
+            return;
+        }
+        if (startDivider) {
+            root = startDivider;
+            effectivePage = Number(startDivider.dataset.volumeTitlePage);
+        }
 
         this.pendingSelection = {
             text: selectedText,
             range,
             page: effectivePage,
-            location: selectionLocation(root, range, effectivePage, ctx.sectionId)
+            location: selectionLocation(root, range, effectivePage, startDivider ? `chapter-${effectivePage}` : ctx.sectionId)
         };
 
         if (this.elements) {

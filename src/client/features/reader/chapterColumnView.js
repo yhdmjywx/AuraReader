@@ -123,16 +123,16 @@ export function placeSentenceAtTopLeft(root, viewport, sentence, mode) {
     return true;
 }
 
-export function placeAnchorIdAtTopLeft(root, viewport, anchor, mode) {
+export function placeAnchorIdAtTopLeft(root, viewport, anchor, mode, sourcePage = null) {
     if (!root || !anchor) return false;
     let target = null;
-    try {
-        target = root.querySelector(`#${CSS.escape(anchor)}`)
-            || root.querySelector(`[name="${anchor}"]`)
-            || root.querySelector(`[id*="${anchor}"]`);
-    } catch (e) {
-        target = root.querySelector(`[id="${anchor}"]`);
-    }
+    const candidates = [...root.querySelectorAll('[name], [id]')].filter(element => {
+        const title = element.closest('[data-volume-title-page]');
+        return !sourcePage || Number(title?.dataset.volumeTitlePage || root.dataset.flowPage) === Number(sourcePage);
+    });
+    target = candidates.find(element => element.id === anchor)
+        || candidates.find(element => element.getAttribute('name') === anchor)
+        || candidates.find(element => element.id.includes(anchor));
     if (!target) return false;
     const text = target.textContent || '';
     const sentence = sentenceSlice(text, 0) || text.trim().slice(0, 40);
