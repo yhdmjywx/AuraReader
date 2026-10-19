@@ -33,7 +33,6 @@ export function queryElements() {
         paperContainer: document.getElementById('paper-container'),
         spreadSpine: document.getElementById('spread-spine'),
         currentBookTitle: document.getElementById('current-book-title'),
-        currentBookTag: document.getElementById('current-book-tag'),
         currentPageSpan: document.getElementById('current-page'),
         totalPagesSpan: document.getElementById('total-pages'),
         pageUnit: document.getElementById('page-unit'),

@@ -4,7 +4,7 @@ const path = require('path');
 console.log('=== HTML & DOM 深度审计 ===');
 const clientDir = path.resolve(__dirname, '../../src/client');
 const html = fs.readFileSync(path.join(clientDir, 'index.html'), 'utf8');
-const js = fs.readFileSync(path.join(clientDir, 'app.js'), 'utf8');
+const js = fs.readFileSync(path.join(clientDir, 'main.js'), 'utf8');
 
 // 1. HTML Tag Balance Stack
 const voidTags = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr', '!doctype']);
@@ -59,7 +59,7 @@ for (const id of jsIds) {
     }
 }
 
-console.log(`[DOM ID 完整性校验] app.js 中引用 ${jsIds.size} 个元素 ID:`, missingIds.length === 0 ? '✅ 全部在 HTML 中存在 (0 孤立)' : '❌ 缺失 ID: ' + JSON.stringify(missingIds));
+console.log(`[DOM ID 完整性校验] main.js 中引用 ${jsIds.size} 个元素 ID:`, missingIds.length === 0 ? '✅ 全部在 HTML 中存在 (0 孤立)' : '❌ 缺失 ID: ' + JSON.stringify(missingIds));
 
 // 3. AI 遗留关键词扫描 (HTML / JS / CSS)
 const css = fs.readFileSync(path.join(clientDir, 'styles.css'), 'utf8');

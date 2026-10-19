@@ -74,6 +74,3 @@ export async function getNotesForBooks(bookIds = []) {
     const ids = [...new Set([...all.map(n => n.bookId), ...pendingNoteBookIds()])];
     return (await Promise.all(ids.map(loadNotesForBook))).flat();
 }
-// Full-book local caches are retired. Only pending operations are buffered.
-export function persistNotesToLocalStorage() {}
-export function loadNotesFromLocalStorage() { return null; }
