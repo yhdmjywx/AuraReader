@@ -1,43 +1,34 @@
-const fs = require('fs');
-const path = require('path');
+const assert = require('node:assert/strict');
+const { JSDOM } = require('jsdom');
 
-console.log("=== AuraReader 书籍目录 (TOC) 抽屉全链路功能测试 ===");
-
-const clientDir = path.resolve(__dirname, '../../src/client');
-const jsContent = fs.readFileSync(path.join(clientDir, 'app.js'), 'utf8');
-const htmlContent = fs.readFileSync(path.join(clientDir, 'index.html'), 'utf8');
-const cssContent = fs.readFileSync(path.join(clientDir, 'styles.css'), 'utf8');
-
-// 1. 检查 DOM 结构
-const hasBtnTocInHtml = htmlContent.includes('id="btn-toc"');
-const hasDrawerInHtml = htmlContent.includes('id="toc-drawer"');
-const hasCloseBtnInHtml = htmlContent.includes('id="btn-close-toc"');
-const hasListInHtml = htmlContent.includes('id="toc-list"');
-
-console.log(`[HTML 结构 1] 目录触发按钮 (#btn-toc): ${hasBtnTocInHtml ? 'PASSED' : 'FAILED'}`);
-console.log(`[HTML 结构 2] 目录左侧滑出抽屉 (#toc-drawer): ${hasDrawerInHtml ? 'PASSED' : 'FAILED'}`);
-console.log(`[HTML 结构 3] 目录关闭按钮与列表 (#btn-close-toc, #toc-list): ${hasCloseBtnInHtml && hasListInHtml ? 'PASSED' : 'FAILED'}`);
-
-// 2. 检查 CSS 样式与动画
-const hasTocCss = cssContent.includes('.toc-drawer') && cssContent.includes('.toc-drawer.open');
-console.log(`[CSS 动画 4] 目录抽屉平滑滑入滑出动画 (.toc-drawer.open): ${hasTocCss ? 'PASSED' : 'FAILED'}`);
-
-// 3. 检查 JS 事件与渲染
-const hasBtnTocListener = jsContent.includes("elements.btnToc.addEventListener('click'");
-const hasCloseListener = jsContent.includes("elements.btnCloseToc.addEventListener('click'");
-const hasOutsideClickListener = jsContent.includes("elements.tocDrawer.classList.contains('open')");
-const hasRenderTOC = jsContent.includes("function renderTOC(tocItems)");
-
-console.log(`[JS 交互 5] 点击【三 目录】按钮展开/折叠抽屉: ${hasBtnTocListener ? 'PASSED' : 'FAILED'}`);
-console.log(`[JS 交互 6] 点击关闭按钮或外部空白处自动收起: ${hasCloseListener && hasOutsideClickListener ? 'PASSED' : 'FAILED'}`);
-console.log(`[JS 逻辑 7] renderTOC 动态章节生成与一键跨章跳转: ${hasRenderTOC ? 'PASSED' : 'FAILED'}`);
-
-const allPass = hasBtnTocInHtml && hasDrawerInHtml && hasTocCss && hasBtnTocListener && hasCloseListener && hasRenderTOC;
-console.log(`\n最终测试结论: ${allPass ? '✅ 100% 成功！书籍目录抽屉完整就绪！' : '❌ 校验失败'}`);
-
-if (!allPass) {
-    console.error("❌ TOC DRAWER CHECKS FAILED!");
-    process.exit(1);
-}
-
-console.log("\n=== ALL TOC DRAWER CHECKS PASSED (100% SUCCESS) ===");
+(async () => {
+    const dom = new JSDOM('<button id="btn-toc">目录</button><aside id="toc-drawer"><button id="btn-close-toc">关闭</button><ul id="toc-list"></ul></aside><button id="outside">正文</button>', { url: 'http://localhost/' });
+    const keys = ['window', 'document', 'localStorage'];
+    const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+    try {
+        keys.forEach(key => globalThis[key] = dom.window[key]);
+        const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
+        const byId = id => document.getElementById(id);
+        const elements = { btnToc: byId('btn-toc'), tocDrawer: byId('toc-drawer'), btnCloseToc: byId('btn-close-toc'), tocList: byId('toc-list') };
+        const reader = new ReaderController();
+        reader.initUI(elements);
+        reader.setBook('toc', { pages: ['第一章', '第二章'], toc: [{ title: '第一章', page: 1 }, { title: '第二章', page: 2 }] });
+        elements.btnToc.click(); assert.equal(elements.tocDrawer.classList.contains('open'), true);
+        assert.equal(elements.btnToc.getAttribute('aria-expanded'), 'true');
+        elements.tocList.lastElementChild.click();
+        assert.equal(reader.getCurrentPage(), 2, '实际章节导航改变阅读位置');
+        assert.equal(elements.tocDrawer.classList.contains('open'), false);
+        elements.btnToc.click(); elements.btnCloseToc.click();
+        assert.equal(elements.btnToc.getAttribute('aria-expanded'), 'false');
+        elements.btnToc.click(); byId('outside').click();
+        assert.equal(elements.tocDrawer.classList.contains('open'), false);
+        elements.btnToc.click(); elements.btnToc.click();
+        assert.equal(elements.tocDrawer.classList.contains('open'), false);
+        console.log('✅ 实际目录按钮、关闭、外部点击、章节列表和跳转通过');
+    } finally {
+        dom.window.close();
+        for (const [key, descriptor] of originals) {
+            if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];
+        }
+    }
+})().catch(error => { console.error(error); process.exitCode = 1; });

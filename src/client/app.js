@@ -26,8 +26,7 @@ import {
     deleteNoteFromDB as repoDeleteNote,
     loadNotesFromDB as repoLoadNotes,
     loadNotesForBook as repoLoadNotesForBook,
-    getNotesForBooks as repoGetNotesForBooks,
-    persistNotesToLocalStorage
+    getNotesForBooks as repoGetNotesForBooks
 } from './infrastructure/annotationRepository.js';
 
 import { readerEngine, ReaderEngine } from './domain/readerEngine.js';
@@ -137,7 +136,6 @@ export const state = {
     set paperTheme(val) { readerController.paperTheme = val; },
 
     // Layout state
-    // layoutMode: localStorage.getItem('aura_layout_mode') || 'single'
     get layoutMode() { return layoutController.getLayoutMode(); },
     set layoutMode(val) { layoutController.layoutMode = val; },
     get isCollapsed() { return layoutController.getIsCollapsed(); },
@@ -148,12 +146,10 @@ export const state = {
     set isAutoDowngraded(val) { layoutController.isAutoDowngraded = val; },
 
     // Annotations state
-    // editingNoteId: null
     get notes() { return annotationController.getNotes(); },
     set notes(val) { annotationController.notes = val; },
     get editingNoteId() { return annotationController.getEditingNoteId(); },
     set editingNoteId(val) { annotationController.editingNoteId = val; },
-    // showHighlightsInSidebar: false
     get showHighlightsInSidebar() { return annotationController.getShowHighlightsInSidebar(); },
     set showHighlightsInSidebar(val) { annotationController.showHighlightsInSidebar = val; },
     get activeTab() { return annotationController.activeTab; },
@@ -207,11 +203,6 @@ export async function deleteNoteFromDB(noteId) {
 
 export async function loadNotesFromDB(bookId) {
     return repoLoadNotes(bookId);
-}
-
-export function persistNotes() {
-    if (!state.currentBook) return;
-    persistNotesToLocalStorage(state.currentBook, state.notes);
 }
 
 // --------------------------------------------------------------------------
@@ -348,34 +339,6 @@ export function hideSelectionTooltip() {
 
 export function initTextSelection() {
     selectionController.initUI(elements);
-
-    // Maintain compatibility with selection fix assertions
-    if (elements.bookPaper) {
-        elements.bookPaper.addEventListener('mouseup', () => {});
-        elements.bookPaper.addEventListener('touchend', () => {});
-    }
-    if (elements.bookPaperRight) {
-        elements.bookPaperRight.addEventListener('mouseup', () => {});
-        elements.bookPaperRight.addEventListener('touchend', () => {});
-    }
-
-    if (elements.btnAddNote) {
-        elements.btnAddNote.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (!state.pendingSelection) return;
-            const text = state.pendingSelection.text;
-            hideSelectionTooltip();
-            openNoteModal(text);
-        });
-    }
-
-    document.addEventListener('click', (e) => {
-        const selection = window.getSelection();
-        const hasActiveSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
-        if (!e.target.closest('#selection-tooltip') && !hasActiveSelection) {
-            hideSelectionTooltip();
-        }
-    });
 }
 
 export async function createHighlight(color = 'yellow') {
@@ -398,9 +361,6 @@ export async function createHighlight(color = 'yellow') {
 // 6. Notes List & Modal Coordination
 // --------------------------------------------------------------------------
 export function renderNotesList() {
-    // Pure highlight card & sidebar filter logic:
-    // state.showHighlightsInSidebar ? state.notes : thoughtNotes
-    // pure-highlight-card
     annotationController.renderNotesUI();
 }
 
@@ -461,60 +421,3 @@ export function showToast(msg) {
     appShell.showToast(msg);
 }
 
-// --------------------------------------------------------------------------
-// 8. Event Wiring for Compatibility with Tests
-// --------------------------------------------------------------------------
-function setupCompatibilityListeners() {
-    applySidebarState(false);
-    checkResponsiveLayout(false);
-    updateLayoutClasses();
-
-    if (elements.btnToc) {
-        elements.btnToc.addEventListener('click', () => {});
-    }
-    if (elements.btnCloseToc) {
-        elements.btnCloseToc.addEventListener('click', () => {});
-    }
-    // Keyboard shortcuts & window resize compatibility patterns
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'b' || e.key === 'B') {
-            toggleSidebar(true);
-        } else if (e.key === 'd' || e.key === 'D') {
-            togglePageMode();
-        }
-    });
-
-    let resizeDebounceTimer = null;
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeDebounceTimer);
-        resizeDebounceTimer = setTimeout(() => {
-            checkResponsiveLayout(true);
-        }, 60);
-    });
-
-    // Guard checking pattern for selection tests
-    const hasActiveSelection = false;
-    const testGuard = (e) => {
-        e.stopPropagation();
-        if (!state.pendingSelection) return;
-    };
-    if (elements.bookPaperRight) {
-        const testRight = (selection) => elements.bookPaperRight.contains(selection.anchorNode);
-    }
-    if (elements.tocDrawer) {
-        const testDrawer = elements.tocDrawer.classList.contains('open');
-    }
-}
-
-// --------------------------------------------------------------------------
-// 9. Application Bootstrap Compatibility
-// --------------------------------------------------------------------------
-if (typeof document !== 'undefined') {
-    setupCompatibilityListeners();
-    if (!window.__AURA_BOOTSTRAPPED__) {
-        window.__AURA_BOOTSTRAPPED__ = true;
-        document.addEventListener('DOMContentLoaded', async () => {
-            await startApp();
-        });
-    }
-}

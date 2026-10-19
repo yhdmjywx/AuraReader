@@ -7,8 +7,7 @@
 import {
     saveNoteToDB as repoSaveNote,
     deleteNoteFromDB as repoDeleteNote,
-    loadNotesForBook as repoLoadNotesForBook,
-    persistNotesToLocalStorage
+    loadNotesForBook as repoLoadNotesForBook
 } from '../../infrastructure/annotationRepository.js';
 
 import {
@@ -106,12 +105,6 @@ export class AnnotationController {
         return this.notes;
     }
 
-    persistNotes(bookId = this.getBookId()) {
-        if (!bookId) return;
-        // Compatibility hook; each mutation owns its short-lived recovery entry.
-        persistNotesToLocalStorage(bookId, this.notes);
-    }
-
     getBookId() {
         return this.callbacks.getCurrentBookId ? this.callbacks.getCurrentBookId() : 'crisis-era';
     }
@@ -128,7 +121,6 @@ export class AnnotationController {
         }
 
         await repoSaveNote(normalized);
-        this.persistNotes();
         this.renderNotesUI();
 
         if (this.callbacks.onNotesChanged) {
@@ -161,7 +153,6 @@ export class AnnotationController {
         });
         this.notes.unshift(newNote);
         await repoSaveNote(newNote);
-        this.persistNotes();
         if (this.callbacks.showToast) this.callbacks.showToast('已成功高亮选中文本');
 
         this.renderNotesUI();
@@ -218,7 +209,6 @@ export class AnnotationController {
         if (!exists) this.notes.unshift(note);
         // Save the raw input, including trailing newlines. No list or body
         // rerender is needed when only a note's own words have changed.
-        this.persistNotes(note.bookId);
         this.writeInlineNote(note);
     }
 
@@ -251,7 +241,6 @@ export class AnnotationController {
             const existed = this.notes.some(item => item.id === note.id);
             this.notes = this.notes.filter(item => item.id !== note.id);
             if (existed) {
-                this.persistNotes(note.bookId);
                 this.writeInlineNote(note, true);
             }
         }
@@ -293,7 +282,6 @@ export class AnnotationController {
             this.notes[noteIndex].color = this.notes[noteIndex].color || 'green';
             this.notes[noteIndex].timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
             await repoSaveNote(this.notes[noteIndex]);
-            this.persistNotes();
             if (this.callbacks.showToast) this.callbacks.showToast('笔记已更新');
         } else {
             if (!this.requireQuote(quote)) return;
@@ -315,7 +303,6 @@ export class AnnotationController {
 
             this.notes.unshift(newNote);
             await repoSaveNote(newNote);
-            this.persistNotes();
             if (this.callbacks.showToast) this.callbacks.showToast('笔记已保存');
         }
 
@@ -349,7 +336,6 @@ export class AnnotationController {
         for (const id of removedIds) {
             await repoDeleteNote(id, this.getBookId());
         }
-        this.persistNotes();
         this.renderNotesUI();
 
         if (this.callbacks.showToast) this.callbacks.showToast('已移除高亮');
@@ -374,7 +360,6 @@ export class AnnotationController {
         this.focusedNoteIds = this.focusedNoteIds.filter(noteId => noteId !== id);
         this.focusedHighlightIds = this.focusedHighlightIds.filter(noteId => noteId !== id);
         await repoDeleteNote(id, this.getBookId());
-        this.persistNotes();
         this.renderNotesUI();
 
         if (this.callbacks.showToast) this.callbacks.showToast(toastMessage);

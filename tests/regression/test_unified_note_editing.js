@@ -1,111 +1,63 @@
-const fs = require('fs');
-const path = require('path');
+const assert = require('node:assert/strict');
+const { JSDOM } = require('jsdom');
 
-console.log("=== AuraReader 高亮与随笔合并绑定及原地编辑自动化测试 ===");
-
-const jsContent = fs.readFileSync(path.resolve(__dirname, '../../src/client/app.js'), 'utf8');
-const controllerContent = fs.readFileSync(path.resolve(__dirname, '../../src/client/features/annotations/annotationController.js'), 'utf8');
-const notesContent = fs.readFileSync(path.resolve(__dirname, '../../src/client/features/annotations/notesUI.js'), 'utf8');
-
-// 1. 静态检测核心逻辑
-const hasEditingNoteIdInState = controllerContent.includes('this.editingNoteId = null');
-const hasOpenNoteModalEditParam = jsContent.includes('function openNoteModal(quote, existingNoteId = null)');
-const hasInPlaceSave = controllerContent.includes('updateInlineNote(id, comment)');
-const hasDirectEditInCard = notesContent.includes('onEdit(note)') && !notesContent.includes('btn-edit-note');
-const openBody = jsContent.slice(jsContent.indexOf('function openNoteModal'), jsContent.indexOf('function closeNoteModal'));
-const hasNoAutoMerge = openBody.length > 0 && !openBody.includes('findOverlappingNote');
-
-console.log(`[静态检查 1] state.editingNoteId 状态追踪: ${hasEditingNoteIdInState ? 'PASSED' : 'FAILED'}`);
-console.log(`[静态检查 2] openNoteModal 编辑模式支持: ${hasOpenNoteModalEditParam ? 'PASSED' : 'FAILED'}`);
-console.log(`[静态检查 3] 原位输入自动保存: ${hasInPlaceSave ? 'PASSED' : 'FAILED'}`);
-console.log(`[静态检查 4] 点击笔记内容直接编辑: ${hasDirectEditInCard ? 'PASSED' : 'FAILED'}`);
-console.log(`[静态检查 5] 新建笔记不再自动改写已有高亮: ${hasNoAutoMerge ? 'PASSED' : 'FAILED'}`);
-
-// 2. 交互仿真测试 (Mock Interactive Lifecycle)
-const mockState = {
-    currentBook: 'crisis-era',
-    currentPage: 7,
-    notes: [],
-    editingNoteId: null,
-    pendingSelection: null
-};
-
-// 步骤 A: 用户划线高亮一段文字
-function mockCreateHighlight(quote, color = 'yellow') {
-    const existing = mockState.notes.find(n => n.page === mockState.currentPage && n.quote === quote);
-    if (existing) {
-        existing.color = color;
-    } else {
-        mockState.notes.unshift({
-            id: 'highlight-' + Date.now(),
-            bookId: mockState.currentBook,
-            kind: 'highlight',
-            quote: quote,
-            comment: '',
-            color: color,
-            page: mockState.currentPage
-        });
-    }
-}
-
-// 步骤 B: 选区里的“笔记”始终新建，不改写已有高亮
-function mockOpenNoteModal(quote, existingId = null) {
-    mockState.editingNoteId = existingId || null;
-}
-
-function mockSaveModalNote(quote, comment) {
-    if (mockState.editingNoteId) {
-        const idx = mockState.notes.findIndex(n => n.id === mockState.editingNoteId);
-        if (idx !== -1 && mockState.notes[idx].kind !== 'highlight') {
-            mockState.notes[idx].comment = comment;
+(async () => {
+    const dom = new JSDOM('<div id="list"></div>', { url: 'http://localhost/' });
+    const keys = ['window', 'document', 'localStorage'];
+    const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+    let storage;
+    try {
+        keys.forEach(key => globalThis[key] = dom.window[key]);
+        storage = await require('../helpers/sqlite').clientStorage([{ id: 'editing', pages: ['同一段原文'] }]);
+        const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
+        const elements = { notesList: document.getElementById('list') };
+        const makeController = () => {
+            const controller = new AnnotationController({ callbacks: {
+                getCurrentBookId: () => 'editing',
+                getVisibleAnnotationIds: () => new Set(controller.getNotes().map(note => note.id))
+            } });
+            controller.initUI(elements);
+            return controller;
+        };
+        const controller = makeController();
+        const location = { page: 1, start: 0, end: 6 };
+        const highlight = await controller.createHighlight({ quote: '同一段原文', location });
+        controller.createNote({ quote: '同一段原文', location });
+        const id = controller.editingNoteId;
+        const editor = () => elements.notesList.querySelector('.note-editor');
+        const input = value => {
+            editor().value = value;
+            editor().dispatchEvent(new window.Event('input', { bubbles: true }));
+        };
+        assert.equal(document.activeElement, editor());
+        input('第一行\n第二行😀\n');
+        await storage.drain();
+        assert.equal(storage.read('annotations', id).comment, '第一行\n第二行😀\n', '退出前已经写入真实 SQLite');
+        await controller.finishInlineEdit();
+        await storage.restart();
+        storage.configureClient();
+        const reopened = makeController();
+        await reopened.loadNotesForBook('editing');
+        assert.equal(reopened.getNotes().length, 2);
+        assert.equal(reopened.getNotes().find(note => note.id === id).comment, '第一行\n第二行😀\n');
+        assert.deepEqual(storage.read('annotations', highlight.id), highlight, '同一原文的笔记不改写高亮');
+        document.getElementById('card-' + id).click();
+        assert.equal(document.activeElement, editor());
+        input('修改后的笔记');
+        await reopened.finishInlineEdit();
+        await reopened.loadNotesForBook('editing');
+        assert.equal(reopened.getNotes().find(note => note.id === id).comment, '修改后的笔记');
+        await reopened.deleteNote(id);
+        assert.equal(storage.read('annotations', id), undefined);
+        assert.deepEqual(storage.read('annotations', highlight.id), highlight);
+        await reopened.deleteHighlight(highlight.id);
+        await reopened.loadNotesForBook('editing');
+        assert.deepEqual(reopened.getNotes(), []);
+        console.log('✅ 真实原位笔记：创建、输入中保存、重启重开、点击编辑、独立删除笔记和高亮通过');
+    } finally {
+        await storage?.close(); dom.window.close();
+        for (const [key, descriptor] of originals) {
+            if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];
         }
-    } else if (comment && comment.trim()) {
-        mockState.notes.unshift({
-            id: 'note-' + Date.now(),
-            bookId: mockState.currentBook,
-            kind: 'note',
-            quote: quote,
-            comment: comment,
-            page: mockState.currentPage
-        });
     }
-    mockState.editingNoteId = null;
-}
-
-const sampleQuote = "远超2008年‘雷曼时刻’的金融危机已迫在眉睫。";
-
-console.log("\n--- [测试步骤 1: 用户点击高亮] ---");
-mockCreateHighlight(sampleQuote, 'yellow');
-console.log(`生成划线后笔记总数: ${mockState.notes.length} 条 (感悟: "${mockState.notes[0].comment}")`);
-
-console.log("\n--- [测试步骤 2: 用户为同一段文字新建笔记 'wfokfaw'] ---");
-mockOpenNoteModal(sampleQuote);
-console.log(`新建流程不应进入编辑: ${mockState.editingNoteId === null ? 'YES' : 'NO'}`);
-mockSaveModalNote(sampleQuote, 'wfokfaw');
-const highlight = mockState.notes.find(n => n.kind === 'highlight');
-const createdNote = mockState.notes.find(n => n.kind === 'note');
-console.log(`保存后记录数: ${mockState.notes.length} 条 (期望: 高亮 1 + 笔记 1)`);
-console.log(`高亮仍无正文: "${highlight && highlight.comment}", 笔记内容: "${createdNote && createdNote.comment}"`);
-
-console.log("\n--- [测试步骤 3: 用户只编辑这条笔记] ---");
-mockOpenNoteModal(sampleQuote, createdNote.id);
-mockSaveModalNote(sampleQuote, '修改后的深度思考感悟');
-const highlightAfter = mockState.notes.find(n => n.kind === 'highlight');
-const noteAfter = mockState.notes.find(n => n.id === createdNote.id);
-console.log(`编辑后记录数: ${mockState.notes.length} 条 (期望: 2 条)`);
-console.log(`笔记更新为: "${noteAfter && noteAfter.comment}", 高亮评论仍为: "${highlightAfter && highlightAfter.comment}"`);
-
-const testPassed = mockState.notes.length === 2
-    && noteAfter
-    && noteAfter.comment === '修改后的深度思考感悟'
-    && highlightAfter
-    && highlightAfter.comment === ''
-    && hasNoAutoMerge;
-console.log(`\n判定结果: ${testPassed ? '✅ 100% 通过！高亮与笔记独立保存，编辑笔记不会改写高亮。' : '❌ 校验失败'}`);
-
-if (!testPassed) {
-    console.error("❌ UNIFIED NOTE EDITING CHECKS FAILED!");
-    process.exit(1);
-}
-
-console.log("\n=== ALL UNIFIED NOTE EDITING TESTS PASSED (100% SUCCESS) ===");
+})().catch(error => { console.error(error); process.exitCode = 1; });
