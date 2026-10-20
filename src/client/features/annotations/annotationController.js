@@ -91,18 +91,20 @@ export class AnnotationController {
 
     async loadNotesForBook(bookId) {
         await this.finishInlineEdit();
-        this.notesScope = 'page';
-        if (!bookId) {
-            this.notes = [];
-            this.renderNotesUI();
-            return [];
-        }
-
-        const loaded = await repoLoadNotesForBook(bookId);
-
-        this.notes = normalizeList(loaded);
+        const loaded = bookId ? await repoLoadNotesForBook(bookId) : [];
+        this.setNotesForBook(loaded);
         this.renderNotesUI();
         return this.notes;
+    }
+
+    // Install prepared data synchronously; the coordinator renders only after
+    // the reader and session have also switched to this book.
+    setNotesForBook(notes) {
+        this.notes = normalizeList(notes);
+        this.notesScope = 'page';
+        this.focusedNoteIds = [];
+        this.focusedHighlightIds = [];
+        this._renderedSidebarIds = null;
     }
 
     getBookId() {

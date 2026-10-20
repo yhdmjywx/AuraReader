@@ -25,7 +25,6 @@ import {
     saveNoteToDB as repoSaveNote,
     deleteNoteFromDB as repoDeleteNote,
     loadNotesFromDB as repoLoadNotes,
-    loadNotesForBook as repoLoadNotesForBook,
     getNotesForBooks as repoGetNotesForBooks
 } from './infrastructure/annotationRepository.js';
 
@@ -256,28 +255,7 @@ export function updateLayoutClasses() {
 // 4. Reading Facade & Book Loading
 // --------------------------------------------------------------------------
 export async function loadBook(bookKey) {
-    state.currentBook = bookKey;
-    let book = await loadBookFromDB(bookKey);
-    if (!book && demoBooks[bookKey]) {
-        book = demoBooks[bookKey];
-    }
-    if (!book) return;
-
-    readerController.setBook(bookKey, book);
-    const loc = readerController.getLocation();
-    state.currentPage = loc.page;
-    state.totalPages = loc.totalPages;
-
-    if (elements.currentBookTitle) elements.currentBookTitle.textContent = book.title;
-    if (elements.currentBookTag) elements.currentBookTag.textContent = book.format || 'EPUB';
-    if (elements.totalPagesSpan) elements.totalPagesSpan.textContent = state.totalPages;
-
-    renderTOC(book.toc || []);
-
-    state.notes = await repoLoadNotesForBook(bookKey);
-
-    renderNotesList();
-    renderPage(1);
+    return appCoordinator.openBook(bookKey);
 }
 
 export function renderPage(pageNum, preserveScroll = false) {
