@@ -24,6 +24,15 @@ export class AppShell {
         }, 2600);
     }
 
+    setBookLoading(loading) {
+        // Leave header and shelf controls available for a newer book request.
+        for (const panel of [this.elements?.readerPanel, this.elements?.notesPanel]) {
+            if (!panel) continue;
+            panel.inert = loading;
+            panel.setAttribute('aria-busy', String(loading));
+        }
+    }
+
     toggleAppTheme() {
         if (this.appTheme === 'light') {
             this.appTheme = 'dark';

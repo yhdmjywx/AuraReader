@@ -12,6 +12,7 @@ import {
 } from '../infrastructure/bookRepository.js';
 
 import { parseEpub, parseTxt } from '../infrastructure/epubParser.js';
+import { loadNotesForBook } from '../infrastructure/annotationRepository.js';
 import { isNote } from '../domain/annotationEngine.js';
 
 export class AppCoordinator {
@@ -33,41 +34,55 @@ export class AppCoordinator {
         this.selection = selectionController;
         this.backup = backupController;
         this.shell = appShell;
+        this.openBookRequestId = 0;
     }
 
     async openBook(bookId) {
         if (!bookId) return;
+        const requestId = ++this.openBookRequestId;
+        this.shell?.setBookLoading?.(true);
 
-        let book = await loadBookFromDB(bookId);
-        if (!book && demoBooks[bookId]) {
-            book = { id: bookId, ...demoBooks[bookId] };
-            await saveBookToDB(book);
-        }
-        if (!book) {
-            if (this.shell) this.shell.showToast("未能载入图书，请重新导入");
-            return;
-        }
+        try {
+            // Finish the old book's editor before reading, while it still owns
+            // the session. Reads below must not replace any current UI state.
+            await this.annotations.finishInlineEdit();
+            if (requestId !== this.openBookRequestId) return;
 
-        // 1. Session updates active book
-        await this.annotations.finishInlineEdit?.();
-        this.session.setCurrentBookId(bookId);
+            let book = await loadBookFromDB(bookId);
+            if (requestId !== this.openBookRequestId) return;
+            if (!book && demoBooks[bookId]) {
+                book = { id: bookId, ...demoBooks[bookId] };
+                await saveBookToDB(book);
+                if (requestId !== this.openBookRequestId) return;
+            }
+            if (!book) {
+                this.shell?.showToast('未能载入图书，请重新导入');
+                return;
+            }
 
-        // 2. Reader engine and UI load book
-        this.reader.setBook(bookId, book);
+            const notes = await loadNotesForBook(bookId);
+            if (requestId !== this.openBookRequestId) return;
 
-        // 3. Annotations controller loads notes for this book
-        const notes = await this.annotations.loadNotesForBook(bookId);
+            // No await between installing the complete data and rendering it.
+            // Session subscribers see the matching reader and annotations.
+            this.annotations.setNotesForBook(notes);
+            this.reader.setBook(bookId, book);
+            this.session.setCurrentBookId(bookId);
+            this.reader.renderPage(1, false, this.annotations.getNotes());
+            this.annotations.refreshVisibleNotes();
 
-        // 4. Reader renders page 1 with highlights
-        this.reader.renderPage(1, false, notes);
-
-        // 5. Shelf refreshes
-        if (this.shelf) {
-            await this.shelf.refreshShelf();
-        }
-
-        if (this.shell) {
-            this.shell.showToast(`已成功加载图书：《${book.title}》`);
+            if (this.shelf) await this.shelf.refreshShelf();
+            if (requestId === this.openBookRequestId) {
+                this.shell?.showToast(`已成功加载图书：《${book.title}》`);
+            }
+        } catch (error) {
+            // A superseded request may fail after the latest book has opened.
+            if (requestId === this.openBookRequestId) {
+                console.error('图书载入失败:', error);
+                this.shell?.showToast(error.message || '图书载入失败，请重试');
+            }
+        } finally {
+            if (requestId === this.openBookRequestId) this.shell?.setBookLoading?.(false);
         }
     }
 
