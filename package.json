@@ -11,7 +11,7 @@
     "prestart": "npm run build",
     "dev": "npm run build && node src/server/server.js",
     "build": "node scripts/build.cjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/build.cjs --check",
     "test": "node scripts/test.cjs all",
     "test:syntax": "node scripts/test.cjs syntax",
     "test:unit": "node scripts/test.cjs unit",

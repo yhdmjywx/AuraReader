@@ -15,7 +15,9 @@ if (diagnostics.length) {
     }));
     process.exit(1);
 }
-if (program.emit().emitSkipped) throw new Error('TypeScript build failed');
-fs.mkdirSync(path.join(root, 'dist/client'), { recursive: true });
-fs.copyFileSync(path.join(root, 'src/client/package.json'), path.join(root, 'dist/client/package.json'));
-console.log('Client build and strict TypeScript checks passed.');
+if (!process.argv.includes('--check')) {
+    if (program.emit().emitSkipped) throw new Error('TypeScript build failed');
+    fs.mkdirSync(path.join(root, 'dist/client'), { recursive: true });
+    fs.copyFileSync(path.join(root, 'src/client/package.json'), path.join(root, 'dist/client/package.json'));
+}
+console.log('Strict TypeScript and contract checks passed' + (process.argv.includes('--check') ? '.' : '; client built.'));
