@@ -8,7 +8,11 @@ const { JSDOM } = require('jsdom');
     let reader;
     try {
         keys.forEach(key => globalThis[key] = dom.window[key]);
-        const { resolveVolumeTitleFlow } = await import('../../src/client/features/reader/volumeTitleFlow.js');
+        const { buildBookStructure, readingUnitForPage } = await import('../../src/client/infrastructure/bookStructure.js');
+        const resolveVolumeTitleFlow = (book, page) => {
+            const unit = readingUnitForPage(buildBookStructure(book), page);
+            return { page: unit.page, titlePage: unit.prefixPages[0] || null };
+        };
         const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
         const { SelectionController } = await import('../../src/client/features/annotations/selectionController.js');
         const { selectionLocation } = await import('../../src/client/features/reader/annotationRenderer.js');

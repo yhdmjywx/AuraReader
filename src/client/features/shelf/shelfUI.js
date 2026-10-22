@@ -1,4 +1,5 @@
 /* Library popover presentation. Book operations remain controller callbacks. */
+import { buildBookStructure, structureSummary } from '../../infrastructure/bookStructure.js';
 export function renderShelf({ elements, books = [], onOpenBook = null, onDeleteBook = null }) {
     if (!elements?.shelfList) return;
     if (elements.shelfBookCount) {
@@ -30,7 +31,7 @@ export function renderShelf({ elements, books = [], onOpenBook = null, onDeleteB
         open.title = title;
         open.setAttribute('aria-label', '打开阅读：《' + title + '》');
         row.querySelector('.shelf-book-title').textContent = title;
-        row.querySelector('.shelf-book-meta').textContent = `${book.format || 'EPUB'} · ${book.pages ? book.pages.length : (book.toc ? book.toc.length : 1)} 章节`;
+        row.querySelector('.shelf-book-meta').textContent = `${book.format || 'EPUB'} · ${structureSummary(buildBookStructure(book))}`;
         open.addEventListener('click', () => {
             closeShelf(elements);
             onOpenBook?.(book.id);

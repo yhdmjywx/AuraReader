@@ -46,7 +46,7 @@ const { JSDOM } = require('jsdom');
         assert.equal(elements.shelfList.querySelectorAll('.shelf-entry').length, 3);
         const openButton = [...elements.shelfList.querySelectorAll('.shelf-book-open')].find(button => button.title === longTitle);
         assert.equal(openButton.querySelector('.shelf-book-title').textContent, longTitle);
-        assert.equal(openButton.querySelector('.shelf-book-meta').textContent, 'EPUB · 2 章节');
+        assert.equal(openButton.querySelector('.shelf-book-meta').textContent, 'EPUB · 2 内容单元');
         assert.equal(openButton.querySelector('img'), null, '书名作为文本渲染');
         elements.shelfPanel.querySelector('h2').click(); assert.ok(isOpen());
         document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
