@@ -8,7 +8,7 @@
 import { ReaderEngine } from '../../domain/readerEngine.js';
 import { FontController } from './fontController.js';
 import { collectVisibleAnnotationIds } from './visibleAnnotations.js';
-import { resolveVolumeTitleFlow } from './volumeTitleFlow.js';
+import { buildBookStructure, readingUnitForPage } from '../../infrastructure/bookStructure.js';
 import { resolveTargetPage, ensureTocHierarchy } from '../../domain/readingLocation.js';
 import { isChapterFlowBook } from '../../domain/chapterFlow.js';
 import {
@@ -59,7 +59,8 @@ export class ReaderController {
         this.elements = null;
         this.flowAnchorText = '';
         this._flowPage = 0;
-        this._volumeTitlePage = null;
+        this._volumeTitlePages = [];
+        this.bookStructure = null;
         this.fonts = new FontController({
             getBook: () => this.getCurrentBook(),
             beforeChange: () => this.rememberAnchor(),
@@ -78,6 +79,7 @@ export class ReaderController {
 
     setBook(bookKey, bookObj) {
         this.engine.setBook(bookKey, bookObj);
+        this.bookStructure = buildBookStructure(bookObj);
         const loc = this.engine.getLocation();
         this.currentPage = loc.page;
         this.currentLeftPage = loc.page;
@@ -93,7 +95,7 @@ export class ReaderController {
         }
 
         this.renderTOC(bookObj.toc || []);
-        this._volumeTitlePage = null;
+        this._volumeTitlePages = [];
         this.fonts.prepareForBook();
         return loc;
     }
@@ -458,9 +460,9 @@ export class ReaderController {
     renderChapterPage(pageNum, preserveScroll = false, notes = [], options = {}) {
         if (!preserveScroll) notes = this.callbacks.beforeNavigate?.() || notes;
         const sourcePage = Number(pageNum);
-        const flow = resolveVolumeTitleFlow(this.getCurrentBook(), sourcePage);
+        const flow = readingUnitForPage(this.bookStructure, sourcePage);
         const loc = this.engine.goToPage(flow.page);
-        this._volumeTitlePage = flow.titlePage;
+        this._volumeTitlePages = flow.prefixPages;
         this.currentPage = loc.page;
         this.currentLeftPage = loc.page;
         this.currentRightPage = null;
@@ -491,14 +493,16 @@ export class ReaderController {
         applyHighlightsToPaper(elements.bookPaper, page, notes, (markEl, note) => {
             if (this.callbacks.onMarkClick) this.callbacks.onMarkClick(markEl, note);
         });
-        if (this._volumeTitlePage) {
+        const prefixes = document.createDocumentFragment();
+        for (const titlePage of this._volumeTitlePages) {
             const title = document.createElement('div');
-            title.dataset.volumeTitlePage = String(this._volumeTitlePage);
+            title.dataset.volumeTitlePage = String(titlePage);
             title.style.display = 'contents';
-            title.innerHTML = this.engine.getPageContent(this._volumeTitlePage);
-            applyHighlightsToPaper(title, this._volumeTitlePage, notes);
-            elements.bookPaper.prepend(title);
+            title.innerHTML = this.engine.getPageContent(titlePage);
+            applyHighlightsToPaper(title, titlePage, notes);
+            prefixes.appendChild(title);
         }
+        elements.bookPaper.prepend(prefixes);
         interceptInTextLinks(elements, this.engine.getCurrentBook(), (href) => {
             this.handleInTextLinkClick(href, this.callbacks.getNotes ? this.callbacks.getNotes() : notes);
         });
@@ -540,7 +544,7 @@ export class ReaderController {
             this._anchorTimer = setTimeout(() => this.rememberAnchor(), 60);
             return this.getLocation();
         }
-        const target = (direction < 0 ? (this._volumeTitlePage || this.currentPage) : this.currentPage) + direction;
+        const target = (direction < 0 ? (this._volumeTitlePages[0] || this.currentPage) : this.currentPage) + direction;
         if (target < 1 || target > this.totalPages) {
             this.syncChapterChrome();
             return this.getLocation();
@@ -556,7 +560,7 @@ export class ReaderController {
         writeChapterIndicator(elements, mode);
         const atStart = atStripStart(elements, mode);
         const atEnd = atStripEnd(elements, mode);
-        if (elements.btnPrevPage) elements.btnPrevPage.disabled = (this._volumeTitlePage || this.currentPage) <= 1 && atStart;
+        if (elements.btnPrevPage) elements.btnPrevPage.disabled = (this._volumeTitlePages[0] || this.currentPage) <= 1 && atStart;
         if (elements.btnNextPage) elements.btnNextPage.disabled = this.currentPage >= this.totalPages && atEnd;
         if (this.layoutController && typeof this.layoutController.updateLayoutClasses === 'function') {
             this.layoutController.updateLayoutClasses(elements);

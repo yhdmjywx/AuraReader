@@ -8,6 +8,7 @@ import { ensureTocHierarchy } from '../domain/readingLocation.js';
 import { groupAnnotationsByRange, normalizeAnnotation, isHighlight, isNote } from '../domain/annotationEngine.js';
 import { compactWithMap, resolveAnnotationRange } from '../domain/annotationRangeEngine.js';
 import { renderAnnotationTokens } from '../features/reader/annotationRenderer.js';
+import { buildBookStructure, structureSummary } from './bookStructure.js';
 
 export function downloadFile(filename, data, type) {
     if (typeof window === 'undefined') return;
@@ -55,30 +56,39 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
         .filter(note => !book.id || !note.bookId || note.bookId === book.id)
         .map((note, idx) => ({ ...note, id: note.id || `export-${idx}` }));
 
+    const structure = buildBookStructure(book);
+    const filesByUnit = new Map(structure.units.map((unit, index) => [unit.id,
+        `${String(index + 1).padStart(2, '0')}_${unit.title.replace(/[\\/:*?"<>|\r\n]/g, '_')}.md`]));
     let indexMd = `# 《${book.title}》 导读书册与笔记全览\n\n`;
     indexMd += `- 格式：${book.format || 'EPUB'}\n`;
-    indexMd += `- 总章节数：${book.pages.length}\n`;
+    indexMd += `- 内容结构：${structureSummary(structure)}\n`;
+    indexMd += `- 导出内容文件：${structure.units.length}\n`;
     indexMd += `- 划线数：${annotations.filter(isHighlight).length}\n`;
     indexMd += `- 笔记数：${annotations.filter(isNote).length}\n`;
     indexMd += `- 导出时间：${new Date().toLocaleString()}\n\n`;
     indexMd += `## 目录结构\n`;
     let unmatchedHighlights = 0;
 
-    book.pages.forEach((pageHtml, idx) => {
-        const pageNum = idx + 1;
+    // Preserve TOC hierarchy, including multiple nodes/anchors sharing a file.
+    // Structural volume nodes link to their first chapter, not an empty file.
+    for (const node of structure.nodes) {
+        const unit = structure.pageToUnit.get(node.page);
+        const label = escapeMarkdownText(node.title);
+        const link = unit ? `[${label}](./${encodeURIComponent(filesByUnit.get(unit.id))})` : label;
+        indexMd += `${'  '.repeat(node.level)}- ${link}\n`;
+    }
+    const untitledUnits = structure.units.filter(unit => !structure.nodes.some(node => unit.sourcePages.includes(node.page)));
+    if (untitledUnits.length) {
+        indexMd += '\n## 其他保留内容\n';
+        untitledUnits.forEach(unit => { indexMd += `- [${escapeMarkdownText(unit.title)}](./${encodeURIComponent(filesByUnit.get(unit.id))})\n`; });
+    }
+
+    // Resolve every annotation within its original source before combining
+    // rendered Markdown. Joining HTML first would shift existing note offsets.
+    function sourceMarkdown(pageNum) {
         const pageNotes = annotations.filter(n => n.page === pageNum);
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = pageHtml;
-
-        let chapTitle = `第${pageNum}章`;
-        const tocEntry = (book.toc || []).find(item => Number(item.page) === pageNum);
-        const legacyEntry = book.toc && book.toc[idx];
-        chapTitle = tocEntry?.title || (legacyEntry && legacyEntry.page == null ? legacyEntry.title : '')
-            || tempDiv.querySelector('h1, h2, h3')?.textContent.trim() || chapTitle;
-        chapTitle = chapTitle.replace(/[\\/:*?"<>|\r\n]/g, '_');
-        const fileName = `${String(pageNum).padStart(2, '0')}_${chapTitle}.md`;
-
-        indexMd += `${pageNum}. [${escapeMarkdownText(chapTitle)}](./${encodeURIComponent(fileName)})\n`;
+        tempDiv.innerHTML = book.pages[pageNum - 1];
 
         // Offsets are chapter-relative, as in the reader. Saved note ranges
         // recover the exact source quote; legacy notes fall back to quote search.
@@ -95,13 +105,19 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
         unmatchedHighlights += exportNotes.filter(isHighlight).filter(note => !resolveAnnotationRange(text, note)).length;
         renderAnnotationTokens(tempDiv, exportNotes, pageNum);
 
-        let chapMd = `# ${escapeMarkdownText(chapTitle)}\n\n`;
-        chapMd += `> 本章划线：${pageNotes.filter(isHighlight).length} 条 | 笔记：${pageNotes.filter(isNote).length} 条\n\n---\n\n`;
         const chapterBody = chapterBodyMarkdown(tempDiv, exportNotes.filter(isNote));
-        chapMd += chapterBody.markdown + '\n\n';
-        chapMd += chapterAnnotationMarkdown(chapterBody.unplacedNotes);
-        folder.file(fileName, chapMd);
-    });
+        return chapterBody.markdown + '\n\n' + chapterAnnotationMarkdown(chapterBody.unplacedNotes);
+    }
+    for (const unit of structure.units) {
+        const unitNotes = annotations.filter(note => unit.sourcePages.includes(note.page));
+        let markdown = '';
+        // A source heading already provides the title for prefixed units:
+        // 第一卷 → 大堂. Do not add a second artificial “大堂” before 第一卷.
+        if (!unit.prefixPages.length) markdown += `# ${escapeMarkdownText(unit.title)}\n\n`;
+        markdown += `> 本章划线：${unitNotes.filter(isHighlight).length} 条 | 笔记：${unitNotes.filter(isNote).length} 条\n\n---\n\n`;
+        markdown += unit.sourcePages.map(sourceMarkdown).join('\n');
+        folder.file(filesByUnit.get(unit.id), markdown);
+    }
 
     const invalidPage = note => !Number.isInteger(note.page) || note.page < 1 || note.page > book.pages.length;
     const unassigned = annotations.filter(isNote).filter(invalidPage);
@@ -217,11 +233,26 @@ function chapterBodyMarkdown(root, notes = []) {
             if (node.nodeType === 3) { write(node.textContent, marked); return; }
             if (node.nodeType !== 1 || node.matches('script,style')) return;
             if (node.tagName === 'BR') { write('\n', false); return; }
+            if (node.tagName.toLowerCase() === 'svg') {
+                // Keep vector illustrations as images, rather than injecting
+                // executable inline SVG into the Markdown document.
+                runs.push({ image: `<img src="data:image/svg+xml,${encodeURIComponent(node.outerHTML)}" alt="">` });
+                return;
+            }
+            if (node.tagName === 'IMG' || node.tagName.toLowerCase() === 'image') {
+                const src = node.getAttribute('src') || node.getAttribute('href') || node.getAttribute('xlink:href') || '';
+                // EPUB images are normally inlined by the parser. Keep them
+                // when preserving illustrated dividers and other source pages.
+                if (/^(?:data:image\/|https?:\/\/)/i.test(src)) {
+                    runs.push({ image: `<img src="${escapeHtml(src)}" alt="${escapeHtml(node.getAttribute('alt') || '')}">` });
+                }
+                return;
+            }
             const isMarked = marked || node.classList.contains('has-highlight');
             node.childNodes.forEach(child => visit(child, isMarked));
         }
         nodes.forEach(node => visit(node));
-        return runs.map(run => run.marked ? highlightMarkdown(run.text) : escapeMarkdownText(run.text)).join('').trim();
+        return runs.map(run => run.image || (run.marked ? highlightMarkdown(run.text) : escapeMarkdownText(run.text))).join('').trim();
     }
     function children(element) {
         let result = '';

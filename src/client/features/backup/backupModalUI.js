@@ -2,6 +2,7 @@
    BackupModalUI - Backup Dialog & Multi-Book Export Presentation (Feature Layer)
    Handles backup modal checkbox list rendering, all-select toggling, and dialog visibility.
    ========================================================================== */
+import { buildBookStructure, structureSummary } from '../../infrastructure/bookStructure.js';
 
 export function renderBackupBookList(elements, books = [], allNotes = []) {
     if (!elements || !elements.backupBookCheckboxList) return;
@@ -20,7 +21,7 @@ export function renderBackupBookList(elements, books = [], allNotes = []) {
                 <input type="checkbox" class="chk-backup-book" data-id="${bookId}" checked>
                 <span>${escapeHtml(book.title)}</span>
             </label>
-            <small style="color: var(--text-sub); font-size: 0.78rem;">${book.format || 'EPUB'} · ${book.pages ? book.pages.length : 1} 章节 · ${noteCount} 条划线</small>
+            <small style="color: var(--text-sub); font-size: 0.78rem;">${book.format || 'EPUB'} · ${escapeHtml(structureSummary(buildBookStructure(book)))} · ${noteCount} 条划线</small>
         `;
         elements.backupBookCheckboxList.appendChild(item);
     });
