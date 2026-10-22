@@ -7,7 +7,7 @@ if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.m
 const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
 const program = ts.createProgram(parsed.fileNames, parsed.options);
 const typeTests = fs.readdirSync(path.join(root, 'tests/types')).filter(file => file.endsWith('.mts')).map(file => path.join(root, 'tests/types', file));
-const contractProgram = ts.createProgram(typeTests, { ...parsed.options, rootDir: root, noEmit: true });
+const contractProgram = ts.createProgram([...typeTests, ...parsed.fileNames.filter(file => file.endsWith('.d.ts'))], { ...parsed.options, rootDir: root, noEmit: true });
 const diagnostics = [...parsed.errors, ...ts.getPreEmitDiagnostics(program), ...ts.getPreEmitDiagnostics(contractProgram)];
 if (diagnostics.length) {
     process.stderr.write(ts.formatDiagnosticsWithColorAndContext(diagnostics, {

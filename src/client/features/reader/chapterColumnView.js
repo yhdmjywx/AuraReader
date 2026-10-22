@@ -123,6 +123,7 @@ export function placeSentenceAtTopLeft(root, viewport, sentence, mode) {
     return true;
 }
 
+/** @param {number | null | undefined} sourcePage */
 export function placeAnchorIdAtTopLeft(root, viewport, anchor, mode, sourcePage = null) {
     if (!root || !anchor) return false;
     let target = null;

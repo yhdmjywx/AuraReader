@@ -8,6 +8,7 @@
 import { filterNotes, isHighlight, isNote } from '../../domain/annotationEngine.js';
 import { isImmersiveNotes, positionMarginNotes, moveNoteCard } from '../layout/marginNotesLayout.js';
 
+/** @param {import('../../app/contracts.js').NotesRenderOptions} options */
 export function renderNotesList({
     elements,
     notes = [],

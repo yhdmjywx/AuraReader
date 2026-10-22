@@ -1,3 +1,7 @@
+import { eventElement } from '../../app/dom.js';
+import type { Annotation, AnnotationInput } from '../../domain/annotation.js';
+import type { AnnotationCallbacks, NoteDraft } from '../../app/contracts.js';
+import type { AppElements } from '../../app/elements.js';
 /* ==========================================================================
    AnnotationController - Notes & Highlights Feature Controller
    Authority owner of: notes, editingNoteId, showHighlightsInSidebar, activeTab.
@@ -24,9 +28,21 @@ import {
 } from './notesUI.js';
 
 export class AnnotationController {
+    callbacks: AnnotationCallbacks;
+    notes: Annotation[];
+    editingNoteId: string | null;
+    inlineEdit: { note: Annotation; opening: boolean } | null;
+    _inlineWrites: Promise<void>;
+    showHighlightsInSidebar: boolean;
+    notesScope: 'page' | 'book';
+    _renderedSidebarIds: string | null;
+    activeTab: string;
+    focusedNoteIds: string[];
+    focusedHighlightIds: string[];
+    elements: AppElements | null;
     constructor({
         callbacks = {}
-    } = {}) {
+    }: { callbacks?: AnnotationCallbacks } = {}) {
         this.callbacks = callbacks; // onNotesChanged, onJump, showToast, getCurrentBookId
         this.notes = [];
         this.editingNoteId = null;
@@ -52,7 +68,7 @@ export class AnnotationController {
 
     // This changes presentation only. getNotes() continues to return the full
     // collection for rendering, persistence, and book-wide exports.
-    setNotesScope(scope = 'page') {
+    setNotesScope(scope: 'page' | 'book' = 'page') {
         if (scope !== 'page' && scope !== 'book') throw new Error('笔记范围只能是 page 或 book');
         this.notesScope = scope;
         this.renderNotesUI();
@@ -75,7 +91,7 @@ export class AnnotationController {
         if (key !== this._renderedSidebarIds) this.renderNotesUI();
     }
 
-    requireQuote(quote) {
+    requireQuote(quote: string) {
         if (String(quote || '').trim()) return true;
         this.callbacks.showToast?.('请先在正文中选择需要引用的文字');
         return false;
@@ -89,7 +105,7 @@ export class AnnotationController {
         return this.showHighlightsInSidebar;
     }
 
-    async loadNotesForBook(bookId) {
+    async loadNotesForBook(bookId: string) {
         await this.finishInlineEdit();
         const loaded = bookId ? await repoLoadNotesForBook(bookId) : [];
         this.setNotesForBook(loaded);
@@ -99,7 +115,7 @@ export class AnnotationController {
 
     // Install prepared data synchronously; the coordinator renders only after
     // the reader and session have also switched to this book.
-    setNotesForBook(notes) {
+    setNotesForBook(notes: AnnotationInput[]) {
         this.notes = normalizeList(notes);
         this.notesScope = 'page';
         this.focusedNoteIds = [];
@@ -111,7 +127,7 @@ export class AnnotationController {
         return this.callbacks.getCurrentBookId ? this.callbacks.getCurrentBookId() : 'crisis-era';
     }
 
-    async addOrUpdateNote(noteObj) {
+    async addOrUpdateNote(noteObj: AnnotationInput) {
         const normalized = normalizeAnnotation(noteObj);
         if (!normalized) return;
         if (isNote(normalized) && !this.requireQuote(normalized.quote)) return;
@@ -130,7 +146,7 @@ export class AnnotationController {
         }
     }
 
-    async createHighlight({ quote, page = 1, chapter = '章节选区', color = 'yellow', location = null }) {
+    async createHighlight({ quote, page = 1, chapter = '章节选区', color = 'yellow', location = null }: NoteDraft & { color?: string }) {
         const highlightPage = Number(page) || 1;
         const cleanQuote = quote || '';
         const existingHighlight = this.notes.find(n => {
@@ -164,7 +180,7 @@ export class AnnotationController {
         return newNote;
     }
 
-    createNote({ quote = '', page = 1, chapter = null, location = null } = {}) {
+    createNote({ quote = '', page = 1, chapter = null, location = null }: NoteDraft = {}) {
         const pending = this.callbacks.getPendingSelection ? this.callbacks.getPendingSelection() : null;
         const selectedQuote = quote || (pending ? pending.text : '');
         if (!this.requireQuote(selectedQuote)) return;
@@ -179,7 +195,7 @@ export class AnnotationController {
         return note;
     }
 
-    beginInlineEdit(note) {
+    beginInlineEdit(note: Annotation) {
         if (this.editingNoteId === note.id && this.inlineEdit) return;
         this.finishInlineEdit();
         this.editingNoteId = note.id;
@@ -196,12 +212,12 @@ export class AnnotationController {
         const win = this.elements?.notesList?.ownerDocument.defaultView;
         win?.requestAnimationFrame?.(() => {
             if (this.inlineEdit !== editSession) return;
-            const editor = this.elements.notesList.querySelector('.note-editor');
+            const editor = this.elements?.notesList?.querySelector<HTMLTextAreaElement>('.note-editor');
             if (editor && editor.ownerDocument.activeElement !== editor) focusInlineEditor(this.elements, note.id);
         });
     }
 
-    updateInlineNote(id, comment) {
+    updateInlineNote(id: string, comment: string) {
         const note = this.inlineEdit?.note;
         if (!note || id !== note.id || note.comment === comment) return;
         note.comment = comment;
@@ -214,13 +230,13 @@ export class AnnotationController {
         this.writeInlineNote(note);
     }
 
-    writeInlineNote(note, remove = false) {
-        const snapshot = JSON.parse(JSON.stringify(note));
+    writeInlineNote(note: Annotation, remove = false) {
+        const snapshot: Annotation = JSON.parse(JSON.stringify(note));
         // Start transactions immediately, in input order. The repository must
         // not mirror an older completed transaction over newer local input.
         const write = remove
-            ? repoDeleteNote(snapshot.id, snapshot.bookId, { syncLocal: false })
-            : repoSaveNote(snapshot, { syncLocal: false });
+            ? repoDeleteNote(snapshot.id, snapshot.bookId)
+            : repoSaveNote(snapshot);
         this._inlineWrites = Promise.all([this._inlineWrites, write]).then(() => undefined).catch(error => {
             console.error('笔记持久化失败', error);
             this.callbacks.showToast?.(error.recoveryAvailable === false
@@ -233,7 +249,7 @@ export class AnnotationController {
     finishInlineEdit() {
         const session = this.inlineEdit;
         if (!session) return this._inlineWrites;
-        const editor = this.elements?.notesList?.querySelector('.note-editor');
+        const editor = this.elements?.notesList?.querySelector<HTMLTextAreaElement>('.note-editor');
         if (editor) this.updateInlineNote(session.note.id, editor.value);
         this.inlineEdit = null;
         this.editingNoteId = null;
@@ -251,12 +267,12 @@ export class AnnotationController {
         return this._inlineWrites;
     }
 
-    async saveModalNote({ quote = '', comment = '', page = 1, chapter = '章节选区', location = null } = {}) {
+    async saveModalNote({ quote = '', comment = '', page = 1, chapter = '章节选区', location = null }: NoteDraft & { comment?: string } = {}) {
         // Compatibility for programmatic callers; the UI uses inline autosave.
         if (this.inlineEdit) {
-            const editor = this.elements?.notesList?.querySelector('.note-editor');
+            const editor = this.elements?.notesList?.querySelector<HTMLTextAreaElement>('.note-editor');
             if (editor) editor.value = comment;
-            this.updateInlineNote(this.editingNoteId, comment);
+            this.updateInlineNote(this.inlineEdit.note.id, comment);
             await this.finishInlineEdit();
             return;
         }
@@ -322,11 +338,11 @@ export class AnnotationController {
         return false;
     }
 
-    async deleteHighlight(id) {
+    async deleteHighlight(id: string) {
         await this.deleteHighlights([id]);
     }
 
-    async deleteHighlights(ids = []) {
+    async deleteHighlights(ids: string[] = []) {
         const idSet = new Set(ids.filter(Boolean));
         const removed = this.notes.filter(n => idSet.has(n.id) && isHighlight(n));
         if (removed.length === 0) return;
@@ -346,13 +362,13 @@ export class AnnotationController {
         }
     }
 
-    async deleteNote(id) {
+    async deleteNote(id: string) {
         const target = this.notes.find(n => n.id === id);
         if (!target || !isNote(target)) return;
         await this.deleteAnnotation(id, '已删除笔记');
     }
 
-    async deleteAnnotation(id, toastMessage = '已删除标注') {
+    async deleteAnnotation(id: string, toastMessage = '已删除标注') {
         if (!id) return;
         if (this.editingNoteId === id) await this.finishInlineEdit();
         const existed = this.notes.some(n => n.id === id);
@@ -370,7 +386,7 @@ export class AnnotationController {
         }
     }
 
-    openNoteModal(quote, existingNoteId = null, targetPage = 1) {
+    openNoteModal(quote: string, existingNoteId: string | null = null, targetPage = 1) {
         if (!existingNoteId) {
             this.createNote({ quote, page: targetPage });
             return;
@@ -402,7 +418,7 @@ export class AnnotationController {
         }
     }
 
-    switchTab(tabId) {
+    switchTab(tabId: string) {
         this.activeTab = tabId;
         if (!this.elements) return;
 
@@ -418,7 +434,7 @@ export class AnnotationController {
         }
     }
 
-    focusNotes(noteIds = []) {
+    focusNotes(noteIds: string[] = []) {
         const ids = uniqueIds(noteIds);
         if (ids.length === 0) return;
         this.switchTab('tab-highlights');
@@ -428,7 +444,7 @@ export class AnnotationController {
         this.scrollCardIntoView(ids[0]);
     }
 
-    focusHighlights(highlightIds = []) {
+    focusHighlights(highlightIds: string[] = []) {
         const ids = uniqueIds(highlightIds);
         if (ids.length === 0) return;
         this.focusedHighlightIds = ids;
@@ -447,11 +463,11 @@ export class AnnotationController {
         this.renderNotesUI();
     }
 
-    highlightNoteCard(noteId) {
+    highlightNoteCard(noteId: string) {
         domHighlightNoteCard(noteId);
     }
 
-    scrollCardIntoView(noteId) {
+    scrollCardIntoView(noteId: string) {
         if (!noteId || typeof document === 'undefined') return;
         const card = document.getElementById(`card-${noteId}`);
         if (card) {
@@ -489,7 +505,7 @@ export class AnnotationController {
         });
     }
 
-    initUI(elements) {
+    initUI(elements: AppElements) {
         this.elements = elements;
         if (!elements || typeof document === 'undefined') return;
 
@@ -497,7 +513,7 @@ export class AnnotationController {
         if (elements.tabBtns) {
             elements.tabBtns.forEach(btn => {
                 btn.addEventListener('click', () => {
-                    this.switchTab(btn.getAttribute('data-tab'));
+                    this.switchTab(btn.getAttribute('data-tab') || 'tab-highlights');
                 });
             });
         }
@@ -510,23 +526,23 @@ export class AnnotationController {
         }
 
         document.addEventListener('pointerdown', event => {
-            if (!event.target.closest?.('.note-editor')) this.finishInlineEdit();
+            if (!eventElement(event)?.closest('.note-editor')) this.finishInlineEdit();
         }, true);
         document.addEventListener('focusin', event => {
             if (this.inlineEdit?.opening) return;
-            if (!event.target.closest?.('.note-editor')) this.finishInlineEdit();
+            if (!eventElement(event)?.closest('.note-editor')) this.finishInlineEdit();
         });
         window.addEventListener('pagehide', () => this.finishInlineEdit());
     }
 }
 
-function normalizeList(list) {
-    return (Array.isArray(list) ? list : []).map(normalizeAnnotation).filter(Boolean);
+function normalizeList(list: AnnotationInput[]): Annotation[] {
+    return (Array.isArray(list) ? list : []).map(normalizeAnnotation).filter((note): note is Annotation => note !== null);
 }
 
-function uniqueIds(ids) {
+function uniqueIds(ids: string[]) {
     const seen = new Set();
-    const result = [];
+    const result: string[] = [];
     (Array.isArray(ids) ? ids : []).forEach(id => {
         if (!id || seen.has(id)) return;
         seen.add(id);

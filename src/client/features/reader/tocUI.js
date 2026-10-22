@@ -4,6 +4,9 @@
    and delegates chapter navigation & drawer toggle to coordinator.
    ========================================================================== */
 
+/** @param {import('../../domain/book.js').TocEntry[]} tocItems
+ * @param {import('../../app/elements.js').AppElements} elements
+ * @param {((entry: import('../../domain/book.js').TocEntry) => void) | null} onSelectChapter */
 export function renderTOC(tocItems = [], elements, onSelectChapter = null) {
     if (!elements || !elements.tocList) return;
 

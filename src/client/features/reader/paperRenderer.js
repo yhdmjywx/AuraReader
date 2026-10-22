@@ -7,6 +7,7 @@
 import { clearChapterFlow } from './chapterColumnView.js';
 import { renderAnnotationTokens } from './annotationRenderer.js';
 
+/** @param {import('../../app/contracts.js').PaperSpreadOptions} options */
 export function renderPaperSpread({
     elements,
     readerEngine,
@@ -14,7 +15,6 @@ export function renderPaperSpread({
     notes = [],
     textIndent = '2em',
     preserveScroll = false,
-    onMarkClick = null,
     onLinkClick = null
 }) {
     if (!elements || !readerEngine || !readerEngine.hasBook()) return;
@@ -45,7 +45,7 @@ export function renderPaperSpread({
         if (elements.bookPaper) {
             elements.bookPaper.innerHTML = htmlContent;
             elements.bookPaper.style.setProperty('--book-text-indent', textIndent);
-            applyHighlightsToPaper(elements.bookPaper, currentPage, notes, onMarkClick);
+            applyHighlightsToPaper(elements.bookPaper, currentPage, notes);
         }
 
         if (elements.btnPrevPage) elements.btnPrevPage.disabled = (currentPage <= 1);
@@ -71,7 +71,7 @@ export function renderPaperSpread({
         if (elements.bookPaper) {
             elements.bookPaper.innerHTML = leftHtml;
             elements.bookPaper.style.setProperty('--book-text-indent', textIndent);
-            applyHighlightsToPaper(elements.bookPaper, leftPage, notes, onMarkClick);
+            applyHighlightsToPaper(elements.bookPaper, leftPage, notes);
         }
 
         // Render Right Page
@@ -80,7 +80,7 @@ export function renderPaperSpread({
             if (elements.bookPaperRight) {
                 elements.bookPaperRight.innerHTML = rightHtml;
                 elements.bookPaperRight.style.setProperty('--book-text-indent', textIndent);
-                applyHighlightsToPaper(elements.bookPaperRight, rightPage, notes, onMarkClick);
+                applyHighlightsToPaper(elements.bookPaperRight, rightPage, notes);
             }
         } else if (elements.bookPaperRight) {
             elements.bookPaperRight.innerHTML = `
@@ -103,6 +103,9 @@ export function renderPaperSpread({
     }
 }
 
+/** @param {HTMLElement} targetPaper
+ * @param {number} targetPage
+ * @param {import('../../domain/annotation.js').Annotation[]} notes */
 export function applyHighlightsToPaper(targetPaper, targetPage, notes = []) {
     if (!targetPaper) return;
 
@@ -131,6 +134,9 @@ export function hideHighlightActionTooltip(elements) {
     }
 }
 
+/** @param {import('../../app/elements.js').AppElements} elements
+ * @param {import('../../domain/book.js').Book | null} currentBookObj
+ * @param {((href: string) => void) | null} onLinkClick */
 export function interceptInTextLinks(elements, currentBookObj, onLinkClick) {
     const linkSelector = (elements.bookPaperRight && elements.bookPaperRight.style.display !== 'none')
         ? '#book-paper a[href], #book-paper-right a[href]'

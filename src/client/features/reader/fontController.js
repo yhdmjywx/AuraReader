@@ -12,6 +12,7 @@ function store(key, value) {
 }
 
 export class FontController {
+    /** @param {import('../../app/contracts.js').FontCallbacks} callbacks */
     constructor(callbacks = {}) {
         this.callbacks = callbacks;
         const savedChoice = readStored(PREFERENCE_KEY, null);

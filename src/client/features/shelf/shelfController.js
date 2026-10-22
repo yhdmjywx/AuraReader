@@ -15,6 +15,7 @@ import {
 } from './shelfUI.js';
 
 export class ShelfController {
+    /** @param {{callbacks?: import('../../app/contracts.js').ShelfCallbacks}} options */
     constructor({
         callbacks = {}
     } = {}) {

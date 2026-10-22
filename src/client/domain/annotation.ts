@@ -17,7 +17,7 @@ export interface AnnotationInput {
     comment?: unknown;
     color?: string | null;
     page?: number | string;
-    chapter?: string;
+    chapter?: string | null;
     timestamp?: string;
     sectionId?: string;
     offset?: number;
@@ -47,7 +47,7 @@ export interface CreateAnnotation {
     comment?: string;
     color?: string | null;
     page?: number;
-    chapter?: string;
+    chapter?: string | null;
     timestamp?: string | null;
     sectionId?: string;
     offset?: number;

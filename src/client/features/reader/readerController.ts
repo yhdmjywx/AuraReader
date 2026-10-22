@@ -1,3 +1,10 @@
+import { eventElement } from '../../app/dom.js';
+import type { Book, ReadingLocation, TocEntry } from '../../domain/book.js';
+import type { Annotation } from '../../domain/annotation.js';
+import type { BookStructure } from '../../domain/bookStructure.js';
+import type { AppElements } from '../../app/elements.js';
+import type { ReaderCallbacks, ChapterRenderOptions } from '../../app/contracts.js';
+import type { LayoutController } from '../layout/layoutController.js';
 /* ==========================================================================
    ReaderController - Reading Interaction & View Management Feature Controller
    Authority owner of: currentPage, currentLeftPage, currentRightPage,
@@ -37,11 +44,30 @@ import {
 } from './tocUI.js';
 
 export class ReaderController {
+    engine: ReaderEngine;
+    layoutController: LayoutController | null;
+    callbacks: ReaderCallbacks;
+    fontSize: number;
+    fontFamily: string;
+    textIndent: string;
+    paperTheme: string;
+    currentPage: number;
+    currentLeftPage: number;
+    currentRightPage: number | null;
+    totalPages: number;
+    elements: AppElements | null;
+    flowAnchorText: string;
+    _flowPage: number;
+    _volumeTitlePages: number[];
+    bookStructure: BookStructure | null;
+    fonts: FontController;
+    _viewportUpdatePending?: boolean;
+    _anchorTimer?: ReturnType<typeof setTimeout>;
     constructor({
         readerEngine = null,
         layoutController = null,
         callbacks = {}
-    } = {}) {
+    }: { readerEngine?: ReaderEngine | null; layoutController?: LayoutController | null; callbacks?: ReaderCallbacks } = {}) {
         this.engine = readerEngine || new ReaderEngine();
         this.layoutController = layoutController;
         this.callbacks = callbacks; // onMarkClick, onLinkClick, showToast, onPageChange
@@ -73,11 +99,11 @@ export class ReaderController {
         });
     }
 
-    setLayoutController(controller) {
+    setLayoutController(controller: LayoutController) {
         this.layoutController = controller;
     }
 
-    setBook(bookKey, bookObj) {
+    setBook(bookKey: string, bookObj: Book) {
         this.engine.setBook(bookKey, bookObj);
         this.bookStructure = buildBookStructure(bookObj);
         const loc = this.engine.getLocation();
@@ -91,7 +117,7 @@ export class ReaderController {
         if (this.elements) {
             if (this.elements.currentBookTitle) this.elements.currentBookTitle.textContent = bookObj.title;
             if (this.elements.currentBookTag) this.elements.currentBookTag.textContent = bookObj.format || 'EPUB';
-            if (this.elements.totalPagesSpan) this.elements.totalPagesSpan.textContent = this.totalPages;
+            if (this.elements.totalPagesSpan) this.elements.totalPagesSpan.textContent = String(this.totalPages);
         }
 
         this.renderTOC(bookObj.toc || []);
@@ -126,7 +152,7 @@ export class ReaderController {
 
     getVisibleAnnotationIds() {
         const elements = this.elements;
-        if (!elements || typeof document === 'undefined') return new Set();
+        if (!elements || typeof document === 'undefined') return new Set<string>();
         return collectVisibleAnnotationIds(
             [elements.bookPaper, elements.bookPaperRight],
             document.getElementById('reader-viewport')
@@ -163,7 +189,7 @@ export class ReaderController {
         return this.flowAnchorText;
     }
 
-    renderPage(pageNum, preserveScroll = false, notes = [], options = {}) {
+    renderPage(pageNum: number, preserveScroll = false, notes: Annotation[] = [], options: ChapterRenderOptions = {}): ReadingLocation {
         if (this.isChapterFlow()) {
             return this.renderChapterPage(pageNum, preserveScroll, notes, options);
         }
@@ -190,11 +216,6 @@ export class ReaderController {
                 notes,
                 textIndent: this.textIndent,
                 preserveScroll,
-                onMarkClick: (markEl, note) => {
-                    if (this.callbacks.onMarkClick) {
-                        this.callbacks.onMarkClick(markEl, note);
-                    }
-                },
                 onLinkClick: (href) => {
                     this.handleInTextLinkClick(href, notes);
                 }
@@ -217,26 +238,26 @@ export class ReaderController {
         return loc;
     }
 
-    nextPage(notes = []) {
+    nextPage(notes: Annotation[] = []): ReadingLocation {
         if (this.isChapterFlow()) return this.stepChapter(1, notes);
         const isDouble = this.layoutController ? this.layoutController.isDoublePageEffective() : false;
         const loc = this.engine.nextPage(isDouble);
         return this.renderPage(loc.page, false, notes);
     }
 
-    prevPage(notes = []) {
+    prevPage(notes: Annotation[] = []): ReadingLocation {
         if (this.isChapterFlow()) return this.stepChapter(-1, notes);
         const isDouble = this.layoutController ? this.layoutController.isDoublePageEffective() : false;
         const loc = this.engine.prevPage(isDouble);
         return this.renderPage(loc.page, false, notes);
     }
 
-    goToPage(pageNum, offset = 0, notes = []) {
+    goToPage(pageNum: number, offset = 0, notes: Annotation[] = []) {
         const loc = this.engine.goToPage(pageNum, offset);
         return this.renderPage(loc.page, false, notes);
     }
 
-    handleInTextLinkClick(href, notes = []) {
+    handleInTextLinkClick(href: string, notes: Annotation[] = []) {
         const currentBookObj = this.engine.getCurrentBook();
         const map = currentBookObj ? (currentBookObj.hrefToPageMap || {}) : {};
         const targetPage = resolveTargetPage(href, map, this.currentPage);
@@ -261,17 +282,17 @@ export class ReaderController {
         }
     }
 
-    scrollToAnchor(anchor) {
+    scrollToAnchor(anchor: string) {
         if (this.elements) {
             domScrollToAnchor(anchor, this.elements);
         }
     }
 
-    scrollToHighlight(noteId) {
+    scrollToHighlight(noteId: string) {
         return this.scrollToAnnotation(noteId);
     }
 
-    scrollToAnnotation(annotationId) {
+    scrollToAnnotation(annotationId: string) {
         if (!this.elements || !annotationId) return null;
         const token = findAnnotationToken(this.elements.bookPaper, annotationId)
             || findAnnotationToken(this.elements.bookPaperRight, annotationId);
@@ -280,19 +301,19 @@ export class ReaderController {
         return token;
     }
 
-    renderTOC(tocItems = []) {
+    renderTOC(tocItems: TocEntry[] = []) {
         if (!this.elements) return;
         const items = ensureTocHierarchy(tocItems);
         domRenderTOC(items, this.elements, (item) => {
             const notes = this.callbacks.getNotes ? this.callbacks.getNotes() : [];
             if (this.isChapterFlow()) {
                 this.flowAnchorText = '';
-                this.renderChapterPage(item.page, false, notes, {
+                this.renderChapterPage(item.page || 1, false, notes, {
                     toStart: !item.anchor,
                     anchorId: item.anchor || ''
                 });
             } else {
-                this.renderPage(item.page, false, notes);
+                this.renderPage(item.page || 1, false, notes);
                 if (item.anchor) this.scrollToAnchor(item.anchor);
             }
             domCloseTOC(this.elements);
@@ -302,11 +323,11 @@ export class ReaderController {
         });
     }
 
-    applyHighlights(targetPaper, targetPage, notes = [], onMarkClick = null) {
-        applyHighlightsToPaper(targetPaper, targetPage, notes, onMarkClick || this.callbacks.onMarkClick);
+    applyHighlights(targetPaper: HTMLElement, targetPage: number, notes: Annotation[] = [], onMarkClick: ReaderCallbacks['onMarkClick'] | null = null) {
+        applyHighlightsToPaper(targetPaper, targetPage, notes);
     }
 
-    initUI(elements) {
+    initUI(elements: AppElements) {
         this.elements = elements;
         if (!elements || typeof document === 'undefined') return;
 
@@ -355,14 +376,15 @@ export class ReaderController {
             elements.indentSelect.value = this.textIndent;
             elements.indentSelect.addEventListener('change', (e) => {
                 this.rememberAnchor();
-                this.textIndent = e.target.value;
+                const input = e.currentTarget as HTMLSelectElement;
+                this.textIndent = input.value;
                 if (typeof localStorage !== 'undefined') {
                     localStorage.setItem('aura_text_indent', this.textIndent);
                 }
                 this.applyTypography();
                 this.refitAfterTypography();
                 if (this.callbacks.showToast) {
-                    this.callbacks.showToast(`已切换首行缩进：${e.target.options[e.target.selectedIndex].text}`);
+                    this.callbacks.showToast(`已切换首行缩进：${input.options[input.selectedIndex].text}`);
                 }
             });
         }
@@ -385,9 +407,9 @@ export class ReaderController {
         if (elements.paperBtns) {
             elements.paperBtns.forEach(btn => {
                 btn.addEventListener('click', () => {
-                    elements.paperBtns.forEach(b => b.classList.remove('active'));
+                    elements.paperBtns?.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    this.paperTheme = btn.getAttribute('data-paper');
+                    this.paperTheme = btn.getAttribute('data-paper') || 'white';
                     if (elements.readerPanel) {
                         elements.readerPanel.className = `reader-panel paper-${this.paperTheme}`;
                     }
@@ -411,7 +433,7 @@ export class ReaderController {
         }
         document.addEventListener('click', (e) => {
             if (elements.tocDrawer && elements.tocDrawer.classList.contains('open')) {
-                if (!e.target.closest('#toc-drawer') && !e.target.closest('#btn-toc')) {
+                if (!eventElement(e)?.closest('#toc-drawer') && !eventElement(e)?.closest('#btn-toc')) {
                     domCloseTOC(elements);
                 }
             }
@@ -439,7 +461,7 @@ export class ReaderController {
         this.refitChapter(this.callbacks.getNotes ? this.callbacks.getNotes() : []);
     }
 
-    refitChapter(notes = []) {
+    refitChapter(notes: Annotation[] = []): ReadingLocation {
         if (!this.isChapterFlow() || !this.elements) return this.getLocation();
         if (this._flowPage !== this.currentPage) {
             return this.renderChapterPage(this.currentPage, false, notes, { placeAnchor: true });
@@ -449,7 +471,7 @@ export class ReaderController {
         return this.getLocation();
     }
 
-    showQuote(page, quote, notes = []) {
+    showQuote(page: number, quote: string, notes: Annotation[] = []): ReadingLocation {
         this.flowAnchorText = String(quote || '').trim();
         return this.renderChapterPage(page || this.currentPage, false, notes, {
             placeAnchor: true,
@@ -457,7 +479,7 @@ export class ReaderController {
         });
     }
 
-    renderChapterPage(pageNum, preserveScroll = false, notes = [], options = {}) {
+    renderChapterPage(pageNum: number, preserveScroll = false, notes: Annotation[] = [], options: ChapterRenderOptions = {}): ReadingLocation {
         if (!preserveScroll) notes = this.callbacks.beforeNavigate?.() || notes;
         const sourcePage = Number(pageNum);
         const flow = readingUnitForPage(this.bookStructure, sourcePage);
@@ -483,16 +505,14 @@ export class ReaderController {
         return loc;
     }
 
-    paintChapter(page, notes) {
+    paintChapter(page: number, notes: Annotation[]) {
         const elements = this.elements;
         if (!elements || !elements.bookPaper) return;
         elements.bookPaper.innerHTML = this.engine.getPageContent(page);
         elements.bookPaper.dataset.flowPage = String(page);
         this._flowPage = page;
         this.applyTypography();
-        applyHighlightsToPaper(elements.bookPaper, page, notes, (markEl, note) => {
-            if (this.callbacks.onMarkClick) this.callbacks.onMarkClick(markEl, note);
-        });
+        applyHighlightsToPaper(elements.bookPaper, page, notes);
         const prefixes = document.createDocumentFragment();
         for (const titlePage of this._volumeTitlePages) {
             const title = document.createElement('div');
@@ -508,7 +528,7 @@ export class ReaderController {
         });
     }
 
-    layoutAndPlace(notes, options = {}) {
+    layoutAndPlace(notes: Annotation[], options: ChapterRenderOptions = {}): void {
         const elements = this.elements;
         if (!elements) return;
         const mode = this.effectiveReaderMode();
@@ -534,7 +554,7 @@ export class ReaderController {
         this._anchorTimer = setTimeout(() => this.rememberAnchor(), 60);
     }
 
-    stepChapter(direction, notes = []) {
+    stepChapter(direction: number, notes: Annotation[] = []): ReadingLocation {
         notes = this.callbacks.beforeNavigate?.() || notes;
         const mode = this.effectiveReaderMode();
         const moved = shiftStrip(this.elements, mode, direction);
@@ -569,7 +589,7 @@ export class ReaderController {
     }
 }
 
-function findAnnotationToken(paper, annotationId) {
+function findAnnotationToken(paper: HTMLElement | null | undefined, annotationId: string): HTMLElement | null {
     if (!paper || !annotationId || typeof paper.querySelector !== 'function') return null;
     const escaped = (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(annotationId) : String(annotationId).replace(/"/g, '\\"');
     return paper.querySelector(`[data-highlight-ids~="${escaped}"], [data-note-ids~="${escaped}"]`);

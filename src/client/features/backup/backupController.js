@@ -34,6 +34,7 @@ import {
 } from './backupModalUI.js';
 
 export class BackupController {
+    /** @param {{callbacks?: import('../../app/contracts.js').BackupCallbacks}} options */
     constructor({
         callbacks = {}
     } = {}) {

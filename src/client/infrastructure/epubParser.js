@@ -352,6 +352,7 @@ export async function extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap) {
     return chooseHierarchicalToc(ncxItems, navItems);
 }
 
+/** @returns {Promise<import('../domain/book.js').Book>} */
 export async function parseEpub(arrayBuffer, fileName, jszipLib) {
     if (!jszipLib) {
         throw new Error("JSZip 解压库未加载，请刷新页面后重试");
@@ -454,6 +455,7 @@ export async function parseEpub(arrayBuffer, fileName, jszipLib) {
     };
 }
 
+/** @returns {import('../domain/book.js').Book} */
 export function parseTxt(text, fileName) {
     const paragraphs = text.split(/\r?\n/).filter(line => line.trim().length > 0);
     const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
