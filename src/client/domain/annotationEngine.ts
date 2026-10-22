@@ -1,3 +1,4 @@
+import type { AnnotationKind, Annotation, AnnotationInput, AnnotationLocation, CreateAnnotation } from './annotation.js';
 /* ==========================================================================
    AnnotationEngine - Pure Annotation Core Algorithms (Domain Layer)
    Zero DOM dependencies. Owns annotation kind, migration, overlap lookup,
@@ -5,35 +6,33 @@
    Body rendering uses annotationRangeEngine + annotationRenderer instead.
    ========================================================================== */
 
-export function isHighlight(annotation) {
+export function isHighlight(annotation: AnnotationInput | null | undefined): boolean {
     if (!annotation || typeof annotation !== 'object') return false;
     if (annotation.kind === 'highlight') return true;
     if (annotation.kind === 'note') return false;
     return !annotation.comment || String(annotation.comment).trim() === '';
 }
 
-export function isNote(annotation) {
+export function isNote(annotation: AnnotationInput | null | undefined): boolean {
     if (!annotation || typeof annotation !== 'object') return false;
     if (annotation.kind === 'note') return true;
     if (annotation.kind === 'highlight') return false;
     return !!(annotation.comment && String(annotation.comment).trim() !== '');
 }
 
-export function normalizeAnnotation(annotation) {
+export function normalizeAnnotation(annotation: AnnotationInput | null | undefined): Annotation | null {
     if (!annotation || typeof annotation !== 'object') return null;
 
     const comment = annotation.comment == null ? '' : String(annotation.comment);
-    let kind = annotation.kind;
-    if (kind !== 'highlight' && kind !== 'note') {
-        kind = comment.trim() !== '' ? 'note' : 'highlight';
-    }
+    const kind: AnnotationKind = annotation.kind === 'highlight' || annotation.kind === 'note'
+        ? annotation.kind : comment.trim() !== '' ? 'note' : 'highlight';
 
     const page = Number(annotation.page) || 1;
     const color = annotation.color || (kind === 'note' ? 'green' : 'yellow');
 
     return {
         ...annotation,
-        id: annotation.id,
+        id: annotation.id || '',
         bookId: annotation.bookId || '',
         kind,
         quote: annotation.quote == null ? '' : String(annotation.quote),
@@ -46,11 +45,11 @@ export function normalizeAnnotation(annotation) {
     };
 }
 
-function normalizeLocation(annotation, page) {
+function normalizeLocation(annotation: AnnotationInput, page: number): AnnotationLocation {
     const existing = annotation.location && typeof annotation.location === 'object'
         ? { ...annotation.location }
         : {};
-    const location = {
+    const location: AnnotationLocation = {
         ...existing,
         sectionId: existing.sectionId || annotation.sectionId || `chapter-${page}`,
         page: Number(existing.page) || page,
@@ -65,8 +64,8 @@ function normalizeLocation(annotation, page) {
     return location;
 }
 
-export function filterNotes(notes = [], showHighlightsInSidebar = false) {
-    const list = (Array.isArray(notes) ? notes : []).map(normalizeAnnotation).filter(Boolean);
+export function filterNotes(notes: AnnotationInput[] = [], showHighlightsInSidebar = false) {
+    const list = (Array.isArray(notes) ? notes : []).map(normalizeAnnotation).filter((item): item is Annotation => item !== null);
     const thoughtNotes = list.filter(isNote);
     const pureHighlights = list.filter(isHighlight);
     const displayedNotes = showHighlightsInSidebar ? list : thoughtNotes;
@@ -81,12 +80,12 @@ export function filterNotes(notes = [], showHighlightsInSidebar = false) {
     };
 }
 
-export function findAnnotationsAtQuote(notes = [], page = 1, quote = '') {
+export function findAnnotationsAtQuote(notes: AnnotationInput[] = [], page = 1, quote = '') {
     const cleanQuote = String(quote || '').trim();
     if (!Array.isArray(notes) || !cleanQuote) return [];
     const targetPage = Number(page) || 1;
 
-    return notes.map(normalizeAnnotation).filter(Boolean).filter(annotation => {
+    return notes.map(normalizeAnnotation).filter((item): item is Annotation => item !== null).filter(annotation => {
         if (Number(annotation.page) !== targetPage) return false;
         if (!annotation.quote) return false;
         const noteQuote = annotation.quote.trim();
@@ -94,23 +93,23 @@ export function findAnnotationsAtQuote(notes = [], page = 1, quote = '') {
     });
 }
 
-export function findOverlappingNote(notes = [], page = 1, quote = '') {
+export function findOverlappingNote(notes: AnnotationInput[] = [], page = 1, quote = '') {
     const matches = findAnnotationsAtQuote(notes, page, quote);
     return matches[0] || null;
 }
 
-export function groupAnnotationsByRange(notes = []) {
-    const groups = new Map();
+export function groupAnnotationsByRange(notes: AnnotationInput[] = []) {
+    const groups = new Map<string, Annotation[]>();
 
-    (Array.isArray(notes) ? notes : []).map(normalizeAnnotation).filter(Boolean).forEach(annotation => {
+    (Array.isArray(notes) ? notes : []).map(normalizeAnnotation).filter((item): item is Annotation => item !== null).forEach(annotation => {
         const quoteKey = (annotation.quote || '').trim();
-        const loc = annotation.location || {};
+        const loc = annotation.location;
         const key = quoteKey
             ? `p${annotation.page}|q|${quoteKey}`
             : `p${annotation.page}|loc|${loc.start ?? ''}|${loc.end ?? ''}|${annotation.id}`;
 
         if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(annotation);
+        groups.get(key)!.push(annotation);
     });
 
     return Array.from(groups.values()).map(items => {
@@ -127,7 +126,7 @@ export function groupAnnotationsByRange(notes = []) {
     });
 }
 
-export function applyHighlightToHtml(html, note) {
+export function applyHighlightToHtml(html: string, note: Annotation): string {
     if (!html || !note || !note.quote) return html;
 
     const colorClass = `hl-${note.color || 'yellow'}`;
@@ -170,7 +169,7 @@ export function applyHighlightToHtml(html, note) {
     return html;
 }
 
-export function applyAllHighlightsToHtml(html, notes = []) {
+export function applyAllHighlightsToHtml(html: string, notes: Annotation[] = []) {
     if (!html || !Array.isArray(notes) || notes.length === 0) return html;
 
     let resultHtml = html;
@@ -193,14 +192,14 @@ export function createAnnotationObject({
     sectionId = '',
     offset = 0,
     location = null
-} = {}) {
+}: CreateAnnotation = {}): Annotation {
     const cleanComment = comment || '';
     const finalKind = (kind === 'highlight' || kind === 'note')
         ? kind
         : (cleanComment.trim() !== '' ? 'note' : 'highlight');
     const validPage = Number(page) || 1;
     const sourceLocation = location && typeof location === 'object' ? location : {};
-    const loc = {
+    const loc: AnnotationLocation = {
         sectionId: sourceLocation.sectionId || sectionId || `chapter-${validPage}`,
         page: Number(sourceLocation.page) || validPage,
         offset: Number(sourceLocation.offset ?? offset) || 0

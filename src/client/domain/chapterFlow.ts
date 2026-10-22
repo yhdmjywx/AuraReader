@@ -1,3 +1,5 @@
+import type { Book, ReaderMode } from './book.js';
+export interface ColumnMetrics { columns: number; gap: number; colWidth: number; stride: number; screenWidth: number }
 /* ==========================================================================
    Chapter flow - EPUB chapter strip math (domain, no DOM)
    A chapter is one spine document. Screen columns are cuts of that document.
@@ -6,7 +8,7 @@
 
 const SENTENCE_END = /[。！？!?]/;
 
-export function isChapterFlowBook(book) {
+export function isChapterFlowBook(book: Book | null | undefined): boolean {
     if (!book) return false;
     if (book.readerFlow === 'chapter') return true;
     if (String(book.format || '').toUpperCase() !== 'EPUB') return false;
@@ -14,7 +16,7 @@ export function isChapterFlowBook(book) {
     return !!(map && typeof map === 'object' && Object.keys(map).length > 0);
 }
 
-export function sentenceStartOffset(text, index) {
+export function sentenceStartOffset(text: string, index: number) {
     const source = String(text || '');
     if (!source) return 0;
     const at = Math.max(0, Math.min(source.length, Number(index) || 0));
@@ -29,7 +31,7 @@ export function sentenceStartOffset(text, index) {
     return start;
 }
 
-export function sentenceSlice(text, index) {
+export function sentenceSlice(text: string, index: number) {
     const source = String(text || '');
     const start = sentenceStartOffset(source, index);
     let end = source.length;
@@ -42,7 +44,7 @@ export function sentenceSlice(text, index) {
     return source.slice(start, end).trim();
 }
 
-export function columnMetrics(viewWidth, mode) {
+export function columnMetrics(viewWidth: number, mode: ReaderMode): ColumnMetrics {
     const width = Math.max(1, Math.floor(Number(viewWidth) || 1));
     const columns = mode === 'double' ? 2 : 1;
     let gap = columns === 2 ? 72 : 0;
@@ -58,13 +60,13 @@ export function columnMetrics(viewWidth, mode) {
     };
 }
 
-export function countColumns(scrollWidth, stride) {
+export function countColumns(scrollWidth: number, stride: number) {
     const step = Number(stride) || 1;
     const width = Math.max(0, Number(scrollWidth) || 0);
     return Math.max(1, Math.round(width / step));
 }
 
-export function columnFromScroll(scrollLeft, stride, total) {
+export function columnFromScroll(scrollLeft: number, stride: number, total: number) {
     const step = Number(stride) || 1;
     const index = Math.round((Number(scrollLeft) || 0) / step) + 1;
     const max = Math.max(1, Number(total) || 1);
@@ -75,13 +77,13 @@ export function columnFromScroll(scrollLeft, stride, total) {
 // that follows the right column. That step is columns*stride, which is one gap
 // wider than the visible width. Scrolling by the visible width walks into the
 // middle of a column and shows a clipped third column.
-export function screenStep(metrics) {
+export function screenStep(metrics: ColumnMetrics) {
     const columns = Math.max(1, Number(metrics && metrics.columns) || 1);
     const stride = Math.max(1, Number(metrics && metrics.stride) || 1);
     return columns * stride;
 }
 
-export function screenStartForColumn(columnIndex, metrics) {
+export function screenStartForColumn(columnIndex: number, metrics: ColumnMetrics) {
     const per = Math.max(1, Number(metrics && metrics.columns) || 1);
     const screenIndex = Math.floor((Math.max(1, Number(columnIndex) || 1) - 1) / per);
     return screenIndex * screenStep(metrics);

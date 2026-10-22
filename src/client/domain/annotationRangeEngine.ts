@@ -1,9 +1,10 @@
+import type { AnnotationInput, AnnotationRange, AnnotationSegment, TextRange } from './annotation.js';
 /* ==========================================================================
    AnnotationRangeEngine - Pure text-range merging for annotation tokens.
    No DOM. Callers supply the page's visible text and half-open offsets.
    ========================================================================== */
 
-export function compactWithMap(text) {
+export function compactWithMap(text: unknown) {
     const source = String(text || '');
     let compact = '';
     const map = [];
@@ -15,7 +16,7 @@ export function compactWithMap(text) {
     return { compact, map };
 }
 
-export function findQuoteRange(text, quote) {
+export function findQuoteRange(text: string, quote: string): TextRange | null {
     const source = String(text || '');
     const target = String(quote || '');
     if (!source || !target.trim()) return null;
@@ -38,7 +39,7 @@ export function findQuoteRange(text, quote) {
     return { start, end };
 }
 
-export function resolveAnnotationRange(text, annotation) {
+export function resolveAnnotationRange(text: string, annotation: AnnotationInput | null | undefined): TextRange | null {
     if (!annotation) return null;
     const source = String(text || '');
     const location = annotation.location || {};
@@ -52,30 +53,30 @@ export function resolveAnnotationRange(text, annotation) {
     }
 
     if (!annotation.quote) return null;
-    return findQuoteRange(source, annotation.quote);
+    return findQuoteRange(source, String(annotation.quote));
 }
 
-function locationMatchesQuote(slice, quote) {
+function locationMatchesQuote(slice: string, quote: unknown) {
     const compactQuote = compactWithMap(quote).compact;
     if (!compactQuote) return true;
     const compactSlice = compactWithMap(slice).compact;
     return compactSlice === compactQuote || compactSlice.includes(compactQuote);
 }
 
-export function buildSegments(ranges = []) {
+export function buildSegments(ranges: AnnotationRange[] = []): AnnotationSegment[] {
     const valid = (Array.isArray(ranges) ? ranges : []).filter(range => {
         return Number.isFinite(range.start) && Number.isFinite(range.end) && range.end > range.start && range.id;
     });
     if (valid.length === 0) return [];
 
-    const points = new Set();
+    const points = new Set<number>();
     valid.forEach(range => {
         points.add(range.start);
         points.add(range.end);
     });
 
     const sorted = Array.from(points).sort((a, b) => a - b);
-    const segments = [];
+    const segments: AnnotationSegment[] = [];
 
     for (let i = 0; i < sorted.length - 1; i++) {
         const start = sorted[i];
@@ -99,19 +100,19 @@ export function buildSegments(ranges = []) {
     return segments;
 }
 
-export function annotationContextKey(highlightIds = [], noteIds = []) {
+export function annotationContextKey(highlightIds: string[] = [], noteIds: string[] = []) {
     return [...highlightIds, ...noteIds].join('|');
 }
 
-export function primaryKindFor(highlightIds = [], noteIds = []) {
+export function primaryKindFor(highlightIds: string[] = [], noteIds: string[] = []) {
     if (noteIds.length > 0) return 'note';
     if (highlightIds.length > 0) return 'highlight';
     return null;
 }
 
-function uniqueIds(ranges) {
-    const seen = new Set();
-    const ids = [];
+function uniqueIds(ranges: AnnotationRange[]) {
+    const seen = new Set<string>();
+    const ids: string[] = [];
     ranges.forEach(range => {
         if (!range.id || seen.has(range.id)) return;
         seen.add(range.id);
@@ -120,7 +121,7 @@ function uniqueIds(ranges) {
     return ids;
 }
 
-function sameIdList(left, right) {
+function sameIdList(left: string[], right: string[]) {
     if (left.length !== right.length) return false;
     for (let i = 0; i < left.length; i++) {
         if (left[i] !== right[i]) return false;
