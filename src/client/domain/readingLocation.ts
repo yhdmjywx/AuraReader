@@ -1,3 +1,4 @@
+import type { ReadingLocation, SpreadPages, TocEntry } from './book.js';
 /* ==========================================================================
    ReadingLocation - Pure Reading Position & Navigation Model (Domain Layer)
    Zero DOM dependencies. Handles page boundary clamping, spread pagination,
@@ -12,7 +13,7 @@ export function createReadingLocation({
     anchor = '',
     sectionId = '',
     offset = 0
-} = {}) {
+}: Partial<ReadingLocation> = {}): ReadingLocation {
     const validPage = clampPage(page, totalPages);
     return {
         bookId,
@@ -25,12 +26,12 @@ export function createReadingLocation({
     };
 }
 
-export function clampPage(page, totalPages) {
+export function clampPage(page: number | string, totalPages: number): number {
     const total = Math.max(1, totalPages || 1);
     return Math.max(1, Math.min(Number(page) || 1, total));
 }
 
-export function calcSpreadPages(currentPage, totalPages) {
+export function calcSpreadPages(currentPage: number, totalPages: number): SpreadPages {
     const total = Math.max(1, totalPages || 1);
     const validCurrent = clampPage(currentPage, total);
     const leftPage = (validCurrent % 2 === 1) ? validCurrent : Math.max(1, validCurrent - 1);
@@ -45,7 +46,7 @@ export function calcSpreadPages(currentPage, totalPages) {
     };
 }
 
-export function resolveTargetPage(href, hrefToPageMap = {}, currentPage = 1) {
+export function resolveTargetPage(href: string, hrefToPageMap: Record<string, number> = {}, currentPage = 1): number {
     if (!href) return currentPage;
     const [srcPath] = href.split('#');
     const cleanPath = srcPath.replace(/^\/+/, '');
@@ -53,12 +54,12 @@ export function resolveTargetPage(href, hrefToPageMap = {}, currentPage = 1) {
 
     if (hrefToPageMap[cleanPath] !== undefined) return hrefToPageMap[cleanPath];
     const filename = cleanPath.split('/').pop();
-    if (hrefToPageMap[filename] !== undefined) return hrefToPageMap[filename];
+    if (hrefToPageMap[filename || ''] !== undefined) return hrefToPageMap[filename || ''];
 
     return currentPage;
 }
 
-export function findChapterForPage(toc = [], page = 1) {
+export function findChapterForPage(toc: TocEntry[] = [], page = 1): string {
     if (!toc || !Array.isArray(toc) || toc.length === 0) return '当前章节';
     const sorted = [...toc].sort((a, b) => {
         const pageDiff = (a.page || 1) - (b.page || 1);
@@ -72,11 +73,11 @@ export function findChapterForPage(toc = [], page = 1) {
 const VOLUME_TITLE_RE = /^(?:第\s*[0-9０-９一二三四五六七八九十百千万零两]+\s*[卷部篇集册]|卷\s*之?\s*[0-9０-９一二三四五六七八九十百千万零两]+|(?:volume|part|book)\s+[0-9ivxlcdm]+)/i;
 const STANDALONE_TITLE_RE = /^(?:作者原序|原序|自序|代序|序言|序|前言|引言|楔子|后记|跋|附录|译后记|译者序|译序|出版说明|版权信息|目录|简介|内容简介|献辞|致谢)$/;
 
-export function isVolumeTitle(title) {
+export function isVolumeTitle(title: unknown): boolean {
     return VOLUME_TITLE_RE.test(String(title || '').trim());
 }
 
-export function ensureTocHierarchy(items) {
+export function ensureTocHierarchy(items: TocEntry[] | null | undefined): (TocEntry & { level: number; hasChildren?: boolean })[] {
     const list = Array.isArray(items)
         ? items.map(item => ({ ...item, level: Math.max(0, Number(item.level) || 0) }))
         : [];

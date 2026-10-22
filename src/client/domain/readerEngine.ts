@@ -1,3 +1,4 @@
+import type { Book, ReadingLocation } from './book.js';
 /* ==========================================================================
    ReaderEngine - Pure Reading Core State Machine (Domain Layer)
    Zero DOM dependencies. Manages book structure, page turning,
@@ -7,19 +8,22 @@
 import { createReadingLocation, clampPage, calcSpreadPages, findChapterForPage, ensureTocHierarchy } from './readingLocation.js';
 
 export class ReaderEngine {
+    currentBookId: string | null;
+    private bookData: Book | null;
+    private location: ReadingLocation;
     constructor() {
         this.currentBookId = null;
         this.bookData = null;
         this.location = createReadingLocation();
     }
 
-    setBook(bookId, bookData) {
+    setBook(bookId: string, bookData: Book | null) {
         this.currentBookId = bookId;
         this.bookData = bookData || null;
 
         const pages = (this.bookData && Array.isArray(this.bookData.pages)) ? this.bookData.pages : [];
         const totalPages = Math.max(1, pages.length);
-        const toc = ensureTocHierarchy(this.bookData && this.bookData.toc);
+        const toc = ensureTocHierarchy(this.bookData && this.bookData!.toc);
         const chapter = toc.length ? findChapterForPage(toc, 1) : '正文';
 
         this.location = createReadingLocation({
@@ -52,12 +56,12 @@ export class ReaderEngine {
         return this.location.page;
     }
 
-    goToPage(pageNum, offset = 0) {
+    goToPage(pageNum: number, offset = 0) {
         if (!this.hasBook()) return this.location;
 
         const total = this.location.totalPages;
         const validPage = clampPage(pageNum, total);
-        const chapter = findChapterForPage(ensureTocHierarchy(this.bookData.toc), validPage);
+        const chapter = findChapterForPage(ensureTocHierarchy(this.bookData?.toc), validPage);
 
         this.location.page = validPage;
         this.location.chapter = chapter;
@@ -102,11 +106,11 @@ export class ReaderEngine {
         return { ...this.location };
     }
 
-    getPageContent(pageNum) {
+    getPageContent(pageNum: number) {
         if (!this.hasBook()) return '<p>页面暂无内容</p>';
         const total = this.location.totalPages;
         const validPage = clampPage(pageNum, total);
-        return this.bookData.pages[validPage - 1] || '<p>页面暂无内容</p>';
+        return this.bookData!.pages[validPage - 1] || '<p>页面暂无内容</p>';
     }
 
     getSpreadPages(page = this.location.page) {

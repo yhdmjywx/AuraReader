@@ -6,7 +6,9 @@ const config = ts.readConfigFile(path.join(root, 'tsconfig.json'), ts.sys.readFi
 if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
 const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
 const program = ts.createProgram(parsed.fileNames, parsed.options);
-const diagnostics = [...parsed.errors, ...ts.getPreEmitDiagnostics(program)];
+const typeTests = fs.readdirSync(path.join(root, 'tests/types')).filter(file => file.endsWith('.mts')).map(file => path.join(root, 'tests/types', file));
+const contractProgram = ts.createProgram(typeTests, { ...parsed.options, rootDir: root, noEmit: true });
+const diagnostics = [...parsed.errors, ...ts.getPreEmitDiagnostics(program), ...ts.getPreEmitDiagnostics(contractProgram)];
 if (diagnostics.length) {
     process.stderr.write(ts.formatDiagnosticsWithColorAndContext(diagnostics, {
         getCurrentDirectory: () => root, getCanonicalFileName: file => file, getNewLine: () => '\n'
