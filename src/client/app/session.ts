@@ -1,3 +1,4 @@
+export interface BookChanged { currentBookId: string; previousBookId: string }
 /* ==========================================================================
    Session - Minimal Shared Application Context
    Authority owner of: currentBook.
@@ -6,6 +7,8 @@
    ========================================================================== */
 
 export class Session {
+    currentBookId: string;
+    listeners: Set<(event: BookChanged) => void>;
     constructor(initialBookId = 'crisis-era') {
         this.currentBookId = initialBookId;
         this.listeners = new Set();
@@ -15,20 +18,20 @@ export class Session {
         return this.currentBookId;
     }
 
-    setCurrentBookId(bookId) {
+    setCurrentBookId(bookId: string) {
         if (!bookId || this.currentBookId === bookId) return;
         const prev = this.currentBookId;
         this.currentBookId = bookId;
         this.notify({ currentBookId: bookId, previousBookId: prev });
     }
 
-    subscribe(listener) {
+    subscribe(listener: (event: BookChanged) => void) {
         if (typeof listener !== 'function') return () => {};
         this.listeners.add(listener);
         return () => this.listeners.delete(listener);
     }
 
-    notify(event) {
+    notify(event: BookChanged) {
         for (const listener of this.listeners) {
             try {
                 listener(event);

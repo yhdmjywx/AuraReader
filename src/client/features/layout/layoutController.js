@@ -10,6 +10,7 @@ import { applyMarginGeometry } from './marginNotesLayout.js';
 export const DOUBLE_PAGE_MIN_WIDTH = 1224;
 
 export class LayoutController {
+    /** @param {import('../../app/contracts.js').LayoutCallbacks} callbacks */
     constructor(callbacks = {}) {
         const storage = (typeof localStorage !== 'undefined') ? localStorage : null;
         const storedMode = storage && storage.getItem('aura_layout_mode');

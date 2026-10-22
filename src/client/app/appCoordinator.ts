@@ -1,3 +1,25 @@
+import type { Session } from './session.js';
+import type { ReaderController } from '../features/reader/readerController.js';
+import type { AnnotationController } from '../features/annotations/annotationController.js';
+import type { SelectionController } from '../features/annotations/selectionController.js';
+import type { ShelfController } from '../features/shelf/shelfController.js';
+import type { LayoutController } from '../features/layout/layoutController.js';
+import type { BackupController } from '../features/backup/backupController.js';
+import type { AppShell } from './appShell.js';
+import type { ReaderMode } from '../domain/book.js';
+import type { NoteDraft } from './contracts.js';
+import { errorMessage } from '../infrastructure/storageError.js';
+interface CoordinatorDependencies {
+    session: Session;
+    readerController: ReaderController;
+    annotationController: AnnotationController;
+    shelfController?: ShelfController;
+    layoutController?: LayoutController;
+    selectionController?: SelectionController;
+    backupController?: BackupController;
+    appShell?: AppShell;
+}
+export type AnnotationDraft = NoteDraft & { type?: 'note' | 'highlight'; color?: string; comment?: string };
 /* ==========================================================================
    AppCoordinator - Cross-Module Task Coordinator
    Coordinates cross-feature tasks across Reader, Annotations, Shelf,
@@ -15,7 +37,18 @@ import { parseEpub, parseTxt } from '../infrastructure/epubParser.js';
 import { loadNotesForBook } from '../infrastructure/annotationRepository.js';
 import { isNote } from '../domain/annotationEngine.js';
 
+const demos: Record<string, (typeof demoBooks)[keyof typeof demoBooks]> = demoBooks;
+
 export class AppCoordinator {
+    session: Session;
+    reader: ReaderController;
+    annotations: AnnotationController;
+    shelf?: ShelfController;
+    layout?: LayoutController;
+    selection?: SelectionController;
+    backup?: BackupController;
+    shell?: AppShell;
+    private openBookRequestId: number;
     constructor({
         session,
         readerController,
@@ -25,7 +58,7 @@ export class AppCoordinator {
         selectionController,
         backupController,
         appShell
-    } = {}) {
+    }: CoordinatorDependencies) {
         this.session = session;
         this.reader = readerController;
         this.annotations = annotationController;
@@ -37,7 +70,7 @@ export class AppCoordinator {
         this.openBookRequestId = 0;
     }
 
-    async openBook(bookId) {
+    async openBook(bookId: string) {
         if (!bookId) return;
         const requestId = ++this.openBookRequestId;
         this.shell?.setBookLoading?.(true);
@@ -50,8 +83,8 @@ export class AppCoordinator {
 
             let book = await loadBookFromDB(bookId);
             if (requestId !== this.openBookRequestId) return;
-            if (!book && demoBooks[bookId]) {
-                book = { id: bookId, ...demoBooks[bookId] };
+            if (!book && demos[bookId]) {
+                book = { id: bookId, ...demos[bookId] };
                 await saveBookToDB(book);
                 if (requestId !== this.openBookRequestId) return;
             }
@@ -79,14 +112,14 @@ export class AppCoordinator {
             // A superseded request may fail after the latest book has opened.
             if (requestId === this.openBookRequestId) {
                 console.error('图书载入失败:', error);
-                this.shell?.showToast(error.message || '图书载入失败，请重试');
+                this.shell?.showToast(errorMessage(error, '图书载入失败，请重试'));
             }
         } finally {
             if (requestId === this.openBookRequestId) this.shell?.setBookLoading?.(false);
         }
     }
 
-    async importBook(file) {
+    async importBook(file: File) {
         if (!file) return;
 
         if (this.shell) {
@@ -94,7 +127,7 @@ export class AppCoordinator {
         }
 
         try {
-            const ext = file.name.split('.').pop().toLowerCase();
+            const ext = file.name.split('.').pop()?.toLowerCase();
             let bookObj = null;
 
             if (ext === 'epub' || ext === 'equb' || ext === 'zip') {
@@ -121,12 +154,12 @@ export class AppCoordinator {
         } catch (err) {
             console.error("书籍导入失败:", err);
             if (this.shell) {
-                this.shell.showToast(`图书导入失败: ${err.message}`);
+                this.shell.showToast(`图书导入失败: ${errorMessage(err, '无法解析该文件格式')}`);
             }
         }
     }
 
-    async addAnnotation(data) {
+    async addAnnotation(data: AnnotationDraft) {
         if (!data) return;
 
         const page = data.page || this.reader.getCurrentPage();
@@ -164,7 +197,7 @@ export class AppCoordinator {
         }
     }
 
-    jumpToAnnotation(annotationId, options = {}) {
+    jumpToAnnotation(annotationId: string, options: { showMenu?: boolean } = {}) {
         if (!this.annotations) return;
         const notes = this.annotations.getNotes();
         const note = notes.find(n => n.id === annotationId);
@@ -182,7 +215,7 @@ export class AppCoordinator {
         if (this.reader && this.reader.isChapterFlow && this.reader.isChapterFlow()) {
             this.reader.showQuote(note.page, quote, notes);
             if (this.selection && typeof this.selection.activateAnnotationId === 'function') {
-                setTimeout(() => this.selection.activateAnnotationId(note.id, { notify: false, showMenu }), 30);
+                setTimeout(() => this.selection?.activateAnnotationId(note.id, { notify: false, showMenu }), 30);
             }
             if (this.shell) this.shell.showToast(`跳转至第 ${note.page} 章原文所在位置`);
             return;
@@ -224,7 +257,7 @@ export class AppCoordinator {
         }
     }
 
-    async deleteBook(bookId) {
+    async deleteBook(bookId: string) {
         if (!bookId) return;
         if (this.session.getCurrentBookId() === bookId) await this.annotations.finishInlineEdit?.();
         await deleteBookFromDB(bookId);
@@ -237,15 +270,15 @@ export class AppCoordinator {
         }
     }
 
-    async restoreBackup(file) {
+    async restoreBackup(file: File) {
         if (!file || !this.backup) return;
         await this.backup.importFullBackup(file);
     }
 
-    changeReadingLayout(mode) {
+    changeReadingLayout(mode: ReaderMode) {
         if (!this.layout) return;
         const width = (typeof document !== 'undefined' && document.getElementById('reader-panel'))
-            ? document.getElementById('reader-panel').clientWidth
+            ? document.getElementById('reader-panel')!.clientWidth
             : ((typeof window !== 'undefined') ? window.innerWidth : 1200);
         const res = this.layout.setPageMode(mode, width);
 

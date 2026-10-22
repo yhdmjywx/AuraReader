@@ -2,6 +2,9 @@
 // one annotation can span multiple lines, columns, or screens.
 const RECT_EPSILON = 0.01;
 
+/** @param {(HTMLElement | null | undefined)[]} papers
+ * @param {HTMLElement | null} viewport
+ * @returns {Set<string>} */
 export function collectVisibleAnnotationIds(papers = [], viewport = null) {
     const ids = new Set();
     if (!viewport) return ids;

@@ -1,3 +1,6 @@
+import { eventElement } from './dom.js';
+import type { AppElements } from './elements.js';
+import type { ShellCallbacks } from './contracts.js';
 /* ==========================================================================
    AppShell - Application Shell & Global Presentation / Input Dispatcher
    Authority owner of: appTheme ('light' | 'dark').
@@ -6,14 +9,18 @@
    ========================================================================== */
 
 export class AppShell {
-    constructor(callbacks = {}) {
+    callbacks: ShellCallbacks;
+    appTheme: 'light' | 'dark';
+    elements: AppElements | null;
+    resizeDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+    constructor(callbacks: ShellCallbacks = {}) {
         this.callbacks = callbacks;
         this.appTheme = 'light';
         this.elements = null;
-        this.resizeDebounceTimer = null;
+        this.resizeDebounceTimer = undefined;
     }
 
-    showToast(msg) {
+    showToast(msg: string) {
         if (!this.elements || !this.elements.toastMsg || !msg) return;
         this.elements.toastMsg.textContent = msg;
         this.elements.toastMsg.classList.add('show');
@@ -24,7 +31,7 @@ export class AppShell {
         }, 2600);
     }
 
-    setBookLoading(loading) {
+    setBookLoading(loading: boolean) {
         // Leave header and shelf controls available for a newer book request.
         for (const panel of [this.elements?.readerPanel, this.elements?.notesPanel]) {
             if (!panel) continue;
@@ -49,7 +56,7 @@ export class AppShell {
         }
     }
 
-    toggleAppearance(forceOpen) {
+    toggleAppearance(forceOpen?: boolean) {
         const panel = this.elements && this.elements.appearancePanel;
         const button = this.elements && this.elements.btnAppearance;
         if (!panel) return;
@@ -66,7 +73,7 @@ export class AppShell {
         this.toggleAppearance(false);
     }
 
-    toggleExportPanel(forceOpen) {
+    toggleExportPanel(forceOpen?: boolean) {
         const panel = this.elements && this.elements.exportPanel;
         const button = this.elements && this.elements.btnExportMenu;
         if (!panel) return;
@@ -74,7 +81,7 @@ export class AppShell {
         if (open) {
             this.closeAppearance();
             this.callbacks.onOpenPanel?.();
-            if (this.elements.exportBookTitle) {
+            if (this.elements?.exportBookTitle) {
                 this.elements.exportBookTitle.textContent = this.elements.currentBookTitle
                     ? this.elements.currentBookTitle.textContent
                     : '未打开书籍';
@@ -103,7 +110,7 @@ export class AppShell {
         }
     }
 
-    init(elements, callbacks = {}) {
+    init(elements: AppElements, callbacks: ShellCallbacks = {}) {
         this.elements = elements;
         this.callbacks = { ...this.callbacks, ...callbacks };
         if (!elements) return;
@@ -127,7 +134,7 @@ export class AppShell {
                 e.stopPropagation();
             });
             document.addEventListener('click', (e) => {
-                if (!elements.appearancePanel.classList.contains('open')) return;
+                if (!elements.appearancePanel?.classList.contains('open')) return;
                 const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
                 const inside = path.some((node) => node === elements.appearancePanel || node === elements.btnAppearance);
                 if (inside) return;
@@ -142,14 +149,14 @@ export class AppShell {
             });
             elements.exportPanel.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (e.target.closest && e.target.closest('[data-export-action]')) {
+                if (eventElement(e)?.closest('[data-export-action]')) {
                     this.closeExportPanel();
                 }
             });
             document.addEventListener('click', (e) => {
-                if (!elements.exportPanel.classList.contains('open')) return;
+                if (!elements.exportPanel?.classList.contains('open')) return;
                 const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
-                if (path.includes(elements.exportPanel) || path.includes(elements.btnExportMenu)) return;
+                if (path.some(node => node === elements.exportPanel || node === elements.btnExportMenu)) return;
                 this.closeExportPanel();
             }, true);
         }
@@ -160,10 +167,11 @@ export class AppShell {
                 this.toggleFullscreen();
             });
             document.addEventListener('fullscreenchange', () => {
-                const icon = elements.btnFullscreen.querySelector('i');
-                if (!icon) return;
+                const button = elements.btnFullscreen;
+                const icon = button?.querySelector('i');
+                if (!button || !icon) return;
                 icon.className = document.fullscreenElement ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
-                elements.btnFullscreen.title = document.fullscreenElement ? '退出全屏' : '全屏阅读';
+                button.title = document.fullscreenElement ? '退出全屏' : '全屏阅读';
             });
         }
 
@@ -179,11 +187,12 @@ export class AppShell {
         // File Input Upload
         if (elements.fileInput) {
             elements.fileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
+                const input = e.currentTarget as HTMLInputElement;
+                const file = input.files?.[0];
                 if (file && this.callbacks.onImportFile) {
                     this.callbacks.onImportFile(file);
                 }
-                e.target.value = '';
+                input.value = '';
             });
         }
 
@@ -196,7 +205,7 @@ export class AppShell {
                 return;
             }
             const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-            if (tag === 'input' || tag === 'textarea' || document.activeElement.isContentEditable) {
+            if (tag === 'input' || tag === 'textarea' || (document.activeElement as HTMLElement | null)?.isContentEditable) {
                 return;
             }
 

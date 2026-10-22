@@ -1,3 +1,7 @@
+import { eventElement } from '../../app/dom.js';
+import type { Annotation, AnnotationLocation } from '../../domain/annotation.js';
+import type { ActiveAnnotationContext, SelectionCallbacks, PendingSelection } from '../../app/contracts.js';
+import type { AppElements } from '../../app/elements.js';
 /* ==========================================================================
    SelectionController - Text Selection & Annotation Click Context
    Authority owner of: pendingSelection, activeAnnotationContext.
@@ -19,9 +23,16 @@ import {
 const DRAG_THRESHOLD = 5;
 
 export class SelectionController {
+    callbacks: SelectionCallbacks;
+    pendingSelection: PendingSelection | null;
+    activeAnnotationContext: ActiveAnnotationContext | null;
+    menuOpen: boolean;
+    pointerOrigin: {x: number; y: number} | null;
+    pointerMoved: boolean;
+    elements: AppElements | null;
     constructor({
         callbacks = {}
-    } = {}) {
+    }: { callbacks?: SelectionCallbacks } = {}) {
         this.callbacks = callbacks;
         this.pendingSelection = null;
         this.activeAnnotationContext = null;
@@ -44,18 +55,18 @@ export class SelectionController {
         return ctx && ctx.highlightIds && ctx.highlightIds.length ? ctx.highlightIds[0] : null;
     }
 
-    set activeHighlightId(val) {
+    set activeHighlightId(val: string | null) {
         if (!val) this.clearAnnotationContext();
     }
 
     clearSelection() {
         this.pendingSelection = null;
         if (window.getSelection) {
-            window.getSelection().removeAllRanges();
+            window.getSelection()?.removeAllRanges();
         }
     }
 
-    showHighlightAction(targetEl, note) {
+    showHighlightAction(targetEl: HTMLElement, note: Annotation) {
         this.hideSelectionTooltip();
         if (!targetEl) return;
         if (targetEl.classList && targetEl.classList.contains('annotation-token')) {
@@ -103,7 +114,7 @@ export class SelectionController {
         if (hadContext && this.callbacks.onClearFocus) this.callbacks.onClearFocus();
     }
 
-    activateToken(token, page, { force = false, notify = true, showMenu = true } = {}) {
+    activateToken(token: HTMLElement, page: number, { force = false, notify = true, showMenu = true } = {}) {
         if (!token) return false;
         const highlightIds = splitIds(token.getAttribute('data-highlight-ids'));
         const noteIds = splitIds(token.getAttribute('data-note-ids'));
@@ -114,11 +125,11 @@ export class SelectionController {
 
         const root = token.closest('[data-volume-title-page]') || token.closest('.book-paper') || token.parentElement;
         const quoteInfo = collectTokenQuote(root, token);
-        const reading = this.callbacks.getReadingContext ? this.callbacks.getReadingContext() : {};
+        const reading = this.callbacks.getReadingContext?.();
         const resolvedPage = Number(page) || Number(token.dataset.page) || 1;
         if (quoteInfo.location) {
             quoteInfo.location.sectionId = token.closest('[data-volume-title-page]')
-                ? `chapter-${resolvedPage}` : (reading.sectionId || quoteInfo.location.sectionId);
+                ? `chapter-${resolvedPage}` : (reading?.sectionId || quoteInfo.location.sectionId);
             quoteInfo.location.page = resolvedPage;
         }
 
@@ -142,7 +153,7 @@ export class SelectionController {
         return true;
     }
 
-    activateAnnotationId(annotationId, { notify = false, showMenu = false } = {}) {
+    activateAnnotationId(annotationId: string, { notify = false, showMenu = false } = {}) {
         if (!annotationId || typeof document === 'undefined') return false;
         const token = findTokenByAnnotationId(annotationId);
         if (!token) return false;
@@ -182,12 +193,12 @@ export class SelectionController {
         showHighlightActionTooltip(this.elements, target, this.activeAnnotationContext);
     }
 
-    handleAnnotationClick(event, paper) {
+    handleAnnotationClick(event: MouseEvent, paper: HTMLElement) {
         if (!paper || !event) return;
         if (this.pointerMoved || hasTextSelection()) return;
 
-        const eventTarget = event.target && event.target.nodeType === 3 ? event.target.parentElement : event.target;
-        const token = eventTarget && eventTarget.closest ? eventTarget.closest('.annotation-token') : null;
+        const eventTarget = eventElement(event);
+        const token = eventTarget?.closest<HTMLElement>('.annotation-token');
         if (!token || !paper.contains(token)) {
             this.clearAnnotationContext();
             return;
@@ -226,7 +237,8 @@ export class SelectionController {
             ? (ctx.currentPage || 1)
             : (isInRight ? (ctx.currentRightPage || (ctx.currentPage + 1)) : (ctx.currentLeftPage || ctx.currentPage));
         let root = isInRight ? this.elements.bookPaperRight : this.elements.bookPaper;
-        const dividerAt = node => (node.nodeType === 1 ? node : node.parentElement)?.closest('[data-volume-title-page]');
+        if (!root) return;
+        const dividerAt = (node: Node) => (node.nodeType === 1 ? node as Element : node.parentElement)?.closest<HTMLElement>('[data-volume-title-page]');
         const startDivider = dividerAt(range.startContainer);
         const endDivider = dividerAt(range.endContainer);
         // Cross-spine selections were never a single annotation. Keep the
@@ -254,7 +266,7 @@ export class SelectionController {
         }
     }
 
-    initUI(elements) {
+    initUI(elements: AppElements) {
         this.elements = elements;
         if (!elements || typeof document === 'undefined') return;
 
@@ -265,7 +277,7 @@ export class SelectionController {
             }
         });
 
-        const bindPaper = (paper) => {
+        const bindPaper = (paper: HTMLElement | null | undefined) => {
             if (!paper) return;
             paper.addEventListener('pointerdown', (event) => {
                 this.pointerOrigin = { x: event.clientX, y: event.clientY };
@@ -342,19 +354,19 @@ export class SelectionController {
             const selection = window.getSelection();
             const hasActiveSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
 
-            if (!e.target.closest('#selection-tooltip') && !hasActiveSelection) {
+            if (!eventElement(e)?.closest('#selection-tooltip') && !hasActiveSelection) {
                 this.hideSelectionTooltip();
             }
 
             if (this.pointerMoved || hasActiveSelection) return;
-            if (e.target.closest('#highlight-action-tooltip') || e.target.closest('.annotation-token')) return;
-            if (e.target.closest('#notes-panel')) return;
+            if (eventElement(e)?.closest('#highlight-action-tooltip') || eventElement(e)?.closest('.annotation-token')) return;
+            if (eventElement(e)?.closest('#notes-panel')) return;
             this.hideHighlightAction();
         });
     }
 }
 
-function splitIds(value) {
+function splitIds(value: string | null) {
     if (!value) return [];
     return String(value).split(/\s+/).filter(Boolean);
 }
@@ -370,32 +382,33 @@ function clearActiveTokens() {
     document.querySelectorAll('.annotation-token.is-active').forEach(token => token.classList.remove('is-active'));
 }
 
-function findTokensByKey(key) {
+function findTokensByKey(key: string) {
     if (typeof document === 'undefined' || !key) return [];
-    return Array.from(document.querySelectorAll('.annotation-token')).filter(token => tokenKey(token) === key);
+    return Array.from(document.querySelectorAll<HTMLElement>('.annotation-token')).filter(token => tokenKey(token) === key);
 }
 
-function findTokenByAnnotationId(annotationId) {
-    if (typeof document === 'undefined' || !annotationId || typeof CSS === 'undefined' || !CSS.escape) {
+function findTokenByAnnotationId(annotationId: string): HTMLElement | null {
+    if (typeof document === 'undefined' || !annotationId) return null;
+    if (typeof CSS === 'undefined' || !CSS.escape) {
         return document && annotationId
-            ? document.querySelector(`[data-highlight-ids~="${annotationId}"], [data-note-ids~="${annotationId}"]`)
+            ? document.querySelector<HTMLElement>(`[data-highlight-ids~="${annotationId}"], [data-note-ids~="${annotationId}"]`)
             : null;
     }
     const escaped = CSS.escape(annotationId);
-    return document.querySelector(`[data-highlight-ids~="${escaped}"], [data-note-ids~="${escaped}"]`);
+    return document.querySelector<HTMLElement>(`[data-highlight-ids~="${escaped}"], [data-note-ids~="${escaped}"]`);
 }
 
-function tokenKey(token) {
+function tokenKey(token: Element) {
     return annotationContextKey(
         splitIds(token.getAttribute('data-highlight-ids')),
         splitIds(token.getAttribute('data-note-ids'))
     );
 }
 
-function collectTokenQuote(root, token) {
+function collectTokenQuote(root: Element | null, token: HTMLElement) {
     const key = tokenKey(token);
     const tokens = root
-        ? Array.from(root.querySelectorAll('.annotation-token')).filter(item => tokenKey(item) === key)
+        ? Array.from(root.querySelectorAll<HTMLElement>('.annotation-token')).filter(item => tokenKey(item) === key)
         : [token];
     tokens.sort((a, b) => Number(a.dataset.start) - Number(b.dataset.start));
 

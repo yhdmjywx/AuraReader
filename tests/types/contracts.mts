@@ -30,3 +30,21 @@ function storageCalls() {
     void pending;
 }
 void storageCalls;
+
+import type { ReaderCallbacks, SelectionCallbacks } from '../../src/client/app/contracts.js';
+import type { AppElements } from '../../src/client/app/elements.js';
+import { AppCoordinator } from '../../src/client/app/appCoordinator.js';
+function controllerContracts() {
+    const reader: ReaderCallbacks = { getNotes: () => [note] };
+    // @ts-expect-error Rendering callbacks must return normalized annotations.
+    reader.getNotes = () => [{ id: 'n', page: 'first' }];
+    const selection: SelectionCallbacks = {};
+    // @ts-expect-error Selection context must provide a numeric current page.
+    selection.getReadingContext = () => ({ currentPage: 'first' });
+    // @ts-expect-error The coordinator needs its session, reader and annotations.
+    new AppCoordinator({});
+    const elements: AppElements = {};
+    // @ts-expect-error The file input must expose files, not just general DOM methods.
+    elements.fileInput = document.createElement('div');
+}
+void controllerContracts;
