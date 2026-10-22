@@ -11,8 +11,8 @@ const { clientStorage } = require('../helpers/sqlite');
     try {
         console.warn = console.error = () => {};
         server = await clientStorage([{ id: 'book-a', pages: ['关联的原文'] }, { id: 'book-b', pages: ['其他书'] }]);
-        const repo = await import('../../src/client/infrastructure/annotationRepository.js');
-        const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
+        const repo = await import('../../dist/client/infrastructure/annotationRepository.js');
+        const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
         const notices = [];
         const controller = () => new AnnotationController({ callbacks: { getCurrentBookId: () => 'book-a', showToast: text => notices.push(text) } });
         const original = { id: 'existing', bookId: 'book-a', kind: 'note', quote: '原文', comment: '旧内容', page: 1 };

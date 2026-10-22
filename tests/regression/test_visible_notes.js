@@ -14,9 +14,9 @@ const { JSDOM } = require('jsdom');
     let storage;
     try {
         for (const key of keys) globalThis[key] = dom.window[key];
-        const { collectVisibleAnnotationIds } = await import('../../src/client/features/reader/visibleAnnotations.js');
-        const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
-        const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
+        const { collectVisibleAnnotationIds } = await import('../../dist/client/features/reader/visibleAnnotations.js');
+        const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
+        const { ReaderController } = await import('../../dist/client/features/reader/readerController.js');
         storage = await require('../helpers/sqlite').clientStorage([{ id: 'visibility-test', pages: ['可见正文'] }]);
         const byId = id => document.getElementById(id);
         const viewport = byId('reader-viewport');

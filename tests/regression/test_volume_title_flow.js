@@ -8,14 +8,14 @@ const { JSDOM } = require('jsdom');
     let reader;
     try {
         keys.forEach(key => globalThis[key] = dom.window[key]);
-        const { buildBookStructure, readingUnitForPage } = await import('../../src/client/infrastructure/bookStructure.js');
+        const { buildBookStructure, readingUnitForPage } = await import('../../dist/client/infrastructure/bookStructure.js');
         const resolveVolumeTitleFlow = (book, page) => {
             const unit = readingUnitForPage(buildBookStructure(book), page);
             return { page: unit.page, titlePage: unit.prefixPages[0] || null };
         };
-        const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
-        const { SelectionController } = await import('../../src/client/features/annotations/selectionController.js');
-        const { selectionLocation } = await import('../../src/client/features/reader/annotationRenderer.js');
+        const { ReaderController } = await import('../../dist/client/features/reader/readerController.js');
+        const { SelectionController } = await import('../../dist/client/features/annotations/selectionController.js');
+        const { selectionLocation } = await import('../../dist/client/features/reader/annotationRenderer.js');
         const byId = id => document.getElementById(id);
         const book = {
             id: 'volume-book', format: 'EPUB', readerFlow: 'chapter',

@@ -2,8 +2,8 @@ const assert = require('node:assert/strict');
 const { JSDOM } = require('jsdom');
 
 (async () => {
-    const { createAnnotationObject, normalizeAnnotation, filterNotes } = await import('../../src/client/domain/annotationEngine.js');
-    const { getSeedNotes } = await import('../../src/client/infrastructure/demoData.js');
+    const { createAnnotationObject, normalizeAnnotation, filterNotes } = await import('../../dist/client/domain/annotationEngine.js');
+    const { getSeedNotes } = await import('../../dist/client/infrastructure/demoData.js');
     const highlight = createAnnotationObject({ id: 'h', bookId: 'b', quote: '原文', comment: '' });
     const note = createAnnotationObject({ id: 'n', bookId: 'b', quote: '原文', comment: '笔记' });
     assert.equal(highlight.kind, 'highlight'); assert.equal(highlight.color, 'yellow');
@@ -17,7 +17,7 @@ const { JSDOM } = require('jsdom');
     const oldDocument = globalThis.document, oldFilter = globalThis.NodeFilter;
     try {
         globalThis.document = dom.window.document; globalThis.NodeFilter = dom.window.NodeFilter;
-        const { renderAnnotationTokens } = await import('../../src/client/features/reader/annotationRenderer.js');
+        const { renderAnnotationTokens } = await import('../../dist/client/features/reader/annotationRenderer.js');
         const paper = document.querySelector('article');
         renderAnnotationTokens(paper, [highlight, note], 1);
         const token = paper.querySelector('.annotation-token');

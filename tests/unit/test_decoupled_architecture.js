@@ -10,7 +10,7 @@ let storage;
     // 1. 测试 ReadingLocation 模型与转换
     console.log("\n--- [测试 1: ReadingLocation 定位模型] ---");
     const { clampPage, calcSpreadPages, resolveTargetPage, findChapterForPage, createReadingLocation } = await import(
-        '../../src/client/core/readingLocation.js'
+        '../../dist/client/core/readingLocation.js'
     );
 
     const loc1 = createReadingLocation({ bookId: 'book-1', page: 2, totalPages: 5, sectionId: 'chapter-2', offset: 1250 });
@@ -52,7 +52,7 @@ let storage;
 
     // 2. 测试 ReaderEngine 阅读内核状态机
     console.log("\n--- [测试 2: ReaderEngine 纯阅读内核] ---");
-    const { ReaderEngine } = await import('../../src/client/core/readerEngine.js');
+    const { ReaderEngine } = await import('../../dist/client/core/readerEngine.js');
     const engine = new ReaderEngine();
 
     const mockBook = {
@@ -93,7 +93,7 @@ let storage;
     // 3. 测试 AnnotationEngine 标注内核
     console.log("\n--- [测试 3: AnnotationEngine 标注算法内核] ---");
     const { filterNotes, findOverlappingNote, applyHighlightToHtml, createAnnotationObject } = await import(
-        '../../src/client/core/annotationEngine.js'
+        '../../dist/client/core/annotationEngine.js'
     );
 
     const annot1 = createAnnotationObject({
@@ -146,10 +146,10 @@ let storage;
     assert.ok(markedHtml.includes('<mark class="hl-yellow" data-id="nh1">第二段文字接续</mark>'), "应成功拆分第二段标记");
 
     const { normalizeAnnotation, isHighlight, isNote, findAnnotationsAtQuote, groupAnnotationsByRange } = await import(
-        '../../src/client/domain/annotationEngine.js'
+        '../../dist/client/domain/annotationEngine.js'
     );
     const { findQuoteRange, buildSegments } = await import(
-        '../../src/client/domain/annotationRangeEngine.js'
+        '../../dist/client/domain/annotationRangeEngine.js'
     );
 
     const legacyNote = normalizeAnnotation({ id: 'legacy-note', comment: '旧笔记', quote: '原文', page: 1, color: 'green' });
@@ -189,7 +189,7 @@ let storage;
 
     // 4. Current fixed-column mode state; DOM buttons are exercised by
     // test_page_layout_system.js using the actual controller and jsdom.
-    const { LayoutController, DOUBLE_PAGE_MIN_WIDTH } = await import('../../src/client/features/layout/layoutController.js');
+    const { LayoutController, DOUBLE_PAGE_MIN_WIDTH } = await import('../../dist/client/features/layout/layoutController.js');
     const layout = new LayoutController();
     layout.setPageMode('double', 1613);
     assert.strictEqual(layout.getEffectiveReaderMode(), 'double');
@@ -207,7 +207,7 @@ let storage;
     console.log("\n--- [测试 5: 数据边界隔离与跨书防串线验证] ---");
     storage = await require('../helpers/sqlite').clientStorage([{ id: 'another-book', pages: ['正文'] }]);
     const { loadNotesForBook, getNotesForBooks } = await import(
-        '../../src/client/repositories/annotationRepository.js'
+        '../../dist/client/repositories/annotationRepository.js'
     );
 
     // 验证新书未保存笔记时返回空数组，而不是沿用上一本书的笔记
@@ -223,7 +223,7 @@ let storage;
 
     // 6. 测试 Session 最小共享上下文与权威状态隔离
     console.log("\n--- [测试 6: Session 最小共享上下文与权威状态隔离] ---");
-    const { Session } = await import('../../src/client/app/session.js');
+    const { Session } = await import('../../dist/client/app/session.js');
     const sess = new Session('initial-book');
     assert.strictEqual(sess.getCurrentBookId(), 'initial-book', "Session 初始书籍 ID 正确");
 
@@ -251,9 +251,9 @@ let storage;
         setItem: (key, value) => saved.set(key, String(value)),
         removeItem: key => saved.delete(key)
     };
-    const { AppCoordinator } = await import('../../src/client/app/appCoordinator.js');
-    const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
-    const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
+    const { AppCoordinator } = await import('../../dist/client/app/appCoordinator.js');
+    const { ReaderController } = await import('../../dist/client/features/reader/readerController.js');
+    const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
 
     const testEngine = new ReaderEngine();
     testEngine.setBook('book-abc', mockBook);
@@ -333,8 +333,8 @@ let storage;
 
     // 9. 测试 app.js 薄门面与 main.js 权威控制器单例统一（无裂脑状态）
     console.log("\n--- [测试 9: app.js 门面与 main.js 架构实例统一性] ---");
-    const mainModule = await import('../../src/client/main.js');
-    const appModule = await import('../../src/client/app.js');
+    const mainModule = await import('../../dist/client/main.js');
+    const appModule = await import('../../dist/client/app.js');
 
     assert.strictEqual(appModule.readerController, mainModule.reader, "app.js 与 main.js 共享唯一的 ReaderController 实例");
     assert.strictEqual(appModule.annotationController, mainModule.annotations, "app.js 与 main.js 共享唯一的 AnnotationController 实例");

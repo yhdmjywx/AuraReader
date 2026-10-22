@@ -12,7 +12,7 @@ console.log('=== AuraReader 章节纸条计算 ===');
         columnFromScroll,
         screenStep,
         screenStartForColumn
-    } = await import('../../src/client/domain/chapterFlow.js');
+    } = await import('../../dist/client/domain/chapterFlow.js');
 
     assert.strictEqual(isChapterFlowBook({ format: 'EPUB', readerFlow: 'chapter', pages: ['<p>a</p>'] }), true);
     assert.strictEqual(isChapterFlowBook({ format: 'EPUB', hrefToPageMap: { 'ch1.html': 1 } }), true);
@@ -77,7 +77,7 @@ console.log('=== AuraReader 章节纸条计算 ===');
     assert.strictEqual(columnFromScroll(800, 400, 5), 3);
     assert.strictEqual(columnFromScroll(9999, 400, 5), 5);
 
-    const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
+    const { ReaderController } = await import('../../dist/client/features/reader/readerController.js');
     let rendered = 0;
     const reader = new ReaderController({ callbacks: { onPageRendered: () => rendered++ } });
     reader.setBook('chapter-merge-test', { format: 'EPUB', readerFlow: 'chapter', pages: ['<p>章节原文</p>'], toc: [] });
@@ -86,7 +86,7 @@ console.log('=== AuraReader 章节纸条计算 ===');
     reader.renderPage(1);
     assert.strictEqual(rendered, 1, '章节分页渲染后必须触发 UI 分支的标注恢复回调');
 
-    const { AppCoordinator } = await import('../../src/client/app/appCoordinator.js');
+    const { AppCoordinator } = await import('../../dist/client/app/appCoordinator.js');
     const activated = [];
     const shown = [];
     const focused = [];

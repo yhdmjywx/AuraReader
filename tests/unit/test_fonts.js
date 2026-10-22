@@ -6,7 +6,7 @@ const JSZip = require('jszip');
 const { createFontStore, inspectFont } = require('../../src/server/fontStore');
 
 (async () => {
-    const { CURATED_FONTS, automaticFont, normalizeFontChoice, resolveFont } = await import('../../src/client/domain/fontCatalog.js');
+    const { CURATED_FONTS, automaticFont, normalizeFontChoice, resolveFont } = await import('../../dist/client/domain/fontCatalog.js');
     assert.deepEqual(CURATED_FONTS.map(font => font.id), ['sarasa', 'literata']);
     const fontDirectory = path.resolve('src/client/assets/fonts');
     const css = await fs.readFile(path.join(fontDirectory, 'fonts.css'), 'utf8');
@@ -92,7 +92,7 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
         globalThis.DOMParser = dom.window.DOMParser;
         globalThis.fetch = async url => ({ ok: true, json: async () => url.endsWith('/system')
             ? { supported: true, fonts: ['Arial', 'Microsoft YaHei'] } : { fonts: [] } });
-        const { FontController } = await import('../../src/client/features/reader/fontController.js');
+        const { FontController } = await import('../../dist/client/features/reader/fontController.js');
         const ids = {
             appearancePanel: 'appearance-panel', fontFamilySelect: 'font-family-select', fontPicker: 'font-picker',
             fontMenu: 'font-menu', fontChoiceLabel: 'font-choice-label', fontMainView: 'font-main-view',
@@ -146,7 +146,7 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
         assert.match(fonts.resolved().family, /system-ui/, '字体加载失败必须回退并继续阅读');
         assert.ok(applied > 0);
 
-        const { parseEpub } = await import('../../src/client/infrastructure/epubParser.js');
+        const { parseEpub } = await import('../../dist/client/infrastructure/epubParser.js');
         async function epub(metaLanguage, bodyLanguage) {
             const zip = new JSZip();
             zip.file('META-INF/container.xml', '<container><rootfiles><rootfile full-path="book.opf"/></rootfiles></container>');

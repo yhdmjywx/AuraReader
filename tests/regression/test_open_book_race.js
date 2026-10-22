@@ -8,12 +8,12 @@ function deferred() {
 }
 
 (async () => {
-    const { configureStorage } = await import('../../src/client/infrastructure/storageClient.js');
-    const { AppCoordinator } = await import('../../src/client/app/appCoordinator.js');
-    const { Session } = await import('../../src/client/app/session.js');
-    const { AppShell } = await import('../../src/client/app/appShell.js');
-    const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
-    const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
+    const { configureStorage } = await import('../../dist/client/infrastructure/storageClient.js');
+    const { AppCoordinator } = await import('../../dist/client/app/appCoordinator.js');
+    const { Session } = await import('../../dist/client/app/session.js');
+    const { AppShell } = await import('../../dist/client/app/appShell.js');
+    const { ReaderController } = await import('../../dist/client/features/reader/readerController.js');
+    const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
 
     function harness() {
         const gates = { books: [], notes: [] };
@@ -156,7 +156,7 @@ function deferred() {
         assert.equal(sameBook.renders.length, 1);
     } finally { sameBook.close(); }
 
-    const app = await import('../../src/client/app.js');
+    const app = await import('../../dist/client/app.js');
     const originalOpen = app.appCoordinator.openBook;
     try {
         let forwarded;

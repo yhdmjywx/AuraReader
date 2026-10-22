@@ -7,7 +7,7 @@ const { JSDOM } = require('jsdom');
     const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     try {
         keys.forEach(key => globalThis[key] = dom.window[key]);
-        const { renderAnnotationTokens } = await import('../../src/client/features/reader/annotationRenderer.js');
+        const { renderAnnotationTokens } = await import('../../dist/client/features/reader/annotationRenderer.js');
         const root = document.querySelector('article');
         const text = root.textContent;
         const quote = '第一段😀 & 继续。第二段结束。';

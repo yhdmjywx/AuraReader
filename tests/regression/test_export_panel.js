@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 (async () => {
-    const { AppShell } = await import('../../src/client/app/appShell.js');
+    const { AppShell } = await import('../../dist/client/app/appShell.js');
     const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
     const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
     const documentListeners = new Map();

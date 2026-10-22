@@ -62,8 +62,8 @@ module.exports = { sqliteServer };
 
 async function clientStorage(books = [], options = {}) {
     const server = await sqliteServer();
-    const client = await import('../../src/client/infrastructure/storageClient.js');
-    const data = await import('../../src/client/infrastructure/demoData.js');
+    const client = await import('../../dist/client/infrastructure/storageClient.js');
+    const data = await import('../../dist/client/infrastructure/demoData.js');
     const builtinBooks = Object.entries(data.demoBooks).map(([id, b]) => ({ id, ...b }));
     const allBooks = [...builtinBooks, ...books];
     const result = await server.request('restore', { opId: require('node:crypto').randomUUID(), books: allBooks, notes: data.getSeedNotes() });

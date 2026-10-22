@@ -4,9 +4,9 @@ const { clientStorage } = require('../helpers/sqlite');
 (async () => {
     const storage = await clientStorage();
     try {
-        const { restoreRecords } = await import('../../src/client/infrastructure/storageClient.js');
-        const { loadNotesForBook, getNotesForBooks } = await import('../../src/client/infrastructure/annotationRepository.js');
-        const { deleteBookFromDB } = await import('../../src/client/infrastructure/bookRepository.js');
+        const { restoreRecords } = await import('../../dist/client/infrastructure/storageClient.js');
+        const { loadNotesForBook, getNotesForBooks } = await import('../../dist/client/infrastructure/annotationRepository.js');
+        const { deleteBookFromDB } = await import('../../dist/client/infrastructure/bookRepository.js');
         const books = [{ id: 'A', pages: ['<p>A 的原文</p>'] }, { id: 'B', pages: ['<p>B 的原文</p>'] }];
         const notes = [
             { id: 'A1', bookId: 'A', quote: 'A 的原文', comment: '笔记 A', unknown: ['完整保留'] },

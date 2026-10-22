@@ -9,10 +9,10 @@ const { JSDOM } = require('jsdom');
     const createURL = URL.createObjectURL, revokeURL = URL.revokeObjectURL;
     try {
         keys.forEach(key => globalThis[key] = dom.window[key]);
-        const { buildBookStructure, readingUnitForPage, structureSummary } = await import('../../src/client/infrastructure/bookStructure.js');
-        const { exportChapterZip } = await import('../../src/client/infrastructure/exporters.js');
-        const { renderShelf } = await import('../../src/client/features/shelf/shelfUI.js');
-        const { renderBackupBookList } = await import('../../src/client/features/backup/backupModalUI.js');
+        const { buildBookStructure, readingUnitForPage, structureSummary } = await import('../../dist/client/infrastructure/bookStructure.js');
+        const { exportChapterZip } = await import('../../dist/client/infrastructure/exporters.js');
+        const { renderShelf } = await import('../../dist/client/features/shelf/shelfUI.js');
+        const { renderBackupBookList } = await import('../../dist/client/features/backup/backupModalUI.js');
         const book = {
             id: 'structure', title: '结构测试', format: 'EPUB', readerFlow: 'chapter',
             pages: ['<h1>封面</h1><img src="cover.jpg">', '<h1>作者原序</h1><p>序文保留</p>',
