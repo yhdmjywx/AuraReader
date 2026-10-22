@@ -17,7 +17,7 @@ const { clientStorage } = require('../helpers/sqlite');
         await books.deleteBookFromDB('pipeline');
         assert.equal(storage.read('books', 'pipeline'), undefined);
         assert.equal(storage.read('annotations', record.id), undefined);
-        for (const file of ['bookRepository.js', 'annotationRepository.js']) {
+        for (const file of ['bookRepository.ts', 'annotationRepository.ts']) {
             const text = fs.readFileSync(path.join('src/client/infrastructure', file), 'utf8');
             assert.ok(!/indexedDB|\.transaction\(/.test(text), '业务 Repository 不再包含 IndexedDB 访问');
         }
