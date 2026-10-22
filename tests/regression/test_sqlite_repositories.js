@@ -8,9 +8,9 @@ const { clientStorage } = require('../helpers/sqlite');
     globalThis.localStorage = dom.window.localStorage;
     const server = await clientStorage([{ id: 'repo', pages: ['<p>原文😀</p>'] }]);
     try {
-        const repo = await import('../../src/client/infrastructure/annotationRepository.js');
-        const books = await import('../../src/client/infrastructure/bookRepository.js');
-        const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
+        const repo = await import('../../dist/client/infrastructure/annotationRepository.js');
+        const books = await import('../../dist/client/infrastructure/bookRepository.js');
+        const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
         const make = () => new AnnotationController({ callbacks: { getCurrentBookId: () => 'repo' } });
         const controller = make();
         await controller.loadNotesForBook('repo');

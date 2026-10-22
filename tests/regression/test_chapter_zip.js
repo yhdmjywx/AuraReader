@@ -24,12 +24,12 @@ const { JSDOM } = require('jsdom');
         dom.window.HTMLAnchorElement.prototype.click = function () {
             downloads.push({ filename: this.download, blob: blobs.get(this.href) });
         };
-        const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
-        const { BackupController } = await import('../../src/client/features/backup/backupController.js');
-        const { exportChapterZip, exportMarkdown, exportStandaloneHtml } = await import('../../src/client/infrastructure/exporters.js');
-        const { parseEpub } = await import('../../src/client/infrastructure/epubParser.js');
-        const { saveBookToDB } = await import('../../src/client/infrastructure/bookRepository.js');
-        const { saveNoteToDB } = await import('../../src/client/infrastructure/annotationRepository.js');
+        const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
+        const { BackupController } = await import('../../dist/client/features/backup/backupController.js');
+        const { exportChapterZip, exportMarkdown, exportStandaloneHtml } = await import('../../dist/client/infrastructure/exporters.js');
+        const { parseEpub } = await import('../../dist/client/infrastructure/epubParser.js');
+        const { saveBookToDB } = await import('../../dist/client/infrastructure/bookRepository.js');
+        const { saveNoteToDB } = await import('../../dist/client/infrastructure/annotationRepository.js');
         storage = await require('../helpers/sqlite').clientStorage();
         const book = {
             id: 'zip-integration', title: '导出验证', format: 'EPUB',

@@ -9,7 +9,7 @@ const { JSDOM } = require('jsdom');
     try {
         keys.forEach(key => globalThis[key] = dom.window[key]);
         storage = await require('../helpers/sqlite').clientStorage([{ id: 'editing', pages: ['同一段原文'] }]);
-        const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
+        const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
         const elements = { notesList: document.getElementById('list') };
         const makeController = () => {
             const controller = new AnnotationController({ callbacks: {

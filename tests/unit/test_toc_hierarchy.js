@@ -28,8 +28,8 @@ function elementStub(tag) {
         chooseHierarchicalToc,
         locateTocTarget,
         resolveRelativePath
-    } = await import('../../src/client/infrastructure/epubParser.js');
-    const { ensureTocHierarchy, findChapterForPage } = await import('../../src/client/domain/readingLocation.js');
+    } = await import('../../dist/client/infrastructure/epubParser.js');
+    const { ensureTocHierarchy, findChapterForPage } = await import('../../dist/client/domain/readingLocation.js');
 
     const nestedNcx = `<?xml version="1.0"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/">
@@ -176,7 +176,7 @@ function elementStub(tag) {
     console.log('✅ Alice EPUB 的 16 条目录、十二章正文及 EPUB3 nav / NCX 一致性');
 
     globalThis.document = { createElement: elementStub };
-    const { renderTOC } = await import('../../src/client/features/reader/tocUI.js');
+    const { renderTOC } = await import('../../dist/client/features/reader/tocUI.js');
     const tocList = elementStub('ul');
     const selected = [];
     renderTOC(flatBook, { tocList }, item => selected.push(item.title));

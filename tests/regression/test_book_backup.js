@@ -1,11 +1,11 @@
 const assert = require('assert');
 
 (async () => {
-    const { exportSelectiveBackup, parseBackupFile } = await import('../../src/client/infrastructure/exporters.js');
-    const { BackupController } = await import('../../src/client/features/backup/backupController.js');
-    const { getIncludeOptions } = await import('../../src/client/features/backup/backupModalUI.js');
-    const { demoBooks } = await import('../../src/client/infrastructure/bookRepository.js');
-    const { saveNoteToDB } = await import('../../src/client/infrastructure/annotationRepository.js');
+    const { exportSelectiveBackup, parseBackupFile } = await import('../../dist/client/infrastructure/exporters.js');
+    const { BackupController } = await import('../../dist/client/features/backup/backupController.js');
+    const { getIncludeOptions } = await import('../../dist/client/features/backup/backupModalUI.js');
+    const { demoBooks } = await import('../../dist/client/infrastructure/bookRepository.js');
+    const { saveNoteToDB } = await import('../../dist/client/infrastructure/annotationRepository.js');
 
     const downloads = [];
     const blobs = new Map();

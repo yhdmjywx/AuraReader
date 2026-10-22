@@ -7,9 +7,9 @@ const { JSDOM } = require('jsdom');
     const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     try {
         for (const key of keys) globalThis[key] = dom.window[key];
-        const { marginGeometry, applyMarginGeometry, positionMarginNotes } = await import('../../src/client/features/layout/marginNotesLayout.js');
-        const { LayoutController } = await import('../../src/client/features/layout/layoutController.js');
-        const { renderNotesList } = await import('../../src/client/features/annotations/notesUI.js');
+        const { marginGeometry, applyMarginGeometry, positionMarginNotes } = await import('../../dist/client/features/layout/marginNotesLayout.js');
+        const { LayoutController } = await import('../../dist/client/features/layout/layoutController.js');
+        const { renderNotesList } = await import('../../dist/client/features/annotations/notesUI.js');
         for (const width of [1224, 1366, 1424, 1440, 1612, 1613, 1920]) {
             const g = marginGeometry(width, 'double');
             assert.equal(g.readingWidth, 1192, `${width}px 窗口不能压缩双页正文`);

@@ -8,7 +8,7 @@ const { setTimeout: delay } = require('node:timers/promises');
     const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     try {
         keys.forEach(key => globalThis[key] = dom.window[key]);
-        const { SelectionController } = await import('../../src/client/features/annotations/selectionController.js');
+        const { SelectionController } = await import('../../dist/client/features/annotations/selectionController.js');
         const byId = id => document.getElementById(id);
         const elements = { readerPanel: byId('reader'), bookPaper: byId('left'), bookPaperRight: byId('right'), selectionTooltip: byId('selection-tooltip'), btnAddNote: byId('add') };
         const created = [];

@@ -12,10 +12,10 @@ const { JSDOM } = require('jsdom');
         const longTitle = '很长的书名😀'.repeat(30) + '<img src=x onerror=alert(1)>';
         const book = { id: 'shelf-book', title: longTitle, format: 'EPUB', pages: ['第一章', '第二章'] };
         storage = await require('../helpers/sqlite').clientStorage([book]);
-        const { renderShelf } = await import('../../src/client/features/shelf/shelfUI.js');
-        const { ShelfController } = await import('../../src/client/features/shelf/shelfController.js');
-        const { AppShell } = await import('../../src/client/app/appShell.js');
-        const repo = await import('../../src/client/infrastructure/bookRepository.js');
+        const { renderShelf } = await import('../../dist/client/features/shelf/shelfUI.js');
+        const { ShelfController } = await import('../../dist/client/features/shelf/shelfController.js');
+        const { AppShell } = await import('../../dist/client/app/appShell.js');
+        const repo = await import('../../dist/client/infrastructure/bookRepository.js');
         const byId = id => document.getElementById(id);
         const elements = Object.fromEntries(Object.entries({
             btnShelf: 'btn-shelf', shelfPanel: 'shelf-panel', shelfList: 'shelf-list', shelfBookCount: 'shelf-book-count',

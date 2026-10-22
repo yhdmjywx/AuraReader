@@ -10,10 +10,10 @@ const { JSDOM } = require('jsdom');
     try {
         globals.forEach(key => { globalThis[key] = dom.window[key]; });
         storage = await require('../helpers/sqlite').clientStorage([{ id: 'menu-test', pages: ['同一段正文，后续内容。'] }]);
-        const { AnnotationController } = await import('../../src/client/features/annotations/annotationController.js');
-        const { SelectionController } = await import('../../src/client/features/annotations/selectionController.js');
-        const { applyHighlightsToPaper } = await import('../../src/client/features/reader/paperRenderer.js');
-        const { showHighlightActionTooltip } = await import('../../src/client/features/annotations/selectionTooltipUI.js');
+        const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
+        const { SelectionController } = await import('../../dist/client/features/annotations/selectionController.js');
+        const { applyHighlightsToPaper } = await import('../../dist/client/features/reader/paperRenderer.js');
+        const { showHighlightActionTooltip } = await import('../../dist/client/features/annotations/selectionTooltipUI.js');
         const byId = id => document.getElementById(id);
         const elements = {
             readerPanel: byId('reader-panel'), bookPaper: byId('book-paper'), bookPaperRight: byId('book-paper-right'),

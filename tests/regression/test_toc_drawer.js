@@ -7,7 +7,7 @@ const { JSDOM } = require('jsdom');
     const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     try {
         keys.forEach(key => globalThis[key] = dom.window[key]);
-        const { ReaderController } = await import('../../src/client/features/reader/readerController.js');
+        const { ReaderController } = await import('../../dist/client/features/reader/readerController.js');
         const byId = id => document.getElementById(id);
         const elements = { btnToc: byId('btn-toc'), tocDrawer: byId('toc-drawer'), btnCloseToc: byId('btn-close-toc'), tocList: byId('toc-list') };
         const reader = new ReaderController();

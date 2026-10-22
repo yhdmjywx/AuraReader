@@ -109,14 +109,18 @@ node src/server/storageMaintenance.js backup
 
 ## 开发与测试
 
-源码位于 `src/client/` 和 `src/server/`；无需构建即可启动。依赖安装后，可以运行：
+源码位于 `src/client/` 和 `src/server/`；前端采用渐进式 TypeScript 迁移，`npm start` 会先检查类型并构建到 `dist/client/`，再启动服务。依赖安装后，可以运行：
 
 ```powershell
 npm test                 # 语法、单元和回归检查
+npm run build            # 严格类型检查并生成浏览器使用的 JavaScript
+npm run typecheck        # 只检查类型
 npm run test:unit        # 单元测试
 npm run test:regression  # 回归检查
 npm run test:syntax      # JavaScript 语法检查
 ```
+
+修改源码后重新运行 `npm run build` 并刷新浏览器；直接运行 `node src/server/server.js` 前也需先构建。迁移边界及运行方式见 [TypeScript 迁移说明](docs/typescript-migration.md)。
 
 测试素材 `tests/fixtures/test.epub` 是 Project Gutenberg 的英文版《爱丽丝梦游仙境》，保留书内原始声明与许可。素材来源见 [测试素材说明](tests/fixtures/README.md)。嵌套目录另由自写测试样例验证。
 

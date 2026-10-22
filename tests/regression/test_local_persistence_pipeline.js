@@ -6,8 +6,8 @@ const { clientStorage } = require('../helpers/sqlite');
 (async () => {
     const storage = await clientStorage([{ id: 'pipeline', pages: ['<p>原文😀</p>'] }]);
     try {
-        const books = await import('../../src/client/infrastructure/bookRepository.js');
-        const repo = await import('../../src/client/infrastructure/annotationRepository.js');
+        const books = await import('../../dist/client/infrastructure/bookRepository.js');
+        const repo = await import('../../dist/client/infrastructure/annotationRepository.js');
         const record = { id: 'pipeline-note', bookId: 'pipeline', quote: '原文😀', comment: '笔记\n', location: { start: 0, end: 4 }, unknown: { value: 1 } };
         await repo.saveNoteToDB(record);
         assert.deepEqual(storage.read('annotations', record.id), record);

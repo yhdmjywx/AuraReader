@@ -74,7 +74,7 @@ const { sqliteServer } = require('../helpers/sqlite');
             globalThis.window = { get indexedDB() { throw new Error('已迁移来源不得再访问 IndexedDB'); } };
             localStorage.setItem('aura_notes_legacy', snapshot.caches.legacy);
             localStorage.setItem('aura_notes_pending_legacy', snapshot.pending.legacy);
-            const client = await import('../../src/client/infrastructure/storageClient.js');
+            const client = await import('../../dist/client/infrastructure/storageClient.js');
             const configure = () => client.configureStorage({ baseUrl: server.base + '/api/storage', sourceId: 'test-source' });
             configure(); await client.initializeStorage();
             assert.equal(localStorage.getItem('aura_notes_legacy'), null);
