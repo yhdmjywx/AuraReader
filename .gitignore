@@ -1,5 +1,7 @@
 node_modules/
 dist/
+release/
+build/icon.ico
 data/
 *.tmp
 deploy_vps_runner.js

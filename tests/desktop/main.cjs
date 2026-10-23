@@ -159,7 +159,7 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     })()`);
     const report = { passed: true, runtime, checks, profile,
         actualGui: true, screenshots: ['shell-light.png', 'shell-dark.png'],
-        closeNoteId, limitations: ['Automated file tests inject main-process dialog results; native dialog operation is a separate check', 'Installer acceptance remains pending; old database support is out of scope'] };
+        closeNoteId, limitations: ['Automated file tests inject main-process dialog results; native dialog operation is a separate check', 'Installer lifecycle acceptance is a separate test:install check; old database support is out of scope'] };
     // Keep app alive until the report is durable, then test the normal close path.
     const closed = once(window, 'closed');
     const holdQuit = event => event.preventDefault();

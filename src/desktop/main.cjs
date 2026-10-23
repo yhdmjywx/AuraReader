@@ -16,7 +16,15 @@ protocol.registerSchemesAsPrivileged([{
 async function startDesktop({ profileDirectory, dialogs } = {}) {
     assertRuntime();
     app.setName('AuraReader');
-    const profile = profileDirectory || path.join(app.getPath('appData'), 'AuraReader');
+    // Honor Electron's explicit profile switch for isolated acceptance and user-
+    // selected data locations. Renderer cannot change this main-process setting.
+    const profile = profileDirectory || app.commandLine.getSwitchValue('user-data-dir') || path.join(app.getPath('appData'), 'AuraReader');
+    if (!path.isAbsolute(profile)) throw new Error('用户数据目录必须使用绝对路径。');
+    if (app.isPackaged) {
+        const relative = path.relative(path.dirname(process.execPath), path.resolve(profile));
+        const outside = relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative);
+        if (!outside) throw new Error('用户数据目录必须位于安装目录之外。');
+    }
     fs.mkdirSync(profile, { recursive: true });
     app.setPath('userData', profile);
     app.setPath('sessionData', profile);
@@ -48,7 +56,7 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
     const owner = window;
     const dataDirectory = path.join(app.getPath('userData'), 'data');
     const files = createFileService({ dataDirectory,
-        protectedDirectories: [dataDirectory, ...(app.isPackaged ? [app.getAppPath()] :
+        protectedDirectories: [dataDirectory, ...(app.isPackaged ? [path.dirname(process.execPath)] :
             [path.resolve(__dirname, '..'), path.resolve(__dirname, '../../dist')])],
         dialogs: dialogs || { open: options => dialog.showOpenDialog(owner, options), save: options => dialog.showSaveDialog(owner, options) }
     });
