@@ -219,6 +219,7 @@ export class AppShell {
             }
 
             if (elements.backupSelectModal && elements.backupSelectModal.classList.contains('active')) return;
+            if (elements.chapterExportModal?.classList.contains('active')) return;
             if (elements.shelfPanel?.classList.contains('open')) return;
 
             if (e.key === 'Escape' && elements.appearancePanel && elements.appearancePanel.classList.contains('open')) {

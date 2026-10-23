@@ -1,10 +1,9 @@
 /* ==========================================================================
    Exporters - Document & Annotation Export / Backup Adapter (Infrastructure Layer)
-   Provides Markdown, Chapter-by-Chapter ZIP, Standalone Offline HTML,
+   Provides Markdown, full-book or selected-chapter ZIP,
    and per-book .aurabackup export & import deserialization.
    ========================================================================== */
 
-import { ensureTocHierarchy } from '../domain/readingLocation.js';
 import { groupAnnotationsByRange, normalizeAnnotation, isHighlight, isNote } from '../domain/annotationEngine.js';
 import { compactWithMap, resolveAnnotationRange } from '../domain/annotationRangeEngine.js';
 import { renderAnnotationTokens } from '../features/reader/annotationRenderer.js';
@@ -46,7 +45,7 @@ export function exportMarkdown(bookTitle = '图书笔记', notes = []) {
     return downloadFile(`${bookTitle}_划线随笔.md`, md, 'text/markdown');
 }
 
-export async function exportChapterZip(book, notes = [], jszipLib) {
+export async function exportChapterZip(book, notes = [], jszipLib, { selectedUnitIds } = {}) {
     if (!jszipLib) {
         throw new Error('JSZip 尚未就绪，请检查网络连接');
     }
@@ -54,21 +53,28 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
         throw new Error('当前图书无可导出内容');
     }
 
+    const structure = buildBookStructure(book);
+    const selection = selectedUnitIds == null ? null : new Set(selectedUnitIds);
+    const units = structure.units.filter(unit => !selection || selection.has(unit.id));
+    if (!units.length) throw new Error('请至少选择一个要导出的章节');
+    const selectedPages = new Set(units.flatMap(unit => unit.sourcePages));
+    const isPartial = units.length < structure.units.length;
     const zip = new jszipLib();
     const bookTitle = String(book.title || '图书').replace(/[\\/:*?"<>|\r\n]/g, '_');
-    const folderName = `${bookTitle}_分章节笔记包`;
+    const folderName = `${bookTitle}_${isPartial ? '所选章节笔记包' : '分章节笔记包'}`;
     const folder = zip.folder(folderName);
     const annotations = (Array.isArray(notes) ? notes : []).map(normalizeAnnotation).filter(Boolean)
         .filter(note => !book.id || !note.bookId || note.bookId === book.id)
+        .filter(note => !isPartial || selectedPages.has(note.page))
         .map((note, idx) => ({ ...note, id: note.id || `export-${idx}` }));
 
-    const structure = buildBookStructure(book);
     const filesByUnit = new Map(structure.units.map((unit, index) => [unit.id,
         `${String(index + 1).padStart(2, '0')}_${unit.title.replace(/[\\/:*?"<>|\r\n]/g, '_')}.md`]));
     let indexMd = `# 《${book.title}》 导读书册与笔记全览\n\n`;
     indexMd += `- 格式：${book.format || 'EPUB'}\n`;
-    indexMd += `- 内容结构：${structureSummary(structure)}\n`;
-    indexMd += `- 导出内容文件：${structure.units.length}\n`;
+    indexMd += `- ${isPartial ? '全书内容结构' : '内容结构'}：${structureSummary(structure)}\n`;
+    indexMd += `- 导出范围：${isPartial ? '所选章节' : '整本书'}\n`;
+    indexMd += `- 导出内容文件：${units.length}\n`;
     indexMd += `- 划线数：${annotations.filter(isHighlight).length}\n`;
     indexMd += `- 笔记数：${annotations.filter(isNote).length}\n`;
     indexMd += `- 导出时间：${new Date().toLocaleString()}\n\n`;
@@ -77,13 +83,19 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
 
     // Preserve TOC hierarchy, including multiple nodes/anchors sharing a file.
     // Structural volume nodes link to their first chapter, not an empty file.
+    const includedNodes = new Set();
     for (const node of structure.nodes) {
+        if (!selectedPages.has(node.page)) continue;
+        for (let ancestor = node; ancestor; ancestor = ancestor.parent) includedNodes.add(ancestor.id);
+    }
+    for (const node of structure.nodes) {
+        if (isPartial && !includedNodes.has(node.id)) continue;
         const unit = structure.pageToUnit.get(node.page);
         const label = escapeMarkdownText(node.title);
-        const link = unit ? `[${label}](./${encodeURIComponent(filesByUnit.get(unit.id))})` : label;
+        const link = unit && selectedPages.has(node.page) ? `[${label}](./${encodeURIComponent(filesByUnit.get(unit.id))})` : label;
         indexMd += `${'  '.repeat(node.level)}- ${link}\n`;
     }
-    const untitledUnits = structure.units.filter(unit => !structure.nodes.some(node => unit.sourcePages.includes(node.page)));
+    const untitledUnits = units.filter(unit => !structure.nodes.some(node => unit.sourcePages.includes(node.page)));
     if (untitledUnits.length) {
         indexMd += '\n## 其他保留内容\n';
         untitledUnits.forEach(unit => { indexMd += `- [${escapeMarkdownText(unit.title)}](./${encodeURIComponent(filesByUnit.get(unit.id))})\n`; });
@@ -114,7 +126,7 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
         const chapterBody = chapterBodyMarkdown(tempDiv, exportNotes.filter(isNote));
         return chapterBody.markdown + '\n\n' + chapterAnnotationMarkdown(chapterBody.unplacedNotes);
     }
-    for (const unit of structure.units) {
+    for (const unit of units) {
         const unitNotes = annotations.filter(note => unit.sourcePages.includes(note.page));
         let markdown = '';
         // A source heading already provides the title for prefixed units:
@@ -136,7 +148,7 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
     folder.file('00_目录概览.md', indexMd);
 
     const blob = await zip.generateAsync({ type: 'blob' });
-    return downloadFile(`${bookTitle}_分章节笔记包.zip`, blob, 'application/zip');
+    return downloadFile(`${folderName}.zip`, blob, 'application/zip');
 }
 
 function resolveNoteRange(text, note) {
@@ -292,128 +304,6 @@ function chapterBodyMarkdown(root, notes = []) {
     return { markdown: children(root).trim(), unplacedNotes };
 }
 
-export function exportStandaloneHtml(book, notes = []) {
-    if (!book || !Array.isArray(book.pages)) {
-        throw new Error('当前图书无可导出内容');
-    }
-
-    const bookTitle = book.title;
-    const allPages = book.pages;
-    const allNotes = notes;
-    const allToc = ensureTocHierarchy(book.toc || []);
-
-    const standaloneHtml = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>《${escapeHtml(bookTitle)}》 - 离线双栏带标注电子书</title>
-    <style>
-        :root {
-            --primary: #4f46e5;
-            --bg: #f8fafc;
-            --paper-bg: #ffffff;
-            --text: #1e293b;
-            --border: #e2e8f0;
-        }
-        body {
-            margin: 0;
-            font-family: system-ui, -apple-system, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-        .sidebar {
-            width: 280px;
-            background: #ffffff;
-            border-right: 1px solid var(--border);
-            padding: 16px;
-            overflow-y: auto;
-        }
-        .sidebar h2 { font-size: 16px; margin-top: 0; color: var(--primary); }
-        .toc-item { padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 6px; }
-        .toc-item:hover { background: #f1f5f9; color: var(--primary); }
-        .main-workspace {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-        .reader-col {
-            flex: 3;
-            padding: 32px 48px;
-            overflow-y: auto;
-            background: var(--paper-bg);
-            line-height: 1.85;
-            font-size: 18px;
-        }
-        .notes-col {
-            flex: 1;
-            min-width: 300px;
-            background: #f8fafc;
-            border-left: 1px solid var(--border);
-            padding: 20px;
-            overflow-y: auto;
-        }
-        .annotation-token { user-select: text; }
-        .annotation-token.has-highlight { background: #fef08a; border-radius: 2px; }
-        .annotation-token.has-note {
-            text-decoration-line: underline;
-            text-decoration-color: #ef4444;
-            text-decoration-thickness: 2px;
-            text-underline-offset: 3px;
-        }
-        .note-card {
-            background: #ffffff;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 14px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            font-size: 13px;
-        }
-        .note-quote { color: #64748b; font-style: italic; margin-bottom: 6px; }
-        .note-comment { font-weight: 600; color: #0f172a; }
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <h2>《${escapeHtml(bookTitle)}》</h2>
-        <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">全书共有 ${allPages.length} 章节 | 标注 ${allNotes.length} 条</div>
-        <div id="toc-list">
-            ${allToc.map((t, idx) => {
-                const level = Math.max(0, Math.min(Number(t.level) || 0, 6));
-                return `<div class="toc-item" style="padding-left:${12 + level * 22}px" onclick="jumpPage(${t.page || idx + 1})">${idx + 1}. ${escapeHtml(t.title)}</div>`;
-            }).join('')}
-        </div>
-    </div>
-    <div class="main-workspace">
-        <div class="reader-col" id="reader-canvas">
-            ${allPages.map((p, idx) => `<div id="page-${idx+1}" style="margin-bottom: 60px;">${annotatePageHtml(p, allNotes.filter(n => Number(n.page) === idx + 1), idx + 1)}</div>`).join('')}
-        </div>
-        <div class="notes-col">
-            <h3 style="font-size: 15px; margin-top: 0; color: var(--primary);">随笔标注卡片 (${allNotes.length})</h3>
-            ${groupAnnotationsByRange(allNotes).map(group => `
-                <div class="note-card">
-                    <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">P.${group.page} | ${escapeHtml(group.chapter || '')}</div>
-                    ${group.quote ? `<div class="note-quote">“${escapeHtml(group.quote)}”</div>` : ''}
-                    ${group.notes.map(note => note.comment ? `<div class="note-comment">💭 ${escapeHtml(note.comment)}</div>` : '').join('')}
-                </div>
-            `).join('')}
-        </div>
-    </div>
-    <script>
-        function jumpPage(p) {
-            const el = document.getElementById('page-' + p);
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-        }
-    </script>
-</body>
-</html>`;
-
-    return downloadFile(`${bookTitle}_带标注电子书.html`, standaloneHtml, 'text/html');
-}
-
 export function exportSelectiveBackup({ selectedBooks = [], notes = [] }) {
     const normalizedNotes = (notes || []).map(normalizeAnnotation).filter(Boolean);
     const exportedAt = new Date().toISOString();
@@ -472,15 +362,6 @@ export function parseBackupFile(file) {
         reader.onerror = (e) => reject(e);
         reader.readAsText(file);
     });
-}
-
-function annotatePageHtml(html, notes, page) {
-    if (!html) return '';
-    if (typeof document === 'undefined' || !notes || notes.length === 0) return html;
-    const holder = document.createElement('div');
-    holder.innerHTML = html;
-    renderAnnotationTokens(holder, notes, page);
-    return holder.innerHTML;
 }
 
 function escapeHtml(str) {

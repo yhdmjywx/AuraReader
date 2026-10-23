@@ -26,7 +26,7 @@ const { JSDOM } = require('jsdom');
         };
         const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
         const { BackupController } = await import('../../dist/client/features/backup/backupController.js');
-        const { exportChapterZip, exportMarkdown, exportStandaloneHtml } = await import('../../dist/client/infrastructure/exporters.js');
+        const { exportChapterZip, exportMarkdown } = await import('../../dist/client/infrastructure/exporters.js');
         const { parseEpub } = await import('../../dist/client/infrastructure/epubParser.js');
         const { saveBookToDB } = await import('../../dist/client/infrastructure/bookRepository.js');
         const { saveNoteToDB } = await import('../../dist/client/infrastructure/annotationRepository.js');
@@ -213,15 +213,6 @@ const { JSDOM } = require('jsdom');
         exportMarkdown('跨行摘要', [{ kind: 'highlight', page: 1, quote: '  first\n\n second  ' }]);
         const multilineSummary = await downloads[5].blob.text();
         assert.ok(multilineSummary.includes('  <mark>first</mark>\n\n <mark>second</mark>  '), '摘要中的空行和边界空白也不得被高亮');
-        exportStandaloneHtml(book, await persisted.loadNotesForBook(book.id));
-        const standalone = new JSDOM(await downloads.at(-1).blob.text());
-        try {
-            assert.equal(standalone.window.document.querySelectorAll('[id^="page-"]').length, book.pages.length);
-            assert.ok(standalone.window.document.querySelector('[data-highlight-ids]'), 'HTML 导出包含恢复后的正文高亮');
-            assert.ok(standalone.window.document.querySelector('[data-note-ids]'), 'HTML 导出包含恢复后的笔记关联');
-            assert.ok(standalone.window.document.body.textContent.includes('已编辑的跨段笔记'));
-            assert.ok(!standalone.window.document.body.textContent.includes('将被删除的笔记'));
-        } finally { standalone.window.close(); }
         console.log('✅ ZIP 实际下载与解压验证：创建、编辑、删除、持久化、引用、高亮、跨段、重叠位置、章节归属及真实 EPUB 全部通过');
     } finally {
         await storage?.drain();

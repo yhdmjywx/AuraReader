@@ -140,9 +140,9 @@
             <i class="ri-file-zip-line" aria-hidden="true"></i>
             <span class="export-action-label">分章节正文与笔记</span><span class="export-extension">.zip</span>
         </button>
-        <button id="btn-export-standalone-html" class="export-menu-action" type="button" data-export-action>
-            <i class="ri-book-open-line" aria-hidden="true"></i>
-            <span class="export-action-label">带标注离线电子书</span><span class="export-extension">.html</span>
+        <button id="btn-export-selected-chapters" class="export-menu-action" type="button" data-export-action>
+            <i class="ri-list-check-3" aria-hidden="true"></i>
+            <span class="export-action-label">选择章节导出</span><span class="export-extension">.zip</span>
         </button>
         <hr class="export-panel-divider">
         <h3 class="export-section-title">书籍备份与恢复</h3>
@@ -247,6 +247,31 @@
 
         </section>
     </main>
+
+    <div class="modal-overlay" id="chapter-export-modal">
+        <div class="modal-card chapter-export-card" role="dialog" aria-modal="true" aria-labelledby="chapter-export-title" aria-describedby="chapter-export-description" tabindex="-1">
+            <div class="modal-header">
+                <h3 id="chapter-export-title"><i class="ri-list-check-3" aria-hidden="true"></i> 选择章节导出</h3>
+                <button class="btn btn-icon-sm" id="btn-close-chapter-export" type="button" aria-label="关闭章节选择"><i class="ri-close-line" aria-hidden="true"></i></button>
+            </div>
+            <div class="modal-body chapter-export-body">
+                <p id="chapter-export-book-title" class="chapter-export-book-title"></p>
+                <p id="chapter-export-description" class="chapter-export-hint">所选章节的正文、高亮与笔记将按章节保存为 Markdown，并打包为 ZIP。</p>
+                <div class="chapter-export-toolbar">
+                    <span id="chapter-export-count" role="status" aria-live="polite"></span>
+                    <div>
+                        <button class="btn btn-ghost-sm" id="btn-select-all-chapters" type="button">全选</button>
+                        <button class="btn btn-ghost-sm" id="btn-deselect-all-chapters" type="button">取消全选</button>
+                    </div>
+                </div>
+                <div id="chapter-export-list" class="chapter-export-list" role="group" aria-label="可导出的章节与内容"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="btn-cancel-chapter-export" type="button">取消</button>
+                <button class="btn btn-primary" id="btn-confirm-chapter-export" type="button">导出所选章节 (.zip)</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal: Selective Book Backup Dialog -->
     <div class="modal-overlay" id="backup-select-modal">

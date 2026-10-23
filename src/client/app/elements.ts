@@ -65,7 +65,16 @@ export interface AppElements {
     countPureHighlights?: HTMLElement | null;
     btnExportMarkdown?: HTMLButtonElement | null;
     btnExportChapterZip?: HTMLButtonElement | null;
-    btnExportStandaloneHtml?: HTMLButtonElement | null;
+    btnExportSelectedChapters?: HTMLButtonElement | null;
+    chapterExportModal?: HTMLElement | null;
+    chapterExportBookTitle?: HTMLElement | null;
+    chapterExportCount?: HTMLElement | null;
+    chapterExportList?: HTMLElement | null;
+    btnCloseChapterExport?: HTMLButtonElement | null;
+    btnCancelChapterExport?: HTMLButtonElement | null;
+    btnSelectAllChapters?: HTMLButtonElement | null;
+    btnDeselectAllChapters?: HTMLButtonElement | null;
+    btnConfirmChapterExport?: HTMLButtonElement | null;
     btnExportFullBackup?: HTMLButtonElement | null;
     btnImportFullBackup?: HTMLButtonElement | null;
     backupFileInput?: HTMLInputElement | null;
