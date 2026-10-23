@@ -1,0 +1,104 @@
+import { drainStorage, unwrapDesktop } from './infrastructure/storageClient.js';
+import { positionMarginNotes } from './features/layout/marginNotesLayout.js';
+
+const bridge = window.auraDesktop;
+if (!bridge) throw new Error('桌面安全入口不可用');
+let application: typeof import('./main.js') | null = null;
+let boot: Promise<void> | null = null;
+
+function disableUnavailableControls() {
+    for (const id of ['file-input', 'btn-import-book', 'btn-export-menu', 'backup-file-input',
+        'btn-export-markdown', 'btn-export-chapter-zip', 'btn-export-standalone-html',
+        'btn-export-full-backup', 'btn-import-full-backup', 'btn-read-system-fonts',
+        'btn-import-font', 'font-file-input', 'btn-fullscreen']) {
+        const control = document.getElementById(id);
+        if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) {
+            control.disabled = true;
+            control.title = '此功能尚未接入桌面版';
+        }
+    }
+}
+
+function gate(message: string, create = false) {
+    for (const control of document.querySelectorAll('button, input, select, textarea')) {
+        if ('disabled' in control) (control as HTMLButtonElement).disabled = true;
+    }
+    const panel = document.createElement('section');
+    panel.id = 'desktop-status'; panel.setAttribute('role', 'status');
+    const title = document.createElement('h1'); title.textContent = 'AuraReader 桌面版';
+    const text = document.createElement('p'); text.textContent = message;
+    const button = document.createElement('button');
+    button.id = create ? 'desktop-create-library' : 'desktop-retry';
+    button.className = 'btn btn-primary';
+    button.textContent = create ? '创建独立桌面书库' : '重试';
+    button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+            if (create) unwrapDesktop(await bridge!.storage.createLibrary());
+            await load();
+        } catch (error) { gate(error instanceof Error ? error.message : '本地书库不可用，原数据未清除'); }
+    });
+    panel.append(title, text, button);
+    document.getElementById('book-paper')?.replaceChildren(panel);
+}
+
+async function start() {
+    window.__AURA_BOOTSTRAPPED__ = true;
+    application = await import('./main.js');
+    for (const control of document.querySelectorAll('button, input, select, textarea')) {
+        if ('disabled' in control) (control as HTMLButtonElement).disabled = false;
+    }
+    disableUnavailableControls();
+    await application.startApp();
+    document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
+        if (application) positionMarginNotes(application.elements);
+    });
+    document.documentElement.dataset.desktopReady = 'library';
+}
+
+async function load() {
+    const status = unwrapDesktop(await bridge!.storage.status());
+    if (!status.initialized) {
+        document.documentElement.dataset.desktopReady = 'setup';
+        gate('原浏览器书库尚未迁移。你可以先创建独立的桌面书库并使用示例书；这不会导入或修改原书库。旧数据迁移功能尚未提供。', true);
+        return;
+    }
+    if (!boot) boot = start().catch(error => { boot = null; throw error; });
+    await boot;
+}
+
+function assertNoRecoveryBuffers() {
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (!key?.startsWith('aura_notes_pending_')) continue;
+        const pending: unknown = JSON.parse(localStorage.getItem(key) || '[]');
+        if (!Array.isArray(pending) || pending.length) throw new Error('仍有未确认保存的笔记，窗口已保留；请先处理恢复内容或冲突。');
+    }
+}
+
+bridge.lifecycle.onCloseCancelled(message => {
+    document.body.inert = false;
+    if (application) application.appShell.showToast(message);
+    else gate(message);
+});
+bridge.lifecycle.onPrepareClose(async requestId => {
+    document.body.inert = true;
+    try {
+        if (boot) await boot;
+        await application?.annotations.finishInlineEdit();
+        await application?.annotations.assertInlineWritesSaved();
+        await drainStorage();
+        assertNoRecoveryBuffers();
+        unwrapDesktop(await bridge.lifecycle.completeClose(requestId, { ok: true }));
+    } catch (error) {
+        const message = error instanceof Error ? error.message.slice(0, 1000) : '保存未完成，窗口已保留';
+        try { unwrapDesktop(await bridge.lifecycle.completeClose(requestId, { ok: false, message })); }
+        catch (failure) { console.error('关闭确认失败', failure); document.body.inert = false; }
+    }
+});
+
+load().catch(error => {
+    document.documentElement.dataset.desktopReady = 'error';
+    console.error('桌面书库启动停止', error);
+    gate(error instanceof Error ? error.message : '本地书库不可用，原数据未清除');
+});

@@ -109,7 +109,7 @@ node src/server/storageMaintenance.js backup
 
 ## 开发与测试
 
-Electron Windows 桌面迁移已完成阶段 2（桌面外壳），可运行 `npm run desktop` 查看独立窗口。当前桌面预览尚未接入书库，阅读、导入和导出不可用；完整使用请继续运行浏览器版。设计边界见 [阶段 1 审计](docs/electron-desktop-audit.md)，实际运行结果、数据目录与阶段 3 前置条件见 [阶段 2 记录](docs/electron-desktop-stage2.md)。NSIS 安装包尚未生成。
+Electron Windows 桌面迁移已完成阶段 3（SQLite 与受限 IPC），运行 `npm run desktop` 可创建独立桌面书库，使用示例书阅读并保存高亮、笔记。首次创建需明确点击；原浏览器书库不会自动导入。桌面书库位于 `%APPDATA%\AuraReader\data`，不在安装目录内。字体枚举/导入、书籍文件导入、原生导出、旧数据迁移及 NSIS 安装包尚未提供；完整文件操作请继续使用浏览器版。运行证据、限制与下一阶段条件见 [阶段 3 记录](docs/electron-desktop-stage3.md)，前期设计见 [审计](docs/electron-desktop-audit.md)和[外壳记录](docs/electron-desktop-stage2.md)。
 
 源码位于 `src/client/` 和 `src/server/`；前端采用渐进式 TypeScript 迁移，`npm start` 会先检查类型并构建到 `dist/client/`，再启动服务。依赖安装后，可以运行：
 
@@ -120,7 +120,7 @@ npm run typecheck        # 只检查类型
 npm run test:unit        # 单元测试
 npm run test:regression  # 回归检查
 npm run test:syntax      # JavaScript 语法检查
-npm run desktop          # Windows x64 桌面外壳预览，不启动 HTTP 服务
+npm run desktop          # Windows x64 桌面预览，书库通过 IPC 访问，不启动 HTTP 服务
 npm run test:desktop     # 真实 Electron 窗口、SQLite 运行时与安全检查
 ```
 

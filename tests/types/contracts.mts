@@ -48,3 +48,15 @@ function controllerContracts() {
     elements.fileInput = document.createElement('div');
 }
 void controllerContracts;
+
+import type { DesktopBridge } from '../../src/shared/desktop.js';
+function desktopContracts(bridge: DesktopBridge) {
+    bridge.storage.saveNote(save);
+    // @ts-expect-error Desktop does not expose arbitrary IPC.
+    bridge.invoke('anything', {});
+    // @ts-expect-error Version information is required over IPC too.
+    bridge.storage.saveBook({ book: { id: 'b', pages: [] } });
+    // @ts-expect-error Lifecycle callbacks receive an id, never an Electron event.
+    bridge.lifecycle.onPrepareClose((event: { sender: unknown }) => event);
+}
+void desktopContracts;

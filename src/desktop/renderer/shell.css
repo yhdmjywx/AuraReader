@@ -8,4 +8,5 @@
 
 #desktop-status h1 { font-size: 1.75rem; margin-bottom: 1.25rem; }
 #desktop-status p { font-size: 1rem; line-height: 1.8; margin-top: 0.5rem; color: var(--text-secondary); }
+#desktop-status button { margin-top: 1.5rem; }
 body button:disabled { opacity: 0.45; cursor: default; }

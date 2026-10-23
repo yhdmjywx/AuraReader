@@ -230,6 +230,9 @@ export class FontController {
     }
 
     async loadImports() {
+        if (typeof window !== 'undefined' && window.auraDesktop) {
+            this.imported = []; return; // Desktop font service is added in stage 4.
+        }
         try {
             const response = await fetch('/api/fonts');
             if (!response.ok) throw new Error();

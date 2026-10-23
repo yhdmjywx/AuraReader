@@ -1,8 +1,4 @@
 interface Window {
-    readonly auraDesktop?: {
-        readonly stage: 2;
-        readonly storageAvailable: false;
-        readonly platform: string;
-        readonly versions: { readonly electron: string; readonly node: string };
-    };
+    readonly auraDesktop?: import('../shared/desktop.js').DesktopBridge;
+    __AURA_BOOTSTRAPPED__?: boolean;
 }

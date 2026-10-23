@@ -4,6 +4,8 @@ const path = require('node:path');
 const { assertRuntime } = require('./runtime.cjs');
 const { APP_URL, createAssetHandler } = require('./assets.cjs');
 const { secureSession, secureWindow } = require('./security.cjs');
+const { createDesktopStorage } = require('./storage.cjs');
+const { registerStorageIpc, coordinateClose } = require('./ipc.cjs');
 
 protocol.registerSchemesAsPrivileged([{
     scheme: 'aurareader', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true }
@@ -43,6 +45,12 @@ async function startDesktop({ profileDirectory } = {}) {
         }
     });
     secureWindow(window);
+    const storage = createDesktopStorage(path.join(app.getPath('userData'), 'data'));
+    const removeStorageHandlers = registerStorageIpc(window, storage);
+    const removeCloseHandlers = coordinateClose(window, storage);
+    window.once('closed', () => {
+        removeStorageHandlers(); removeCloseHandlers(); storage.close();
+    });
     app.on('window-all-closed', () => app.quit());
     window.webContents.on('preload-error', (_event, _file, error) => {
         console.error('Desktop preload failed:', error);

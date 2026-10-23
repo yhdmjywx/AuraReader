@@ -1,20 +1,47 @@
 import type { Book } from '../domain/book.js';
 import type { BookRecord, BookRevision, MigrationStatus, NoteRecord, Revision, StorageRoutes, StoredAnnotation } from '../../shared/storage.js';
 import { StorageClientError } from './storageError.js';
+import type { DesktopResult, DesktopStorage } from '../../shared/desktop.js';
 // The browser remains asynchronous; SQLite is owned exclusively by Node.js.
 let base = '/api/storage';
 let transport: typeof fetch = (...args) => fetch(...args);
 let token: string | null = null;
 let source: string | null = null;
 let ready: Promise<MigrationStatus> | null = null;
+let forceHttp = false;
 const bookVersions = new Map<string, BookRevision & { deleted: boolean }>();
 const noteVersions = new Map<string, Revision & { bookId: string; deleted: boolean }>();
 const queues = new Map<string, Promise<unknown>>();
 export const operationId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 
 export function configureStorage({ baseUrl = '/api/storage', fetch: fetcher = (...args) => fetch(...args), sourceId = null }: { baseUrl?: string; fetch?: typeof fetch; sourceId?: string | null } = {}) {
+    forceHttp = true;
     base = baseUrl; transport = fetcher; token = null; source = sourceId; ready = null;
     bookVersions.clear(); noteVersions.clear(); queues.clear();
+}
+function desktopStorage(): DesktopStorage | undefined {
+    return !forceHttp && typeof window !== 'undefined' ? window.auraDesktop?.storage : undefined;
+}
+export function unwrapDesktop<T>(result: DesktopResult<T>): T {
+    if (result.ok) return result.value;
+    const error = new StorageClientError(result.error.message);
+    error.status = result.error.status; error.details = result.error.details;
+    throw error;
+}
+async function desktopRequest<R extends keyof StorageRoutes>(bridge: DesktopStorage, route: R, body: StorageRoutes[R]['request']): Promise<StorageRoutes[R]['response']> {
+    // Each route calls one capability. No route/channel string crosses preload.
+    let result: unknown;
+    switch (route) {
+        case 'books': result = unwrapDesktop(await bridge.listBooks()); break;
+        case 'books/save': result = unwrapDesktop(await bridge.saveBook(body as StorageRoutes['books/save']['request'])); break;
+        case 'books/delete': result = unwrapDesktop(await bridge.deleteBook(body as StorageRoutes['books/delete']['request'])); break;
+        case 'notes/query': result = unwrapDesktop(await bridge.queryNotes(body as StorageRoutes['notes/query']['request'])); break;
+        case 'notes/save': result = unwrapDesktop(await bridge.saveNote(body as StorageRoutes['notes/save']['request'])); break;
+        case 'notes/delete': result = unwrapDesktop(await bridge.deleteNote(body as StorageRoutes['notes/delete']['request'])); break;
+        case 'restore': result = unwrapDesktop(await bridge.restore(body as StorageRoutes['restore']['request'])); break;
+        default: throw new StorageClientError('浏览器旧数据迁移不能通过桌面存储入口执行');
+    }
+    return result as StorageRoutes[R]['response'];
 }
 function sourceId(): string {
     if (source) return source;
@@ -30,6 +57,14 @@ async function session() {
     token = (await response.json()).token;
 }
 export async function storageRequest<R extends keyof StorageRoutes>(route: R, body: StorageRoutes[R]['request'], retried = false): Promise<StorageRoutes[R]['response']> {
+    const desktop = desktopStorage();
+    if (desktop) {
+        try { return await desktopRequest(desktop, route, body); }
+        catch (error) {
+            if (!(error instanceof StorageClientError) && !retried) return storageRequest(route, body, true);
+            throw error;
+        }
+    }
     if (!token) await session();
     let response;
     try {
@@ -58,6 +93,17 @@ export async function storageRequest<R extends keyof StorageRoutes>(route: R, bo
     return result;
 }
 export function initializeStorage() {
+    const desktop = desktopStorage();
+    if (desktop) {
+        if (!ready) ready = desktop.status().then(result => {
+            if (!unwrapDesktop(result).initialized) {
+                const error = new StorageClientError('请先明确创建独立桌面书库；原浏览器数据尚未迁移');
+                error.status = 423; throw error;
+            }
+            return { completed: true };
+        }).catch(error => { ready = null; throw error; });
+        return ready;
+    }
     if (!ready) ready = import('./legacyMigration.js').then(module => module.migrateLegacyStorage());
     return ready;
 }

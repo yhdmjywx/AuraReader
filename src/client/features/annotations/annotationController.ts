@@ -1,4 +1,5 @@
 import { eventElement } from '../../app/dom.js';
+import { pendingNoteWrites } from '../../infrastructure/annotationRecovery.js';
 import type { Annotation, AnnotationInput } from '../../domain/annotation.js';
 import type { AnnotationCallbacks, NoteDraft } from '../../app/contracts.js';
 import type { AppElements } from '../../app/elements.js';
@@ -33,6 +34,7 @@ export class AnnotationController {
     editingNoteId: string | null;
     inlineEdit: { note: Annotation; opening: boolean } | null;
     _inlineWrites: Promise<void>;
+    private inlineWriteErrors = new Map<string, { bookId: string; recoveryAvailable: boolean }>();
     showHighlightsInSidebar: boolean;
     notesScope: 'page' | 'book';
     _renderedSidebarIds: string | null;
@@ -237,7 +239,10 @@ export class AnnotationController {
         const write = remove
             ? repoDeleteNote(snapshot.id, snapshot.bookId)
             : repoSaveNote(snapshot);
-        this._inlineWrites = Promise.all([this._inlineWrites, write]).then(() => undefined).catch(error => {
+        this._inlineWrites = Promise.all([this._inlineWrites, write]).then(() => {
+            this.inlineWriteErrors.delete(snapshot.id);
+        }).catch(error => {
+            this.inlineWriteErrors.set(snapshot.id, { bookId: snapshot.bookId, recoveryAvailable: error.recoveryAvailable === true });
             console.error('笔记持久化失败', error);
             this.callbacks.showToast?.(error.recoveryAvailable === false
                 ? '笔记尚未可靠保存，请暂勿关闭页面'
@@ -265,6 +270,16 @@ export class AnnotationController {
         this.renderNotesUI();
         if (blank) this.callbacks.onNotesChanged?.(this.notes);
         return this._inlineWrites;
+    }
+
+    async assertInlineWritesSaved() {
+        await this._inlineWrites;
+        // Durable entries are removed by the repository only after acknowledgment.
+        // A later recovery must release the close guard; non-durable failures stay.
+        for (const [id, failure] of this.inlineWriteErrors) {
+            if (failure.recoveryAvailable && !pendingNoteWrites(failure.bookId).some(entry => entry.id === id)) this.inlineWriteErrors.delete(id);
+        }
+        if (this.inlineWriteErrors.size) throw new Error('存在保存失败的笔记，窗口已保留；请处理冲突或恢复写入后重试。');
     }
 
     async saveModalNote({ quote = '', comment = '', page = 1, chapter = '章节选区', location = null }: NoteDraft & { comment?: string } = {}) {
