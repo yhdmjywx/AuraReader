@@ -13,9 +13,6 @@ export function marginGeometry(width, mode = 'single') {
         if (w >= 1612) {
             placement = 'flanks';
             noteWidth = Math.min(260, (w - 1260) / 2);
-        } else if (w >= 1424) {
-            noteWidth = Math.min(220, w - 1248);
-            readingLeft = (w - readingWidth - gap - noteWidth) / 2;
         } else placement = 'bottom';
     } else if (readingLeft + readingWidth + gap + noteWidth > w - 24) {
         gap = 32;

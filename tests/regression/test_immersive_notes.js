@@ -10,19 +10,21 @@ const { JSDOM } = require('jsdom');
         const { marginGeometry, applyMarginGeometry, positionMarginNotes } = await import('../../dist/client/features/layout/marginNotesLayout.js');
         const { LayoutController } = await import('../../dist/client/features/layout/layoutController.js');
         const { renderNotesList } = await import('../../dist/client/features/annotations/notesUI.js');
-        for (const width of [1224, 1366, 1424, 1440, 1612, 1613, 1920]) {
+        for (const width of [1224, 1366, 1424, 1440, 1611, 1612, 1613, 1920]) {
             const g = marginGeometry(width, 'double');
             assert.equal(g.readingWidth, 1192, `${width}px 窗口不能压缩双页正文`);
+            assert.equal(g.readingLeft, (width - 1192) / 2, '双页正文始终居中，笔记换位不引起横移');
+            assert.equal(g.placement, width >= 1612 ? 'flanks' : 'bottom', '双页仅保留双侧和底部笔记');
             assert.ok(g.readingLeft >= 16 || g.placement === 'flanks');
             if (g.placement !== 'bottom') assert.ok(g.rightNoteLeft + g.noteWidth <= width);
         }
         assert.equal(marginGeometry(1613, 'double').noteWidth, 176.5);
         assert.equal(marginGeometry(1920, 'double').noteWidth, 260);
-        assert.equal(marginGeometry(1440, 'double').placement, 'right');
-        assert.equal(marginGeometry(1440, 'double').noteWidth, 192);
+        assert.equal(marginGeometry(1440, 'double').bandHeight, 168);
         assert.equal(marginGeometry(1366, 'double').bandHeight, 168);
         assert.equal(marginGeometry(1613, 'single').readingWidth, 560);
         assert.equal(marginGeometry(1613, 'single').noteWidth, 260);
+        assert.equal(marginGeometry(1440, 'single').placement, 'right', '单页仍保留右侧笔记');
 
         const byId = id => document.getElementById(id);
         const workspace = document.querySelector('main');
@@ -76,15 +78,21 @@ const { JSDOM } = require('jsdom');
         assert.equal(card.querySelector('.btn-edit-note'), null, '点击文字即可编辑，不增加编辑按钮');
 
         for (const node of elements.notesList.querySelectorAll('.note-card')) Object.defineProperty(node, 'offsetHeight', { value: 180 });
-        width = 1440; applyMarginGeometry(elements, 'double'); positionMarginNotes(elements);
+        width = 1440; applyMarginGeometry(elements, 'single'); positionMarginNotes(elements);
         assert.equal(elements.notesList.querySelectorAll('.margin-notes-lane').length, 1);
         assert.equal(byId('card-left'), card, '排版时复用卡片，保留焦点和监听');
         const ordered = [...elements.notesList.querySelectorAll('.note-card')].sort((a, b) => parseFloat(a.style.top) - parseFloat(b.style.top));
         ordered.slice(1).forEach((node, index) => assert.ok(parseFloat(node.style.top) >= parseFloat(ordered[index].style.top) + 180 + 24, '同侧笔记不得互相覆盖'));
-        width = 1366; applyMarginGeometry(elements, 'double'); positionMarginNotes(elements);
+        applyMarginGeometry(elements, 'double'); positionMarginNotes(elements);
         assert.equal(workspace.dataset.notesPlacement, 'bottom');
         assert.equal(workspace.style.getPropertyValue('--note-band-height'), '168px');
         assert.equal(elements.notesList.querySelector('[data-margin-side="right"]').style.height, '144px');
+        assert.equal(byId('card-left'), card, '从右侧移到底部仍复用原卡片');
+        width = 1612; applyMarginGeometry(elements, 'double'); positionMarginNotes(elements);
+        assert.equal(workspace.dataset.notesPlacement, 'flanks');
+        assert.equal(workspace.style.getPropertyValue('--note-band-height'), '0px');
+        assert.equal(elements.notesList.querySelectorAll('.margin-notes-lane').length, 2);
+        assert.equal(card.parentElement.dataset.marginSide, 'left', '窗口扩大后恢复左页笔记位置');
         elements.bookPaper.style.setProperty('--bg-paper-text', '#d1d5db');
         elements.bookPaper.style.color = 'rgb(29, 33, 41)';
         positionMarginNotes(elements);
