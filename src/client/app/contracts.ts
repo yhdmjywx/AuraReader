@@ -71,6 +71,7 @@ export interface FontCallbacks {
     notify?: (message: string) => void;
 }
 export interface ShelfCallbacks {
+    onImportFile?: AsyncAction<[file: File]>;
     showToast?: (message: string) => void;
     onOpen?: () => void;
     onOpenBook?: AsyncAction<[id: string]>;

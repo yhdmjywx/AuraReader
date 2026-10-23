@@ -5,14 +5,15 @@ const { assertRuntime } = require('./runtime.cjs');
 const { APP_URL, createAssetHandler } = require('./assets.cjs');
 const { secureSession, secureWindow } = require('./security.cjs');
 const { createDesktopStorage } = require('./storage.cjs');
-const { registerStorageIpc, coordinateClose } = require('./ipc.cjs');
+const { registerStorageIpc, registerFileIpc, coordinateClose } = require('./ipc.cjs');
+const { createFileService } = require('./files.cjs');
 
 protocol.registerSchemesAsPrivileged([{
     scheme: 'aurareader', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true }
 }]);
 
-/** @param {{profileDirectory?: string}} [options] */
-async function startDesktop({ profileDirectory } = {}) {
+/** @param {{profileDirectory?: string, dialogs?: import('./dialogs.js').DialogPort}} [options] */
+async function startDesktop({ profileDirectory, dialogs } = {}) {
     assertRuntime();
     app.setName('AuraReader');
     const profile = profileDirectory || path.join(app.getPath('appData'), 'AuraReader');
@@ -33,7 +34,6 @@ async function startDesktop({ profileDirectory } = {}) {
     Menu.setApplicationMenu(null);
     const desktopSession = session.defaultSession;
     secureSession(desktopSession);
-    desktopSession.protocol.handle('aurareader', await createAssetHandler(path.resolve(__dirname, '../..')));
     window = new BrowserWindow({
         title: 'AuraReader', width: 1440, height: 960, minWidth: 800, minHeight: 600,
         backgroundColor: '#f8fafc', show: false,
@@ -45,11 +45,20 @@ async function startDesktop({ profileDirectory } = {}) {
         }
     });
     secureWindow(window);
-    const storage = createDesktopStorage(path.join(app.getPath('userData'), 'data'));
+    const owner = window;
+    const dataDirectory = path.join(app.getPath('userData'), 'data');
+    const files = createFileService({ dataDirectory,
+        protectedDirectories: [dataDirectory, ...(app.isPackaged ? [app.getAppPath()] :
+            [path.resolve(__dirname, '..'), path.resolve(__dirname, '../../dist')])],
+        dialogs: dialogs || { open: options => dialog.showOpenDialog(owner, options), save: options => dialog.showSaveDialog(owner, options) }
+    });
+    desktopSession.protocol.handle('aurareader', await createAssetHandler(path.resolve(__dirname, '../..'), files.fontResource));
+    const storage = createDesktopStorage(dataDirectory);
     const removeStorageHandlers = registerStorageIpc(window, storage);
-    const removeCloseHandlers = coordinateClose(window, storage);
+    const removeFileHandlers = registerFileIpc(window, files);
+    const removeCloseHandlers = coordinateClose(window, { ...storage, async settle() { await storage.settle(); await files.settle(); } });
     window.once('closed', () => {
-        removeStorageHandlers(); removeCloseHandlers(); storage.close();
+        removeStorageHandlers(); removeFileHandlers(); removeCloseHandlers(); storage.close();
     });
     app.on('window-all-closed', () => app.quit());
     window.webContents.on('preload-error', (_event, _file, error) => {

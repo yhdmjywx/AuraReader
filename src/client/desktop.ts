@@ -5,19 +5,8 @@ const bridge = window.auraDesktop;
 if (!bridge) throw new Error('桌面安全入口不可用');
 let application: typeof import('./main.js') | null = null;
 let boot: Promise<void> | null = null;
-
-function disableUnavailableControls() {
-    for (const id of ['file-input', 'btn-import-book', 'btn-export-menu', 'backup-file-input',
-        'btn-export-markdown', 'btn-export-chapter-zip', 'btn-export-standalone-html',
-        'btn-export-full-backup', 'btn-import-full-backup', 'btn-read-system-fonts',
-        'btn-import-font', 'font-file-input', 'btn-fullscreen']) {
-        const control = document.getElementById(id);
-        if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) {
-            control.disabled = true;
-            control.title = '此功能尚未接入桌面版';
-        }
-    }
-}
+const originalControls = new Map([...document.querySelectorAll<HTMLButtonElement>('button, input, select, textarea')]
+    .map(control => [control, control.disabled]));
 
 function gate(message: string, create = false) {
     for (const control of document.querySelectorAll('button, input, select, textarea')) {
@@ -44,11 +33,8 @@ function gate(message: string, create = false) {
 
 async function start() {
     window.__AURA_BOOTSTRAPPED__ = true;
+    originalControls.forEach((disabled, control) => { control.disabled = disabled; });
     application = await import('./main.js');
-    for (const control of document.querySelectorAll('button, input, select, textarea')) {
-        if ('disabled' in control) (control as HTMLButtonElement).disabled = false;
-    }
-    disableUnavailableControls();
     await application.startApp();
     document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
         if (application) positionMarginNotes(application.elements);
@@ -60,7 +46,7 @@ async function load() {
     const status = unwrapDesktop(await bridge!.storage.status());
     if (!status.initialized) {
         document.documentElement.dataset.desktopReady = 'setup';
-        gate('原浏览器书库尚未迁移。你可以先创建独立的桌面书库并使用示例书；这不会导入或修改原书库。旧数据迁移功能尚未提供。', true);
+        gate('创建此设备上的阅读书库，开始导入书籍、阅读和记录笔记。书籍与笔记仅保存在本机。', true);
         return;
     }
     if (!boot) boot = start().catch(error => { boot = null; throw error; });

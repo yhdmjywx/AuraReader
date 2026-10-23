@@ -16,8 +16,8 @@ const { APP_URL, createAssetHandler, desktopHtml, resourcePath } = require('../.
     const dom = new JSDOM(html, { url: APP_URL });
     try {
         const document = dom.window.document;
-        assert.equal(document.querySelectorAll('script').length, 1);
-        assert.equal(document.querySelector('script').getAttribute('src'), 'desktop-shell.js');
+        assert.deepEqual([...document.querySelectorAll('script')].map(script => script.getAttribute('src')),
+            ['vendor/jszip.min.js', 'desktop-shell.js']);
         assert.equal(document.querySelectorAll('[src^="http"], [href^="http"]').length, 0);
         assert.ok(document.getElementById('book-paper'));
         assert.ok(document.getElementById('btn-import-book'));

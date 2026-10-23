@@ -17,7 +17,7 @@ function desktopHtml(html) {
     return html.replace(/<link\b[^>]*\bhref="https?:\/\/[^>]*>/gi, '')
         .replace(/<script\b[^>]*\bsrc="https?:\/\/[^>]*><\/script>/gi, '')
         .replace('</head>', '<link rel="stylesheet" href="vendor/remixicon.css">\n' +
-            '<link rel="stylesheet" href="desktop-shell.css">\n</head>')
+            '<link rel="stylesheet" href="desktop-shell.css">\n<script src="vendor/jszip.min.js"></script>\n</head>')
         .replace(entry,
             '<script type="module" src="desktop-shell.js"></script>');
 }
@@ -35,8 +35,8 @@ function resourcePath(raw) {
     return decoded === '/' ? '/index.html' : decoded;
 }
 
-/** @param {string} root */
-async function createAssetHandler(root) {
+/** @param {string} root @param {(name: string) => Promise<{bytes: Uint8Array, type: string} | null>} [fontResource] */
+async function createAssetHandler(root, fontResource) {
     /** @type {Map<string, {filename: string, root: string, type: string}>} */
     const files = new Map();
     /** @param {string} url @param {string} directory @param {string} filename @param {string} type */
@@ -51,6 +51,7 @@ async function createAssetHandler(root) {
     add('/desktop-shell.js', renderer, 'shell.js', 'application/javascript; charset=utf-8');
     add('/desktop-shell.css', renderer, 'shell.css', 'text/css; charset=utf-8');
     add('/vendor/remixicon.css', icons, 'remixicon.css', 'text/css; charset=utf-8');
+    add('/vendor/jszip.min.js', path.join(root, 'node_modules/jszip/dist'), 'jszip.min.js', 'application/javascript; charset=utf-8');
     for (const ext of ['woff2', 'woff', 'ttf', 'eot', 'svg']) {
         const type = ({ woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf',
             eot: 'application/vnd.ms-fontobject', svg: 'image/svg+xml' })[ext];
@@ -85,6 +86,14 @@ async function createAssetHandler(root) {
         let name;
         try { name = resourcePath(request.url); }
         catch { return new Response('Forbidden', { status: 403, headers }); }
+        if (name.startsWith('/user-fonts/') && fontResource) {
+            try {
+                const font = await fontResource(name.slice('/user-fonts/'.length));
+                if (font) return new Response(request.method === 'HEAD' ? null : new Uint8Array(font.bytes).buffer,
+                    { headers: { ...headers, 'Content-Type': font.type } });
+            } catch (error) { console.error('Desktop font resource failed:', error); }
+            return new Response('Font unavailable', { status: 404, headers });
+        }
         const resource = files.get(name);
         if (!resource) return new Response('Not found', { status: 404, headers });
         try {

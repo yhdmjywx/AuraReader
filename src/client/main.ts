@@ -189,6 +189,7 @@ export function bootstrapApp() {
     });
 
     // 3. Connect Cross-Module Callbacks
+    shelf.callbacks.onImportFile = file => coordinator.importBook(file);
     reader.callbacks.getNotes = () => annotations.getRenderingNotes();
     reader.callbacks.beforeNavigate = () => {
         annotations.finishInlineEdit();

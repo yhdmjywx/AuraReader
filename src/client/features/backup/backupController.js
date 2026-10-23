@@ -15,6 +15,7 @@ import {
 
 import { normalizeAnnotation } from '../../domain/annotationEngine.js';
 import { restoreRecords } from '../../infrastructure/storageClient.js';
+import { chooseDesktopFile } from '../../infrastructure/desktopFiles.js';
 
 import {
     exportMarkdown as adapterExportMarkdown,
@@ -100,14 +101,19 @@ export class BackupController {
             notesToExport = await repoGetNotesForBooks(selectedIds);
         }
 
-        adapterExportSelectiveBackup({
+        const results = await adapterExportSelectiveBackup({
             selectedBooks,
             notes: notesToExport
         });
 
         this.closeBackupSelectModal();
         if (this.callbacks.showToast) {
-            this.callbacks.showToast(`已为 ${selectedBooks.length} 本图书分别发起备份下载，包含 ${notesToExport.length} 条高亮与笔记`);
+            if (window.auraDesktop) {
+                const saved = results.filter(result => result.status === 'saved').length;
+                const failed = results.find(result => result.status === 'failed');
+                this.callbacks.showToast(`已保存 ${saved}/${selectedBooks.length} 份书籍备份` +
+                    (failed ? `；保存失败：${failed.message}` : saved < selectedBooks.length ? '；其余未保存，已取消后续操作' : ''));
+            } else this.callbacks.showToast(`已为 ${selectedBooks.length} 本图书分别发起备份下载，包含 ${notesToExport.length} 条高亮与笔记`);
         }
     }
 
@@ -167,25 +173,28 @@ export class BackupController {
         }
     }
 
-    exportMarkdown(bookTitle, notes) {
-        adapterExportMarkdown(bookTitle, notes);
-        if (this.callbacks.showToast) this.callbacks.showToast('已导出高亮与随笔 Markdown 文件');
+    async exportMarkdown(bookTitle, notes) {
+        try { this.exportFeedback(await adapterExportMarkdown(bookTitle, notes), 'Markdown 文件'); }
+        catch (error) { this.callbacks.showToast?.('导出 Markdown 失败: ' + error.message); }
+    }
+
+    exportFeedback(result, label) {
+        this.callbacks.showToast?.(result?.status === 'canceled' ? '已取消保存' :
+            result?.status === 'saved' ? `已保存${label}` : `已发起${label}下载`);
     }
 
     async exportChapterZip(book, notes) {
         try {
             if (this.callbacks.showToast) this.callbacks.showToast('正在生成分章节 Zip 压缩包...');
-            await adapterExportChapterZip(book, notes, window.JSZip);
-            if (this.callbacks.showToast) this.callbacks.showToast('已成功导出分章节 Zip 压缩包！');
+            this.exportFeedback(await adapterExportChapterZip(book, notes, window.JSZip), '分章节 Zip 压缩包');
         } catch (err) {
             if (this.callbacks.showToast) this.callbacks.showToast('导出 Zip 失败: ' + err.message);
         }
     }
 
-    exportStandaloneHtml(book, notes) {
+    async exportStandaloneHtml(book, notes) {
         try {
-            adapterExportStandaloneHtml(book, notes);
-            if (this.callbacks.showToast) this.callbacks.showToast('已成功导出双栏带标注独立 HTML 电子书！');
+            this.exportFeedback(await adapterExportStandaloneHtml(book, notes), '带标注 HTML 电子书');
         } catch (err) {
             if (this.callbacks.showToast) this.callbacks.showToast('导出 HTML 失败: ' + err.message);
         }
@@ -226,7 +235,12 @@ export class BackupController {
         }
 
         if (elements.btnImportFullBackup) {
-            elements.btnImportFullBackup.addEventListener('click', () => {
+            elements.btnImportFullBackup.addEventListener('click', async () => {
+                if (window.auraDesktop) {
+                    try { const file = await chooseDesktopFile('backup'); if (file) await this.importFullBackup(file); }
+                    catch (error) { this.callbacks.showToast?.('备份文件读取失败: ' + error.message); }
+                    return;
+                }
                 if (elements.backupFileInput) elements.backupFileInput.click();
             });
         }

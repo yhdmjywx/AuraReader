@@ -109,7 +109,9 @@ node src/server/storageMaintenance.js backup
 
 ## 开发与测试
 
-Electron Windows 桌面迁移已完成阶段 3（SQLite 与受限 IPC），运行 `npm run desktop` 可创建独立桌面书库，使用示例书阅读并保存高亮、笔记。首次创建需明确点击；原浏览器书库不会自动导入。桌面书库位于 `%APPDATA%\AuraReader\data`，不在安装目录内。字体枚举/导入、书籍文件导入、原生导出、旧数据迁移及 NSIS 安装包尚未提供；完整文件操作请继续使用浏览器版。运行证据、限制与下一阶段条件见 [阶段 3 记录](docs/electron-desktop-stage3.md)，前期设计见 [审计](docs/electron-desktop-audit.md)和[外壳记录](docs/electron-desktop-stage2.md)。
+Electron Windows 桌面迁移已完成阶段 4（字体、书籍文件与导出）。运行 `npm run desktop` 可创建独立桌面书库，通过 Windows 原生对话框导入 EPUB/TXT、阅读并保存高亮和笔记；可读取系统字体、导入 TTF/OTF/WOFF2，以及保存 Markdown、带标注 HTML、章节 ZIP 和每书 `.aurabackup`，并恢复当前书籍备份。文件取消与保存失败会明确反馈，多书备份显示实际保存数量。桌面资源与 JSZip 随本地源码提供，离线运行不使用 localhost 服务。
+
+首次创建书库需明确点击；桌面 SQLite 和导入字体位于 `%APPDATA%\AuraReader\data`，不在安装目录内。按当前范围只保证现用 SQLite 的读写、版本/幂等、备份与恢复，不提供旧数据库或 IndexedDB 的桌面迁移；未知或缺失数据库仍阻断启动，不静默清库。浏览器模式继续独立运行，上文旧版迁移说明仅适用于现有浏览器模式。NSIS 安装包和安装升级验收留在阶段 5，目前仍为源码桌面预览。运行证据、风险与下一阶段条件见 [阶段 4 记录](docs/electron-desktop-stage4.md)，历史记录见 [阶段 3](docs/electron-desktop-stage3.md)、[审计](docs/electron-desktop-audit.md)和[外壳记录](docs/electron-desktop-stage2.md)。
 
 源码位于 `src/client/` 和 `src/server/`；前端采用渐进式 TypeScript 迁移，`npm start` 会先检查类型并构建到 `dist/client/`，再启动服务。依赖安装后，可以运行：
 
@@ -122,6 +124,7 @@ npm run test:regression  # 回归检查
 npm run test:syntax      # JavaScript 语法检查
 npm run desktop          # Windows x64 桌面预览，书库通过 IPC 访问，不启动 HTTP 服务
 npm run test:desktop     # 真实 Electron 窗口、SQLite 运行时与安全检查
+npm run test:desktop:native # 交互验收真实 Windows 文件对话框，按终端提示选项目测试素材
 ```
 
 修改源码后重新运行 `npm run build` 并刷新浏览器；直接运行 `node src/server/server.js` 前也需先构建。迁移边界及运行方式见 [TypeScript 迁移说明](docs/typescript-migration.md)。
@@ -133,7 +136,7 @@ npm run test:desktop     # 真实 Electron 窗口、SQLite 运行时与安全检
 - 当前支持 EPUB 和 TXT。虽然文件选择器包含 PDF 扩展名，但尚未实现 PDF 正文解析，不应将其视为支持的阅读格式。
 - “原书字体”选项暂未启用；当前 EPUB 解析流程不会完整保留出版方的样式和字体规则，复杂排版与原书可能存在差异。
 - 本机字体读取已在 Windows 本地服务下验证；其他环境取决于浏览器能力和授权，无法读取时仍可导入字体文件。
-- 内置正文精选字体可由本地服务提供，但界面图标、界面字体和浏览器端 JSZip 仍引用外部 CDN。首次加载及部分功能依赖这些资源可用，当前不能保证完整离线启动。
+- 浏览器模式的界面图标、界面字体和 JSZip 仍引用外部 CDN，不能保证完整离线启动。桌面模式使用本地图标、内置正文精选字体与 JSZip，已验证断网启动、EPUB 导入及 ZIP 导出。
 - 页边笔记排版主要在桌面窗口验证；手机等小屏设备和复杂 EPUB 尚需进一步测试。
 - 重新加载页面时，当前不会自动恢复上次打开的书籍和阅读位置；书库中的书籍和笔记仍可重新打开。
 - 项目代码采用 [Apache License 2.0](LICENSE)，版权声明为 Copyright © 2026 yhdmjywx。内置字体遵循各自许可证，来源与原文见 [字体资源说明](src/client/assets/fonts/README.md) 和其 `licenses/` 目录；第三方依赖遵循其各自许可证。测试书籍的原始声明与许可保留在 EPUB 内，不纳入项目代码的 Apache-2.0 许可范围。

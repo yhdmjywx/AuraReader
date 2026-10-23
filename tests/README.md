@@ -23,13 +23,17 @@ DOM 测试通过 jsdom 执行真实产品事件和模块，只为不可用的几
 
 ## Electron 桌面测试
 
-`npm test` 还自动执行 `test_desktop_assets.js`、`test_desktop_storage.js`、`test_desktop_repositories.js`。覆盖资源响应、CSP/MIME、路径隔离、显式建库、命令校验、版本/幂等/删除、备份恢复和实际 Repository/SQLite 链路。Repository 测试把 fetch 替换为失败函数，确认桌面路径不使用 HTTP；在服务提交后注入丢失响应，验证重试原命令、恢复缓冲和错误 status/details；同时覆盖短暂启动失败后重试、快速输入、恢复成功解除关闭阻断和无恢复权限时仍阻止退出。当前完整计数为 43（6 个语法检查、6 个 unit 脚本、31 个 regression 脚本）。
+`npm test` 自动执行 `test_desktop_assets.js`、`test_desktop_storage.js`、`test_desktop_repositories.js`、`test_desktop_files.js` 和 `test_desktop_export_feedback.js`。覆盖资源响应、CSP/MIME、路径隔离、显式建库、命令校验、版本/幂等/删除、备份恢复和实际 Repository/SQLite 链路。Repository 测试把 fetch 替换为失败函数，确认桌面路径不使用 HTTP；在服务提交后注入丢失响应，验证重试原命令、恢复缓冲和错误 status/details；同时覆盖短暂启动失败后重试、快速输入、恢复成功解除关闭阻断和无恢复权限时仍阻止退出。文件测试使用真实临时文件与主进程对话框替身，验证大小限制、允许扩展名、字体哈希/持久化、保存/替换/取消/失败、目录保护、并发对话框与等待；反馈测试验证保存前无成功提示，多书备份按实际保存数量反馈并在取消/失败后停止。当前完整计数为 45（6 个语法检查、6 个 unit 脚本、33 个 regression 脚本）。
 
 `npm run test:desktop` 单独启动真实 Windows x64 Electron 主进程及可见原生窗口，不使用 headless/jsdom 替代桌面验收。除运行时 SQLite、安全隔离、资源/字体、主题与 CSP 外，还验证首次点击前没有数据库、实际 IPC 完整对象/冲突/重试/备份/恢复回滚、其他窗口和非精确 URL 的访问拒绝、真实编辑器输入落库、待写记录跨重载保留并阻止关闭、恢复补写和离线读取。最后不触发 input 事件地修改实际编辑器再关闭窗口，由关闭握手读取并保存最后内容；父进程重新启动一个新的 Electron 进程，从同一测试 profile 读取该内容作断言。截图等待绘制帧和主题过渡结束，并检查非空图像。
 
 每次测试生成独立 `.commandcode/desktop-tests/run-*/`，其中 profile 和 runtime-storage 都只属于测试，results.json、failure.json 及截图用于诊断，不纳入 Git。它不读取或恢复日常书库，也不清理用户配置。桌面检查失败或超时返回非零；默认 `npm test` 通过不能代替该检查通过。图形测试需可用的 Windows 桌面会话；Codex 外层沙箱若不允许启动原生应用，需在允许原生进程运行的权限下执行，不允许加 `--no-sandbox` 绕过 Electron 隔离。
 
-当前测试使用本地源码和未打包 Electron；不能证明安装包、签名、文件关联、原生文件对话框、实际旧书库迁移或系统强制关机已经通过。实际结果及阶段边界见 [阶段 3 记录](../docs/electron-desktop-stage3.md)。
+阶段 4 增加了真实 Electron 内的 EPUB/TXT 导入、系统字体读取与 FontFace 加载、四种导出实际文件、ZIP 解压核对、当前 `.aurabackup` 恢复、取消与错误提示、全屏和重启后的书籍/字体持久化。自动化测试在主进程注入对话框选择结果，不将它计为原生对话框操作；其他窗口和非精确 URL 访问文件/字体能力必须被拒绝。原阅读/标注和存储安全断言继续执行。
+
+`npm run test:desktop:native` 是单独的交互验收，不能在无人桌面上自动通过。它不注入对话框替身，依次要求用真实系统对话框选择项目 `test.epub`、`literata.woff2`，将 Markdown 保存到终端打印的隔离输出目录，然后取消 ZIP 保存；完成后检查实际文件、SQLite 完整性和 UI 反馈，生成 `.commandcode/desktop-native/run-*/results.json` 与截图。失败或十分钟超时返回非零，不得改为跳过通过。本次已通过实际 Windows 操作完成该检查。
+
+当前测试使用本地源码和未打包 Electron；不能证明安装包、签名、文件关联或系统强制关机已经通过。旧数据库桌面迁移已按用户要求移出范围，原浏览器测试保留。实际结果及阶段边界见 [阶段 4 记录](../docs/electron-desktop-stage4.md)。
 
 源码静态检查只用于明确的资源/结构约束（例如无独立笔记弹窗、红色 caret CSS、入口 DOM 引用），不要用函数名、源码片段或测试自写的算法代替行为验证。
 

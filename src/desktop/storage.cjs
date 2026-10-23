@@ -83,7 +83,7 @@ function createDesktopStorage(directory) {
         if (createMigration(current).status(DESKTOP_SOURCE).completed) return { initialized: true };
         if (current.all('SELECT 1 FROM books LIMIT 1').length || current.all('SELECT 1 FROM operations LIMIT 1').length
             || current.all('SELECT 1 FROM migrations LIMIT 1').length) {
-            throw new StorageError('此目录不是已确认的桌面书库，请保留数据并通过迁移接入', 409);
+            throw new StorageError('此目录不是当前桌面书库，请保留原文件；不支持旧数据库', 409);
         }
         return { initialized: false }; // Interrupted empty initialization may be resumed explicitly.
     }

@@ -13,6 +13,7 @@ import {
     openShelf as domOpenShelf,
     closeShelf as domCloseShelf
 } from './shelfUI.js';
+import { chooseDesktopFile } from '../../infrastructure/desktopFiles.js';
 
 export class ShelfController {
     /** @param {{callbacks?: import('../../app/contracts.js').ShelfCallbacks}} options */
@@ -93,7 +94,13 @@ export class ShelfController {
             this.closeShelf();
             elements.btnShelf?.focus();
         });
-        elements.btnImportBook?.addEventListener('click', () => elements.fileInput?.click());
+        elements.btnImportBook?.addEventListener('click', async () => {
+            if (!window.auraDesktop) { elements.fileInput?.click(); return; }
+            try {
+                const file = await chooseDesktopFile('book');
+                if (file) { this.closeShelf(); await this.callbacks.onImportFile?.(file); }
+            } catch (error) { this.callbacks.showToast?.('导入文件失败: ' + error.message); }
+        });
         elements.fileInput?.addEventListener('change', () => {
             if (elements.fileInput.files?.length) this.closeShelf();
         });

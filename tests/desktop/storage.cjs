@@ -56,9 +56,13 @@ async function verifyStorage(window, profile, checks) {
     await outsider.loadURL(APP_URL);
     const denied = await outsider.webContents.executeJavaScript('auraDesktop.storage.status()');
     assert.equal(denied.error.status, 403);
+    for (const capability of ['auraDesktop.files.chooseBook()', 'auraDesktop.fonts.list()', 'auraDesktop.window.toggleFullscreen()']) {
+        assert.equal((await outsider.webContents.executeJavaScript(capability)).error.status, 403);
+    }
     outsider.destroy();
     await wc.loadURL(APP_URL + '?untrusted');
     assert.equal((await run('auraDesktop.storage.status()')).error.status, 403);
+    assert.equal((await run('auraDesktop.files.chooseBook()')).error.status, 403);
     await wc.loadURL(APP_URL);
     await run(`(async () => { while (document.documentElement.dataset.desktopReady !== 'library')
         await new Promise(resolve => setTimeout(resolve, 20)); })()`);

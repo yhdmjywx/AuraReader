@@ -4,7 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 if (process.isMainFrame) {
     /** @type {import('../shared/desktop.js').DesktopBridge} */
     const bridge = {
-        stage: 3, platform: process.platform,
+        stage: 4, platform: process.platform,
         versions: { electron: process.versions.electron, node: process.versions.node },
         storage: {
             status: () => ipcRenderer.invoke('aura:storage:status', undefined),
@@ -18,6 +18,17 @@ if (process.isMainFrame) {
             restore: command => ipcRenderer.invoke('aura:storage:restore', command),
             backup: () => ipcRenderer.invoke('aura:storage:backup', undefined)
         },
+        files: {
+            chooseBook: () => ipcRenderer.invoke('aura:files:chooseBook', undefined),
+            chooseBackup: () => ipcRenderer.invoke('aura:files:chooseBackup', undefined),
+            saveExport: input => ipcRenderer.invoke('aura:files:saveExport', input)
+        },
+        fonts: {
+            list: () => ipcRenderer.invoke('aura:files:listFonts', undefined),
+            system: () => ipcRenderer.invoke('aura:files:systemFonts', undefined),
+            importFont: () => ipcRenderer.invoke('aura:files:importFont', undefined)
+        },
+        window: { toggleFullscreen: () => ipcRenderer.invoke('aura:window:fullscreen') },
         lifecycle: {
             onPrepareClose: callback => {
                 /** @param {import('electron').IpcRendererEvent} _event @param {string} id */

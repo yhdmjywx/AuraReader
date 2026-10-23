@@ -12,10 +12,37 @@ function assertSender(event, window) {
 }
 
 /** @param {unknown} error */
-function failure(error) {
+function failure(error, fallback = '本地书库操作失败，原数据未清除') {
     if (error instanceof StorageError) return { ok: false, error: { message: error.message, status: error.status, details: error.details } };
     console.error('Desktop service failed:', error);
-    return { ok: false, error: { message: '本地书库操作失败，原数据未清除', status: 500 } };
+    return { ok: false, error: { message: fallback, status: 500 } };
+}
+
+/** @param {import('electron').BrowserWindow} window @param {ReturnType<typeof import('./files.cjs').createFileService>} files */
+function registerFileIpc(window, files) {
+    const actions = ['chooseBook', 'chooseBackup', 'saveExport', 'listFonts', 'systemFonts', 'importFont'];
+    for (const action of actions) {
+        ipcMain.handle('aura:files:' + action, async (event, ...args) => {
+            try {
+                assertSender(event, window);
+                if (args.length !== 1) throw new StorageError('无效参数数量');
+                const value = await files.call(action, args[0], () => assertSender(event, window));
+                assertSender(event, window);
+                return { ok: true, value };
+            } catch (error) { return failure(error, '文件或字体操作失败，请检查文件和目录权限'); }
+        });
+    }
+    ipcMain.handle('aura:window:fullscreen', event => {
+        try {
+            assertSender(event, window);
+            window.setFullScreen(!window.isFullScreen());
+            return { ok: true, value: { fullscreen: window.isFullScreen() } };
+        } catch (error) { return failure(error, '窗口全屏切换失败'); }
+    });
+    return () => {
+        actions.forEach(action => ipcMain.removeHandler('aura:files:' + action));
+        ipcMain.removeHandler('aura:window:fullscreen');
+    };
 }
 
 /** @param {import('electron').BrowserWindow} window @param {ReturnType<typeof import('./storage.cjs').createDesktopStorage>} storage */
@@ -77,4 +104,4 @@ function coordinateClose(window, storage) {
     };
 }
 
-module.exports = { assertSender, registerStorageIpc, coordinateClose };
+module.exports = { assertSender, registerStorageIpc, registerFileIpc, coordinateClose };

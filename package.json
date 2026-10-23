@@ -12,6 +12,7 @@
     "dev": "npm run build && node src/server/server.js",
     "desktop": "npm run build && node scripts/desktop.cjs",
     "test:desktop": "npm run build && node scripts/test-desktop.cjs",
+    "test:desktop:native": "npm run build && node scripts/test-native-dialogs.cjs",
     "build": "node scripts/build.cjs",
     "typecheck": "node scripts/build.cjs --check",
     "test": "node scripts/test.cjs all",
@@ -24,7 +25,6 @@
     "@types/node": "24.19.2",
     "electron": "45.0.0",
     "jsdom": "^30.1.2",
-    "jszip": "^3.10.1",
     "typescript": "5.9.3"
   },
   "keywords": [
@@ -36,6 +36,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "fontkit": "^2.0.4",
+    "jszip": "3.10.1",
     "remixicon": "4.6.0"
   }
 }

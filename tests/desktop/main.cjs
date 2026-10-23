@@ -8,6 +8,7 @@ const { startDesktop } = require('../../src/desktop/main.cjs');
 const { APP_URL } = require('../../src/desktop/assets.cjs');
 const { verifyRuntime } = require('./runtime.cjs');
 const { verifyStorage } = require('./storage.cjs');
+const { verifyFiles } = require('./files.cjs');
 
 const output = path.resolve(process.argv[2]);
 const checks = [];
@@ -18,11 +19,16 @@ app.on('web-contents-created', (_event, contents) => {
     contents.on('did-fail-load', (_event, code, message, url) => errors.push(`${code}: ${message} ${url}`));
     contents.on('did-start-navigation', (_event, url) => requested.push(url));
 });
-const watchdog = setTimeout(() => { console.error('Electron checks timed out'); app.exit(1); }, 75000);
+const watchdog = setTimeout(() => { console.error('Electron checks timed out'); app.exit(1); }, 85000);
 
 (async () => {
     const profile = path.join(output, 'profile');
-    const window = await startDesktop({ profileDirectory: profile });
+    const queues = { open: [], save: [] };
+    const dialogs = Object.fromEntries(['open', 'save'].map(kind => [kind, async () => {
+        assert.ok(queues[kind].length, `Unexpected ${kind} dialog`);
+        return queues[kind].shift();
+    }]));
+    const window = await startDesktop({ profileDirectory: profile, dialogs });
     assert.ok(window);
     const runtime = await verifyRuntime(path.join(output, 'runtime-storage'));
     checks.push('real Electron SQLite: WAL, timeout, complete JSON, rollback, idempotency, backup, readOnly, reopen');
@@ -39,12 +45,12 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
         })()`);
     };
     await waitFor(`document.documentElement.dataset.desktopReady === 'setup'`);
-    assert.match(await run(`document.getElementById('desktop-status').textContent`), /原浏览器书库尚未迁移/);
+    assert.match(await run(`document.getElementById('desktop-status').textContent`), /创建此设备上的阅读书库/);
     await assert.rejects(fs.access(path.join(profile, 'data/aurareader.sqlite')));
     assert.equal((await run(`auraDesktop.storage.listBooks()`)).error.status, 423);
     await run(`document.getElementById('desktop-create-library').click()`);
     await waitFor(`document.documentElement.dataset.desktopReady === 'library'`);
-    checks.push('no database before explicit create; original browser data migration disclosed; existing app booted through IPC');
+    checks.push('no database before explicit create; current SQLite library created and existing app booted through IPC');
     const state = await run(`(async () => {
         await document.fonts.load('16px remixicon');
         await document.fonts.load('16px Literata');
@@ -54,7 +60,8 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
                 versions: window.auraDesktop.versions }, bridgeFrozen: Object.isFrozen(window.auraDesktop),
             require: typeof require, process: typeof process, Buffer: typeof Buffer,
             controls: ['btn-import-book', 'btn-export-menu', 'btn-read-system-fonts', 'btn-import-font']
-                .every(id => document.getElementById(id).disabled),
+                .every(id => !document.getElementById(id).disabled),
+            zip: typeof window.JSZip,
             icons: document.fonts.check('16px remixicon'),
             literals: document.fonts.check('16px Literata'),
             chinese: document.fonts.check('16px "Sarasa Gothic SC"'),
@@ -64,8 +71,10 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     assert.equal(state.ready, 'library');
     assert.equal(state.require, 'undefined'); assert.equal(state.process, 'undefined'); assert.equal(state.Buffer, 'undefined');
     assert.equal(state.bridgeFrozen, true);
-    assert.deepEqual(state.bridge.keys.sort(), ['lifecycle', 'platform', 'stage', 'storage', 'versions']);
-    assert.equal(state.bridge.stage, 3);
+    assert.deepEqual(state.bridge.keys.sort(), ['files', 'fonts', 'lifecycle', 'platform', 'stage', 'storage', 'versions', 'window']);
+    assert.equal(state.bridge.stage, 4);
+    assert.equal(state.zip, 'function');
+    assert.equal(await run(`document.querySelector('button[title="原书字体恢复将在后续支持"]').disabled`), true);
     assert.equal(state.bridge.versions.electron, runtime.electron);
     assert.ok(state.controls && state.icons && state.literals && state.chinese);
     assert.match(state.title, /危机时代/);
@@ -75,7 +84,7 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     const preferences = wc.getLastWebPreferences();
     for (const key of ['sandbox', 'contextIsolation', 'webSecurity']) assert.equal(preferences[key], true, key);
     for (const key of ['nodeIntegration', 'nodeIntegrationInWorker', 'nodeIntegrationInSubFrames', 'webviewTag']) assert.equal(preferences[key], false, key);
-    checks.push('visible native window, isolated profile, DOM ready, Node absent, capability-only bridge, remaining stage 4 actions disabled');
+    checks.push('visible native window, isolated profile, DOM ready, Node absent, scoped bridge, file/font/export controls enabled and local JSZip ready');
     checks.push('local CSS, Remix Icon and both reader fonts loaded; no remote resources or storage HTTP requests');
     const capture = async name => {
         await run(`(async () => {
@@ -103,6 +112,8 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     }
     checks.push('actual protocol resources and denial of package/data/API routes');
     await verifyStorage(window, profile, checks);
+    await verifyFiles(window, output, queues, checks);
+    assert.deepEqual(queues, { open: [], save: [] });
     // Permission and CSP probes run after the clean-load assertion. Their console
     // violations are expected here and do not hide errors during normal startup.
     const denied = await run(`(async () => {
@@ -148,7 +159,7 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     })()`);
     const report = { passed: true, runtime, checks, profile,
         actualGui: true, screenshots: ['shell-light.png', 'shell-dark.png'],
-        closeNoteId, limitations: ['No native files/fonts/export, old-library migration or installer acceptance'] };
+        closeNoteId, limitations: ['Automated file tests inject main-process dialog results; native dialog operation is a separate check', 'Installer acceptance remains pending; old database support is out of scope'] };
     // Keep app alive until the report is durable, then test the normal close path.
     const closed = once(window, 'closed');
     const holdQuit = event => event.preventDefault();

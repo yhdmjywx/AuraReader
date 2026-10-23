@@ -9,10 +9,15 @@ import { groupAnnotationsByRange, normalizeAnnotation, isHighlight, isNote } fro
 import { compactWithMap, resolveAnnotationRange } from '../domain/annotationRangeEngine.js';
 import { renderAnnotationTokens } from '../features/reader/annotationRenderer.js';
 import { buildBookStructure, structureSummary } from './bookStructure.js';
+import { unwrapDesktop } from './storageClient.js';
 
 export function downloadFile(filename, data, type) {
     if (typeof window === 'undefined') return;
     const blob = (data instanceof Blob) ? data : new Blob([data], { type });
+    if (window.auraDesktop) {
+        const files = window.auraDesktop.files;
+        return blob.arrayBuffer().then(bytes => files.saveExport({ filename, bytes: new Uint8Array(bytes) })).then(unwrapDesktop);
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
@@ -20,6 +25,7 @@ export function downloadFile(filename, data, type) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
+    return { status: 'download-requested' };
 }
 
 export function exportMarkdown(bookTitle = '图书笔记', notes = []) {
@@ -37,7 +43,7 @@ export function exportMarkdown(bookTitle = '图书笔记', notes = []) {
         md += `---\n\n`;
     });
 
-    downloadFile(`${bookTitle}_划线随笔.md`, md, 'text/markdown');
+    return downloadFile(`${bookTitle}_划线随笔.md`, md, 'text/markdown');
 }
 
 export async function exportChapterZip(book, notes = [], jszipLib) {
@@ -130,7 +136,7 @@ export async function exportChapterZip(book, notes = [], jszipLib) {
     folder.file('00_目录概览.md', indexMd);
 
     const blob = await zip.generateAsync({ type: 'blob' });
-    downloadFile(`${bookTitle}_分章节笔记包.zip`, blob, 'application/zip');
+    return downloadFile(`${bookTitle}_分章节笔记包.zip`, blob, 'application/zip');
 }
 
 function resolveNoteRange(text, note) {
@@ -405,7 +411,7 @@ export function exportStandaloneHtml(book, notes = []) {
 </body>
 </html>`;
 
-    downloadFile(`${bookTitle}_带标注电子书.html`, standaloneHtml, 'text/html');
+    return downloadFile(`${bookTitle}_带标注电子书.html`, standaloneHtml, 'text/html');
 }
 
 export function exportSelectiveBackup({ selectedBooks = [], notes = [] }) {
@@ -413,7 +419,7 @@ export function exportSelectiveBackup({ selectedBooks = [], notes = [] }) {
     const exportedAt = new Date().toISOString();
     const yyyymmdd = exportedAt.slice(0, 10).replace(/-/g, '');
 
-    selectedBooks.forEach(book => {
+    const files = selectedBooks.map(book => {
         const backupPayload = {
             version: "1.0",
             // Keep the existing envelope for compatibility with earlier readers.
@@ -426,8 +432,26 @@ export function exportSelectiveBackup({ selectedBooks = [], notes = [] }) {
             .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_');
         const fileName = `AuraReader_Backup_${bookTitle}_${yyyymmdd}.aurabackup`;
 
-        downloadFile(fileName, JSON.stringify(backupPayload, null, 2), 'application/json;charset=utf-8');
+        return { filename: fileName, data: JSON.stringify(backupPayload, null, 2) };
     });
+    if (typeof window !== 'undefined' && window.auraDesktop) {
+        return (async () => {
+            const results = []; let stopped = false;
+            for (const file of files) {
+                if (stopped) { results.push({ name: file.filename, status: 'not-saved' }); continue; }
+                try {
+                    const result = await downloadFile(file.filename, file.data, 'application/json;charset=utf-8');
+                    results.push({ name: file.filename, ...result });
+                    if (result.status === 'canceled') stopped = true;
+                } catch (error) {
+                    results.push({ name: file.filename, status: 'failed', message: error.message });
+                    stopped = true;
+                }
+            }
+            return results;
+        })();
+    }
+    return files.map(file => downloadFile(file.filename, file.data, 'application/json;charset=utf-8'));
 }
 
 export function parseBackupFile(file) {

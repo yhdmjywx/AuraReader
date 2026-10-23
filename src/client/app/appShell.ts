@@ -1,4 +1,5 @@
 import { eventElement } from './dom.js';
+import { unwrapDesktop } from '../infrastructure/storageClient.js';
 import type { AppElements } from './elements.js';
 import type { ShellCallbacks } from './contracts.js';
 /* ==========================================================================
@@ -97,6 +98,14 @@ export class AppShell {
     }
 
     toggleFullscreen() {
+        if (window.auraDesktop) {
+            window.auraDesktop.window.toggleFullscreen().then(result => {
+                const { fullscreen } = unwrapDesktop(result);
+                const icon = this.elements?.btnFullscreen?.querySelector('i');
+                if (icon) icon.className = fullscreen ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
+            }).catch(error => this.showToast(error instanceof Error ? error.message : '全屏切换失败'));
+            return;
+        }
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => {
                 console.warn("全屏模式不可用:", err);
