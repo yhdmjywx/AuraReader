@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "checkJs": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src/desktop/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

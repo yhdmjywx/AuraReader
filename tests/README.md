@@ -21,6 +21,16 @@ SQLite 集成测试使用 `helpers/sqlite.js` 创建临时目录、真实 HTTP A
 
 DOM 测试通过 jsdom 执行真实产品事件和模块，只为不可用的几何 API 提供矩形数据。它不能代替真实浏览器排版、系统输入法及原生光标的检查。涉及视觉布局或焦点交接的修改，仍需浏览器回归。
 
+## Electron 桌面测试
+
+`npm test` 还自动执行 `test_desktop_assets.js`，验证真实协议处理函数的资源响应、CSP/MIME、源代码/数据隔离、非法路径和浏览器入口保留。当前完整计数为 41（6 个语法检查、6 个 unit 脚本、29 个 regression 脚本）。
+
+`npm run test:desktop` 单独启动真实 Windows x64 Electron 主进程及可见原生窗口，不使用 headless/jsdom 替代桌面验收。它验证内置 SQLite 的 WAL/timeout、完整 JSON、事务回滚、幂等、在线备份、只读和重开，再检查安全隔离、本地资源/字体、禁用未接入操作、CSP、权限/导航/弹窗拦截、离线重新加载、最后窗口关闭退出。截图等待绘制帧和主题过渡结束，并检查非空图像。
+
+每次测试生成独立 `.commandcode/desktop-tests/run-*/`，其中 profile 和 runtime-storage 都只属于测试，results.json、failure.json 及截图用于诊断，不纳入 Git。它不读取或恢复日常书库，也不清理用户配置。桌面检查失败或超时返回非零；默认 `npm test` 通过不能代替该检查通过。图形测试需可用的 Windows 桌面会话；Codex 外层沙箱若不允许启动原生应用，需在允许原生进程运行的权限下执行，不允许加 `--no-sandbox` 绕过 Electron 隔离。
+
+当前测试使用本地源码和未打包 Electron；不能证明安装包、签名、文件关联、真实书库 IPC、原生文件对话框或保存退出已经通过。实际结果及阶段边界见 [阶段 2 记录](../docs/electron-desktop-stage2.md)。
+
 源码静态检查只用于明确的资源/结构约束（例如无独立笔记弹窗、红色 caret CSS、入口 DOM 引用），不要用函数名、源码片段或测试自写的算法代替行为验证。
 
 ## SQLite 收尾与侧栏清理验证记录（2026-10-19）
