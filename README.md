@@ -109,6 +109,8 @@ node src/server/storageMaintenance.js backup
 
 ## 开发与测试
 
+Electron Windows 桌面迁移目前完成阶段 1（代码审计与基线测试）；当前仍使用下述浏览器运行方式。运行时兼容性、接入边界、测试结果与后续验收条件见 [桌面迁移审计](docs/electron-desktop-audit.md)。Electron 客户端与 NSIS 安装包尚未实现。
+
 源码位于 `src/client/` 和 `src/server/`；前端采用渐进式 TypeScript 迁移，`npm start` 会先检查类型并构建到 `dist/client/`，再启动服务。依赖安装后，可以运行：
 
 ```powershell
