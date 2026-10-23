@@ -117,8 +117,8 @@ async function verifyInstalled(install, output, phase, expectedVersion) {
         const systemFonts = await client.run('auraDesktop.fonts.system()'); assert.equal(systemFonts.ok, true); assert.ok(systemFonts.value.fonts.length > 0);
         const screenshot = await client.call('Page.captureScreenshot', { format: 'png' });
         await fs.writeFile(path.join(output, phase + '.png'), Buffer.from(screenshot.data, 'base64'));
-        // Browser.close exercises application shutdown; renderer window.close()
-        // is Chromium's page-close path and is not a native window-close action.
+        // Browser.close exercises application shutdown. The separately tested
+        // page-close API now requests the same native flush handshake via IPC.
         await client.call('Browser.close');
         const [code] = await exited; assert.equal(code, 0);
         if (phase === 'fresh') {
@@ -141,4 +141,4 @@ async function verifyInstalled(install, output, phase, expectedVersion) {
         if (child.exitCode === null) child.kill();
     }
 }
-module.exports = { verifyInstalled };
+module.exports = { verifyInstalled, connect };

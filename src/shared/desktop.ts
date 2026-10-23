@@ -37,6 +37,7 @@ export interface DesktopBridge {
     };
     readonly window: { toggleFullscreen(): Promise<DesktopResult<{ fullscreen: boolean }>> };
     readonly lifecycle: {
+        requestClose(): Promise<DesktopResult<{ requested: boolean }>>;
         onPrepareClose(callback: (requestId: string) => void): () => void;
         onCloseCancelled(callback: (message: string) => void): () => void;
         completeClose(requestId: string, result: { ok: boolean; message?: string }): Promise<DesktopResult<{ accepted: boolean }>>;

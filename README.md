@@ -113,9 +113,9 @@ node src/server/storageMaintenance.js backup
 
 ## 开发与测试
 
-Electron Windows 桌面迁移已交付阶段 5 候选安装包。运行 `npm run desktop` 也可从源码创建独立桌面书库，通过 Windows 原生对话框导入 EPUB/TXT、阅读并保存高亮和笔记；可读取系统字体、导入 TTF/OTF/WOFF2，以及保存 Markdown、带标注 HTML、章节 ZIP 和每书 `.aurabackup`，并恢复当前书籍备份。文件取消与保存失败会明确反馈，多书备份显示实际保存数量。桌面资源与 JSZip 随应用提供，离线运行不使用 localhost 服务。
+Electron Windows 桌面迁移已进入阶段 6 的本地验证，保留 Windows x64 NSIS 候选安装包，暂不发布。运行 `npm run desktop` 也可从源码创建独立桌面书库，通过 Windows 原生对话框导入 EPUB/TXT、阅读并保存高亮和笔记；可读取系统字体、导入 TTF/OTF/WOFF2，以及保存 Markdown、带标注 HTML、章节 ZIP 和每书 `.aurabackup`，并恢复当前书籍备份。文件取消与保存失败会明确反馈，多书备份显示实际保存数量。桌面资源与 JSZip 随应用提供，离线运行不使用 localhost 服务。
 
-首次创建书库需明确点击；桌面 SQLite 和导入字体位于 `%APPDATA%\AuraReader\data`，不在安装目录内。按当前范围只保证现用 SQLite 的读写、版本/幂等、备份与恢复，不提供旧数据库或 IndexedDB 的桌面迁移；未知或缺失数据库仍阻断启动，不静默清库。浏览器模式继续独立运行，上文旧版迁移说明仅适用于现有浏览器模式。阶段 5 已生成 Windows x64 NSIS 候选安装包并验证其静默安装生命周期，阶段 6 的稳定性与发布验收尚未开始。最新证据、风险与条件见 [阶段 5 记录](docs/electron-desktop-stage5.md)，文件功能见 [阶段 4](docs/electron-desktop-stage4.md)，历史记录见 [阶段 3](docs/electron-desktop-stage3.md)、[审计](docs/electron-desktop-audit.md)和[外壳记录](docs/electron-desktop-stage2.md)。
+首次创建书库需明确点击；桌面 SQLite 和导入字体位于 `%APPDATA%\AuraReader\data`，不在安装目录内。按当前范围只保证现用 SQLite 的读写、版本/幂等、备份与恢复，不提供旧数据库或 IndexedDB 的桌面迁移；未知或缺失数据库仍阻断启动，不静默清库。浏览器模式继续独立运行，上文旧版迁移说明仅适用于现有浏览器模式。阶段 6 增加实际 SQLite 容量、只读和锁竞争故障、Renderer/主进程终止恢复、大书与持续读写、打包程序及安装生命周期验证，并修复容量错误掩盖与页面关闭漏保存。发布验收仍有未验证项；最新证据与限制见 [阶段 6 记录](docs/electron-desktop-stage6.md)，安装设计见 [阶段 5](docs/electron-desktop-stage5.md)，文件功能见 [阶段 4](docs/electron-desktop-stage4.md)，历史记录见 [阶段 3](docs/electron-desktop-stage3.md)、[审计](docs/electron-desktop-audit.md)和[外壳记录](docs/electron-desktop-stage2.md)。
 
 源码位于 `src/client/` 和 `src/server/`；前端采用渐进式 TypeScript 迁移，`npm start` 会先检查类型并构建到 `dist/client/`，再启动服务。依赖安装后，可以运行：
 
@@ -128,6 +128,8 @@ npm run test:regression  # 回归检查
 npm run test:syntax      # JavaScript 语法检查
 npm run desktop          # Windows x64 桌面预览，书库通过 IPC 访问，不启动 HTTP 服务
 npm run test:desktop     # 真实 Electron 窗口、SQLite 运行时与安全检查
+npm run test:stability   # 独立 profile 的故障、异常终止恢复、大书及默认 300 秒持续读写；可附 -- 600
+npm run test:packaged:stability # 复验已有 win-unpacked 的真实 exe；先运行 dist:win
 npm run test:desktop:native # 交互验收真实 Windows 文件对话框，按终端提示选项目测试素材
 npm run dist:win          # 构建 Windows x64 NSIS 候选包，并校验资源、许可和安全 fuses
 npm run verify:package    # 核对已有 win-unpacked，并生成安装包 SHA256 与检查报告

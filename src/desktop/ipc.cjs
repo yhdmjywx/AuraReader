@@ -75,11 +75,30 @@ function coordinateClose(window, storage) {
         if (allowed) return;
         event.preventDefault();
         if (pending) return;
+        // A crashed renderer cannot acknowledge a flush. Its confirmed writes
+        // are already in SQLite; keep its recovery journal and let the user exit.
+        if (window.webContents.isCrashed()) {
+            storage.settle().then(() => { allowed = true; window.close(); })
+                .catch(error => console.error('崩溃后的书库关闭未完成', error));
+            return;
+        }
         if (window.webContents.mainFrame.url !== APP_URL) { cancel('页面尚未就绪，关闭已取消；请保留窗口并重试。'); return; }
         const id = randomUUID();
         pending = { id, frame: window.webContents.mainFrame,
             timer: setTimeout(() => cancel('保存确认超时，窗口已保留；请检查未保存内容后重试。'), 30000) };
         window.webContents.send('aura:lifecycle:prepare-close', id);
+    });
+    ipcMain.handle('aura:lifecycle:request-close', (event, ...args) => {
+        try {
+            assertSender(event, window);
+            if (args.length) throw new StorageError('关闭请求不接受参数');
+            setImmediate(() => { if (!window.isDestroyed()) window.close(); });
+            return { ok: true, value: { requested: true } };
+        } catch (error) { return failure(error); }
+    });
+    window.on('query-session-end', event => {
+        if (allowed) return;
+        event.preventDefault(); window.close();
     });
     ipcMain.handle('aura:lifecycle:complete-close', async (event, id, result) => {
         try {
@@ -101,6 +120,7 @@ function coordinateClose(window, storage) {
     return () => {
         if (pending) clearTimeout(pending.timer);
         ipcMain.removeHandler('aura:lifecycle:complete-close');
+        ipcMain.removeHandler('aura:lifecycle:request-close');
     };
 }
 

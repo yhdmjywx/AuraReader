@@ -57,7 +57,13 @@ function createDataStore(directory) {
     function transaction(fn) {
         db.exec('BEGIN IMMEDIATE');
         try { const result = fn(); db.exec('COMMIT'); return result; }
-        catch (error) { db.exec('ROLLBACK'); throw error; }
+        catch (error) {
+            // SQLITE_FULL and some I/O errors already roll back the transaction.
+            // Preserve that original failure instead of replacing it with a
+            // second "no transaction is active" error.
+            if (db.isTransaction) db.exec('ROLLBACK');
+            throw error;
+        }
     }
     function mutate(command, apply) {
         id(command.opId, 'opId');

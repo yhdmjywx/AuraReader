@@ -15,6 +15,8 @@
     "verify:package": "node scripts/verify-package.cjs",
     "test:install": "npm run dist:win && node scripts/package-upgrade-fixture.cjs && node scripts/test-install.cjs",
     "test:desktop": "npm run build && node scripts/test-desktop.cjs",
+    "test:stability": "npm run build && node scripts/test-stability.cjs",
+    "test:packaged:stability": "node tests/desktop/packaged-stability.cjs",
     "test:desktop:native": "npm run build && node scripts/test-native-dialogs.cjs",
     "build": "node scripts/build.cjs",
     "typecheck": "node scripts/build.cjs --check",

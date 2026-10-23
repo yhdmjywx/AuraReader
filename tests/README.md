@@ -23,7 +23,7 @@ DOM 测试通过 jsdom 执行真实产品事件和模块，只为不可用的几
 
 ## Electron 桌面测试
 
-`npm test` 自动执行 `test_desktop_assets.js`、`test_desktop_storage.js`、`test_desktop_repositories.js`、`test_desktop_files.js` 和 `test_desktop_export_feedback.js`。覆盖资源响应、CSP/MIME、路径隔离、显式建库、命令校验、版本/幂等/删除、备份恢复和实际 Repository/SQLite 链路。Repository 测试把 fetch 替换为失败函数，确认桌面路径不使用 HTTP；在服务提交后注入丢失响应，验证重试原命令、恢复缓冲和错误 status/details；同时覆盖短暂启动失败后重试、快速输入、恢复成功解除关闭阻断和无恢复权限时仍阻止退出。文件测试使用真实临时文件与主进程对话框替身，验证大小限制、允许扩展名、字体哈希/持久化、保存/替换/取消/失败、目录保护、并发对话框与等待；反馈测试验证保存前无成功提示，多书备份按实际保存数量反馈并在取消/失败后停止。当前完整计数为 45（6 个语法检查、6 个 unit 脚本、33 个 regression 脚本）。
+`npm test` 自动执行 `test_desktop_assets.js`、`test_desktop_storage.js`、`test_desktop_repositories.js`、`test_desktop_files.js` 和 `test_desktop_export_feedback.js`。覆盖资源响应、CSP/MIME、路径隔离、显式建库、命令校验、版本/幂等/删除、备份恢复和实际 Repository/SQLite 链路。Repository 测试把 fetch 替换为失败函数，确认桌面路径不使用 HTTP；在服务提交后注入丢失响应，验证重试原命令、恢复缓冲和错误 status/details；同时覆盖短暂启动失败后重试、快速输入、恢复成功解除关闭阻断和无恢复权限时仍阻止退出。文件测试使用真实临时文件与主进程对话框替身，验证大小限制、允许扩展名、字体哈希/持久化、保存/替换/取消/失败、目录保护、并发对话框与等待；反馈测试验证保存前无成功提示，多书备份按实际保存数量反馈并在取消/失败后停止。阶段 6 增加 `test_sqlite_faults.js` 后，当前完整计数为 46（6 个语法检查、6 个 unit 脚本、34 个 regression 脚本）。
 
 `npm run test:desktop` 单独启动真实 Windows x64 Electron 主进程及可见原生窗口，不使用 headless/jsdom 替代桌面验收。除运行时 SQLite、安全隔离、资源/字体、主题与 CSP 外，还验证首次点击前没有数据库、实际 IPC 完整对象/冲突/重试/备份/恢复回滚、其他窗口和非精确 URL 的访问拒绝、真实编辑器输入落库、待写记录跨重载保留并阻止关闭、恢复补写和离线读取。最后不触发 input 事件地修改实际编辑器再关闭窗口，由关闭握手读取并保存最后内容；父进程重新启动一个新的 Electron 进程，从同一测试 profile 读取该内容作断言。截图等待绘制帧和主题过渡结束，并检查非空图像。
 
@@ -37,9 +37,17 @@ DOM 测试通过 jsdom 执行真实产品事件和模块，只为不可用的几
 
 阶段 5 增加 `npm run dist:win` / `npm run verify:package`：检查实际 app.asar 的 16 项必需资源、生产依赖、许可证、安全 fuses 和私有数据/测试/HTTP Server 排除，生成 SHA256 与 package-verification.json。安装验收使用 `npm run test:install`，它构建 1.0.0 候选包及仅供本地测试的 1.0.1 包，调用真实 NSIS 执行当前用户安装、升级、卸载、重装。脚本按稳定安装 GUID 检查 HKCU/HKLM；发现已有 AuraReader 安装就停止，不覆盖用户安装。递归卸载前核对注册路径精确属于本轮 `.commandcode/install-tests/run-*/AuraReader`，保留隔离 profile。
 
-`tests/desktop/packaged.cjs` 从已安装的真实 exe 启动 Renderer，PATH 只保留 Windows 系统目录，验证包内运行时、字体/资源、IPC、SQLite 读写、幂等、在线备份、关闭前编辑保存、新进程重启，以及升级/重装后的完整对象、字体和偏好。字体文件是测试主进程写入当前测试 profile 的有效 WOFF2 素材，后续由实际打包 Renderer 加载，不将这项测试声称为原生字体选择操作。正常卸载前后比较全部 data 文件哈希。测试没有向安装包加入专用 IPC 或测试模块；外部 CDP 仅通过验收启动参数开启，不能视为产品依赖 localhost HTTP。结果和截图位于 `.commandcode/install-tests/run-*/`，完整 `npm test` 仍为 45 项，并不包含这项另行运行的系统安装验收。
+`tests/desktop/packaged.cjs` 从已安装的真实 exe 启动 Renderer，PATH 只保留 Windows 系统目录，验证包内运行时、字体/资源、IPC、SQLite 读写、幂等、在线备份、关闭前编辑保存、新进程重启，以及升级/重装后的完整对象、字体和偏好。字体文件是测试主进程写入当前测试 profile 的有效 WOFF2 素材，后续由实际打包 Renderer 加载，不将这项测试声称为原生字体选择操作。正常卸载前后比较全部 data 文件哈希。测试没有向安装包加入专用 IPC 或测试模块；外部 CDP 仅通过验收启动参数开启，不能视为产品依赖 localhost HTTP。结果和截图位于 `.commandcode/install-tests/run-*/`，完整 `npm test` 不包含这项另行运行的系统安装验收。
 
 实际 NSIS 静默生命周期和已安装 GUI 程序通过不等于逐页点击安装向导或纯净无 Node 虚拟机已通过。额外普通窗口观察遇到 Computer Use 应用授权超时，仍记为未验证；签名、文件关联、系统强制关机与最终发布检查留待后续。最新证据见 [阶段 5 记录](../docs/electron-desktop-stage5.md)。
+
+阶段 6 的 `test_sqlite_faults.js` 用真实 SQLite 的 `max_page_count`、`query_only` 和第二写连接产生 SQLITE_FULL、SQLITE_READONLY、SQLITE_BUSY，验证原错误、完整对象、版本与操作数量、同命令恢复及在线备份。它不是物理磁盘满或 Windows ACL 验收。
+
+`npm run test:stability` 使用真实 Electron 可见窗口与独立 `.commandcode/stability/run-*/`。先验证页面关闭、崩溃页面关闭、模拟 query-session-end，再验证故障期间 journal 与关闭阻断、解除故障后重放、显式重载 Renderer 后恢复、128 章 EPUB 的原解析/导入/ZIP 导出、默认 300 秒持续写读及窗口/内存/计时数据。父进程在真实未提交 WAL 事务产生后终止测试主进程；新进程核对旧的已确认完整对象和操作数量、回滚未提交内容、校验数据库并在线备份。损坏样本单独阻断启动，不改变其字节。可用 `npm run test:stability -- 600` 改时长（30–3600 秒）；不把后台计时器、短时内存样本或模拟会话事件称为前台流畅性、无泄漏或实际系统关机验收。故障控制只在测试进程中获取服务引用，不增加生产 IPC。
+
+`npm run test:packaged:stability` 验证已有 `release/win-unpacked` 的实际 hardened exe（先构建 dist:win），也可直接向 `node tests/desktop/packaged-stability.cjs` 传入安装目录。PATH 排除宿主 Node、模拟断网，以外部第二 SQLite 写连接检查保存失败/拒绝关闭和恢复；40 次已确认 Repository 写入后杀主进程并重开，检查完整数据、页面关闭末次原始输入、当前 SQLite 在线备份在新 profile 恢复，以及损坏库不重置。证据在 `.commandcode/packaged-stability/run-*/`。CDP 仅由测试启动参数开启，首屏仅重试导航引起的 execution-context 销毁，其他错误和超时仍失败；未加入通用 IPC 或产品测试入口。
+
+阶段 6 实际结果、性能界限与尚未通过的发布条件见 [验证记录](../docs/electron-desktop-stage6.md)。本轮仅验证和修复，不上传、推送、创建 Release 或发布安装包。
 
 源码静态检查只用于明确的资源/结构约束（例如无独立笔记弹窗、红色 caret CSS、入口 DOM 引用），不要用函数名、源码片段或测试自写的算法代替行为验证。
 

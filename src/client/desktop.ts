@@ -7,6 +7,15 @@ let application: typeof import('./main.js') | null = null;
 let boot: Promise<void> | null = null;
 const originalControls = new Map([...document.querySelectorAll<HTMLButtonElement>('button, input, select, textarea')]
     .map(control => [control, control.disabled]));
+// Chromium's native window.close() destroys WebContents without emitting the
+// BrowserWindow close event. Route the app's page-close API through the same
+// main-process flush handshake as the title-bar close button.
+Object.defineProperty(window, 'close', { configurable: false, writable: false, value: () => {
+    bridge!.lifecycle.requestClose().then(unwrapDesktop).catch(error => {
+        console.error('关闭请求失败', error);
+        application?.appShell.showToast('关闭未完成，请保留窗口并重试');
+    });
+} });
 
 function gate(message: string, create = false) {
     for (const control of document.querySelectorAll('button, input, select, textarea')) {

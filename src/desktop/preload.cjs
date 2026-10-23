@@ -30,6 +30,7 @@ if (process.isMainFrame) {
         },
         window: { toggleFullscreen: () => ipcRenderer.invoke('aura:window:fullscreen') },
         lifecycle: {
+            requestClose: () => ipcRenderer.invoke('aura:lifecycle:request-close'),
             onPrepareClose: callback => {
                 /** @param {import('electron').IpcRendererEvent} _event @param {string} id */
                 const listener = (_event, id) => callback(id);
