@@ -44,7 +44,7 @@ const { createFileService, readBounded, exportName } = require('../../src/deskto
         assert.ok(await reloaded.fontResource(name));
         const invalid = path.join(directory, '坏字体.ttf'); await fs.writeFile(invalid, 'not a font');
         choose(invalid); await assert.rejects(service.call('importFont'), { status: 400 });
-        for (const extension of ['md', 'html', 'zip', 'aurabackup']) {
+        for (const extension of ['md', 'zip', 'aurabackup']) {
             const target = path.join(directory, '导出.' + extension);
             const bytes = new Uint8Array([0, 1, 10, 240, 159, 152, 128]);
             destination(target);
@@ -64,12 +64,46 @@ const { createFileService, readBounded, exportName } = require('../../src/deskto
         destination(path.join(directory, 'wrong.exe'));
         await assert.rejects(service.call('saveExport', { filename: 'x.md', bytes: new Uint8Array([1]) }), { status: 400 });
         await assert.rejects(service.call('saveExport', { filename: 'x.exe', bytes: new Uint8Array([1]) }), { status: 400 });
+        await assert.rejects(service.call('saveExport', { filename: 'x.html', bytes: new Uint8Array([1]) }), { status: 400 });
         await assert.rejects(service.call('saveExport', { filename: 'x.md', bytes: new Uint8Array([1]), path: target }), { status: 400 });
         destination(path.join(directory, 'missing-parent', 'failure.md'));
         await assert.rejects(service.call('saveExport', { filename: 'x.md', bytes: new Uint8Array([1]) }), { status: 500 });
         assert.deepEqual(await fs.readFile(target), original);
         assert.ok(!(await fs.readdir(directory)).some(name => name.endsWith('.tmp')));
         assert.equal(exportName('C:\\folder\\CON.md'), '_CON.md');
+        const folderRequest = { folderName: '章节导出', files: [
+            { filename: '01_一.md', bytes: new TextEncoder().encode('# 一\n原文😀') },
+            { filename: '00_目录概览.md', bytes: new TextEncoder().encode('[一](./01_一.md)') }
+        ] };
+        choose(directory);
+        const folder = await service.call('saveExportFolder', folderRequest);
+        assert.deepEqual(folder, { status: 'saved', kind: 'folder', name: '章节导出' });
+        assert.equal(await fs.readFile(path.join(directory, folder.name, '01_一.md'), 'utf8'), '# 一\n原文😀');
+        choose(directory);
+        assert.equal((await service.call('saveExportFolder', folderRequest)).name, '章节导出 (2)');
+        assert.equal(await fs.readFile(path.join(directory, '章节导出', '01_一.md'), 'utf8'), '# 一\n原文😀', '同名导出不覆盖旧文件');
+        opens.push({ canceled: true, filePaths: [] });
+        assert.equal((await service.call('saveExportFolder', folderRequest)).status, 'canceled');
+        for (const invalid of [
+            { ...folderRequest, folderName: '../escape' },
+            { ...folderRequest, folderName: 'CON' },
+            { ...folderRequest, files: [{ filename: '../escape.md', bytes: new Uint8Array([1]) }] },
+            { ...folderRequest, files: [{ filename: 'script.html', bytes: new Uint8Array([1]) }] },
+            { ...folderRequest, files: [folderRequest.files[0], folderRequest.files[0]] },
+            { ...folderRequest, path: directory }
+        ]) await assert.rejects(service.call('saveExportFolder', invalid), { status: 400 });
+        choose(data);
+        await assert.rejects(service.call('saveExportFolder', folderRequest), { status: 403 });
+        choose(directory);
+        let checks = 0;
+        const { StorageError } = require('../../src/server/dataStore.js');
+        await assert.rejects(service.call('saveExportFolder', { ...folderRequest, folderName: '回滚导出' }, () => {
+            if (++checks > 4) throw new StorageError('sender changed', 403);
+        }), { status: 403 });
+        await assert.rejects(fs.access(path.join(directory, '回滚导出')), { code: 'ENOENT' });
+        choose(path.join(directory, 'missing'));
+        await assert.rejects(service.call('saveExportFolder', folderRequest), { status: 500 });
+        assert.ok(options.some(value => value.properties.includes('openDirectory')));
         let release;
         opens.push(new Promise(resolve => { release = resolve; }));
         const pending = service.call('chooseBook');

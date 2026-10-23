@@ -1,6 +1,6 @@
 /* ==========================================================================
    Exporters - Document & Annotation Export / Backup Adapter (Infrastructure Layer)
-   Provides Markdown, full-book or selected-chapter ZIP,
+   Provides Markdown, full-book or selected-chapter folder export,
    and per-book .aurabackup export & import deserialization.
    ========================================================================== */
 
@@ -9,6 +9,7 @@ import { compactWithMap, resolveAnnotationRange } from '../domain/annotationRang
 import { renderAnnotationTokens } from '../features/reader/annotationRenderer.js';
 import { buildBookStructure, structureSummary } from './bookStructure.js';
 import { unwrapDesktop } from './storageClient.js';
+import { saveMarkdownFolder } from './folderExport.js';
 
 export function downloadFile(filename, data, type) {
     if (typeof window === 'undefined') return;
@@ -45,10 +46,7 @@ export function exportMarkdown(bookTitle = '图书笔记', notes = []) {
     return downloadFile(`${bookTitle}_划线随笔.md`, md, 'text/markdown');
 }
 
-export async function exportChapterZip(book, notes = [], jszipLib, { selectedUnitIds } = {}) {
-    if (!jszipLib) {
-        throw new Error('JSZip 尚未就绪，请检查网络连接');
-    }
+export function buildChapterDocuments(book, notes = [], { selectedUnitIds } = {}) {
     if (!book || !Array.isArray(book.pages)) {
         throw new Error('当前图书无可导出内容');
     }
@@ -59,17 +57,17 @@ export async function exportChapterZip(book, notes = [], jszipLib, { selectedUni
     if (!units.length) throw new Error('请至少选择一个要导出的章节');
     const selectedPages = new Set(units.flatMap(unit => unit.sourcePages));
     const isPartial = units.length < structure.units.length;
-    const zip = new jszipLib();
-    const bookTitle = String(book.title || '图书').replace(/[\\/:*?"<>|\r\n]/g, '_');
+    const bookTitle = safeExportTitle(book.title || '图书');
     const folderName = `${bookTitle}_${isPartial ? '所选章节笔记包' : '分章节笔记包'}`;
-    const folder = zip.folder(folderName);
+    const files = [];
+    const chapterFiles = [];
     const annotations = (Array.isArray(notes) ? notes : []).map(normalizeAnnotation).filter(Boolean)
         .filter(note => !book.id || !note.bookId || note.bookId === book.id)
         .filter(note => !isPartial || selectedPages.has(note.page))
         .map((note, idx) => ({ ...note, id: note.id || `export-${idx}` }));
 
     const filesByUnit = new Map(structure.units.map((unit, index) => [unit.id,
-        `${String(index + 1).padStart(2, '0')}_${unit.title.replace(/[\\/:*?"<>|\r\n]/g, '_')}.md`]));
+        `${String(index + 1).padStart(2, '0')}_${safeExportTitle(unit.title)}.md`]));
     let indexMd = `# 《${book.title}》 导读书册与笔记全览\n\n`;
     indexMd += `- 格式：${book.format || 'EPUB'}\n`;
     indexMd += `- ${isPartial ? '全书内容结构' : '内容结构'}：${structureSummary(structure)}\n`;
@@ -134,18 +132,57 @@ export async function exportChapterZip(book, notes = [], jszipLib, { selectedUni
         if (!unit.prefixPages.length) markdown += `# ${escapeMarkdownText(unit.title)}\n\n`;
         markdown += `> 本章划线：${unitNotes.filter(isHighlight).length} 条 | 笔记：${unitNotes.filter(isNote).length} 条\n\n---\n\n`;
         markdown += unit.sourcePages.map(sourceMarkdown).join('\n');
-        folder.file(filesByUnit.get(unit.id), markdown);
+        const file = { filename: filesByUnit.get(unit.id), text: markdown };
+        files.push(file);
+        chapterFiles.push(file);
     }
 
     const invalidPage = note => !Number.isInteger(note.page) || note.page < 1 || note.page > book.pages.length;
     const unassigned = annotations.filter(isNote).filter(invalidPage);
     if (unassigned.length) {
-        folder.file('未归属笔记.md', '# 未归属笔记\n\n以下笔记的章节位置无效，保留引用与笔记内容以避免遗漏。\n\n' + chapterAnnotationMarkdown(unassigned));
+        files.push({ filename: '未归属笔记.md', text: '# 未归属笔记\n\n以下笔记的章节位置无效，保留引用与笔记内容以避免遗漏。\n\n' + chapterAnnotationMarkdown(unassigned) });
         indexMd += '\n[未归属笔记](./未归属笔记.md)\n';
     }
     unmatchedHighlights += annotations.filter(isHighlight).filter(invalidPage).length;
     if (unmatchedHighlights) indexMd += `\n> 有 ${unmatchedHighlights} 条高亮未能定位到正文，未生成正文标记。原始标注仍保留在书库及书籍备份中。\n`;
-    folder.file('00_目录概览.md', indexMd);
+    files.push({ filename: '00_目录概览.md', text: indexMd });
+    return { bookTitle, folderName, chapterFiles, files, unmatchedHighlights };
+}
+
+function safeExportTitle(title) {
+    let name = String(title).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 120).replace(/[\uD800-\uDBFF]$/, '').replace(/[. ]+$/, '') || '图书';
+    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) name = '_' + name;
+    return name;
+}
+
+export async function exportChapters(book, notes = [], options = {}) {
+    const structure = buildBookStructure(book);
+    const selection = options.selectedUnitIds == null ? null : new Set(options.selectedUnitIds);
+    const count = structure.units.filter(unit => !selection || selection.has(unit.id)).length;
+    if (!count) throw new Error('请至少选择一个要导出的章节');
+    // Browser pickers must start during the click, before expensive conversion.
+    const destination = count > 1 && !window.auraDesktop ? await saveMarkdownFolder.pick() : null;
+    if (count > 1 && !window.auraDesktop && !destination) return { status: 'canceled' };
+    const documents = buildChapterDocuments(book, notes, options);
+    if (documents.chapterFiles.length === 1) {
+        const chapter = documents.chapterFiles[0];
+        let text = chapter.text;
+        const orphan = documents.files.find(file => file.filename === '未归属笔记.md');
+        if (orphan) text += '\n\n' + orphan.text;
+        if (documents.unmatchedHighlights) text += `\n\n> 有 ${documents.unmatchedHighlights} 条高亮未能定位到正文，原始标注仍保留在书库及书籍备份中。\n`;
+        const filename = safeExportTitle(`${documents.bookTitle}_${chapter.filename.slice(0, -3)}`) + '.md';
+        return { ...await downloadFile(filename, text, 'text/markdown;charset=utf-8'), kind: 'file' };
+    }
+    return saveMarkdownFolder(`${documents.bookTitle}_章节导出`, documents.files, destination);
+}
+
+// Compatibility adapter for legacy consumers; the product UI exports .md/folders.
+export async function exportChapterZip(book, notes = [], jszipLib, options = {}) {
+    if (!jszipLib) throw new Error('JSZip 尚未就绪，请检查网络连接');
+    const { folderName, files } = buildChapterDocuments(book, notes, options);
+    const zip = new jszipLib();
+    const folder = zip.folder(folderName);
+    files.forEach(file => folder.file(file.filename, file.text));
 
     const blob = await zip.generateAsync({ type: 'blob' });
     return downloadFile(`${folderName}.zip`, blob, 'application/zip');

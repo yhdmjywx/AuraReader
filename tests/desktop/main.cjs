@@ -99,21 +99,23 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     await capture('shell-light.png');
     await run(`document.getElementById('btn-export-menu').click()`);
     await capture('export-menu.png');
-    await run(`document.getElementById('btn-export-selected-chapters').click()`);
-    assert.equal(await run(`document.getElementById('chapter-export-modal').classList.contains('active')`), true);
+    await run(`document.getElementById('btn-export-chapters').click(); document.getElementById('btn-select-chapters').click()`);
+    assert.equal(await run(`document.getElementById('chapter-export-custom').hidden`), false);
     await capture('chapter-export-light.png');
     await run(`document.getElementById('btn-cancel-chapter-export').click()`);
-    assert.equal(await run(`document.activeElement.id`), 'btn-export-menu');
+    assert.equal(await run(`document.activeElement.id`), 'btn-select-chapters');
+    await run(`document.getElementById('btn-export-menu').click()`);
     await run(`document.getElementById('btn-theme-toggle').click()`);
     assert.equal(await run(`document.body.classList.contains('theme-dark')`), true);
     await capture('shell-dark.png');
-    await run(`document.getElementById('btn-export-menu').click(); document.getElementById('btn-export-selected-chapters').click()`);
+    await run(`document.getElementById('btn-export-menu').click(); document.getElementById('btn-export-chapters').click(); document.getElementById('btn-select-chapters').click()`);
     await capture('chapter-export-dark.png');
     await run(`document.getElementById('btn-cancel-chapter-export').click()`);
+    await run(`document.getElementById('btn-export-menu').click()`);
     assert.equal(await run(`getComputedStyle(document.querySelector('.app-header')).backgroundColor`), 'rgb(30, 41, 59)');
     assert.equal(await run(`document.getElementById('notes-panel').style.getPropertyValue('--margin-note-color').trim()`), '#e2e8f0');
     checks.push('theme interaction and native renderer screenshots');
-    checks.push('chapter selection opens from export menu, light/dark dialog screenshots, cancel restores focus');
+    checks.push('inline chapter options and custom list, light/dark screenshots, no reader overlay, cancel restores focus');
 
     for (const [url, status] of [['/main.js?v=15', 200], ['/assets/fonts/inventory.json', 200],
         ['/package.json', 404], ['/data/aurareader.sqlite', 404], ['/api/storage/session', 404]]) {

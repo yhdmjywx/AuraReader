@@ -8,7 +8,7 @@ SQLite 集成测试使用 `helpers/sqlite.js` 创建临时目录、真实 HTTP A
 
 | 分类 | 测试 | 处理与覆盖 |
 | --- | --- | --- |
-| 保留 | SQLite API、迁移、恢复、进程重启、备份恢复、Markdown 摘要、整书及所选章节 ZIP 导出 | 调用实际模块/API，比较完整对象和磁盘数据 |
+| 保留 | SQLite API、迁移、恢复、进程重启、备份恢复、Markdown 摘要、单章 Markdown、整书及所选章节文件夹导出 | 调用实际模块/API，比较完整对象和磁盘数据 |
 | 保留 | `test_inline_notes.js`、`test_visible_notes.js`、`test_mini_tooltip_interaction.js`、`test_immersive_notes.js` | DOM 事件、原位编辑、合成 IME 事件、焦点与光标、可见范围、独立删除、页边定位 |
 | 改造 | `test_unified_note_editing.js` | 替换源码搜索和自写模拟：创建、输入中自动保存、服务重启后重开、编辑和删除，均经过实际控制器与 SQLite |
 | 改造 | `test_selection_fix_verification.js` | 实际左右页 mouseup/touchend 与 click 冒泡，不再要求门面内存在空监听器 |

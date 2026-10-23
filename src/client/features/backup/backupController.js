@@ -16,11 +16,11 @@ import {
 import { normalizeAnnotation } from '../../domain/annotationEngine.js';
 import { restoreRecords } from '../../infrastructure/storageClient.js';
 import { chooseDesktopFile } from '../../infrastructure/desktopFiles.js';
-import { ChapterExportDialog } from './chapterExportDialog.js';
+import { ChapterExportMenu } from './chapterExportMenu.js';
 
 import {
     exportMarkdown as adapterExportMarkdown,
-    exportChapterZip as adapterExportChapterZip,
+    exportChapters as adapterExportChapters,
     exportSelectiveBackup as adapterExportSelectiveBackup,
     parseBackupFile
 } from '../../infrastructure/exporters.js';
@@ -183,15 +183,12 @@ export class BackupController {
             result?.status === 'saved' ? `已保存${label}` : `已发起${label}下载`);
     }
 
-    async exportChapterZip(book, notes, options) {
+    async exportChapters(book, notes, options) {
         try {
-            if (this.callbacks.showToast) this.callbacks.showToast('正在生成分章节 Zip 压缩包...');
-            const result = await adapterExportChapterZip(book, notes, window.JSZip, options);
-            this.exportFeedback(result, '分章节 Zip 压缩包');
+            const result = await adapterExportChapters(book, notes, options);
+            this.exportFeedback(result, result.kind === 'folder' ? `章节文件夹「${result.name}」` : '章节 Markdown 文件');
             return result;
-        } catch (err) {
-            if (this.callbacks.showToast) this.callbacks.showToast('导出 Zip 失败: ' + err.message);
-        }
+        } catch (error) { this.callbacks.showToast?.('章节导出失败: ' + error.message); }
     }
 
     initUI(elements) {
@@ -206,18 +203,10 @@ export class BackupController {
             });
         }
 
-        if (elements.btnExportChapterZip) {
-            elements.btnExportChapterZip.addEventListener('click', async () => {
-                const book = this.callbacks.getCurrentBook ? this.callbacks.getCurrentBook() : null;
-                const notes = this.callbacks.getCurrentNotes ? this.callbacks.getCurrentNotes() : [];
-                await this.exportChapterZip(book, notes);
-            });
-        }
-
-        if (elements.chapterExportModal) {
-            this.chapterExportDialog = new ChapterExportDialog(elements, {
+        if (elements.chapterExportEntry) {
+            this.chapterExportMenu = new ChapterExportMenu(elements, {
                 ...this.callbacks,
-                onExport: (book, notes, options) => this.exportChapterZip(book, notes, options)
+                onExport: (book, notes, options) => this.exportChapters(book, notes, options)
             });
         }
 

@@ -33,9 +33,9 @@ const timer = setTimeout(() => { console.error('Native dialog acceptance timed o
     assert.match(toast, /已保存/);
     assert.match(await fs.readFile(path.join(output, 'native.md'), 'utf8'), /《test》/);
     checks.push('actual native save dialog creates Markdown; disk bytes and success feedback verified');
-    console.log('NATIVE STEP 4: cancel ZIP save dialog');
+    console.log('NATIVE STEP 4: cancel chapter directory dialog');
     const cancel = await run(`(async () => { const a = await import('./main.js');
-        await a.backup.exportChapterZip(a.reader.getCurrentBook(), []); return document.getElementById('toast-msg').textContent; })()`);
+        await a.backup.exportChapters(a.reader.getCurrentBook(), []); return document.getElementById('toast-msg').textContent; })()`);
     assert.equal(cancel, '已取消保存');
     checks.push('actual native cancel returns to reader without false success');
     const database = new DatabaseSync(path.join(profile, 'data/aurareader.sqlite'), { readOnly: true });

@@ -52,6 +52,9 @@ void controllerContracts;
 import type { DesktopBridge } from '../../src/shared/desktop.js';
 function desktopContracts(bridge: DesktopBridge) {
     bridge.storage.saveNote(save);
+    bridge.files.saveExportFolder({ folderName: '书籍', files: [{ filename: '01_章节.md', bytes: new Uint8Array([1]) }] });
+    // @ts-expect-error Renderer cannot choose a filesystem path through the bridge.
+    bridge.files.saveExportFolder({ folderName: '书籍', files: [], path: 'C:/arbitrary' });
     // @ts-expect-error Desktop does not expose arbitrary IPC.
     bridge.invoke('anything', {});
     // @ts-expect-error Version information is required over IPC too.

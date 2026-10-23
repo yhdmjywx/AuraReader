@@ -20,7 +20,7 @@ function failure(error, fallback = '本地书库操作失败，原数据未清�
 
 /** @param {import('electron').BrowserWindow} window @param {ReturnType<typeof import('./files.cjs').createFileService>} files */
 function registerFileIpc(window, files) {
-    const actions = ['chooseBook', 'chooseBackup', 'saveExport', 'listFonts', 'systemFonts', 'importFont'];
+    const actions = ['chooseBook', 'chooseBackup', 'saveExport', 'saveExportFolder', 'listFonts', 'systemFonts', 'importFont'];
     for (const action of actions) {
         ipcMain.handle('aura:files:' + action, async (event, ...args) => {
             try {

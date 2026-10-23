@@ -91,6 +91,8 @@ export class AppShell {
         panel.classList.toggle('open', open);
         panel.setAttribute('aria-hidden', open ? 'false' : 'true');
         if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        const PanelEvent = panel.ownerDocument?.defaultView?.Event || Event;
+        if (!open) panel.dispatchEvent?.(new PanelEvent('exportpanelclose'));
     }
 
     closeExportPanel() {
@@ -219,7 +221,7 @@ export class AppShell {
             }
 
             if (elements.backupSelectModal && elements.backupSelectModal.classList.contains('active')) return;
-            if (elements.chapterExportModal?.classList.contains('active')) return;
+            if (elements.exportPanel?.classList.contains('open')) return;
             if (elements.shelfPanel?.classList.contains('open')) return;
 
             if (e.key === 'Escape' && elements.appearancePanel && elements.appearancePanel.classList.contains('open')) {

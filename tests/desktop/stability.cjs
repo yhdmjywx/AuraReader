@@ -131,11 +131,11 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
             const b=a.reader.getCurrentBook();return {id:b.id,pages:b.pages.length,toc:b.toc.length};})()`);
         assert.equal(imported.id, 'book_large.epub'); assert.equal(imported.pages, chapters); assert.equal(imported.toc, chapters);
         const importMs = Date.now() - importStart;
-        saves.push({ canceled: false, filePath: path.join(output, 'large.zip') });
-        await run(`(async()=>{const a=await import('./main.js');await a.backup.exportChapterZip(a.reader.getCurrentBook(),[]);})()`);
-        const exported = await JSZip.loadAsync(await fs.readFile(path.join(output, 'large.zip')));
-        assert.equal(Object.values(exported.files).filter(f => !f.dir && f.name.endsWith('.md')).length, chapters + 1);
-        checks.push(`offline generated EPUB: ${chapters} chapters, ${decodedBytes} decoded bytes; original parser, SQLite, reader and real chapter ZIP verified (${importMs}ms import)`);
+        opens.push({ canceled: false, filePaths: [output] });
+        await run(`(async()=>{const a=await import('./main.js');await a.backup.exportChapters(a.reader.getCurrentBook(),[]);})()`);
+        const exported = await fs.readdir(path.join(output, 'large_章节导出'));
+        assert.equal(exported.filter(name => name.endsWith('.md')).length, chapters + 1);
+        checks.push(`offline generated EPUB: ${chapters} chapters, ${decodedBytes} decoded bytes; original parser, SQLite, reader and real chapter folder verified (${importMs}ms import)`);
 
         const start = Date.now(); let iteration = 0;
         while (Date.now() - start < seconds * 1000) {

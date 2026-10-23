@@ -1469,51 +1469,27 @@ mark.hl-active {
     background-color: var(--bg-app);
 }
 
-.chapter-export-card {
-    max-width: 540px;
-    max-height: calc(100dvh - 32px);
-    display: flex;
-    flex-direction: column;
-}
-.chapter-export-card .modal-header,
-.chapter-export-card .modal-footer { flex-shrink: 0; }
-.chapter-export-card .modal-header i { color: var(--primary); }
-.chapter-export-body { min-height: 0; overflow-y: auto; }
-.chapter-export-book-title { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.chapter-export-hint { margin-top: 6px; font-size: 12px; line-height: 1.7; color: var(--text-secondary); }
-.chapter-export-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 14px 0 8px;
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-.chapter-export-list {
-    max-height: 40dvh;
-    overflow-y: auto;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-}
-.chapter-export-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 12px;
-    cursor: pointer;
-    font-size: 13px;
-    line-height: 1.6;
-}
-.chapter-export-item + .chapter-export-item { border-top: 1px solid var(--border-color); }
-.chapter-export-item:hover { background: var(--bg-app); }
-.chapter-export-item:has(input:checked) { background: var(--primary-light); }
-body.theme-dark .chapter-export-item:has(input:checked) { background: var(--bg-app); }
-.chapter-export-item input { flex-shrink: 0; margin-top: 4px; accent-color: var(--primary); }
-.chapter-export-item span { min-width: 0; overflow-wrap: anywhere; }
-.chapter-export-item small { display: block; font-size: 11px; color: var(--text-secondary); }
-.chapter-export-card button:disabled { opacity: 0.5; cursor: default; }
+    .chapter-export-entry { overflow: hidden; }
+    .chapter-export-options { padding-bottom: 3px; }
+    .chapter-export-back { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 37px; padding: 6px 11px; border: 0; background: transparent; text-align: left; color: var(--text-secondary); font-size: 12px; border-radius: 6px; }
+    .chapter-export-back i { font-size: 17px; }
+    .chapter-export-back:hover { color: var(--primary); background: var(--bg-app); }
+    .chapter-export-range { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: calc(100% - 25px); min-height: 36px; padding: 7px 11px; margin-left: 25px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); text-align: left; font-size: 13px; }
+    .chapter-export-range:hover { color: var(--primary); background: var(--primary-light); }
+    body.theme-dark .chapter-export-range:hover { background: var(--bg-app); }
+    .chapter-export-range i { font-size: 16px; color: var(--text-secondary); transition: transform 180ms ease; }
+    .chapter-export-range[aria-expanded="true"] { color: var(--primary); }
+    .chapter-export-range[aria-expanded="true"] i { transform: rotate(90deg); }
+    .chapter-export-list { max-height: min(234px, 36dvh); overflow: auto; margin: 4px 0 0 25px; padding-left: 2px; border-left: 1px solid var(--border-color); scrollbar-width: thin; scrollbar-color: var(--border-color) transparent; }
+    .chapter-export-item { display: flex; align-items: flex-start; gap: 9px; padding: 9px 11px; cursor: pointer; position: relative; }
+    .chapter-export-item:hover { background: var(--bg-app); }
+    .chapter-export-item input { margin: 4px 0 0; width: 15px; height: 15px; flex-shrink: 0; accent-color: var(--primary); cursor: pointer; }
+    .chapter-export-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 10px 3px 3px 25px; }
+
+.chapter-export-item span { min-width: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
+.chapter-export-entry [hidden] { display: none !important; }
+.chapter-export-entry button:disabled { opacity: 0.5; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .chapter-export-range i { transition: none; } }
 
 /* Toast Message */
 .toast {

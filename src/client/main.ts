@@ -100,16 +100,16 @@ export function queryElements(): AppElements {
 
         // Header Export Panel / Backup
         btnExportMarkdown: document.getElementById('btn-export-markdown') as HTMLButtonElement | null,
-        btnExportChapterZip: document.getElementById('btn-export-chapter-zip') as HTMLButtonElement | null,
-        btnExportSelectedChapters: document.getElementById('btn-export-selected-chapters') as HTMLButtonElement | null,
-        chapterExportModal: document.getElementById('chapter-export-modal'),
-        chapterExportBookTitle: document.getElementById('chapter-export-book-title'),
-        chapterExportCount: document.getElementById('chapter-export-count'),
+        btnExportChapters: document.getElementById('btn-export-chapters') as HTMLButtonElement | null,
+        chapterExportEntry: document.getElementById('chapter-export-entry'),
+        chapterExportOptions: document.getElementById('chapter-export-options'),
+        chapterExportCustom: document.getElementById('chapter-export-custom'),
         chapterExportList: document.getElementById('chapter-export-list'),
-        btnCloseChapterExport: document.getElementById('btn-close-chapter-export') as HTMLButtonElement | null,
+        btnCollapseChapterExport: document.getElementById('btn-collapse-chapter-export') as HTMLButtonElement | null,
+        btnExportCurrentChapter: document.getElementById('btn-export-current-chapter') as HTMLButtonElement | null,
+        btnExportAllChapters: document.getElementById('btn-export-all-chapters') as HTMLButtonElement | null,
+        btnSelectChapters: document.getElementById('btn-select-chapters') as HTMLButtonElement | null,
         btnCancelChapterExport: document.getElementById('btn-cancel-chapter-export') as HTMLButtonElement | null,
-        btnSelectAllChapters: document.getElementById('btn-select-all-chapters') as HTMLButtonElement | null,
-        btnDeselectAllChapters: document.getElementById('btn-deselect-all-chapters') as HTMLButtonElement | null,
         btnConfirmChapterExport: document.getElementById('btn-confirm-chapter-export') as HTMLButtonElement | null,
         btnExportFullBackup: document.getElementById('btn-export-full-backup') as HTMLButtonElement | null,
         btnImportFullBackup: document.getElementById('btn-import-full-backup') as HTMLButtonElement | null,
@@ -181,7 +181,9 @@ export function bootstrapApp() {
         callbacks: {
             showToast: (msg) => appShell.showToast(msg),
             getCurrentBook: () => reader.getCurrentBook(),
-            getCurrentNotes: () => annotations.getNotes()
+            getCurrentNotes: () => annotations.getNotes(),
+            getCurrentPage: () => reader.getCurrentPage(),
+            closeExportPanel: () => appShell.closeExportPanel()
         }
     });
 

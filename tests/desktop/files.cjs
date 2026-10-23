@@ -1,7 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const JSZip = require('jszip');
 const { DatabaseSync } = require('node:sqlite');
 const { net } = require('electron');
 
@@ -23,18 +22,17 @@ async function verifyFiles(window, output, queues, checks) {
     // Existing parser intentionally derives the display title from the filename.
     assert.equal(imported.title, 'test'); assert.ok(imported.pages >= 12); assert.ok(imported.toc >= 12);
     await fs.writeFile(path.join(output, 'imported-book.json'), JSON.stringify(imported));
-    await run(`document.getElementById('btn-export-menu').click(); document.getElementById('btn-export-selected-chapters').click();
-        document.getElementById('btn-deselect-all-chapters').click();
-        const firstChapter = document.querySelector('#chapter-export-list input');
-        firstChapter.checked = true; firstChapter.dispatchEvent(new Event('change', {bubbles:true}));`);
-    save('selected-chapters.zip');
+    await run(`document.getElementById('btn-export-menu').click(); document.getElementById('btn-export-chapters').click(); document.getElementById('btn-select-chapters').click();
+        const chapters = document.querySelectorAll('#chapter-export-list input');
+        for (const chapter of [chapters[0], chapters[1]]) { chapter.checked = true; chapter.dispatchEvent(new Event('change', {bubbles:true})); }`);
+    select(output);
     await run(`document.getElementById('btn-confirm-chapter-export').click()`);
-    await waitFor(`!document.getElementById('chapter-export-modal').classList.contains('active')`);
-    const selectedZip = await JSZip.loadAsync(await fs.readFile(path.join(output, 'selected-chapters.zip')));
-    const selectedFiles = Object.values(selectedZip.files).filter(file => file.name.endsWith('.md'));
-    assert.equal(selectedFiles.length, 2, 'native chapter chooser exports just one selected content file and index');
-    assert.match(await selectedFiles.find(file => file.name.endsWith('00_目录概览.md')).async('string'), /导出范围：所选章节/);
-    checks.push('chapter selection from actual imported EPUB: checkbox UI, native save, selected ZIP bytes and index verified');
+    await waitFor(`!document.getElementById('export-panel').classList.contains('open')`);
+    const chapterDirectory = path.join(output, 'test_章节导出');
+    const selectedFiles = (await fs.readdir(chapterDirectory)).filter(file => file.endsWith('.md'));
+    assert.equal(selectedFiles.length, 3, 'native folder export contains exactly two selected chapters and index');
+    assert.match(await fs.readFile(path.join(chapterDirectory, '00_目录概览.md'), 'utf8'), /导出范围：所选章节/);
+    checks.push('actual imported EPUB -> inline multi-selection -> native directory chooser -> folder with two Markdown chapters and valid index');
     checks.push('offline EPUB chooser -> unchanged EPUB parser -> coordinator -> current SQLite -> reader; local JSZip and TOC intact');
 
     const txt = path.join(output, '桌面文字.txt');
@@ -71,7 +69,7 @@ async function verifyFiles(window, output, queues, checks) {
     await run(`(async () => { const a = await import('./main.js'); await a.coordinator.openBook('desktop-ipc'); })()`);
     for (const [filename, method, args] of [
         ['notes.md', 'exportMarkdown', 'a.reader.getCurrentBook().title, a.annotations.getNotes()'],
-        ['chapters.zip', 'exportChapterZip', 'a.reader.getCurrentBook(), a.annotations.getNotes()']
+        ['chapter.md', 'exportChapters', 'a.reader.getCurrentBook(), a.annotations.getNotes()']
     ]) {
         save(filename);
         await run(`(async () => { const a = await import('./main.js'); await a.backup.${method}(${args}); })()`);
@@ -79,10 +77,8 @@ async function verifyFiles(window, output, queues, checks) {
         assert.ok((await fs.stat(path.join(output, filename))).size > 0);
     }
     assert.match(await fs.readFile(path.join(output, 'notes.md'), 'utf8'), /待写恢复/);
-    const zip = await JSZip.loadAsync(await fs.readFile(path.join(output, 'chapters.zip')));
-    const markdown = await Promise.all(Object.values(zip.files).filter(f => !f.dir).map(f => f.async('string')));
-    assert.ok(markdown.some(text => text.includes('待写恢复')));
-    assert.ok(markdown.some(text => text.includes('第二段')));
+    const markdown = await fs.readFile(path.join(output, 'chapter.md'), 'utf8');
+    assert.ok(markdown.includes('待写恢复') && markdown.includes('第二段'));
     save('current.aurabackup');
     await run(`(async () => { const a = await import('./main.js'); const e = await import('./infrastructure/exporters.js');
         const r = await e.exportSelectiveBackup({selectedBooks: [a.reader.getCurrentBook()], notes: a.annotations.getNotes()});
@@ -107,7 +103,7 @@ async function verifyFiles(window, output, queues, checks) {
     queues.open.push({ canceled: true, filePaths: [] });
     // The public capability ignores arguments; renderer paths never reach main.
     assert.deepEqual(await run(`auraDesktop.files.chooseBook({path:'C:/arbitrary'})`), { ok: true, value: { canceled: true } });
-    checks.push('real renderer exports Markdown/ZIP/current .aurabackup, disk bytes verified; backup restore preserves note offsets and unknown fields; cancel/error feedback truthful; fullscreen works');
+    checks.push('real renderer exports single-chapter Markdown / chapter folders / .aurabackup, disk bytes verified; backup restore preserves offsets; truthful cancel/error feedback; fullscreen works');
 
     const database = new DatabaseSync(path.join(output, 'profile/data/aurareader.sqlite'), { readOnly: true });
     try {

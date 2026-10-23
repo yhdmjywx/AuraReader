@@ -5,7 +5,7 @@ const { StorageError } = require('../server/dataStore.js');
 const { createFontStore, listSystemFonts, MAX_FONT_BYTES } = require('../server/fontStore.js');
 
 const MAX_FILE_BYTES = 256 * 1024 * 1024;
-const EXPORTS = new Map([['.md', 'Markdown'], ['.html', 'HTML'], ['.zip', 'ZIP'], ['.aurabackup', 'AuraReader 书籍备份']]);
+const EXPORTS = new Map([['.md', 'Markdown'], ['.zip', 'ZIP'], ['.aurabackup', 'AuraReader 书籍备份']]);
 /** @param {string} filename @param {number} limit */
 async function readBounded(filename, limit) {
     const handle = await fs.open(filename, 'r');
@@ -62,6 +62,75 @@ async function writeExport(filename, bytes, protectedDirectories) {
     }
 }
 
+/** @param {unknown} body */
+function folderExportRequest(body) {
+    if (!body || typeof body !== 'object') throw new StorageError('无效文件夹导出请求');
+    const value = /** @type {{folderName?: unknown, files?: unknown}} */ (body);
+    if (Object.keys(value).length !== 2 || typeof value.folderName !== 'string'
+        || exportName(value.folderName + '.md') !== value.folderName + '.md'
+        || !Array.isArray(value.files) || !value.files.length || value.files.length > 10000) throw new StorageError('无效文件夹导出字段');
+    const names = new Set();
+    let size = 0;
+    const files = value.files.map(entry => {
+        if (!entry || typeof entry !== 'object' || Object.keys(entry).length !== 2
+            || typeof entry.filename !== 'string' || !entry.filename.endsWith('.md')
+            || exportName(entry.filename) !== entry.filename || !(entry.bytes instanceof Uint8Array)
+            || !entry.bytes.byteLength) throw new StorageError('无效章节文件');
+        const name = entry.filename.toLowerCase();
+        if (names.has(name)) throw new StorageError('章节文件名重复');
+        names.add(name);
+        size += entry.bytes.byteLength;
+        if (size > MAX_FILE_BYTES) throw new StorageError('导出内容超过 256MB', 413);
+        return { filename: entry.filename, bytes: entry.bytes };
+    });
+    return { folderName: value.folderName, files };
+}
+
+/** @param {string} parent @param {ReturnType<typeof folderExportRequest>} request @param {string[]} protectedDirectories @param {() => void} authorize */
+async function writeExportFolder(parent, request, protectedDirectories, authorize) {
+    if (!path.isAbsolute(parent)) throw new StorageError('保存位置无效');
+    const directory = await fs.realpath(parent);
+    const protectedRoots = [];
+    for (const root of protectedDirectories) {
+        let resolved;
+        try { resolved = await fs.realpath(root); }
+        catch (error) { if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'ENOENT') throw error; resolved = path.resolve(root); }
+        if (inside(directory, resolved)) throw new StorageError('不能将导出文件夹保存到应用或书库内部目录', 403);
+        protectedRoots.push(resolved);
+    }
+    let target = '';
+    // mkdir is exclusive: existing folders, files and links are never reused.
+    for (let suffix = 0; suffix < 10000; suffix++) {
+        authorize();
+        const name = request.folderName + (suffix ? ` (${suffix + 1})` : '');
+        const candidate = path.join(directory, name);
+        if (protectedRoots.some(root => inside(candidate, root))) throw new StorageError('不能将导出文件夹保存到应用或书库内部目录', 403);
+        try { await fs.mkdir(candidate); target = candidate; break; }
+        catch (error) { if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'EEXIST') throw error; }
+    }
+    if (!target) throw new StorageError('同名文件夹过多，请选择其他位置');
+    /** @type {string[]} */ const created = [];
+    try {
+        for (const file of request.files) {
+            authorize();
+            const filename = path.join(target, file.filename);
+            const handle = await fs.open(filename, 'wx');
+            created.push(filename);
+            try { await handle.writeFile(file.bytes); await handle.sync(); } finally { await handle.close(); }
+        }
+        authorize();
+        return { status: /** @type {const} */ ('saved'), kind: /** @type {const} */ ('folder'), name: path.basename(target) };
+    } catch (error) {
+        // Remove only entries created by this request; never recursively remove
+        // a user-selected directory or an existing export.
+        for (const filename of created) {
+            try { await fs.unlink(filename); } catch (cleanup) { console.error('章节导出清理失败:', cleanup); }
+        }
+        try { await fs.rmdir(target); } catch (cleanup) { console.error('章节导出目录清理失败:', cleanup); }
+        throw error;
+    }
+}
+
 /** @param {{dataDirectory: string, protectedDirectories: string[], dialogs: import('./dialogs.js').DialogPort}} options */
 function createFileService({ dataDirectory, protectedDirectories, dialogs }) {
     const fontDirectory = path.join(dataDirectory, 'fonts');
@@ -101,7 +170,7 @@ function createFileService({ dataDirectory, protectedDirectories, dialogs }) {
         async call(action, body, authorize = () => {}) {
             const task = (async () => {
                 authorize();
-                if (action !== 'saveExport' && body !== undefined) throw new StorageError('请求不接受参数');
+                if (!['saveExport', 'saveExportFolder'].includes(action) && body !== undefined) throw new StorageError('请求不接受参数');
                 if (action === 'listFonts') return { fonts: (await fontStore.list()).map(mapFont) };
                 if (action === 'systemFonts') return listSystemFonts();
                 return withDialog(async () => {
@@ -116,6 +185,19 @@ function createFileService({ dataDirectory, protectedDirectories, dialogs }) {
                         catch (error) {
                             if (/** @type {NodeJS.ErrnoException} */ (error).code) throw error;
                             throw new StorageError(error instanceof Error ? error.message : '字体文件无效', 400);
+                        }
+                    }
+                    if (action === 'saveExportFolder') {
+                        const request = folderExportRequest(body);
+                        const destination = await dialogs.open({ title: '选择章节导出位置', properties: ['openDirectory', 'createDirectory', 'dontAddToRecent'] });
+                        authorize();
+                        if (destination.canceled) return { status: 'canceled' };
+                        if (destination.filePaths.length !== 1) throw new StorageError('请选择一个文件夹');
+                        try { return await writeExportFolder(destination.filePaths[0], request, protectedDirectories, authorize); }
+                        catch (error) {
+                            if (error instanceof StorageError) throw error;
+                            console.error('章节文件夹保存失败:', error);
+                            throw new StorageError('章节文件夹保存失败，请检查目录权限和可用空间；未报告保存成功', 500);
                         }
                     }
                     if (action === 'saveExport') {

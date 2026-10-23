@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AuraReader · 按章节导出 UX 设计稿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fa; --panel: #fff; --paper: #fff; --text: #1d2129;
+      --secondary: #4e5969; --muted: #697586; --border: #e5e6eb;
+      --primary: #3b82f6; --primary-hover: #2563eb; --primary-light: #eff6ff;
+      --pill: #f2f3f5; --overlay: rgba(20, 27, 39, .38); --shadow: 0 12px 40px rgba(20, 35, 60, .14);
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0f172a; --panel: #1e293b; --paper: #182234; --text: #f1f5f9;
+      --secondary: #cbd5e1; --muted: #9caec5; --border: #334155;
+      --primary: #60a5fa; --primary-hover: #93c5fd; --primary-light: #243b58;
+      --pill: #263449; --overlay: rgba(3, 7, 18, .6); --shadow: 0 12px 40px rgba(0, 0, 0, .3);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--text); background: var(--bg); font: 14px/1.5 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; }
+    button, input { font: inherit; }
+    button { color: inherit; cursor: pointer; }
+    button:disabled { cursor: default; opacity: .45; }
+    button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+    [hidden] { display: none !important; }
+    .app { position: relative; min-height: 540px; height: 100dvh; overflow: hidden; background: var(--paper); }
+    .app-header { height: 56px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; gap: 16px; }
+    .brand { font-weight: 700; font-size: 18px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .brand i { color: var(--primary); font-size: 23px; }
+    .book-nav { display: flex; align-items: center; gap: 9px; border: 0; background: var(--pill); padding: 7px 15px; border-radius: 30px; font-size: 13px; color: var(--secondary); }
+    .header-actions { display: flex; gap: 6px; }
+    .icon-button { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; border-radius: 6px; color: var(--secondary); font-size: 20px; }
+    .icon-button:hover { background: var(--pill); }
+    .icon-button[aria-expanded="true"] { color: var(--primary); background: var(--primary-light); }
+    .reading-surface { position: relative; width: min(980px, calc(100% - 80px)); margin: 64px auto 0; display: grid; grid-template-columns: minmax(0, 620px) 220px; gap: 64px; }
+    .reading-chapter { color: var(--muted); font-size: 12px; letter-spacing: .03em; margin: 0 0 18px; }
+    .reading-title { font-size: 30px; font-weight: 650; margin: 0 0 34px; line-height: 1.6; }
+    .book-copy { font-family: 'Microsoft YaHei', sans-serif; font-size: 18px; line-height: 2.25; color: var(--text); }
+    .book-copy p { margin: 0 0 23px; text-indent: 2em; }
+    .book-copy mark { background: #fef08a; color: #29303a; padding: 2px 0; }
+    .underlined { text-decoration: underline; text-decoration-color: #df7773; text-underline-offset: 6px; text-decoration-thickness: 1.5px; }
+    .margin-note { margin-top: 200px; font-size: 13px; line-height: 1.9; color: var(--secondary); }
+    .note-line { width: 24px; height: 2px; background: var(--border); margin-bottom: 12px; }
+    .page-turn { display: flex; gap: 24px; justify-content: center; align-items: center; position: absolute; bottom: 22px; left: 0; right: 0; color: var(--muted); font-size: 12px; }
+    .page-turn button { background: transparent; border: 0; font-size: 20px; color: var(--secondary); padding: 4px 8px; }
+    .export-menu { position: absolute; z-index: 5; top: 65px; right: 18px; width: min(320px, calc(100vw - 28px)); max-height: calc(100dvh - 82px); overflow-y: auto; scrollbar-width: thin; padding: 15px 9px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+    .export-heading { padding: 2px 11px 13px; }
+    .export-heading h2 { margin: 0; font-size: 14px; font-weight: 600; }
+    .export-heading p { margin: 4px 0 0; font-size: 12px; color: var(--secondary); }
+    .menu-section { font-size: 12px; font-weight: 400; margin: 3px 11px 4px; color: var(--muted); }
+    .menu-action { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px; min-height: 44px; border: 0; background: transparent; border-radius: 7px; text-align: left; }
+    .menu-action:hover { background: var(--primary-light); }
+    .menu-action > i { color: var(--primary); font-size: 19px; }
+    .menu-action .label { flex: 1; }
+    .menu-action .extension { color: var(--muted); font-size: 11px; }
+    .menu-action small { display: block; font-size: 11px; color: var(--secondary); margin-top: 2px; }
+    .menu-action.backup > i { color: #10a57b; }
+    .menu-divider { border: 0; border-top: 1px solid var(--border); margin: 12px 11px; }
+    .menu-note { margin: 8px 11px 0; color: var(--muted); font-size: 11px; }
+    .chapter-export { overflow: hidden; }
+    .chapter-options { padding-bottom: 3px; }
+    .entry-back { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 37px; padding: 6px 11px; border: 0; background: transparent; text-align: left; color: var(--secondary); font-size: 12px; border-radius: 6px; }
+    .entry-back i { font-size: 17px; }
+    .entry-back:hover { color: var(--primary); background: var(--bg); }
+    .range-action { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: calc(100% - 25px); min-height: 36px; padding: 7px 11px; margin-left: 25px; border: 0; border-radius: 6px; background: transparent; text-align: left; font-size: 13px; }
+    .range-action:hover { color: var(--primary); background: var(--primary-light); }
+    .range-action i { font-size: 16px; color: var(--muted); transition: transform 180ms ease; }
+    .range-action[aria-expanded="true"] { color: var(--primary); }
+    .range-action[aria-expanded="true"] i { transform: rotate(90deg); }
+    .chapter-list { max-height: min(234px, 36dvh); overflow: auto; margin: 4px 0 0 25px; padding-left: 2px; border-left: 1px solid var(--border); scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    .chapter-row { display: flex; align-items: flex-start; gap: 9px; padding: 9px 11px; cursor: pointer; position: relative; }
+    .chapter-row:hover { background: var(--bg); }
+    .chapter-row input { margin: 4px 0 0; width: 15px; height: 15px; flex-shrink: 0; accent-color: var(--primary); cursor: pointer; }
+    .chapter-label { flex: 1; min-width: 0; }
+    .chapter-title { font-size: 13px; line-height: 1.6; display: block; overflow-wrap: anywhere; }
+    .footer-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 10px 3px 3px 25px; }
+    .button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid transparent; border-radius: 6px; min-height: 35px; padding: 7px 13px; font-size: 13px; background: transparent; white-space: nowrap; }
+    .button:hover { background: var(--pill); }
+    .button-primary { background: #3b82f6; color: #fff; }
+    .button-primary:hover:not(:disabled) { background: #2563eb; }
+    .button-primary i { font-size: 16px; }
+    .button-primary:disabled { opacity: .45; }
+    .toast { z-index: 20; position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); padding: 11px 18px; color: var(--panel); background: var(--text); border-radius: 8px; font-size: 13px; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+    @media (max-width: 760px) {
+      .app { height: 100dvh; min-height: 540px; }
+      .book-nav { display: none; }
+      .app-header { padding: 0 14px; }
+      .reading-surface { margin-top: 36px; width: calc(100% - 40px); display: block; }
+      .reading-title { font-size: 24px; }
+      .margin-note { display: none; }
+    }
+    @media (max-width: 420px) {
+      .footer-actions { justify-content: flex-end; }
+      .chapter-row { padding: 10px; gap: 8px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .range-action i { transition: none; } }
+  </style>
+  <link rel="stylesheet" href="../../node_modules/remixicon/fonts/remixicon.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="app-header">
+      <div class="brand"><i class="ri-book-open-fill" aria-hidden="true"></i>AuraReader</div>
+      <div class="book-nav"><i class="ri-list-unordered" aria-hidden="true"></i>危机时代（罗杰斯·思考与洞察）<i class="ri-arrow-down-s-line" aria-hidden="true"></i></div>
+      <div class="header-actions">
+        <button class="icon-button" type="button" aria-label="我的书库" data-demo-action="书库"><i class="ri-book-shelf-line" aria-hidden="true"></i></button>
+        <button class="icon-button" type="button" id="appearance-toggle" aria-label="切换明暗主题"><i class="ri-palette-line" aria-hidden="true"></i></button>
+        <button class="icon-button" type="button" id="export-trigger" aria-label="导出与备份" aria-expanded="false" aria-controls="export-menu"><i class="ri-download-line" aria-hidden="true"></i></button>
+        <button class="icon-button" type="button" aria-label="全屏阅读" data-demo-action="全屏阅读"><i class="ri-fullscreen-line" aria-hidden="true"></i></button>
+      </div>
+    </header>
+    <main class="reading-surface">
+      <article>
+        <p class="reading-chapter">第一部分 · 认识危机</p>
+        <h2 class="reading-title">第三章：理解债务周期</h2>
+        <div class="book-copy">
+          <p>理解危机，需要把眼前的变化放回更长的时间里观察。市场会变化，人们面对不确定性时的反应却常常相似。</p>
+          <p>阅读历史的意义，不在于寻找一个可以直接套用的答案，而在于<mark>辨认那些反复出现的结构与信号</mark>。</p>
+          <p>当我们重新看待债务、价格和增长之间的联系时，许多孤立的事件开始显露出共同的脉络。<span class="underlined">保持独立判断，也意味着愿意不断修正自己的理解。</span></p>
+          <p>在变化中，耐心不是停下来等待，而是在充分理解之后，仍然能够为选择留出余地。</p>
+        </div>
+      </article>
+      <aside class="margin-note"><div class="note-line"></div>把当前的市场变化放进长期周期里，能帮助我区分短期波动与真正的结构性变化。</aside>
+    </main>
+    <div class="page-turn"><button aria-label="上一页" data-demo-action="翻页">‹</button><span>第三章 · 12 / 28 页</span><button aria-label="下一页" data-demo-action="翻页">›</button></div>
+
+    <section class="export-menu" id="export-menu" aria-label="导出与备份">
+      <div class="export-heading"><h2>导出与备份</h2><p>当前书籍 · 危机时代</p></div>
+      <h3 class="menu-section">导出</h3>
+      <button class="menu-action" type="button" data-demo-action="笔记摘要"><i class="ri-file-text-line" aria-hidden="true"></i><span class="label">笔记摘要</span><span class="extension">.md</span></button>
+      <div class="chapter-export" id="chapter-export">
+        <button class="menu-action" type="button" id="open-chapter-export" aria-expanded="false" aria-controls="chapter-options"><i class="ri-folder-download-line" aria-hidden="true"></i><span class="label">按章节导出</span><span class="extension">.md</span></button>
+        <div class="chapter-options" id="chapter-options" hidden>
+          <button class="entry-back" id="collapse-chapter-export" type="button" aria-label="返回导出菜单"><i class="ri-arrow-left-s-line" aria-hidden="true"></i>按章节导出</button>
+          <button class="range-action" type="button" id="export-current">当前章节</button>
+          <button class="range-action" type="button" id="export-all">全部章节</button>
+          <button class="range-action" type="button" id="select-chapters" aria-expanded="false" aria-controls="custom-chapters">选择章节<i class="ri-arrow-right-s-line" aria-hidden="true"></i></button>
+          <div id="custom-chapters" hidden>
+            <div class="chapter-list" id="chapter-list" role="group" aria-label="选择需要导出的章节"></div>
+            <div class="footer-actions"><button class="button" type="button" id="cancel-export">取消</button><button class="button button-primary" type="button" id="confirm-export" disabled>导出</button></div>
+          </div>
+        </div>
+      </div>
+      <hr class="menu-divider">
+      <h3 class="menu-section">书籍备份与恢复</h3>
+      <button class="menu-action backup" type="button" data-demo-action="导出书籍备份"><i class="ri-archive-line" aria-hidden="true"></i><span class="label">导出书籍备份</span><span class="extension">.aurabackup</span></button>
+      <button class="menu-action backup" type="button" data-demo-action="从备份恢复书籍"><i class="ri-upload-line" aria-hidden="true"></i><span class="label">从备份恢复书籍</span></button>
+      <p class="menu-note">每本书一个备份文件 · 包含高亮与笔记</p>
+    </section>
+
+    <div class="toast" id="toast" role="status" hidden></div>
+  </div>
+  <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      const chapters = [
+        { id: 'ch1', title: '第一章：人生最险恶的危机不可避免' },
+        { id: 'ch2', title: '第二章：周期的铁律与历史的经验' },
+        { id: 'ch3', title: '第三章：理解债务周期' },
+        { id: 'ch4', title: '第四章：价格背后的长期信号' },
+        { id: 'ch5', title: '第五章：全球市场中的机会与风险' },
+        { id: 'ch6', title: '第六章：实体供应链与大宗商品的锚点' },
+        { id: 'ch7', title: '第七章：在不确定中保持独立判断' },
+        { id: 'ch8', title: '第八章：给未来保留选择' }
+      ];
+      const selected = new Set();
+      const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+      reducedMotion.addEventListener('change', () => {
+        if (reducedMotion.matches) $('chapter-export').getAnimations({ subtree: true }).forEach(animation => animation.cancel());
+      });
+      let heightAnimation;
+      let toastTimer;
+      chapters.forEach(chapter => {
+        const label = document.createElement('label');
+        label.className = 'chapter-row'; label.dataset.chapter = chapter.id;
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox'; checkbox.value = chapter.id;
+        const text = document.createElement('span'); text.className = 'chapter-label';
+        const title = document.createElement('span'); title.className = 'chapter-title'; title.textContent = chapter.title;
+        text.append(title); label.append(checkbox, text);
+        checkbox.addEventListener('change', () => {
+          checkbox.checked ? selected.add(chapter.id) : selected.delete(chapter.id);
+          $('confirm-export').disabled = !selected.size;
+        });
+        $('chapter-list').append(label);
+      });
+      function transition(change, entering) {
+        const container = $('chapter-export');
+        const before = container.getBoundingClientRect().height;
+        heightAnimation?.cancel();
+        change();
+        const after = container.getBoundingClientRect().height;
+        if (reducedMotion.matches) return;
+        heightAnimation = container.animate([{ height: `${before}px` }, { height: `${after}px` }], { duration: 200, easing: 'cubic-bezier(.2,.7,.2,1)' });
+        entering?.animate([{ opacity: 0, transform: 'translateY(-3px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 160, easing: 'ease-out' });
+      }
+      function setExpanded(expanded, animate = true) {
+        const change = () => {
+          $('open-chapter-export').hidden = expanded;
+          $('open-chapter-export').setAttribute('aria-expanded', String(expanded));
+          $('chapter-options').hidden = !expanded;
+          $('custom-chapters').hidden = true;
+          $('select-chapters').setAttribute('aria-expanded', 'false');
+        };
+        const entering = expanded ? $('chapter-options') : $('open-chapter-export');
+        if (animate) transition(change, entering);
+        else { heightAnimation?.cancel(); change(); }
+      }
+      function setCustom(expanded) {
+        transition(() => {
+          $('custom-chapters').hidden = !expanded;
+          $('select-chapters').setAttribute('aria-expanded', String(expanded));
+        }, expanded ? $('custom-chapters') : null);
+      }
+      function closeMenu(restoreFocus = true) {
+        $('export-menu').hidden = true;
+        $('export-trigger').setAttribute('aria-expanded', 'false');
+        setExpanded(false, false);
+        if (restoreFocus) $('export-trigger').focus({ preventScroll: true });
+      }
+      $('export-trigger').addEventListener('click', () => {
+        if (!$('export-menu').hidden) { closeMenu(); return; }
+        $('export-menu').hidden = false;
+        $('export-trigger').setAttribute('aria-expanded', 'true');
+      });
+      $('open-chapter-export').addEventListener('click', () => { setExpanded(true); $('export-current').focus({ preventScroll: true }); });
+      $('collapse-chapter-export').addEventListener('click', () => { setExpanded(false); $('open-chapter-export').focus({ preventScroll: true }); });
+      $('select-chapters').addEventListener('click', () => setCustom($('custom-chapters').hidden));
+      $('cancel-export').addEventListener('click', () => { setCustom(false); $('select-chapters').focus({ preventScroll: true }); });
+      function toast(message) { clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false; toastTimer = setTimeout(() => { $('toast').hidden = true; }, 4500); }
+      function exportRange(count) {
+        closeMenu();
+        toast(count === 1 ? '设计稿演示：选择位置，保存章节 .md 文件' : `设计稿演示：选择位置，新建「危机时代_章节导出」文件夹，保存 ${count} 章 .md`);
+      }
+      $('export-current').addEventListener('click', () => exportRange(1));
+      $('export-all').addEventListener('click', () => exportRange(chapters.length));
+      $('confirm-export').addEventListener('click', () => { if (selected.size) exportRange(selected.size); });
+      document.querySelectorAll('[data-demo-action]').forEach(button => button.addEventListener('click', () => toast(`「${button.dataset.demoAction}」沿用现有功能，本稿仅演示章节导出流程。`)));
+      function toggleTheme() {
+        const dark = document.documentElement.dataset.theme !== 'dark';
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      }
+      $('appearance-toggle').addEventListener('click', toggleTheme);
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || $('export-menu').hidden) return;
+        event.preventDefault();
+        if (!$('custom-chapters').hidden) { setCustom(false); $('select-chapters').focus({ preventScroll: true }); }
+        else if (!$('chapter-options').hidden) { setExpanded(false); $('open-chapter-export').focus({ preventScroll: true }); }
+        else closeMenu();
+      });
+      document.addEventListener('click', event => {
+        if (!$('export-menu').hidden && !$('export-menu').contains(event.target) && !event.target.closest('#export-trigger')) closeMenu(false);
+      });
+      $('export-trigger').setAttribute('aria-expanded', 'true');
+    })();
+  </script>
+</body>
+</html>

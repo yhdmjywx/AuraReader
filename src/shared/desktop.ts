@@ -3,7 +3,7 @@ import type { BookRecord, BookRevision, DeleteBookCommand, DeleteNoteCommand, No
 export type DesktopResult<T> = { ok: true; value: T } | { ok: false; error: { message: string; status: number; details?: unknown } };
 export interface DesktopLibraryStatus { initialized: boolean }
 export type PickedFile = { canceled: true } | { canceled: false; file: { name: string; bytes: Uint8Array } };
-export type SaveOutcome = { status: 'saved' | 'canceled'; name?: string };
+export type SaveOutcome = { status: 'saved' | 'canceled'; name?: string; kind?: 'file' | 'folder' };
 export interface DesktopFont {
     id: string; type: 'ttf' | 'otf' | 'woff2'; name: string; family: string;
     weight: string; size: number; filename: string; url: string;
@@ -29,6 +29,7 @@ export interface DesktopBridge {
         chooseBook(): Promise<DesktopResult<PickedFile>>;
         chooseBackup(): Promise<DesktopResult<PickedFile>>;
         saveExport(input: { filename: string; bytes: Uint8Array }): Promise<DesktopResult<SaveOutcome>>;
+        saveExportFolder(input: { folderName: string; files: { filename: string; bytes: Uint8Array }[] }): Promise<DesktopResult<SaveOutcome>>;
     };
     readonly fonts: {
         list(): Promise<DesktopResult<{ fonts: DesktopFont[] }>>;

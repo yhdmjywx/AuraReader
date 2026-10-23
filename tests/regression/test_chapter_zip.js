@@ -79,7 +79,7 @@ const { JSDOM } = require('jsdom');
         notes.push({ id: 'foreign', bookId: 'other-book', page: 1, quote: '重复句。', comment: '其他书籍的笔记' });
         notes.push({ id: 'unassigned', bookId: book.id, kind: 'highlight', page: 99, quote: '章节已不存在的引用' });
         notes.push({ id: 'unassigned-note', bookId: book.id, kind: 'note', page: 99, quote: '旧章节笔记原文', comment: '旧章节笔记内容' });
-        await backup.exportChapterZip(book, notes);
+        await exportChapterZip(book, notes, JSZip);
         assert.equal(downloads.length, 1, '实际控制器应触发 ZIP 下载');
         const zip = await JSZip.loadAsync(await downloads[0].blob.arrayBuffer());
         const files = Object.keys(zip.files).filter(name => name.endsWith('.md'));
@@ -162,7 +162,7 @@ const { JSDOM } = require('jsdom');
         if (process.env.AURA_EPUB_ZIP_SAMPLE) fs.writeFileSync(process.env.AURA_EPUB_ZIP_SAMPLE, Buffer.from(await downloads[1].blob.arrayBuffer()));
 
         await persisted.deleteHighlight(highlight.id);
-        await backup.exportChapterZip(book, persisted.getNotes());
+        await exportChapterZip(book, persisted.getNotes(), JSZip);
         const afterDeleteZip = await JSZip.loadAsync(await downloads[2].blob.arrayBuffer());
         const afterDelete = await afterDeleteZip.file(files.find(name => /01_第一章\.md$/.test(name))).async('string');
         assert.ok(!afterDelete.split('## 本章笔记\n')[0].includes('<mark>重复句。</mark>'), '删除高亮后，下一次导出不应出现旧高亮');

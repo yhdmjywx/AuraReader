@@ -21,7 +21,8 @@ if (process.isMainFrame) {
         files: {
             chooseBook: () => ipcRenderer.invoke('aura:files:chooseBook', undefined),
             chooseBackup: () => ipcRenderer.invoke('aura:files:chooseBackup', undefined),
-            saveExport: input => ipcRenderer.invoke('aura:files:saveExport', input)
+            saveExport: input => ipcRenderer.invoke('aura:files:saveExport', input),
+            saveExportFolder: input => ipcRenderer.invoke('aura:files:saveExportFolder', input)
         },
         fonts: {
             list: () => ipcRenderer.invoke('aura:files:listFonts', undefined),

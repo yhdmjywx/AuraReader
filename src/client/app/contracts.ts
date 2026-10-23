@@ -82,6 +82,8 @@ export interface BackupCallbacks {
     showToast?: (message: string) => void;
     getCurrentBook?: () => Book | null;
     getCurrentNotes?: () => Annotation[];
+    getCurrentPage?: () => number;
+    closeExportPanel?: () => void;
     beforeRestore?: AsyncAction;
     onRestoreBackup?: AsyncAction<[{ data: BackupData; importedBooksCount: number; importedNotesCount: number }]>;
 }
