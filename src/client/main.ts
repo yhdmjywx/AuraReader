@@ -218,7 +218,7 @@ export function bootstrapApp() {
     annotations.callbacks.getVisibleAnnotationIds = () => reader.getVisibleAnnotationIds();
 
     annotations.callbacks.onNotesChanged = (notes) => {
-        reader.renderPage(reader.getCurrentPage(), true, notes);
+        reader.refreshAnnotations(notes);
     };
     annotations.callbacks.onJump = (note) => {
         coordinator.jumpToAnnotation(note.id);

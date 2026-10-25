@@ -9,6 +9,12 @@ import { buildSegments, resolveAnnotationRange } from '../../domain/annotationRa
 export function renderAnnotationTokens(root, annotations = [], page = null) {
     if (!root || typeof document === 'undefined' || !root.ownerDocument) return;
     if (page != null) root.dataset.annotationPage = String(page);
+    // Refresh only our wrappers. Keep the source blocks, typography and link
+    // handlers intact; a note edit must never remount or repaginate the chapter.
+    root.querySelectorAll('.annotation-token').forEach(token => {
+        if (token.closest('[data-volume-title-page]') && !root.closest('[data-volume-title-page]')) return;
+        token.replaceWith(...token.childNodes);
+    });
     if (!Array.isArray(annotations) || annotations.length === 0) return;
 
     const index = buildTextIndex(root);

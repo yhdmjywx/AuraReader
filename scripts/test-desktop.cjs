@@ -31,6 +31,9 @@ async function run(entry) {
     await run('restart.cjs');
     const restart = JSON.parse(fs.readFileSync(path.join(output, 'restart-results.json'), 'utf8'));
     if (restart.passed !== true) throw new Error('Desktop restart did not pass');
-    console.log(JSON.stringify({ ...report, restart }, null, 2));
+    await run('note-interaction.cjs');
+    const notes = JSON.parse(fs.readFileSync(path.join(output, 'note-interaction-results.json'), 'utf8'));
+    if (notes.passed !== true) throw new Error('Desktop note interaction did not pass');
+    console.log(JSON.stringify({ ...report, restart, notes }, null, 2));
     console.log('Desktop artifacts:', output);
 })().catch(error => { console.error(error); process.exitCode = 1; });

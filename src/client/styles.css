@@ -1118,6 +1118,7 @@ mark.hl-active {
     text-decoration-color: #ef4444;
     text-decoration-thickness: 2px;
     text-underline-offset: 3px;
+    text-decoration-skip-ink: none; /* Keep note underlines continuous through descenders (g, y, p). */
 }
 
 .annotation-token.is-active {
@@ -1605,7 +1606,6 @@ mark.hl-active {
     --reading-width: 560px;
     --reading-left: max(16px, calc((100% - 560px) / 2));
     --reading-right: var(--reading-left);
-    --note-band-height: 0px;
 }
 .immersive-notes .reader-panel {
     width: 100% !important;
@@ -1614,7 +1614,6 @@ mark.hl-active {
 }
 .immersive-notes .reader-viewport {
     padding: 32px var(--reading-right) 32px var(--reading-left);
-    margin-bottom: var(--note-band-height);
     overflow-x: hidden;
 }
 .immersive-notes .paper-container,
@@ -1700,6 +1699,29 @@ mark.hl-active {
 .immersive-notes .note-card-actions button { color: var(--text-muted); }
 .immersive-notes .note-card-actions button:hover,
 .immersive-notes .note-card-actions button:focus-visible { color: var(--primary); }
+.note-editor-shell { position: relative; }
+.note-caret-mirror {
+    position: absolute;
+    top: 0;
+    left: 0;
+    visibility: hidden;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+.note-block-caret {
+    position: absolute;
+    width: 1ch;
+    background: #d95353;
+    opacity: .65;
+    pointer-events: none;
+    animation: note-caret-blink 1s step-end infinite;
+}
+.note-block-caret[hidden] { display: none; }
+@keyframes note-caret-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+    .note-block-caret { animation: none; }
+}
+.note-editor.has-block-caret { caret-color: transparent; }
 .note-editor {
     display: block;
     width: 100%;
@@ -1724,16 +1746,4 @@ mark.hl-active {
 }
 .note-card-actions[hidden] { display: none; }
 .immersive-notes .margin-highlight-label { font-size: 12px; color: var(--text-muted); }
-.immersive-notes[data-notes-placement="bottom"] .margin-notes-lane {
-    display: flex;
-    gap: 32px;
-    align-items: flex-start;
-    overflow: auto;
-}
-.immersive-notes[data-notes-placement="bottom"] .note-card {
-    position: relative;
-    top: 0 !important;
-    flex: 0 0 min(350px, 100%);
-    width: min(350px, 100%);
-}
 
