@@ -1,0 +1,9 @@
+{
+  "name": "aurareader-website",
+  "private": true,
+  "scripts": {
+    "build": "node build-demo.cjs",
+    "start": "node serve.cjs",
+    "test": "node test-demo.cjs"
+  }
+}
