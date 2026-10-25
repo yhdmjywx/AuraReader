@@ -4,10 +4,9 @@
    Margin note geometry is shared by single, double and scroll modes.
    ========================================================================== */
 
-import { applyMarginGeometry } from './marginNotesLayout.js';
+import { applyMarginGeometry, DOUBLE_PAGE_MIN_WIDTH } from './marginNotesLayout.js';
 
-// Two 560px columns + 72px gap + 16px outer margins on each side.
-export const DOUBLE_PAGE_MIN_WIDTH = 1224;
+export { DOUBLE_PAGE_MIN_WIDTH };
 
 export class LayoutController {
     /** @param {import('../../app/contracts.js').LayoutCallbacks} callbacks */
@@ -134,7 +133,7 @@ export class LayoutController {
             if (this.isAutoDowngraded) {
                 el.btnPageMode.classList.add('auto-downgraded');
                 if (el.textPageMode) el.textPageMode.textContent = '双页(自适应)';
-                el.btnPageMode.title = '当前窗口放不下固定行宽的双页，扩大窗口后将自动恢复';
+                el.btnPageMode.title = '当前窗口放不下双页及双侧笔记，扩大窗口后将自动恢复';
             } else {
                 el.btnPageMode.classList.remove('auto-downgraded');
                 if (el.textPageMode) el.textPageMode.textContent = '双页';
