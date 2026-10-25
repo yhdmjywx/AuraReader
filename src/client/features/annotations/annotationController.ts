@@ -206,7 +206,9 @@ export class AnnotationController {
         this.renderNotesUI();
         // Include unsaved drafts only in the reading surface, never in exports
         // or storage. This also gives the new editor its existing margin anchor.
-        this.callbacks.onNotesChanged?.(this.getRenderingNotes());
+        if (!this.notes.some(item => item.id === note.id)) {
+            this.callbacks.onNotesChanged?.(this.getRenderingNotes());
+        }
         if (this.inlineEdit !== editSession) return;
         editSession.opening = false;
         // The body and margin lanes are now mounted in their final positions.

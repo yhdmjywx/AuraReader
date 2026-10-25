@@ -7,6 +7,7 @@
 
 import { filterNotes, isHighlight, isNote } from '../../domain/annotationEngine.js';
 import { isImmersiveNotes, positionMarginNotes, moveNoteCard } from '../layout/marginNotesLayout.js';
+import { attachNoteCaret } from './noteCaret.js';
 
 /** @param {import('../../app/contracts.js').NotesRenderOptions} options */
 export function renderNotesList({
@@ -202,12 +203,17 @@ function startInlineEditor({ card, note, elements, onInput, onFinish }) {
     editor.setAttribute('aria-keyshortcuts', 'Escape Control+Enter Meta+Enter');
     editor.rows = 1;
     editor.value = note.comment || '';
-    text.replaceChildren(editor);
+    const shell = document.createElement('div');
+    shell.className = 'note-editor-shell';
+    shell.appendChild(editor);
+    text.replaceChildren(shell);
+    const updateCaret = attachNoteCaret(editor, shell);
     card.querySelector('.note-card-actions').hidden = true;
     const resize = () => {
         editor.style.height = '0px';
         editor.style.height = `${Math.max(editor.scrollHeight, 25.2)}px`;
         positionMarginNotes(elements);
+        updateCaret();
     };
     let composing = false;
     editor.addEventListener('compositionstart', () => { composing = true; });
