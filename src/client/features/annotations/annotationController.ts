@@ -225,6 +225,7 @@ export class AnnotationController {
         const note = this.inlineEdit?.note;
         if (!note || id !== note.id || note.comment === comment) return;
         note.comment = comment;
+        this.callbacks.onAnnotationContentChanged?.(note);
         note.timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
         const exists = this.notes.some(item => item.id === id);
         if (!exists && !comment.trim()) return;
@@ -360,6 +361,7 @@ export class AnnotationController {
     }
 
     async deleteHighlights(ids: string[] = []) {
+        await this.callbacks.beforeDeleteAnnotations?.();
         const idSet = new Set(ids.filter(Boolean));
         const removed = this.notes.filter(n => idSet.has(n.id) && isHighlight(n));
         if (removed.length === 0) return;
@@ -386,6 +388,7 @@ export class AnnotationController {
     }
 
     async deleteAnnotation(id: string, toastMessage = '已删除标注') {
+        await this.callbacks.beforeDeleteAnnotations?.();
         if (!id) return;
         if (this.editingNoteId === id) await this.finishInlineEdit();
         const existed = this.notes.some(n => n.id === id);
@@ -499,6 +502,8 @@ export class AnnotationController {
         renderNotesList({
             elements: this.elements,
             notes: sidebarNotes,
+            getGoalAction: this.callbacks.getGoalAction,
+            onLinkGoal: this.callbacks.onLinkGoal ? id => { Promise.resolve(this.callbacks.onLinkGoal?.(id)).catch(error => this.callbacks.showToast?.(String(error.message || error))); } : null,
             notesScope: this.notesScope,
             showHighlightsInSidebar: this.showHighlightsInSidebar,
             focusedNoteIds: this.focusedNoteIds,

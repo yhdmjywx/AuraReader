@@ -15,6 +15,8 @@ if (process.isMainFrame) {
             queryNotes: query => ipcRenderer.invoke('aura:storage:queryNotes', query),
             saveNote: command => ipcRenderer.invoke('aura:storage:saveNote', command),
             deleteNote: command => ipcRenderer.invoke('aura:storage:deleteNote', command),
+            queryGoals: query => ipcRenderer.invoke('aura:storage:queryGoals', query),
+            saveGoals: command => ipcRenderer.invoke('aura:storage:saveGoals', command),
             restore: command => ipcRenderer.invoke('aura:storage:restore', command),
             backup: () => ipcRenderer.invoke('aura:storage:backup', undefined)
         },

@@ -1747,3 +1747,45 @@ mark.hl-active {
 .note-card-actions[hidden] { display: none; }
 .immersive-notes .margin-highlight-label { font-size: 12px; color: var(--text-muted); }
 
+
+/* Goal module: the approved single-page margin design. */
+.goal-panel { position:absolute; top:58px; bottom:70px; left:0; width:260px; padding:0 5px; overflow:auto; scrollbar-width:thin; z-index:3; color:var(--bg-paper-text); font-size:14px; line-height:1.8; }
+.goal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.goal-header .btn { color:var(--text-secondary); }
+#tree-toggle { padding-left:0; font-size:12px; gap:5px; }
+.goal-icon { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border:0; background:transparent; color:var(--text-secondary); border-radius:4px; cursor:pointer; flex:none; }
+.goal-icon:hover { background:var(--nav-pill-bg); color:var(--primary); }
+.goal-parent { display:flex; gap:5px; align-items:center; width:100%; border:0; background:none; color:var(--text-secondary); text-align:left; font-size:12px; line-height:1.6; padding:0 0 12px; cursor:pointer; }
+.goal-parent span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.goal-current { display:flex; align-items:flex-start; gap:8px; }
+.goal-title { flex:1; width:0; padding:0; border:0; background:none; color:inherit; text-align:left; font-size:16px; font-weight:500; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; cursor:text; }
+.goal-children { margin:14px 0 0 14px; }
+.goal-child { display:block; width:100%; padding:8px 0; border:0; background:none; color:var(--text-secondary); text-align:left; font-size:14px; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere; cursor:pointer; }
+.goal-child:hover { color:var(--primary); }
+.goal-items-toggle { display:inline-flex; align-items:center; gap:6px; padding:0; margin-top:20px; border:0; background:none; color:var(--text-secondary); font-size:12px; cursor:pointer; }
+.goal-items { margin-top:12px; }
+.goal-item { display:flex; align-items:flex-start; gap:8px; margin:14px 0; }
+.goal-item > i { margin-top:3px; font-size:13px; color:var(--text-secondary); }
+.goal-item-text { flex:1; min-width:0; border:0; padding:0; background:none; color:var(--text-secondary); text-align:left; font-size:13px; line-height:1.8; cursor:pointer; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
+.goal-item-text:hover { color:var(--primary); }
+.goal-item .goal-icon { width:24px; height:24px; }
+.goal-tree { list-style:none; padding:0; margin:0; }
+.goal-tree-row { display:flex; align-items:flex-start; gap:4px; padding:5px 0; }
+.goal-tree-label { flex:1; min-width:0; padding:2px 0; background:none; border:0; text-align:left; color:var(--text-secondary); line-height:1.8; cursor:pointer; white-space:pre-wrap; overflow-wrap:anywhere; }
+.goal-tree-label[aria-current="true"] { color:var(--primary); }
+.tree-spacer { width:28px; flex:none; }
+.goal-editor { margin:0; width:100%; }
+.goal-editor textarea { width:100%; min-height:32px; margin:0; padding:0; border:0; border-bottom:1px solid var(--border-color); border-radius:0; resize:none; overflow:hidden; background:none; color:inherit; font:inherit; font-size:16px; line-height:1.75; white-space:pre-wrap; }
+.goal-editor textarea:focus-visible { outline:2px solid var(--primary); outline-offset:4px; }
+.goal-editor.is-new { margin-top:14px; }
+.goal-current > .goal-icon,.goal-item > .goal-icon { opacity:0; }
+.goal-current:hover > .goal-icon,.goal-current:focus-within > .goal-icon,
+.goal-item:hover > .goal-icon,.goal-item:focus-within > .goal-icon { opacity:1; }
+@media (hover:none) { .goal-current > .goal-icon,.goal-item > .goal-icon { opacity:1; } }
+
+.goal-status { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.goal-panel [hidden] { display:none !important; }
+#goal-tree-toggle { padding-left:0; font-size:12px; gap:5px; color:var(--text-secondary); }
+.goal-editor { flex:1; min-width:0; }
+.goal-panel .goal-icon:disabled { opacity:.5; cursor:default; }
+.goal-panel button:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }

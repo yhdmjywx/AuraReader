@@ -34,7 +34,7 @@ export class AppShell {
 
     setBookLoading(loading: boolean) {
         // Leave header and shelf controls available for a newer book request.
-        for (const panel of [this.elements?.readerPanel, this.elements?.notesPanel]) {
+        for (const panel of [this.elements?.readerPanel, this.elements?.notesPanel, this.elements?.goalPanel]) {
             if (!panel) continue;
             panel.inert = loading;
             panel.setAttribute('aria-busy', String(loading));
@@ -55,6 +55,7 @@ export class AppShell {
                 this.elements.btnThemeToggle.innerHTML = '<i class="ri-sun-line"></i>';
             }
         }
+        this.callbacks.onThemeChanged?.();
     }
 
     toggleAppearance(forceOpen?: boolean) {

@@ -1,3 +1,4 @@
+import type { GoalStateRecord, SaveGoalsCommand, NoteDeleteRevision } from './storage.js';
 import type { BookRecord, BookRevision, DeleteBookCommand, DeleteNoteCommand, NoteRecord, RestoreCommand, Revision, SaveBookCommand, SaveNoteCommand } from './storage.js';
 
 export type DesktopResult<T> = { ok: true; value: T } | { ok: false; error: { message: string; status: number; details?: unknown } };
@@ -15,8 +16,10 @@ export interface DesktopStorage {
     saveBook(command: SaveBookCommand): Promise<DesktopResult<BookRevision>>;
     deleteBook(command: DeleteBookCommand): Promise<DesktopResult<Revision>>;
     queryNotes(query: { bookIds: string[] }): Promise<DesktopResult<{ records: NoteRecord[] }>>;
+    queryGoals(query: { bookIds: string[] }): Promise<DesktopResult<{ records: GoalStateRecord[] }>>;
+    saveGoals(command: SaveGoalsCommand): Promise<DesktopResult<Revision>>;
     saveNote(command: SaveNoteCommand): Promise<DesktopResult<Revision>>;
-    deleteNote(command: DeleteNoteCommand): Promise<DesktopResult<Revision>>;
+    deleteNote(command: DeleteNoteCommand): Promise<DesktopResult<NoteDeleteRevision>>;
     restore(command: RestoreCommand): Promise<DesktopResult<{ books: number; notes: number }>>;
     backup(): Promise<DesktopResult<{ name: string; integrity: string; books: number; notes: number }>>;
 }

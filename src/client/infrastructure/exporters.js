@@ -341,19 +341,21 @@ function chapterBodyMarkdown(root, notes = []) {
     return { markdown: children(root).trim(), unplacedNotes };
 }
 
-export function exportSelectiveBackup({ selectedBooks = [], notes = [] }) {
+export function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStates = [], includeNotes = true }) {
     const normalizedNotes = (notes || []).map(normalizeAnnotation).filter(Boolean);
     const exportedAt = new Date().toISOString();
     const yyyymmdd = exportedAt.slice(0, 10).replace(/-/g, '');
 
     const files = selectedBooks.map(book => {
         const backupPayload = {
-            version: "1.0",
+            version: "1.1",
             // Keep the existing envelope for compatibility with earlier readers.
             type: "aurareader_full_backup",
             exportedAt,
             books: [book],
-            notes: normalizedNotes.filter(note => note.bookId === book.id)
+            notes: normalizedNotes.filter(note => note.bookId === book.id),
+            goalStates: goalStates.filter(state => state.bookId === book.id).map(state => includeNotes
+                ? state : { bookId: state.bookId, goals: state.goals })
         };
         const bookTitle = String(book.title || book.id || '图书')
             .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_');

@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { createDataStore, StorageError, bookRecord, noteRecord } = require('../server/dataStore.js');
+const { createDataStore, StorageError, bookRecord, noteRecord, goalRecord, goalBackupRecord } = require('../server/dataStore.js');
 const { createMigration } = require('../server/migration.js');
 const { backupDatabase } = require('../server/storageMaintenance.js');
 
@@ -127,6 +127,15 @@ function createDesktopStorage(directory) {
                         const c = command(body, ['opId', 'expected', 'id']);
                         return current.deleteBook({ ...writeVersion(c), id: identifier(c.id) });
                     }
+                    case 'queryGoals': {
+                        const c = command(body, ['bookIds']);
+                        if (!Array.isArray(c.bookIds)) throw new StorageError('无效书籍列表');
+                        return { records: current.goals(c.bookIds.map(identifier)) };
+                    }
+                    case 'saveGoals': {
+                        const c = command(body, ['opId', 'expected', 'generation', 'state']);
+                        return current.saveGoals({ ...writeVersion(c), generation: identifier(c.generation), state: goalRecord(c.state) });
+                    }
                     case 'queryNotes': {
                         const query = command(body, ['bookIds']);
                         if (!Array.isArray(query.bookIds)) throw new StorageError('无效书籍列表');
@@ -141,9 +150,11 @@ function createDesktopStorage(directory) {
                         return current.deleteNote({ ...writeVersion(c), generation: identifier(c.generation), id: identifier(c.id), bookId: identifier(c.bookId) });
                     }
                     case 'restore': {
-                        const c = command(body, ['opId', 'books', 'notes']);
+                        const withGoals = !!body && Object.hasOwn(body, 'goalStates');
+                        const c = command(body, ['opId', 'books', 'notes', ...(withGoals ? ['goalStates'] : [])]);
                         if (!Array.isArray(c.books) || !Array.isArray(c.notes)) throw new StorageError('备份必须包含书籍和标注数组');
-                        return current.restore({ opId: identifier(c.opId), books: c.books.map(bookRecord), notes: c.notes.map(noteRecord) });
+                        if (withGoals && !Array.isArray(c.goalStates)) throw new StorageError('无效 Goal 备份');
+                        return current.restore({ opId: identifier(c.opId), books: c.books.map(bookRecord), notes: c.notes.map(noteRecord), ...(withGoals ? { goalStates: /** @type {unknown[]} */ (c.goalStates).map(goalBackupRecord) } : {}) });
                     }
                     case 'backup': {
                         const result = await backupDatabase(directory);

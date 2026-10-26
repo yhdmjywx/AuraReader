@@ -1,3 +1,4 @@
+const { validateGoalState } = require('./goalValidation');
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
@@ -9,6 +10,17 @@ function verifyDatabase(filename) {
         const integrity = db.prepare('PRAGMA integrity_check').all();
         const foreignKeys = db.prepare('PRAGMA foreign_key_check').all();
         if (integrity.some(row => row.integrity_check !== 'ok') || foreignKeys.length) throw new Error('SQLite 完整性校验失败');
+        if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='goal_states'").get()) {
+            for (const row of db.prepare('SELECT payload FROM goal_states WHERE deleted=0').all()) {
+                const state = JSON.parse(row.payload);
+                const book = db.prepare('SELECT deleted FROM books WHERE id=?').get(state.bookId);
+                if (!book || book.deleted) throw new Error('Goal 缺少有效书籍');
+                validateGoalState(state, (id, bookId) => {
+                    const note = db.prepare('SELECT book_id,deleted FROM annotations WHERE id=?').get(id);
+                    return !!note && !note.deleted && note.book_id === bookId;
+                });
+            }
+        }
         return { integrity: 'ok', books: db.prepare('SELECT count(*) AS n FROM books WHERE deleted=0').get().n, notes: db.prepare('SELECT count(*) AS n FROM annotations WHERE deleted=0').get().n };
     } finally { db.close(); }
 }

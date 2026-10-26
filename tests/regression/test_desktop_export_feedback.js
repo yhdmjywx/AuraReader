@@ -3,9 +3,9 @@ const { JSDOM } = require('jsdom');
 
 (async () => {
     const dom = new JSDOM('<body></body>', { url: 'https://reader.test' });
-    const old = new Map(['window', 'document'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+    const old = new Map(['window', 'document', 'localStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     try {
-        globalThis.window = dom.window; globalThis.document = dom.window.document;
+        globalThis.window = dom.window; globalThis.document = dom.window.document; globalThis.localStorage = dom.window.localStorage;
         let complete; const calls = [];
         dom.window.auraDesktop = { files: { saveExport: input => {
             calls.push(input); return new Promise(resolve => { complete = resolve; });
@@ -32,6 +32,11 @@ const { JSDOM } = require('jsdom');
         list.innerHTML = books.map(book => `<input class="chk-backup-book" type="checkbox" data-id="${book.id}" checked>`).join('');
         controller.elements = { backupBookCheckboxList: list, chkBackupIncludeNotes: { checked: false } };
         controller.availableBackupBooks = books;
+        dom.window.auraDesktop.storage = {
+            status: async () => ({ ok: true, value: { initialized: true } }),
+            listBooks: async () => ({ ok: true, value: { records: books.map(book => ({ id: book.id, revision: 1, generation: book.id, deleted: false, value: book })) } }),
+            queryGoals: async () => ({ ok: true, value: { records: [] } })
+        };
         saves = 0;
         await controller.executeSelectiveBackupExport();
         assert.match(messages.pop(), /已保存 1\/3.*取消/);

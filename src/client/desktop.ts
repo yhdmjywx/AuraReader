@@ -1,3 +1,4 @@
+import { assertNoGoalRecovery } from './infrastructure/goalRecovery.js';
 import { drainStorage, unwrapDesktop } from './infrastructure/storageClient.js';
 import { positionMarginNotes } from './features/layout/marginNotesLayout.js';
 
@@ -80,9 +81,12 @@ bridge.lifecycle.onPrepareClose(async requestId => {
     document.body.inert = true;
     try {
         if (boot) await boot;
+        await application?.goals.finishInlineEdit();
         await application?.annotations.finishInlineEdit();
         await application?.annotations.assertInlineWritesSaved();
+        await application?.goals.assertWritesSaved();
         await drainStorage();
+        assertNoGoalRecovery();
         assertNoRecoveryBuffers();
         unwrapDesktop(await bridge.lifecycle.completeClose(requestId, { ok: true }));
     } catch (error) {

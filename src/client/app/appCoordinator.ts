@@ -1,3 +1,5 @@
+import type { GoalController } from '../features/goals/goalController.js';
+import { loadGoalsForBook } from '../infrastructure/goalRepository.js';
 import type { Session } from './session.js';
 import type { ReaderController } from '../features/reader/readerController.js';
 import type { AnnotationController } from '../features/annotations/annotationController.js';
@@ -10,6 +12,7 @@ import type { ReaderMode } from '../domain/book.js';
 import type { NoteDraft } from './contracts.js';
 import { errorMessage } from '../infrastructure/storageError.js';
 interface CoordinatorDependencies {
+    goalController?: GoalController;
     session: Session;
     readerController: ReaderController;
     annotationController: AnnotationController;
@@ -48,6 +51,7 @@ export class AppCoordinator {
     selection?: SelectionController;
     backup?: BackupController;
     shell?: AppShell;
+    goals?: GoalController;
     private openBookRequestId: number;
     constructor({
         session,
@@ -57,7 +61,8 @@ export class AppCoordinator {
         layoutController,
         selectionController,
         backupController,
-        appShell
+        appShell,
+        goalController
     }: CoordinatorDependencies) {
         this.session = session;
         this.reader = readerController;
@@ -67,6 +72,7 @@ export class AppCoordinator {
         this.selection = selectionController;
         this.backup = backupController;
         this.shell = appShell;
+        this.goals = goalController;
         this.openBookRequestId = 0;
     }
 
@@ -78,6 +84,7 @@ export class AppCoordinator {
         try {
             // Finish the old book's editor before reading, while it still owns
             // the session. Reads below must not replace any current UI state.
+            await this.goals?.finishInlineEdit();
             await this.annotations.finishInlineEdit();
             if (requestId !== this.openBookRequestId) return;
 
@@ -96,10 +103,14 @@ export class AppCoordinator {
             const notes = await loadNotesForBook(bookId);
             if (requestId !== this.openBookRequestId) return;
 
+            const goalState = this.goals ? await loadGoalsForBook(bookId) : null;
+            if (requestId !== this.openBookRequestId) return;
+
             // No await between installing the complete data and rendering it.
             // Session subscribers see the matching reader and annotations.
             this.annotations.setNotesForBook(notes);
             this.reader.setBook(bookId, book);
+            if (goalState) this.goals?.setStateForBook(goalState);
             this.session.setCurrentBookId(bookId);
             this.reader.renderPage(1, false, this.annotations.getNotes());
             this.annotations.refreshVisibleNotes();
@@ -260,6 +271,7 @@ export class AppCoordinator {
     async deleteBook(bookId: string) {
         if (!bookId) return;
         if (this.session.getCurrentBookId() === bookId) await this.annotations.finishInlineEdit?.();
+        if (this.session.getCurrentBookId() === bookId) await this.goals?.finishInlineEdit();
         await deleteBookFromDB(bookId);
         if (this.shelf) {
             await this.shelf.refreshShelf();

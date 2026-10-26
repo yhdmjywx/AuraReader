@@ -51,6 +51,8 @@ function createStorageApi(store) {
                 const actions = {
                     '/api/storage/books/save': () => store.saveBook(body),
                     '/api/storage/books/delete': () => store.deleteBook(body),
+                    '/api/storage/goals/query': () => ({ records: store.goals(body.bookIds) }),
+                    '/api/storage/goals/save': () => store.saveGoals(body),
                     '/api/storage/notes/query': () => ({ records: store.notes(body.bookIds) }),
                     '/api/storage/notes/save': () => store.saveNote(body),
                     '/api/storage/notes/delete': () => store.deleteNote(body),

@@ -22,7 +22,9 @@ export function renderNotesList({
     onDelete = null,
     editingNoteId = null,
     onInput = null,
-    onFinish = null
+    onFinish = null,
+    getGoalAction = null,
+    onLinkGoal = null
 }) {
     if (!elements || !elements.notesList) return;
 
@@ -137,7 +139,7 @@ export function renderNotesList({
         }
 
         card.addEventListener('click', (e) => {
-            if (e.target.closest('.btn-delete-note') || e.target.closest('.note-editor')) return;
+            if (e.target.closest('button') || e.target.closest('.note-editor')) return;
             if (noteKind && typeof onEdit === 'function') onEdit(note);
             else if (typeof onJump === 'function') onJump(note);
         });
@@ -159,6 +161,14 @@ export function renderNotesList({
             });
         }
 
+        if (onLinkGoal) {
+            const linkButton = document.createElement('button');
+            linkButton.className = 'btn btn-ghost-sm btn-goal-link'; linkButton.type = 'button';
+            linkButton.dataset.annotationId = note.id;
+            linkButton.innerHTML = '<i class="ri-links-line" aria-hidden="true"></i><span>Goal</span>';
+            linkButton.addEventListener('click', event => { event.stopPropagation(); onLinkGoal(note.id); });
+            card.querySelector('.note-card-actions').appendChild(linkButton);
+        }
         elements.notesList.appendChild(card);
         if (note.id === editingNoteId) startInlineEditor({ card, note, elements, onInput, onFinish });
     });
@@ -247,4 +257,14 @@ function escapeHtml(str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+export function updateNoteGoalActions(elements, getGoalAction) {
+    for (const control of elements?.notesList?.querySelectorAll('.btn-goal-link') || []) {
+        const state = getGoalAction?.(control.dataset.annotationId);
+        control.hidden = !state?.visible; control.disabled = !state || state.disabled;
+        control.title = state?.linked ? 'Added to goal' : 'Add to goal';
+        control.setAttribute('aria-label', control.title);
+        control.querySelector('i').className = state?.linked ? 'ri-check-line' : 'ri-links-line';
+    }
 }

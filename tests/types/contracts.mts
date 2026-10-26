@@ -63,3 +63,15 @@ function desktopContracts(bridge: DesktopBridge) {
     bridge.lifecycle.onPrepareClose((event: { sender: unknown }) => event);
 }
 void desktopContracts;
+
+// Goal storage stays book-scoped and strongly typed.
+function goalStorageCalls() {
+    const state = { bookId: 'book', goals: [], links: [] };
+    storageRequest('goals/save', { opId: 'op', expected: 0, generation: 'g', state });
+    storageRequest('goals/query', { bookIds: ['book'] });
+    // @ts-expect-error Goal saves require their book generation.
+    storageRequest('goals/save', { opId: 'op', expected: 0, state });
+    // @ts-expect-error A note cannot be sent as a Goal state.
+    storageRequest('goals/save', { opId: 'op', expected: 0, generation: 'g', state: note });
+}
+void goalStorageCalls;

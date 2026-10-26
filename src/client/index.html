@@ -217,12 +217,15 @@
                 <button class="tooltip-btn" id="btn-add-note" title="添加随笔"><i class="ri-sticky-note-line"></i> 笔记</button>
             </div>
 
-            <!-- Existing annotations expose only their independent delete actions. -->
+            <!-- Existing annotation actions; Goal links to the current reading intent. -->
             <div class="selection-tooltip" id="highlight-action-tooltip">
                 <button class="tooltip-btn" id="btn-hl-remove" type="button" style="color: #fca5a5;" title="只移除黄色高亮"><i class="ri-delete-bin-line"></i> 删除高亮</button>
                 <button class="tooltip-btn" id="btn-note-remove" type="button" style="color: #fca5a5;" title="只删除此处关联的笔记"><i class="ri-delete-bin-line"></i> <span>删除笔记</span></button>
+                <button class="tooltip-btn" id="btn-annotation-goal" type="button" hidden aria-label="Add to goal"><i class="ri-links-line" aria-hidden="true"></i><span>Goal</span></button>
             </div>
         </section>
+
+        <aside class="goal-panel" id="goal-panel" aria-label="Reading goals" hidden></aside>
 
         <!-- Immersive notes on the reading surface -->
         <section class="notes-panel" id="notes-panel">

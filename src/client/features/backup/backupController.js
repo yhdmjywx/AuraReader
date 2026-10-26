@@ -1,3 +1,4 @@
+import { getGoalsForBooks } from '../../infrastructure/goalRepository.js';
 /* ==========================================================================
    BackupController - Exporters & Backup Feature Controller
    Authority owner of: availableBackupBooks, backup checkbox selection.
@@ -93,6 +94,7 @@ export class BackupController {
             return;
         }
 
+        await this.callbacks.beforeExport?.();
         const selectedBooks = this.availableBackupBooks.filter((b, idx) => selectedIds.includes(b.id || String(idx)));
         const { includeNotes } = getIncludeOptions(this.elements);
 
@@ -101,9 +103,11 @@ export class BackupController {
             notesToExport = await repoGetNotesForBooks(selectedIds);
         }
 
+        const goalStates = await getGoalsForBooks(selectedBooks.map(book => book.id));
         const results = await adapterExportSelectiveBackup({
             selectedBooks,
-            notes: notesToExport
+            notes: notesToExport,
+            goalStates, includeNotes
         });
 
         this.closeBackupSelectModal();
@@ -156,7 +160,7 @@ export class BackupController {
                 }
             }
 
-            await restoreRecords(booksToRestore, notesToRestore);
+            await restoreRecords(booksToRestore, notesToRestore, undefined, data.goalStates);
 
             if (this.callbacks.onRestoreBackup) {
                 await this.callbacks.onRestoreBackup({

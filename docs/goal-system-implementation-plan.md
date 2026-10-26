@@ -1,159 +1,105 @@
-# AuraReader Goal 模块实现计划
+# Goal 模块代码实现计划（以最终效果稿为准）
 
-日期：2026-10-25。以当前工作区代码为依据；这是实现计划与交互提案，Goal 业务尚未接入。
+日期：2026-10-25。代码基线：`c48695d`。2026-10-26 已按本计划接入 Goal 模块；实际交付与验证记录见 [实现记录](goal-system-implementation.md)。
 
-交互修订：笔记保持点击内容原位编辑，不增加“编辑／完成”按钮。高亮保持现有操作浮条，不把点击高亮改成打开 Goal 面板。归入只增加一个动作，目标统一由左侧当前选中的 Goal 决定。
+唯一 UX 基准：[最终效果稿](prototypes/goals.html)。本计划替代此前的探索方案；实现时按该稿接入现有 AuraReader，不再重新设计 Goal 的入口、面板或操作流程。
 
-## 1. 产品边界与交付物
+效果稿 SHA-256：`7b5d1c736e7bfdfdd127f833d9c0aeac7e56d38165639dc30b643a02d4a1dc0d`。本次不修改效果稿；后续若用户调整效果稿，再同步修改计划与验收项。
 
-Goal 是现有阅读器中的新功能模块，沿用 `main.ts → AppCoordinator → feature controller/UI → repository → storageClient → SQLite`，不引入框架、状态库、图数据库或另一套阅读工作台。
+## 1. 本轮范围
 
-- 自由输入 Goal；不设置目标／问题／体验类型，不弹分类选择，不自动生成阅读意图。
-- 支持多个根 Goal、子 Goal 及继续建立更深层子 Goal。允许完整树，但阅读界面只展示有用的一小段结构。
-- 高亮、笔记沿用现有记录，以 ID 关联；一条标注可以关联多个 Goal，用户每次只需选择一个归入位置。
-- 首轮只做用户主动选择的**单页分页模式**，验证左侧空白区域。双页及连续滚动不展开 Goal 面板，也不改其现有布局；切回单页保留当前 Goal。不借本次实现新增刷新后恢复阅读位置。
-- 无 AI、完成率、优先级、状态看板、任务期限、知识图谱或强制整理流程。
+Goal 表达阅读者自己的目的、问题或期待，在没有高亮和笔记时也能独立存在。高亮和笔记作为读者主动归入的相关材料，不决定 Goal 的含义，不自动生成或分类 Goal。
 
-效果稿：[prototypes/goals.html](prototypes/goals.html)。UI 与示例内容统一为英文，直接引用当前 `src/client/styles.css`、本地字体和 Remix Icon。移除演示工具栏、说明文案与底部位置切换，只展示单页左侧方案；所有交互仍仅在内存中，不读写真实书库。
+本轮实现最终稿已经呈现的闭环：多个根 Goal、多层子 Goal、原位编辑、章节相关子 Goal、完整树导航、已有高亮／笔记直接归入、自动展开相关内容、回到原文、解除关联，以及可靠保存和书籍备份恢复。
 
-## 2. 当前代码事实与复用方式
+以下后续方向保留在产品讨论中，不在本轮加入口或预建系统：Goal 内独立文字条目、点赞点踩、AI、拖拽、跨书共享 Goal、Goal 删除／移动／排序、完成度与期限、底部常驻面板、双页和连续滚动适配。Goal 自身的自由文字编辑属于本轮；独立文字条目是另一项后续能力。
 
-旧文档可能描述笔记侧栏；当前产品实际已是沉浸式页边笔记，应以源码为准。
+代码继续沿用 `main.ts → AppCoordinator / feature controller → domain / repository → storageClient → DataStore`。新增同级 Goal 功能模块；保留现有 DOM、TypeScript、SQLite 和桌面 IPC，不引入框架、通用内容引擎、事件总线或第二套数据库。
 
-| 当前实现 | Goal 如何复用 | 需要补的部分 |
+## 2. 最终稿的行为契约
+
+| 场景 | 必须实现的行为 | 对应原型位置 |
 | --- | --- | --- |
-| `domain/annotation.ts`、`domain/annotationEngine.ts` | `Annotation` 已区分 `note` 与 `highlight`；沿用 id、bookId、quote、comment、location | 不把 Goal 塞进 Annotation，不复制引用或重新创建笔记 |
-| `features/annotations/annotationController.ts` | 仍是高亮／笔记的唯一管理者；通过 `getNotes()` 查全书已保存标注 | 增加已保存、已删除通知及关联动作；草稿不能作为持久化关联目标 |
-| `features/annotations/notesUI.js`、`noteCaret.js` | 沿用点击笔记内容进入原位 textarea、输入保存、失焦／Escape／Ctrl+Enter 结束编辑、中文输入保护及编辑节点保留 | 不加“编辑／完成”按钮；只在既有笔记操作区补“归入 Goal”。Goal 用独立轻量行组件，不照搬依赖 quote 的 Note 校验 |
-| `features/annotations/selectionController.ts`、`selectionTooltipUI.js` | 保留点击已有标注后的原有小操作浮条、目标 ID、激活样式、选文保护及定位方式 | 在原浮条内追加“归入 Goal”，点击时直接关联左侧当前 Goal；不另弹 Goal 列表或新面板 |
-| `features/reader/annotationRenderer.js`、`visibleAnnotations.js` | 保留范围定位、高亮颜色及当前可见笔记判定 | Goal 不增加原文渲染标记，不修改选区偏移算法 |
-| `AppCoordinator.jumpToAnnotation()` | 点击 Goal 关联条目后直接定位原文 | 不另写引文检索、分页或跳转实现 |
-| `features/layout/marginNotesLayout.js` | 读取已有 `_marginGeometry`、`readingLeft`、`readingWidth`、`noteWidth` 等实际尺寸 | 增加左侧 Goal 几何计算；不挤占右侧 notes lane |
-| `main.ts` 与 `features/layout/layoutController.js` | 沿用页面、视口、布局回调及 `rememberAnchor → refitChapter` | 注入 Goal Controller；连接现有回调，不覆盖原回调逻辑 |
-| `app/session.ts`、`app/appCoordinator.ts` | 保留当前书籍上下文及 `openBookRequestId` 防串书机制 | 同一次打开请求准备 notes、goals 后一起安装；切书前提交 Goal 编辑 |
-| `infrastructure/storageClient.ts` | 复用 HTTP／桌面分发、`enqueue(bookId)`、`operationId`、`drainStorage` | 增加 Goal 路由及 revision 缓存；不新建 HTTP 或 IPC 客户端 |
-| `infrastructure/annotationRecovery.ts` | 复用“待确认操作缓冲、ACK 后清理、版本化重试”的策略 | 它绑定 note 命令与缓存键，不能直接用于 Goal；增加小型 Goal 恢复模块，不先重构成通用存储框架 |
-| `server/dataStore.js` | 共用数据库、`mutate` 幂等、事务、expected revision、book generation | 为现用库做显式增量 schema 升级并新增 Goal 文档表 |
-| `infrastructure/exporters.js`、`features/backup/backupController.js` | 扩展现有每书 `.aurabackup` 和原子 restore | 保存／恢复 Goal 树与关联；有 Goal 的备份必须包含其依赖标注 |
-| `src/shared/desktop.ts`、`desktop/preload.cjs`、`ipc.cjs`、`storage.cjs` | 沿用白名单能力、JSON 校验及共享 DataStore | 每个新增方法逐层注册；不能只实现浏览器 HTTP 路径 |
-| `src/client/desktop.ts` | 沿用关闭前完成编辑、排空存储、失败保留窗口的握手 | 同时检查 Goal 编辑与 Goal 恢复缓冲，否则 `drainStorage` 本身不能证明保存成功 |
+| 无 Goal | 左侧保留 `Goals` 与新建 `+`；可以直接阅读 | `.goal-header` |
+| 新建根 Goal | `+` 打开一个原位输入框；不选类别、不打开对话框 | `startGoalEdit('root')` |
+| 原位编辑 | 点击当前 Goal 文字，用 textarea 替换原文字，保留换行；无 Save/Cancel | `.goal-title`、`.goal-editor` |
+| 结束编辑 | 失焦、Escape、Ctrl/Cmd+Enter；Enter 换行；IME 组合输入期间不结束 | `finishGoalEdit()` |
+| 空白输入 | 新 Goal 空草稿丢弃并回到先前视图；已有 Goal 清空后恢复最近非空内容，不解释为删除 | `previousAllGoals` 与空白判断 |
+| 新建子 Goal | 当前 Goal 旁 `+` 原位输入；记录当前章节上下文；保存后选中新节点 | `.goal-current` |
+| 常态阅读 | 显示当前 Goal、单行直接父级、与当前章节相关的直接子 Goal | `.goal-parent`、`.goal-children` |
+| 完整树 | 点 `Goals` 在同一左侧区域切到完整树；分支箭头只展开／收起，文字按钮选择节点；不画关系线 | `.goal-tree` |
+| 选择 Goal | 从父级、子 Goal 或树选择后，回到该 Goal，并自动展开它已有的高亮和笔记 | `choose()`：`itemsOpen=true` |
+| 直接归入 | 笔记原操作区、高亮原操作浮条各加一个 `Goal` 动作，目标是左侧当前 Goal；不弹 Goal 列表 | `linkCurrent()` |
+| 归入反馈 | 回到当前 Goal 视图并自动展开相关内容；按钮显示勾，计数更新；不增加成功 toast | `allGoals=false; itemsOpen=true` |
+| 展开／收起 | 回形针＋非零数量；允许手动收起；再次选择或归入时重新展开 | `.goal-items-toggle` |
+| 关联内容 | 显示类型图标和最多两行摘录；高亮用 quote，笔记用 comment；不重复显示章节／时间／来源行 | `.goal-item` |
+| 原文定位 | 点击摘录走现有 `jumpToAnnotation(id)`；不再实现一套引文定位 | `locate()` 的产品接入 |
+| 解除关联 | 条目旁 `×` 只移出关联，原标注仍保留 | `Unlink` |
+| 既有笔记／高亮 | 笔记仍点击内容进入原位编辑；高亮仍显示原操作浮条并独立删除 | 原有 annotations 功能 |
+| 快捷操作 | 子 Goal `+`、解除关联 `×` 在 hover/focus 时出现，触屏常显；保留英文可访问名称与原生键盘操作 | 最终稿 CSS 与 aria 属性 |
 
-`src/client/core/`、`repositories/`、`ui/` 等旧入口主要用于兼容，新增实现放在现有 `domain/`、`features/`、`infrastructure/`，不要在新旧目录各写一套。
+新增区域及关联动作采用最终稿的简短英文文案，真实书籍和用户输入保持原语言。原型中省略的现有书库、字体、目录、导出等控件继续保留；这次不做全站翻译。
 
-## 3. Lean UX — current prototype
+原型只作为 Goal 的视觉和行为基准：不能把 `#stage` 的 1613×928 整页缩放、固定横坐标、演示数据、模拟章节切换或整块 DOM 重建直接复制到产品。
 
-The UI uses English. Reader-written Goal text remains unrestricted, including multiline text and any language. This revision changes presentation only; the data model and reuse boundaries below still apply.
+## 3. 现有代码复用与新增文件
 
-### 3.1 One place for each task
+| 位置 | 本轮工作 |
+| --- | --- |
+| 新增 `src/client/domain/goal.ts` | Goal、书内 Goal 状态与关联类型 |
+| 新增 `src/client/domain/goalEngine.ts` | 创建／编辑、树与路径查询、章节相关子节点、关联／解除、完整性校验；纯函数，不含 DOM/数据库 |
+| 新增 `src/client/features/goals/goalController.ts` | 当前书数据、选择／树／展开／编辑状态、串行保存与错误状态；对外暴露选择、编辑、归入和 flush 方法 |
+| 新增 `src/client/features/goals/goalUI.ts` | 按最终稿增量渲染 Goal 行、树、同一 textarea 和关联摘录；只发出动作，不调用存储 |
+| 新增 `src/client/features/goals/goalLayout.ts` | 从既有阅读几何和实际 DOM 计算左侧位置／可见性；不改变正文尺寸 |
+| 新增 `src/client/infrastructure/goalRepository.ts` | 读取／保存 Goal 状态、版本接受与恢复重试；复用 storageClient |
+| 新增 `src/client/infrastructure/goalRecovery.ts` | Goal 专用待确认写入缓冲；复用笔记的恢复策略，不重构成通用框架 |
+| `src/client/index.html`、`styles.css` | 挂载一个 `.goal-panel`，移植最终稿 Goal 专属样式；原笔记操作区与高亮浮条各补一个动作 |
+| `src/client/main.ts`、`app/elements.ts`、`app/contracts.ts` | DOM 引用、Goal callbacks 类型、同级控制器装配及跨模块连接 |
+| `app/appCoordinator.ts`、`app/session.ts` | 沿用书籍 session；在现有任务协调中安装／切换 Goal 数据、定位原文，不增加全局状态库 |
+| `features/annotations/notesUI.js`、`annotationController.ts` | 复用 note-card、原位编辑、焦点和保存流程；增加归入回调与内容变更通知 |
+| `features/annotations/selectionController.ts`、`selectionTooltipUI.js` | 沿用 activeAnnotationContext、原浮条定位／关闭、文本选择保护；新增同浮条内的归入动作 |
+| `features/layout/marginNotesLayout.js`、`layoutController.js` | 复用 marginGeometry 和模式状态；在已有布局更新之后刷新 Goal 位置 |
+| `infrastructure/storageClient.ts`、`src/shared/storage.ts` | 扩展既有请求分发、同书队列、Goal revision 与命令类型 |
+| `server/dataStore.js`、`dataStore.d.ts`、`storageApi.js` | 增量 schema、Goal 读写、服务端校验、同事务清理与恢复 |
+| `src/shared/desktop.ts`、`desktop/preload.cjs`、`ipc.cjs`、`storage.cjs` | 同时补齐桌面方法白名单、输入验证与共享 DataStore 调用 |
+| `src/client/desktop.ts` | 将 Goal flush、失败检查和恢复缓冲纳入现有关闭握手 |
+| `features/backup/backupController.js`、`infrastructure/exporters.js`、`server/storageMaintenance.js` 及相关声明 | 扩展书籍备份、原子恢复和 SQLite 完整性核验 |
 
-| Task | Entry point | Behavior |
-| --- | --- | --- |
-| Create a root Goal | + beside Goals | A single inline text field; no type, template, category, or dialog |
-| Switch Goals / inspect the full tree | Goals | Reuse the same left region for a collapsible outline; selecting a node returns to reading view and expands its linked highlights and notes |
-| Edit the current Goal | Its text | Replace the text with an inline field; no duplicate heading or editor panel |
-| Add a subgoal | + beside the current Goal | Show the action on hover or keyboard focus; always visible on touch devices; record the current chapter internally |
-| Return to the parent | One short parent row | Move up one level; do not repeat the entire ancestor path |
-| Review linked content | Paperclip + count | Only present when nonzero; selecting a Goal or linking content automatically expands its short excerpts; manual collapse remains available |
-| Return to the source | A linked excerpt | Use the existing jumpToAnnotation behavior |
-| Unlink content | × on an expanded excerpt | Available on hover or focus and on touch; preserve the original annotation |
+`annotationRenderer.js`、`annotationRangeEngine.ts`、章节分栏／翻页算法继续沿用；新增关联不改 quote、comment、color、timestamp 或 location。旧 `core/`、`repositories/`、`ui/` 兼容入口不再各建一套 Goal 实现。
 
-Reading view shows the current Goal and its relevant direct children. Full-tree navigation uses modest indentation and expand/collapse controls, with no relationship lines, arrows between cards, badges, or repeated paths. Deeper trees remain supported. User text wraps instead of being rewritten into system-generated short labels.
+## 4. 最小数据与保存协议
 
-The current Goal is the association destination. Do not automatically change it when turning a page or changing chapters. Other branches remain reachable through Goals. Chapter origin stays in the data, without a permanent Created in chapter label.
-
-### 3.2 Remove interface copy, retain capability
-
-Remove the prototype review toolbar, explanatory paragraphs, Single page label, placement/theme comparison controls, created-in metadata, separate All structure / Back controls, repeated New Goal rows, persistent Subgoal action text, Save/Cancel button pair, zero-content counts, and routine success toasts.
-
-Goal editing follows the existing note pattern: click text, type, finish on blur / Escape / Ctrl+Enter. Enter inserts a newline; IME composition must not finish an edit. Empty new drafts disappear; clearing an existing Goal does not silently delete it. Real persistence still uses the queued autosave and recovery rules in section 5.3; the local prototype commits its in-memory draft when editing ends.
-
-Keep icon buttons accessible through English names, focus styles, native keyboard activation, and short tooltips. Quiet quick actions remain in the keyboard order and become visible on focus. The English UI does not constrain how a reader expresses a Goal.
-
-### 3.3 Keep existing notes and highlight behavior
-
-- Notes still enter inline editing by clicking their content. Keep input saving, blur / Escape / Ctrl+Enter, IME protection, and the existing delete icon. There is no Edit or Done button.
-- Highlights retain their existing activation, selection protection, color/range rendering, delete action, small toolbar, and closing rules. Do not open a Goal picker when a highlight is clicked.
-- Add only one compact Goal action to each existing annotation action location. It directly links to the Goal selected on the left. Select a different destination on the left, rather than adding a second picker at the source.
-- Successful linking changes the existing action to a check, updates the count, and automatically expands the linked excerpts below the current Goal. If the full outline is open, return to the existing current-Goal view so the result is visible. Do not change the selected Goal, scroll the reader, or move focus to an excerpt. Readers can still collapse the content manually; adding another item opens it again. Announce the result to assistive technology without adding another visible toast or sentence.
-- Editing a note updates its linked excerpt without rebuilding either active textarea. Association does not change annotation content or turn every new annotation into an automatic link.
-- Duplicate associations are ignored; unlinking preserves the annotation. Deleting an annotation retains the existing independent deletion semantics and removes its links.
-- Enable the source action only for a unique annotation target. Ambiguous overlapping contexts retain current behavior; do not silently batch-link them or introduce another disambiguation panel in this prototype.
-
-Drag and drop remains an optional later comparison, using the same association command. All required actions remain available without dragging.
-
-### 3.4 Geometry and scope
-
-Read the actual marginGeometry result. Keep the existing 560px single-page text, right-hand notes, and reading anchor. Trial left-rail width is 200–260px, with 24px outer clearance and 40px from the body. Available space is readingLeft − 24 − 40; do not squeeze the body to fit a Goal rail.
-
-The prototype focuses on the left-side option. The final placement decision remains open; removing the bottom comparison button is not a data-model decision. Small-window recall, double-page support, and continuous-scroll support must not be improvised as part of this cleanup. Follow the previously scoped single-page implementation and record the remaining layout verification separately.
-
-### 3.5 Design references
-
-These references inform the reduction, not a new component library or framework:
-
-- [Apple — Context menus](https://developer.apple.com/design/human-interface-guidelines/context-menus): keep actions relevant to the object and avoid clutter.
-- [IBM Carbon — Menu guidelines](https://www.carbondesignsystem.com/building-blocks/core/components/menu/guidelines): disclose secondary actions when needed and keep labels short.
-- [Microsoft Fluent 2 — Tree](https://fluent2.microsoft.design/components/web/react/core/tree/usage): distinguish branch disclosure from selection, wrap content, and keep quick actions few and accessible.
-
-## 4. 最小数据模型
-
-建议一书一份轻量 Goal 文档：树与关联在同一 JSON 中原子保存，符合现有书籍／标注完整 JSON 的存储习惯。比首轮同时新增 Goal、边、层级排序等多套表和 API 更小；代价是同一本书的并发 Goal 修改共享一个 revision。正常阅读量下先采用此方案，不为尚无证据的规模问题增加架构。
+采用一书一份小型 Goal 状态，与当前完整 JSON 存储方式一致。Goal 不嵌进 `Book` payload，也不作为 `AnnotationKind` 的新种类。
 
 ```ts
-interface GoalOrigin {
-  sectionId: string;
-  sourcePage: number; // 1-based 源文档编号，不是屏幕栏号
-  chapter: string;    // 显示快照，不用章节标题充当唯一 ID
-}
 interface Goal {
   id: string;
   parentId: string | null;
   text: string;
-  origin: GoalOrigin | null;
-  createdAt: string; // ISO 时间，仅用于记录，不增加 UI 字段
+  origin: null | {
+    sourcePage: number; // 1-based 源文档，不是屏幕栏号
+    sectionId: string;
+    chapter: string;    // 仅来源快照，不作为关联主键或常驻 UI 标签
+  };
+  createdAt: string;    // ISO 时间
   updatedAt: string;
 }
 interface GoalLink { goalId: string; annotationId: string }
 interface BookGoalState {
   bookId: string;
-  goals: Goal[];     // 数组顺序是兄弟节点的稳定创建顺序
-  links: GoalLink[]; // (goalId, annotationId) 去重
+  goals: Goal[];
+  links: GoalLink[];
 }
-// 持久化包装沿用 StoredRecord<T>；state 不内嵌 revision。
+// StoredRecord 沿用 src/shared/storage.ts
+// 每本书一条，record.id = record.bookId
+// GoalStateRecord = StoredRecord<BookGoalState> & { bookId: string }
 ```
 
-不加 `type`、`progress`、`priority`、`status` 等字段。根 Goal 默认 `origin=null`；阅读中创建子 Goal 时取 reader 当前位置。一个源文档含多个 TOC 锚点时优先使用 sectionId，缺乏稳定子章节 ID 时退回 sourcePage 相关性，不使用屏幕页号或标题匹配冒充精确关联。
+根 Goal 的 origin=null；子 Goal 记录创建时 reader 的源文档位置。本轮章节相关性按该书源文档编号匹配，sectionId 辅助定位；不把显示栏号或章节标题作为稳定 ID，同一源文档内多个 TOC 小节不伪装成精确分节筛选。完整树始终可找到其他章节的节点。
 
-`selectedGoalId`、展开状态、左侧／浮层开关属于呈现状态，由 Goal Controller 按书保留在内存；不进入书籍备份，不污染 Goal 树。新一轮打开可显示第一个根 Goal，刷新后如何恢复选择暂不扩范围。
+数组保持创建／归入顺序，不增加排序入口。链接以 `(goalId, annotationId)` 去重，允许同一标注经用户明确操作分别归入不同 Goal；数量只计算当前 Goal 的直接关联，不隐含汇总后代。
 
-核心约束同时在纯函数与存储边界校验：
-
-- Goal ID 唯一，parent 存在，不能以自己或后代为父节点，不接受环；迭代遍历，避免深树递归溢出。
-- 空白内容不能创建；已有 Goal 编辑为空时取消这次清空并恢复原内容，删除走明确动作。支持纯文本与多行，渲染用 `textContent`。
-- link 的两端必须存在，并且 annotation 属于同一 active book；重复归入为无操作。
-- 选择父 Goal 时关联数默认只计算直接归入内容；后代内容逐层查看，避免隐含汇总与重复计数。
-- 删除 Goal 的推荐语义：只删除该 Goal 及其直接关联，直接子 Goal 提升到其父级，其他标注不动。通过就地确认明确告知子 Goal 将保留；不默认级联删除整棵树。原型暂不承诺完整删除流程。
-- 删除标注时清除所有相关 GoalLink；删除书籍时一起清除其 Goal 文档；恢复、重导入后不得留下对旧 generation 的待写命令。
-
-## 5. 文件与接口变更
-
-### 5.1 新增的模块
-
-| 文件（拟新增） | 最小职责 |
-| --- | --- |
-| `src/client/domain/goal.ts` | 上述 Goal／GoalState 类型 |
-| `src/client/domain/goalEngine.ts` | 创建、编辑、提升子节点删除、路径／子节点查询、关联与解除；纯函数 |
-| `src/client/features/goals/goalController.ts` | 当前书的 GoalState、选择、编辑草稿、写入状态与 callbacks |
-| `src/client/features/goals/goalUI.ts` | 左侧轻量 Goal 行、原位输入、局部层级和关联摘录；目标在左侧选择，无数据库调用 |
-| `src/client/features/goals/goalLayout.ts` | 只读取既有阅读几何，决定左侧位置／空间不足的召回 |
-| `src/client/infrastructure/goalRepository.ts` | 读取／保存 GoalState，使用既有队列、版本、generation 与 transport |
-| `src/client/infrastructure/goalRecovery.ts` | 独立命名的待写缓冲和 ACK 清理，不储存整本书或标注副本 |
-
-这些文件只按现有边界拆分，不为一次动作新增 service 层、依赖注入容器或事件总线。UI 继续用现有 DOM 渲染方式。
-
-### 5.2 存储协议与数据库
-
-新增 `goal_states(book_id PRIMARY KEY REFERENCES books(id), payload, revision, deleted)`，每书一行。新增两项协议即可覆盖首轮所有 Goal 动作：
+保存到 `goal_states(book_id PRIMARY KEY REFERENCES books(id), payload, revision, deleted)`，复用 `mutate`、`opId`、expected revision 和 book generation：
 
 ```ts
 'goals/query': {
@@ -161,86 +107,122 @@ interface BookGoalState {
   response: { records: GoalStateRecord[] };
 };
 'goals/save': {
-  request: { opId: string; expected: number; generation: string; state: BookGoalState };
+  request: {
+    opId: string; expected: number; generation: string;
+    state: BookGoalState;
+  };
   response: { revision: number };
 };
 ```
 
-`GoalStateRecord` 为 `StoredRecord<BookGoalState> & { bookId: string }`，令 id=bookId；无行表示空 GoalState、revision=0。清空最后一个 Goal 保存空文档，不另增删除接口。文档按书保存，但不能修改 `Book` payload，否则每次编辑 Goal 都会重写整本书。
+没有记录表示空状态、revision=0；读取失败不是空状态，不能据此保存空文档。Goal ID 在书内唯一，parent 必须存在且无环；迭代遍历深树。text 保留原始换行，空白只用于判断有效性；渲染使用 textContent。所有链接必须指向同一有效书籍中的现存标注。服务端在一个事务中完成整份状态的校验与保存，拒绝孤儿、跨书引用、重复节点和不合法版本。
 
-需要同步修改 `src/shared/storage.ts`、`src/shared/desktop.ts`、`storageClient.ts`、`dataStore.js` 及 `dataStore.d.ts`、`storageApi.js`、`desktop/preload.cjs`、`ipc.cjs`、`storage.cjs`。桌面方法为 `queryGoals`、`saveGoals`，沿用逐方法白名单和严格字段校验；同时更新现有 `.d.ts` 与类型契约测试。
+### 4.1 数据库与双端接入
 
-**现用库升级是必要工作：** 当前 DataStore 拒绝 `user_version>1`，且每次启动执行 `PRAGMA user_version=1`。应改成明确的 v1→v2 事务式加表升级，新库建立 v2；不清库、不重建 annotations、不重新解析 EPUB。对未知更高版本继续拒绝，不无条件降版本。原始旧数据库／IndexedDB 自动迁移仍不扩大范围。升级前使用现有 `backupDatabase` 在连接可用时完成一致性备份，失败则不进入升级。
+当前 `createDataStore()` 拒绝 user_version>1，且每次打开都写 user_version=1。实现时改为明确的新库 v2 与现用 v1→v2 加表升级；schema 修改和版本提升放在同一事务中。失败回滚，保留更高版本拒绝及数据库丢失保护，不清库、不重写旧书／标注、不重新解析 EPUB。
 
-所有 Goal 保存仍走 `mutate`、expected、activeBook generation；原子校验整棵树和全部 link 后再写入。冲突保留本地草稿和最后的已确认基线，提示重载处理，不盲目把旧全文配上最新 revision 重发覆盖别人修改。
+保持 DataStore 同步打开约定，不在同步构造函数中塞入未等待的异步备份。升级验证前通过现有 `storageMaintenance.js backup` 对测试副本做一致性备份；SQLite 日常备份与校验需同时覆盖新表，并验证 JSON 内 parent/link 的逻辑完整性。
 
-**删除标注涉及两种数据：** 在已有 `deleteNote` 事务中同步删 link 并增加 GoalState revision；不能依靠 UI 回调最终清理。响应增加可选的最新 `goalState`，客户端接收并刷新已确认状态。若有尚未提交的本地 Goal 操作，以已确认基线为准重放可确定的编辑／归入意图，去除已删除目标；存在文本或结构冲突则保留草稿并停写，不能直接覆盖。重试同一 opId 返回旧响应时，不用较低 revision 覆盖较新缓存。仅当 link 确实变化才增加 Goal revision。
+HTTP 增加两条路由；桌面增加 `queryGoals`、`saveGoals` 两项明确能力，从 preload、IPC、storage 校验到共享 DataStore 逐层注册。保持现有发送者验证和 JSON 字段限制，不开放任意通道或 SQL；更新 `.d.ts` 与 `tests/types/contracts.mts`。
 
-`deleteBook` 同事务将 GoalState 置删除标记并提高 revision，客户端清理其版本／待写缓冲。恢复已删书籍后旧 generation 命令仍应拒绝。服务端校验与事务不能用前端防误操作代替。
+### 4.2 写入、恢复及删除
 
-### 5.3 打开、输入与关闭流程
+- 所有 Goal 写入使用现有 `enqueue(bookId)`，与同书笔记／书籍写入共用顺序；有实际数据变化才保存，选择／翻页／展开不写数据库。
+- 小型待写缓冲使用独立 `aura_goals_pending_` 前缀，仅保存未确认 Goal 状态／操作和必要版本，不缓存整书或标注正文副本。输入先同步进入缓冲，再提交 SQLite；数据库 ACK 后按本地写入版本清理，旧 ACK 不能清掉新输入。
+- 创建的空草稿只在内存，首次非空后进入可恢复草稿缓冲；新节点结束编辑前不写入已确认树，重开时恢复同一草稿，不擅自变成已创建 Goal。结束时为空则清理该草稿，非空则保存节点，ACK 后清理缓冲，避免新建后又清空需要额外的 Goal 删除操作。已有 Goal 输入先进入待写恢复，清空时保留最近非空内容，结束编辑恢复它。可短暂合并尚未发送的输入；失焦、切书、切模式、备份和关闭立即 flush。不要照搬原型“只在 blur 时写内存”的可靠性边界。
+- 同 opId 重试保留相同命令；已发送但未收到 ACK 的命令不能随意修改。409 保留本地输入与已确认基线，停止盲目重发，复用现有错误反馈；不将旧全文换上新 revision 后覆盖。
+- `deleteNote` 在原事务中清除该 annotationId 的全部 GoalLink，且仅在关联变化时提升 Goal revision；响应扩展为 `{ revision, goalState? }`。不能只靠前端回调最终清理。客户端只接受不低于当前版本的记录；有冲突草稿时保留草稿，显式暂停受影响的后续保存，不自动覆盖。
+- 同书正常操作先结束当前 Goal 编辑并按队列提交，再删除标注，减少自身操作冲突；笔记清空删除等原路径也由服务端兜底。无论从哪个入口删除，都保证库内不留悬空关联。
+- 删除书籍时同事务将 Goal 状态置删除标记并提升 revision；成功后清理该书 Goal 版本、呈现状态和恢复缓冲。重建书籍后旧 generation 的写入继续拒绝。
 
-1. 切书前完成当前笔记和 Goal 编辑。依照现有打开请求令牌读取书籍，再并行读取该书 notes 与 goals；每次 await 后检查令牌。只有最新请求才能同步安装 session、reader、annotations、goals 并渲染。Goal 读取失败需明确提示并禁止空状态覆盖数据库，不能伪装为“没有 Goal”。
-2. Goal 原位输入沿用笔记的可见编辑方式和 IME 互锁。新增 Goal 的空草稿只在内存；有内容后的输入先写待确认缓冲，随后以短暂合并写入提交，失焦／Ctrl+Enter／切书时立即 flush。Escape 结束编辑，不把已 ACK 的文字伪装为撤销。
-3. 不重建当前 textarea，不因 notes 更新或 Goal 计数变化丢失光标与中文组合输入。输入 Goal 时左右键、D 等不会触发翻页／模式切换；扩展 `AppShell` 的现有输入互锁判断。笔记仍按现有点击内容进入编辑及结束编辑的规则运行。
-4. 归入已有笔记前等待该笔记最新已发起写入成功；空草稿不能归入。建立关联不改 note 的 timestamp、颜色、quote、comment 或 location。
-5. `main.ts` 将 `onNotesChanged` 同时连接 reader 的现有刷新与 Goal 摘录刷新；`onPageRendered`／`onViewportChange` 更新章节上下文与几何，但仅布局变化不保存 GoalState。
-6. 桌面关闭握手：完成两种编辑 → 检查两种未确认失败 → `drainStorage()` → 检查两种恢复缓冲 → ACK。浏览器退出前尽量 flush，但不能依赖异步 unload；待确认内容靠同步写入的小缓冲恢复。
+## 5. 控制器、编辑与阅读集成
 
-## 6. 备份、恢复与导出
+### 5.1 Goal 状态和动作
 
-这一部分属于可用模块的完整性，不应等到用户积累 Goal 后再补。
+GoalController 保存已确认状态、当前编辑草稿，以及仅在内存按书保留的 selectedGoalId、完整树开关、树分支展开集合、itemsOpen。UI 状态不进入书籍备份。首次打开已有 Goal 时选择第一个根节点；有相关内容时采用选择 Goal 的自动展开规则，不恢复整书阅读位置。
 
-- `.aurabackup` 新版本建议为 `1.1`，保持当前 type、books、notes 包络，增加 `goalStates`。新程序读取没有该字段的 1.0 备份时按“未提供 Goal 数据”处理，不能清除现有 Goal。
-- 当前备份可选择不含标注。若导出 Goal，必须同时带齐所引用标注；首轮推荐有 Goal 时该书备份包含全部高亮／笔记，并在现有备份 UI 明确显示依赖，不静默导出悬空关联。
-- `restoreRecords` 与 RestoreCommand 增加可选 `goalStates`；桌面 `command()` 目前严格校验字段数，必须显式同时支持旧／新两种形状。
-- 保持现有恢复的合并语义：没有 goalStates 就保留已有 Goal；有时按 Goal ID upsert、保留未出现在备份中的现有 Goal。备份中出现的同 ID Goal，以备份的节点及其直接关联为准替换；其余节点及关联保留，然后验证合成树与 link。ID 跨书冲突、孤儿、环或依赖不完整时整体拒绝，不静默丢条目或重命名。
-- 书籍、标注、Goal 一次 restore 事务落库；中途任何验证／写入失败全部回滚。恢复前完成编辑、处理未确认写入，恢复后刷新 Goal revision 与选中状态；已不存在的选择回到首个根 Goal。
-- SQLite 一致性备份自然覆盖新表，但需要补查验新表与 JSON 中树／link 的逻辑完整性；`PRAGMA foreign_key_check` 无法发现 JSON 内的孤儿引用。
-- 首轮默认交付可逆备份。按 Goal 导出 Markdown 可作为下一小步：复用现有下载／桌面保存通道和标注格式，将 Goal 层级、直接关联高亮／笔记及章节来源导出，便于用户自行交给 AI；不新增 AI 服务。本次不为章节导出额外塞入一份重复的全树。
-- 旧程序当前可能忽略未知备份字段；不能宣称 1.1 在旧版本中无损往返。文档明确 Goal 数据需新版恢复；若要强制阻止旧端导入，需要额外格式策略，不能靠 version 字段自动实现。
+最小动作：`setStateForBook`、`selectGoal`、`toggleTree`、`toggleBranch`、`beginEdit`、`updateDraft`、`finishInlineEdit`、`linkAnnotation`、`unlinkAnnotation`、`updateReadingContext`、`flush`、`assertWritesSaved`。具体命名可按代码风格调整，行为契约不能变化。
 
-## 7. 实施顺序与阶段验收
+`selectGoal` 必须同步选中并令 itemsOpen=true；成功归入必须 allGoals=false、itemsOpen=true。手动收起只影响当前展示，再次选择／归入重新展开。关联全文来自 annotations 的全书集合，不受当前可见页笔记筛选影响；笔记条目更新 comment，高亮条目读取 quote。
 
-| 阶段 | 代码工作 | 阶段完成条件 |
+### 5.2 输入与 DOM 保留
+
+复用现有 notesUI / noteCaret 的编辑方式与 IME 保护，Goal 校验独立，不调用笔记 requireQuote。只维护一个当前 Goal textarea，保留选区、光标、滚动和组合输入。普通文字键、D、左右键在 textarea 中由现有输入互锁保护；Enter 换行，Escape 结束编辑，不额外赋予撤销已保存文本的含义。
+
+原型的 `replaceChildren()` 会拆掉编辑节点，不能照搬。Goal UI 按 ID 保留行与编辑器；文字输入只更新草稿和高度，关联数量／笔记文字变化只更新对应条目。失焦保存后，用户点击子 Goal `+`、树节点、父级或关联内容的同一次操作必须继续生效，不能因 blur 重建目标按钮而吞掉点击。
+
+当前 `AnnotationController.updateInlineNote()` 不会在每次输入时调用 onNotesChanged。增加轻量的 `onAnnotationContentChanged(note)` 通知，用于定点更新 Goal 摘录；不为此重建 notesList 或重刷正文。create/delete 仍串联既有 onNotesChanged，不能覆盖 reader.refreshAnnotations 的连接。
+
+### 5.3 归入动作与异步边界
+
+笔记归入按钮和原删除按钮一样 stopPropagation；卡片点击过滤该按钮，Enter/Space 激活按钮也不能触发卡片编辑。原位编辑时沿用现有隐藏操作区的规则。
+
+高亮动作使用已有 activeAnnotationContext。单一明确 annotationId 才显示可用归入；重叠多个目标时保持原删除能力，不猜测、不批量关联、不增加选择面板。原浮条的选文／拖动保护、重复点击、激活边框与关闭行为继续保留。无当前 Goal、相关写入未可靠保存、该模式不提供 Goal，或已关联时，动作隐藏／禁用按原型反馈，不额外弹面板。
+
+发起归入时冻结 bookId、generation、goalId、annotationId；等该标注已发起写入成功后再保存关联。编辑中的新笔记草稿不能入关联。await 期间切书或切 Goal，不得把材料归入后来选中的目标；完成后仅在界面仍对应原书／原 Goal 时展开，不能用旧响应覆盖新界面。
+
+本地可立即预览归入结果并展开；成功状态仍以 SQLite ACK 为准。保存失败时保留待写恢复和当前内容，复用错误反馈，不能把未确认关联当成已可靠保存用于备份。
+
+### 5.4 打开、导航、模式与关闭
+
+在 AppCoordinator 现有 openBookRequestId 机制内：先结束旧书两种编辑，再读书籍，先完成该书 notes 的加载和未确认操作恢复，再读取／恢复 Goal 状态，避免笔记补写／删除改变 Goal 版本后安装了先前的旧快照；每次 await 后检查请求令牌。准备完成后同步安装 reader、session、annotations、goals，再渲染；A 的迟到读取／失败不得覆盖 B。Goal 读取失败明确报错并禁写，不能显示空状态后覆盖原数据。
+
+沿用 `onPageRendered`、`onPageChange`、`onViewportChange` 与布局回调更新上下文和左栏位置；翻页只更新章节相关子 Goal，不改用户当前选择。Goal 展开、切树和归入不调用 refitChapter 或 renderPage，点击关联摘录除外，直接交给现有 `AppCoordinator.jumpToAnnotation()`。
+
+`beforeNavigate`、切书、切模式、beforeRestore 以及导出备份前，都结束两种编辑并 flush。桌面关闭仍走现有握手：结束编辑 → 检查笔记与 Goal 失败 → drainStorage → 检查两种缓冲 → completeClose；失败保留窗口。浏览器不能依赖异步 unload，输入恢复由同步缓冲保证。
+
+## 6. 左侧布局与可见范围
+
+复用 `marginGeometry()` 和实际正文容器矩形，保证读到的是现有正文最终位置，不把原型的 left=226.5 等数字写死。
+
+参考 1613×928 内容窗口：正文560px，readingLeft≈526.5；Goal 宽260px，距正文40px，左侧起点≈226.5。顶部与最终稿相同，Goal 内部独立滚动，不挤正文或右侧笔记。文字、背景和状态色跟随现有纸张／主题 token；参照页边笔记从 paper 读取文字颜色，避免 sibling Goal 区拿不到 reader-panel 内的纸张主题变量。保持原书字体、字号、缩进和真实工具栏。
+
+只在用户选择的单页分页模式且左侧可用宽度至少200px时显示，Goal 宽度为 `min(260, readingLeft - 40 - 24)`。应用窗口当前允许800px宽，不能假定左侧一直足够。空间不足时提交编辑并隐藏 Goal 区及其归入动作，保留数据和选择，恢复空间后重新显示；不压缩正文、不自动滚动，也不新增底部召回按钮或浮层。
+
+双页、滚动及双页自动降级状态不在本轮提供 Goal UI；不改原模式行为。若用户后续要求窄窗或其他模式入口，以新效果稿为准，当前不自行补设计。
+
+## 7. 备份与恢复
+
+沿用现有每书 `.aurabackup`、现有“包含高亮与笔记”选项和单次原子 restore，不增加 Goal 专用备份控件。版本升级为1.1，保留原 type、books、notes 包络，新增可选 goalStates。
+
+- 正常包含标注的备份：保存完整 Goal 树及全部链接，确保链接指向同文件中的标注。
+- 用户明确不包含标注：仍保存 Goal 的文字和树，省略每份 Goal 状态的 links 字段；不复制高亮／笔记，也不保存悬空引用。备份类型可定义为 `GoalBackupState = Omit<BookGoalState, 'links'> & { links?: GoalLink[] }`。
+- 恢复时区分 links 缺失和空数组：缺失表示该备份未提供关联，不清除目标书已有链接；空数组表示备份中的该部分确实没有链接。新库中缺失 links 按空关联安装。
+- 旧1.0备份没有 goalStates 时保留现有 Goal；有 goalStates 时按书内 Goal ID upsert，保留备份之外的节点。提供 links 时替换备份包含节点的直接关联，其余节点保留；未提供时保留这些节点已有链接。最后统一验证合成树和所有链接。
+- RestoreCommand、BackupData、restoreRecords 及桌面严格命令校验同步支持可选 goalStates；不能只让导出器写出字段而导入器忽略。先准备完整书／标注／Goal，再在一个事务中恢复；环、孤儿或写入失败全回滚。
+- 导出前等待未确认写入，避免漏掉刚输入的 Goal 或刚归入的材料；恢复后刷新所有版本并清理／校正失效选择。
+- SQLite 在线备份包含新表，恢复核验需比较 Goal 树与链接。旧客户端可能忽略新备份字段，不能宣称旧版无损恢复1.1。
+
+本轮不新增按 Goal 导出 Markdown 的菜单；既有章节、笔记摘要等导出继续保持原功能。
+
+## 8. 五步实施与完成条件
+
+| 顺序 | 可执行工作 | 完成条件 |
 | --- | --- | --- |
-| 1. 单页效果验证 | 用效果稿确认左侧真实尺寸、原位创建、局部层级与归入流程；笔记与高亮逐项对照当前交互 | 看得到左侧效果；笔记没有新增编辑按钮，高亮没有新增 Goal 面板；原有操作入口保持 |
-| 2. 数据闭环 | goal 类型／纯函数／repository／recovery；现用库升级；HTTP、桌面 IPC；备份／恢复与删除清理 | 创建／编辑／关联刷新后保留；旧库数据不变；桌面和浏览器同样可用；故障和恢复无悬空引用 |
-| 3. 接入阅读界面 | GoalController、UI、布局计算；接入 main/coordinator；同书选择与章节相关子 Goal；复用笔记与高亮归入入口 | 完整完成“建 Goal → 子 Goal → 归入已有标注 → 回看原文”，不重排正文，不抢输入焦点 |
-| 4. 核验与收尾 | 补针对性测试与人工验收；更新 README、存储／备份说明 | 必要自动检查通过，完成下表；未完成项明确记录，不将原型等同上线 |
+| 1 | 添加 Goal 类型、纯函数、协议；事务式 v1→v2；同步实现 HTTP、桌面能力与 repository/recovery | 隔离库中可保存／重读树与关联；版本、幂等和故障保留通过；旧书／标注 JSON 不变 |
+| 2 | 实现 GoalController、增量 UI、左侧布局并装配 main/coordinator | 用真实书显示最终稿交互：原位创建／编辑、多层树、章节子 Goal、选择后展开；正文几何不变 |
+| 3 | 在原笔记操作区／高亮浮条接入同一归入动作；联动内容、原文跳转及删除清理 | 归入后立即看到内容；点击 Goal 自动展开；无新增编辑按钮或 Goal 选择面板；输入焦点与删除语义保留 |
+| 4 | 补齐切书竞态、未确认输入恢复、关闭握手、书籍备份恢复 | 刷新重开、异常终止和隔离恢复不丢 Goal／关联，失败不静默覆盖或误报成功 |
+| 5 | 执行必要自动测试和真实桌面视觉验收，更新 README 的新增行为／范围 | 对照固定效果稿签出下列验收清单；记录结果及限制，未验证项不写成通过 |
 
-第 2 阶段的数据结构不依赖左侧、底部或拖拽的具体实现；界面反馈可局部调整，不引发架构迁移。
+不再安排“选左侧还是底部”“拖拽还是新面板”等探索步骤，不把后续能力混入本轮变更。
 
-## 8. 必要测试与人工验收
+## 9. 验证清单
 
-沿用当前 `tests/unit`、`tests/regression` 与 `tests/desktop` 运行方式。只测试行为和数据风险，不给每条 CSS 写镜像断言。
+自动测试新增建议：`tests/unit/test_goals.js`（纯模型）、`tests/regression/test_goal_interaction.js`（DOM 行为）、`test_sqlite_goals.js`（存储）、`tests/desktop/goal-interaction.cjs`（真实窗口）。文件名可按现有运行器调整；unit/regression 的 `.js` 自动发现，新增 desktop 用例必须在 `scripts/test-desktop.cjs` 显式注册。
 
-| 验证项 | 关键检查 |
+| 验证面 | 必须覆盖 |
 | --- | --- |
-| Goal 纯函数 | 自由文本、多层树、重复 link、环／孤儿拒绝、删父节点提升孩子、跨书目标拒绝 |
-| SQLite 与协议 | v1→v2 保留原书／标注完整 JSON；反复打开不重复升级；revision 冲突、同 opId 重放、旧 generation 拒绝；HTTP 与桌面都能读写 |
-| 删除与恢复 | 删除一个标注清除它在多个 Goal 的 link；删除书籍清理；恢复缺失字段保留现有 Goal；合并后验证环；无效备份整笔回滚；新备份往返完全一致 |
-| 恢复缓冲 | 成功 ACK 清理，网络失败／磁盘满保留内容，409 不覆盖，写入顺序不倒退；关闭时失败拦截、重新打开可恢复 |
-| 切书竞态 | 扩展 `test_open_book_race.js`：A 的迟到 Goal 响应／写入结果不能覆盖 B；读取失败不能被当空数据保存 |
-| 编辑连续性 | 点击笔记内容直接编辑，无新增编辑／完成按钮；中文输入、换行、D／方向键、点击归入、notes 重渲染均不丢光标；输入期间不触发阅读快捷键 |
-| 交互复用 | 高亮点击仍显示原删除操作浮条；只追加直接归入动作，不弹 Goal 选择面板。笔记归入不触发编辑，左右两处删除都保留各自语义 |
-| 原有回归 | 高亮颜色与范围、笔记编辑与当前页筛选、导出、原文定位、阅读位置保持继续通过 |
+| 模型 | 无标注可创建；多根与深层树；文本／换行保留；环／孤儿／跨书引用拒绝；重复归入无重复；只计直接关联 |
+| 最终稿行为 | 根 `+`、子 `+`、编辑结束／空草稿、父级／子级／树选择均正确；选择和归入自动展开；手动收起后再次操作重新展开；零计数隐藏；解除保留原标注 |
+| 输入与事件 | 中文 IME、选区和光标保留；D／方向键不翻页；blur 后紧接的按钮点击不丢；笔记编辑时 Goal 摘录更新且不重建 textarea；归入不触发笔记编辑 |
+| 原标注 | 高亮颜色／范围、选文保护、浮条关闭和独立删除不变；重叠目标不明时不误归入；草稿和失败保存不能当可靠材料 |
+| 存储与竞态 | v1数据完整升级；更高版本拒绝；同opId重试、409、旧ACK不覆盖新输入、旧generation拒绝；同书多条关联清理原子；切书迟到响应不串书 |
+| 故障与恢复 | 磁盘满／只读／锁竞争、缓冲不可写及异常终止；关闭前flush包含Goal；有未可靠保存内容时不能确认关闭 |
+| 备份 | 1.0读取、1.1完整往返、不含标注时省略links；缺失与空数组语义不同；合并后的环／断链整笔回滚；SQLite一致性备份含新表 |
 
-建议先跑 `npm run typecheck`、针对新增纯函数与存储的测试，再跑 `npm test`；涉及桌面白名单、关闭握手与新 schema，必须跑 `npm run test:desktop`，涉及保存故障的项目接入现有 stability 测试。测试通过后再做人工阅读体验验收，不把 JSDOM 当几何与拖拽验收依据。
+先运行 `npm run typecheck` 和针对性测试，再运行 `npm test`、`npm run test:desktop`。将新 Goal 读写加入现有 `npm run test:stability` 的故障／终止恢复场景；本轮不要求重走安装器发布流程。文档撰写本身不视为上述实现测试已执行。
 
-人工验收以约 1613×928 内容窗口的真实 EPUB 单页为主：
+人工验收以同一真实 EPUB、约1613×928的内容窗口对照最终稿，再核验当前默认1440×960窗口、窄窗安全隐藏、纸张主题和模式切换。检查单页正文与右侧笔记位置、原阅读句子、长文本、深树、跨章回看、创建后归入及关闭重开。JSDOM或原型整页缩放不能代替实际几何与阅读连续性验收。
 
-1. 无 Goal 可直接阅读；创建“时间是什么？”时没有分类框。长文本、多行与中文输入正常。
-2. 在章节内建子 Goal；前后翻页不切走当前 Goal；换章节可简洁找到相关子 Goal；多根与深层树也可返回查看。
-3. 先在左侧选 Goal，再从原文高亮的原操作浮条或右侧笔记操作区直接归入；不出现额外 Goal 面板或笔记编辑按钮。重复归入不重复，移出保留原标注，重叠目标不明时不误归入。
-4. 点击 Goal 中的跨章摘录能定位原文；右侧笔记仍显示当前可见正文，已有编辑体验不变。
-5. 展开结构、编辑 Goal、展开相关内容前后，正文宽度、左上方句子、右侧笔记位置不变。
-6. 缩窄窗口后 Goal 召回不挤正文与笔记；双页／滚动无 Goal 覆盖，切回单页状态仍在。
-7. 刷新后重新从书库打开：Goal 与关联保留。不要把当前未实现的“自动恢复上本书及位置”当作本模块验收条件。
-8. 导出新书籍备份，在隔离书库恢复：树、关联、高亮、笔记全部保留；故障时无半份数据。
-
-## 9. 需要通过体验再确定的少量决定
-
-左侧是首轮效果验证位置，不将底部方案从设计上排除；局部层级与全部结构如何切换、是否增加专用拖动把手，需要在真实阅读中比较。数据层只依赖树和 annotation ID，因此这些选择均为 Goal 模块内部调整。
-
-当前按第 3 节的精简英文效果稿落地：左侧统一管理 Goal、原标注操作处直接归入；不添加常驻说明、重复入口或新的标注面板。笔记、高亮、阅读引擎与存储仍沿用现有功能边界。
+完成标准：最终稿的每个 Goal 交互在真实书籍上可用，用户意图与关联能够可靠保存和恢复，原有阅读、高亮、笔记、导出继续工作；没有顺带加入尚未出现在最终稿中的用户入口。

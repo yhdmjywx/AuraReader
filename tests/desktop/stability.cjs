@@ -43,7 +43,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
         live.db.exec('PRAGMA cache_size=-64; BEGIN IMMEDIATE');
         live.run('UPDATE annotations SET payload=?,revision=revision+1 WHERE id=?', JSON.stringify({ ...confirmed.value, comment: 'UNCOMMITTED' + 'x'.repeat(5 * 1024 * 1024) }), confirmed.id);
         live.run('INSERT INTO operations VALUES(?,?,?)', 'must-rollback', 'uncommitted', '{}');
-        await fs.writeFile(path.join(output, 'kill-ready.json'), JSON.stringify({ confirmed, operations,
+        await fs.writeFile(path.join(output, 'kill-ready.json'), JSON.stringify({ confirmed, operations, goals: live.goals(['stability']),
             walBytes: (await fs.stat(live.filename + '-wal')).size, pid: process.pid }));
         console.log('KILL READY with real uncommitted WAL transaction');
         return; // Parent terminates this process, without finally/close/checkpoint.
@@ -51,6 +51,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     if (mode === 'recover') {
         const previous = JSON.parse(await fs.readFile(path.join(output, 'kill-ready.json'), 'utf8'));
         assert.deepEqual(live.notes(['stability'])[0], previous.confirmed);
+        assert.deepEqual(live.goals(['stability']), previous.goals, 'Goal tree and links survive forced main termination');
         assert.equal(live.one('SELECT count(*) AS n FROM operations').n, previous.operations);
         assert.equal(live.one('SELECT * FROM operations WHERE id=?', 'must-rollback'), undefined);
         assert.deepEqual(live.check(), { integrity: 'ok', foreignKeys: 0 });
@@ -65,6 +66,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
             if(!saved.ok)throw new Error(JSON.stringify(saved));const a=await import('./main.js');await a.coordinator.openBook('stability');a.annotations.setNotesScope('book');
             window.__closeCancelled=null;auraDesktop.lifecycle.onCloseCancelled(message=>window.__closeCancelled=message);
         })()`);
+        await run(`(async()=>{const a=await import('./main.js');a.goals.beginEdit('root');a.goals.ui.editor.value='Why am I reading?';a.goals.updateDraft(a.goals.ui.editor.value);await a.goals.finishInlineEdit();await a.goals.linkAnnotation('primary-note');})()`);
         const baseline = live.notes(['stability'])[0];
         live.db.exec('PRAGMA query_only=ON');
         const failed = await run(`(async()=>{const a=await import('./main.js');a.annotations.openNoteModal('稳定性原文😀','primary-note',1);
@@ -83,6 +85,13 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
         assert.equal(await run(`localStorage.getItem('aura_notes_pending_stability')`), null);
         checks.push('actual SQLite read-only -> renderer input failure -> journal retained and close refused -> exact pending command recovered once');
 
+        const confirmedGoal = live.goals(['stability'])[0];
+        live.db.exec('PRAGMA query_only=ON');
+        const goalBlocked = await run(`(async()=>{const a=await import('./main.js');a.goals.beginEdit('edit');a.goals.ui.editor.value='Goal retained during failure';a.goals.updateDraft(a.goals.ui.editor.value);try{await a.goals.finishInlineEdit();return false;}catch{return true;}})()`);
+        assert.equal(goalBlocked,true); assert.deepEqual(live.goals(['stability'])[0],confirmedGoal);
+        live.db.exec('PRAGMA query_only=OFF'); await run(`(async()=>{await (await import('./main.js')).goals.assertWritesSaved();})()`);
+        assert.equal(live.goals(['stability'])[0].value.goals[0].text,'Goal retained during failure');
+        checks.push('Goal: actual read-only failure retains intent and exact command; retry commits once without changing links');
         const max = live.one('PRAGMA max_page_count').max_page_count;
         live.db.exec('PRAGMA max_page_count=' + live.one('PRAGMA page_count').page_count);
         const full = await run(`(async()=>{window.__fullCommand={opId:crypto.randomUUID(),expected:0,book:{id:'full-test',pages:['x'.repeat(2*1024*1024)]}};
@@ -99,7 +108,9 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
         live.db.exec('PRAGMA query_only=ON');
         await run(`(async()=>{const a=await import('./main.js');a.annotations.setNotesScope('book');a.annotations.openNoteModal('稳定性原文😀','primary-note',1);
             const e=document.querySelector('.note-editor');e.value='Renderer 崩溃恢复\\n😀';e.dispatchEvent(new Event('input',{bubbles:true}));await a.annotations.finishInlineEdit();})()`);
+        await run(`(async()=>{const a=await import('./main.js');a.goals.beginEdit('edit');a.goals.ui.editor.value='Goal after Renderer crash';a.goals.updateDraft(a.goals.ui.editor.value);try{await a.goals.finishInlineEdit();}catch{}})()`);
         const pending = await run(`localStorage.getItem('aura_notes_pending_stability')`); assert.ok(pending);
+        assert.ok(await run(`localStorage.getItem('aura_goals_pending_stability')`));
         wc.session.flushStorageData(); await sleep(250);
         live.db.exec('PRAGMA query_only=OFF');
         const gone = once(wc, 'render-process-gone'); wc.forcefullyCrashRenderer(); await gone;
@@ -107,6 +118,9 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
         await run(`(async()=>{const a=await import('./main.js');await a.coordinator.openBook('stability');})()`);
         assert.equal(live.notes(['stability'])[0].value.comment, 'Renderer 崩溃恢复\n😀');
         assert.equal(await run(`localStorage.getItem('aura_notes_pending_stability')`), null);
+        assert.equal(live.goals(['stability'])[0].value.goals[0].text,'Goal after Renderer crash');
+        assert.equal(live.goals(['stability'])[0].value.links[0].annotationId,'primary-note');
+        assert.equal(await run(`localStorage.getItem('aura_goals_pending_stability')`),null);
         checks.push('forced Renderer process termination; explicit reload preserves current SQLite and replays previously flushed recovery journal without reset');
 
         const zip = new JSZip(); const chapters = 128; let decodedBytes = 0;

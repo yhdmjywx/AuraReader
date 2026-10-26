@@ -1,3 +1,5 @@
+import { GoalController } from './features/goals/goalController.js';
+import { updateNoteGoalActions } from './features/annotations/notesUI.js';
 import type { AppElements } from './app/elements.js';
 import { errorMessage } from './infrastructure/storageError.js';
 /* ==========================================================================
@@ -28,6 +30,8 @@ export function queryElements(): AppElements {
         workspaceContainer: document.getElementById('workspace-container'),
         readerPanel: document.getElementById('reader-panel'),
         notesPanel: document.getElementById('notes-panel'),
+        goalPanel: document.getElementById('goal-panel'),
+        btnAnnotationGoal: document.getElementById('btn-annotation-goal') as HTMLButtonElement | null,
 
         // Reader Controls
         bookPaper: document.getElementById('book-paper'),
@@ -187,9 +191,17 @@ export function bootstrapApp() {
         }
     });
 
+    const goals = new GoalController({
+        getAnnotations: () => annotations.getNotes(), getLocation: () => reader.getLocation(),
+        getMode: () => layout.getLayoutMode(), showToast: message => appShell.showToast(message),
+        jump: id => coordinator.jumpToAnnotation(id),
+        finishAnnotations: () => annotations.finishInlineEdit(), annotationsSaved: () => annotations.assertInlineWritesSaved()
+    });
+
     // 2. Create Central Coordinator
     const coordinator = new AppCoordinator({
         session,
+        goalController: elements.goalPanel ? goals : undefined,
         readerController: reader,
         annotationController: annotations,
         shelfController: shelf,
@@ -199,26 +211,41 @@ export function bootstrapApp() {
         appShell
     });
 
+    const goalAction = (id: string) => ({ visible: goals.visible, disabled: !goals.canLink(id) || goals.linked(id), linked: goals.linked(id) });
+    annotations.callbacks.getGoalAction = goalAction;
+    annotations.callbacks.onLinkGoal = id => goals.linkAnnotation(id);
+    annotations.callbacks.beforeDeleteAnnotations = () => goals.finishInlineEdit();
+    annotations.callbacks.onAnnotationContentChanged = () => goals.refreshAnnotations();
+    selection.callbacks.getGoalAction = goalAction;
+    selection.callbacks.onLinkGoal = id => goals.linkAnnotation(id).catch(error => { appShell.showToast(error.message); });
+    goals.callbacks.onActionsChanged = () => {
+        updateNoteGoalActions(elements, goalAction); selection.refreshGoalAction();
+    };
+
     // 3. Connect Cross-Module Callbacks
     shelf.callbacks.onImportFile = file => coordinator.importBook(file);
     reader.callbacks.getNotes = () => annotations.getRenderingNotes();
     reader.callbacks.beforeNavigate = () => {
         annotations.finishInlineEdit();
+        goals.finishInlineEdit().catch(() => {});
         return annotations.getRenderingNotes();
     };
     reader.callbacks.onPageRendered = () => {
         selection.restoreActiveTokens();
         annotations.refreshVisibleNotes();
         positionMarginNotes(elements);
+        goals.updateReadingContext();
     };
     reader.callbacks.onViewportChange = () => {
         annotations.refreshVisibleNotes(true);
         positionMarginNotes(elements);
+        goals.updateReadingContext();
     };
     annotations.callbacks.getVisibleAnnotationIds = () => reader.getVisibleAnnotationIds();
 
     annotations.callbacks.onNotesChanged = (notes) => {
         reader.refreshAnnotations(notes);
+        goals.refreshAnnotations();
     };
     annotations.callbacks.onJump = (note) => {
         coordinator.jumpToAnnotation(note.id);
@@ -288,7 +315,9 @@ export function bootstrapApp() {
         const activeTitle = reader.getCurrentBook() ? reader.getCurrentBook()?.title : '恢复图书';
         appShell.showToast(`🎉 成功从备份恢复！已为您自动打开《${activeTitle}》，加载 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
     };
-    backup.callbacks.beforeRestore = () => annotations.finishInlineEdit();
+    const finishReadingEdits = async () => { await goals.finishInlineEdit(); await annotations.finishInlineEdit(); await annotations.assertInlineWritesSaved(); await goals.assertWritesSaved(); };
+    backup.callbacks.beforeRestore = finishReadingEdits;
+    backup.callbacks.beforeExport = finishReadingEdits;
 
     const syncReaderLayout = () => {
         layout.updateLayoutClasses(elements);
@@ -296,7 +325,7 @@ export function bootstrapApp() {
         if (reader.isChapterFlow()) reader.refitChapter(notes);
         else reader.renderPage(reader.getCurrentPage(), true, notes);
     };
-    layout.callbacks.beforeGeometryChange = () => reader.rememberAnchor();
+    layout.callbacks.beforeGeometryChange = () => { goals.finishInlineEdit().catch(() => {}); reader.rememberAnchor(); };
     layout.callbacks.onLayoutChange = (res) => {
         syncReaderLayout();
         if (appShell) {
@@ -325,8 +354,11 @@ export function bootstrapApp() {
         shelf.initUI(elements);
         backup.initUI(elements);
         layout.initUI(elements);
+        goals.initUI(elements);
+        window.addEventListener('pagehide', () => { goals.finishInlineEdit().catch(() => {}); });
 
         appShell.init(elements, {
+            onThemeChanged: () => { positionMarginNotes(elements); goals.updateReadingContext(); },
             onOpenPanel: () => shelf.closeShelf(),
             onPrevPage: () => reader.prevPage(annotations.getNotes()),
             onNextPage: () => reader.nextPage(annotations.getNotes()),
@@ -370,6 +402,7 @@ export function bootstrapApp() {
         layout,
         backup,
         appShell,
+        goals,
         elements
     };
 }
@@ -385,6 +418,7 @@ export const {
     layout,
     backup,
     appShell,
+    goals,
     elements
 } = appInstance;
 
