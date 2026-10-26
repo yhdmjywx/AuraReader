@@ -15,7 +15,11 @@ function writePreference(key: string, value: string) {
     try { localStorage.setItem(key, value); } catch { /* Layout preferences must not block reading or saved Goal data. */ }
 }
 function availableWidth(elements: AppElements) {
-    return elements.readingWorkspace?.clientWidth || elements.workspaceContainer?.clientWidth || 0;
+    const width = elements.readingWorkspace?.clientWidth || elements.workspaceContainer?.clientWidth || 0;
+    const surface = elements.workspaceContainer;
+    const style = surface?.ownerDocument.defaultView?.getComputedStyle(surface);
+    const gutter = (parseFloat(style?.marginLeft || '') || 0) + (parseFloat(style?.marginRight || '') || 0);
+    return Math.max(0, width - gutter);
 }
 export function positionGoals(elements: AppElements, mode: string, preferred = DEFAULT_WIDTH, closed = false): boolean {
     const { goalPanel: panel, goalSidebar: sidebar, btnGoals: toggle, goalResizer: resizer } = elements;

@@ -276,6 +276,8 @@ export class SelectionController {
         control.hidden = !state?.visible; control.disabled = !state || state.disabled;
         control.title = state?.linked ? 'Added to goal' : 'Add to goal';
         control.setAttribute('aria-label', control.title);
+        control.classList.toggle('is-linked', !!state?.linked);
+        const label = control.querySelector('span'); if (label) label.textContent = state?.linked ? 'Linked' : 'Goal';
         const glyph = control.querySelector('i'); if (glyph) glyph.className = state?.linked ? 'ri-check-line' : 'ri-links-line';
     }
 

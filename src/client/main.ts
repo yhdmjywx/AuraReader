@@ -1,4 +1,6 @@
 import { GoalController } from './features/goals/goalController.js';
+import { GoalHome } from './features/goals/goalHome.js';
+import { getAllBooksFromDB } from './infrastructure/bookRepository.js';
 import { updateNoteGoalActions } from './features/annotations/notesUI.js';
 import type { AppElements } from './app/elements.js';
 import { errorMessage } from './infrastructure/storageError.js';
@@ -33,7 +35,6 @@ export function queryElements(): AppElements {
         goalPanel: document.getElementById('goal-panel'),
         goalSidebar: document.getElementById('goal-sidebar'),
         goalResizer: document.getElementById('goal-resizer'),
-        btnGoals: document.getElementById('btn-goals') as HTMLButtonElement | null,
         btnGoalSidebar: document.getElementById('btn-goal-sidebar') as HTMLButtonElement | null,
         btnGoalBack: document.getElementById('btn-goal-back') as HTMLButtonElement | null,
         goalPage: document.getElementById('goal-page'), goalPageContent: document.getElementById('goal-page-content'),
@@ -150,7 +151,7 @@ export function bootstrapApp() {
 
     // 1. Create Feature Controllers
     const layout = new LayoutController();
-    const session = new Session('crisis-era');
+    const session = new Session('');
     const appShell = new AppShell();
 
     const reader = new ReaderController({
@@ -217,6 +218,21 @@ export function bootstrapApp() {
         backupController: backup,
         appShell
     });
+    const homeHost = typeof document !== 'undefined' ? document.getElementById('goal-home') : null;
+    const home = homeHost ? new GoalHome(homeHost, {
+        goals, coordinator, currentBookId: () => session.getCurrentBookId(),
+        finishAnnotations: async () => { await annotations.finishInlineEdit(); await annotations.assertInlineWritesSaved(); },
+        beforeOpen: () => { shelf.closeShelf(); appShell.closeAppearance(); appShell.closeExportPanel(); reader.rememberAnchor(); }
+    }) : null;
+    const brand = typeof document !== 'undefined' ? document.querySelector<HTMLElement>('.brand') : null;
+    if (brand && home) {
+        brand.setAttribute('role', 'button'); brand.tabIndex = 0; brand.setAttribute('aria-label', 'Open reading home');
+        const openHome = () => { home.open().catch(error => appShell.showToast(errorMessage(error, 'Could not open reading home'))); };
+        brand.addEventListener('click', openHome);
+        brand.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openHome(); } });
+    }
+    coordinator.onBookOpened = () => home?.leave();
+    goals.callbacks.onEnterGoalPage = () => home?.leave();
 
     const goalAction = (id: string) => ({ visible: goals.visible, disabled: !goals.canLink(id) || goals.linked(id), linked: goals.linked(id) });
     annotations.callbacks.getGoalAction = goalAction;
@@ -227,6 +243,7 @@ export function bootstrapApp() {
     selection.callbacks.onLinkGoal = id => goals.linkAnnotation(id).catch(error => { appShell.showToast(error.message); });
     goals.callbacks.onActionsChanged = () => {
         updateNoteGoalActions(elements, goalAction); selection.refreshGoalAction();
+        home?.changed();
     };
     goals.callbacks.onBeforeSidebarResize = () => reader.rememberAnchor();
     goals.callbacks.chooseBook = () => shelf.openShelf();
@@ -330,7 +347,7 @@ export function bootstrapApp() {
     backup.callbacks.beforeExport = finishReadingEdits;
 
     const syncReaderLayout = () => {
-        if (goals.page) return;
+        if (goals.page || home?.active) return;
         layout.updateLayoutClasses(elements);
         const notes = annotations.getNotes();
         if (reader.isChapterFlow()) reader.refitChapter(notes);
@@ -371,10 +388,10 @@ export function bootstrapApp() {
         appShell.init(elements, {
             onThemeChanged: () => { positionMarginNotes(elements); goals.updateReadingContext(); },
             onOpenPanel: () => shelf.closeShelf(),
-            onPrevPage: () => { if (!goals.page) reader.prevPage(annotations.getNotes()); },
-            onNextPage: () => { if (!goals.page) reader.nextPage(annotations.getNotes()); },
+            onPrevPage: () => { if (!goals.page && !home?.active) reader.prevPage(annotations.getNotes()); },
+            onNextPage: () => { if (!goals.page && !home?.active) reader.nextPage(annotations.getNotes()); },
             onTogglePageMode: () => {
-                if (goals.page) return;
+                if (goals.page || home?.active) return;
                 const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
                     ? elements.readerPanel.clientWidth
                     : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
@@ -386,7 +403,7 @@ export function bootstrapApp() {
             },
             onImportFile: (file) => coordinator.importBook(file),
             onWindowResize: (notify) => {
-                if (goals.page) return;
+                if (goals.page || home?.active) return;
                 const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
                     ? elements.readerPanel.clientWidth
                     : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
@@ -404,7 +421,7 @@ export function bootstrapApp() {
             let resizeTimer: ReturnType<typeof setTimeout>;
             new ResizeObserver(() => {
                 const next = elements.workspaceContainer!.clientWidth;
-                if (goals.page || next === 0) return;
+                if (goals.page || home?.active || next === 0) return;
                 if (next === width) return;
                 width = next;
                 clearTimeout(resizeTimer);
@@ -431,6 +448,7 @@ export function bootstrapApp() {
         backup,
         appShell,
         goals,
+        home,
         elements
     };
 }
@@ -447,6 +465,7 @@ export const {
     backup,
     appShell,
     goals,
+    home,
     elements
 } = appInstance;
 
@@ -473,7 +492,13 @@ export async function startApp() {
     }
     await appInstance.reader.fonts.ready;
     if (appInstance.elements.goalPanel) await appInstance.goals.initialize();
-    await appInstance.coordinator.openBook('crisis-era');
+    if (!appInstance.goals.disabled) {
+        try { await appInstance.goals.recoverBookIntents(); }
+        catch (error) { appInstance.appShell.showToast(errorMessage(error, 'Book association needs a retry in reading home')); }
+    }
+    const books = await getAllBooksFromDB();
+    if (appInstance.home && !books.length) await appInstance.home.open();
+    else await appInstance.coordinator.openBook(books.find(b => b.id === 'crisis-era')?.id || books[0].id);
     return appInstance;
 }
 

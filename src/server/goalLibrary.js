@@ -1,7 +1,7 @@
 const { createHash } = require('node:crypto');
 const { validateGoalState } = require('./goalValidation');
 const legacyGoalId = (bookId, id) => 'legacy-' + createHash('sha256').update(JSON.stringify([bookId, id])).digest('hex');
-function validateLibrary(state, sourceExists = () => true, fail = message => { throw new Error(message); }) {
+function validateLibrary(state, sourceExists = () => true, fail = message => { throw new Error(message); }, bookExists = () => true) {
     if (!state || !Array.isArray(state.goals) || !Array.isArray(state.links)) return fail('无效 Goal 库');
     // Reuse the existing tree/field/cycle validation without inventing a book owner.
     const normalized = state.goals.map(goal => ({ ...goal, origin: goal?.origin ? { ...goal.origin, sourcePage: goal.origin.sourcePage === null ? 1 : goal.origin.sourcePage } : null }));
@@ -16,6 +16,16 @@ function validateLibrary(state, sourceExists = () => true, fail = message => { t
         const pair = JSON.stringify([link.goalId, link.annotationId, link.bookId]);
         if (pairs.has(pair)) return fail('重复 Goal 关联'); pairs.add(pair);
     }
+    if (state.bookLinks !== undefined) {
+        if (!Array.isArray(state.bookLinks)) return fail('无效 Goal 书籍关联');
+        const pairs = new Set();
+        for (const link of state.bookLinks) {
+            if (!link || !ids.has(link.goalId) || typeof link.bookId !== 'string' || !link.bookId || link.bookId.length > 4096
+                || typeof link.generation !== 'string' || !link.generation || !bookExists(link)) return fail('Goal 书籍已删除或变化');
+            const pair = JSON.stringify([link.goalId, link.bookId]);
+            if (pairs.has(pair)) return fail('重复 Goal 书籍关联'); pairs.add(pair);
+        }
+    }
     return state;
 }
 function convertLegacy(state, generation) {
@@ -29,9 +39,16 @@ function createGoalLibrary(store, fail, canonical) {
         const book = one('SELECT generation,deleted FROM books WHERE id=?', link.bookId);
         const note = one('SELECT book_id,deleted FROM annotations WHERE id=?', link.annotationId);
         return book && !book.deleted && book.generation === link.generation && note && !note.deleted && note.book_id === link.bookId;
-    }, fail);
+    }, fail, link => {
+        const book = one('SELECT generation,deleted FROM books WHERE id=?', link.bookId);
+        return book && !book.deleted && book.generation === link.generation;
+    });
     const read = () => { const row = one('SELECT * FROM goal_library WHERE id=1'); return { id: 'reader-goals', revision: row.revision, deleted: false, value: JSON.parse(row.payload) }; };
-    const write = state => { validate(state); const revision = read().revision + 1; run('UPDATE goal_library SET payload=?,revision=? WHERE id=1', JSON.stringify(state), revision); return read(); };
+    const write = state => {
+        // Old frozen commands keep their original hash and must not erase new relations.
+        if (state.bookLinks === undefined) state = { ...state, bookLinks: read().value.bookLinks || [] };
+        validate(state); const revision = read().revision + 1; run('UPDATE goal_library SET payload=?,revision=? WHERE id=1', JSON.stringify(state), revision); return read();
+    };
     function legacy(state, previous, generation, restoring = false) {
         const incoming = convertLegacy(state, generation), before = convertLegacy(previous || { bookId: state.bookId, goals: [], links: [] }, generation), current = read().value;
         const ids = new Set([...before.goals, ...incoming.goals].map(g => g.id));
@@ -54,17 +71,24 @@ function createGoalLibrary(store, fail, canonical) {
     }
     function prune(bookId, annotationId) {
         const record = read(), links = record.value.links.filter(l => l.bookId !== bookId || (annotationId && l.annotationId !== annotationId));
-        if (links.length === record.value.links.length) return undefined;
-        return write({ ...record.value, links });
+        const bookLinks = (record.value.bookLinks || []).filter(l => annotationId || l.bookId !== bookId);
+        if (links.length === record.value.links.length && bookLinks.length === (record.value.bookLinks || []).length) return undefined;
+        return write({ ...record.value, links, bookLinks });
     }
     function restore(graph, bookIds) {
-        if (!graph || !Array.isArray(graph.goals) || (graph.links !== undefined && !Array.isArray(graph.links))) fail('无效 Goal 图备份');
+        if (!graph || !Array.isArray(graph.goals) || (graph.links !== undefined && !Array.isArray(graph.links))
+            || (graph.bookLinks !== undefined && !Array.isArray(graph.bookLinks))) fail('无效 Goal 图备份');
         const current = read().value, ids = new Set(graph.goals.map(g => g?.id));
         if (ids.size !== graph.goals.length) fail('重复 Goal 节点');
         current.goals = current.goals.filter(g => !ids.has(g.id)).concat(graph.goals);
         if (graph.links !== undefined) {
             if (graph.links.some(l => !l || !ids.has(l.goalId) || !bookIds.has(l.bookId))) fail('备份 Goal 关联超出本文件范围');
             current.links = current.links.filter(l => !ids.has(l.goalId) || !bookIds.has(l.bookId)).concat(graph.links.map(l => ({ ...l, generation: one('SELECT generation FROM books WHERE id=?', l.bookId)?.generation })));
+        }
+        if (graph.bookLinks !== undefined) {
+            if (graph.bookLinks.some(l => !l || !ids.has(l.goalId) || !bookIds.has(l.bookId))) fail('备份书籍关联超出本文件范围');
+            current.bookLinks = (current.bookLinks || []).filter(l => !ids.has(l.goalId) || !bookIds.has(l.bookId))
+                .concat(graph.bookLinks.map(l => ({ ...l, generation: one('SELECT generation FROM books WHERE id=?', l.bookId)?.generation })));
         }
         return write(current);
     }
@@ -86,7 +110,7 @@ function createGoalLibrary(store, fail, canonical) {
             }
             validate(state); run('INSERT INTO goal_library VALUES(1,?,0)', JSON.stringify(state));
         } else validate(read().value);
-        run('PRAGMA user_version=3');
+        run('PRAGMA user_version=4');
     }
     return { initialize, read, write, validate, legacy, prune, restore };
 }

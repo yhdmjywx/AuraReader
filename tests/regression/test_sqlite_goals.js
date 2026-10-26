@@ -21,7 +21,7 @@ const goal = (id, parentId = null) => ({ id, parentId, text: 'Why?\n自己的问
     const legacy = new DatabaseSync(path.join(directory, 'aurareader.sqlite'));
     legacy.exec('DROP TABLE goal_states; PRAGMA user_version=1'); legacy.close();
     store = createDataStore(directory);
-    assert.equal(store.one('PRAGMA user_version').user_version, 3);
+    assert.equal(store.one('PRAGMA user_version').user_version, 4);
     assert.deepEqual(store.books()[0].value, book); assert.deepEqual(store.notes(['a']).find(row => row.id === 'n').value, note);
     const state = { bookId: 'a', goals: [goal('g'), goal('child', 'g')], links: [{ goalId: 'g', annotationId: 'h' }, { goalId: 'child', annotationId: 'n' }] };
     const command = { opId: randomUUID(), expected: 0, generation: version.generation, state };

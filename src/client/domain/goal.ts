@@ -12,5 +12,6 @@ export interface BookGoalState { bookId: string; goals: Goal[]; links: GoalLink[
 export type GoalBackupState = Omit<BookGoalState, 'links'> & { links?: GoalLink[] };
 export interface GoalDraft { id: string; parentId: string | null; text: string; origin: GoalOrigin | null }
 export interface GoalSourceLink extends GoalLink { bookId: string; generation: string }
-export interface GoalLibraryState { goals: Goal[]; links: GoalSourceLink[] }
-export interface GoalGraphBackup { goals: Goal[]; links?: GoalSourceLink[] }
+export interface GoalBookLink { goalId: string; bookId: string; generation: string }
+export interface GoalLibraryState { goals: Goal[]; links: GoalSourceLink[]; bookLinks?: GoalBookLink[] }
+export interface GoalGraphBackup { goals: Goal[]; links?: GoalSourceLink[]; bookLinks?: GoalBookLink[] }

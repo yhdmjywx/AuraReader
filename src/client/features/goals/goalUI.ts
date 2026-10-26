@@ -2,13 +2,13 @@ import type { Annotation } from '../../domain/annotation.js';
 import type { GoalLibraryState, GoalDraft } from '../../domain/goal.js';
 import { goalChildren } from '../../domain/goalEngine.js';
 export interface GoalView {
-    state: GoalLibraryState; selected: string | null; allGoals: boolean; expanded: Set<string>;
+    state: GoalLibraryState; selected: string | null; allGoals: boolean;
     itemsOpen: boolean; edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft } | null;
     sourcePage: number; annotations: Annotation[]; disabled: boolean;
     sourceBook: string; fullPage: boolean; titles: Map<string, string>; materialStatus: 'ready' | 'loading' | 'error';
 }
 interface Actions {
-    select(id: string): void; tree(): void; branch(id: string): void; items(): void;
+    select(id: string): void; home(): void; up(): void; create(): void; expand(): void; items(): void;
     edit(mode: 'root' | 'child' | 'edit'): void; input(text: string): void; finish(): void;
     unlink(id: string): void; jump(id: string): void;
 }
@@ -33,38 +33,38 @@ export class GoalUI {
     private treeToggle: HTMLButtonElement;
     private addRoot: HTMLButtonElement;
     private parent: HTMLButtonElement;
-    private parentText = node('span');
+    private expand: HTMLButtonElement;
     private current = node('div', 'goal-current');
     private title: HTMLButtonElement;
-    private addChild: HTMLButtonElement;
     private children = node('div', 'goal-children');
-    private tree = node('ul', 'goal-tree');
     private content = node('div', 'goal-content');
     private toggle: HTMLButtonElement;
     private count = node('span');
+    private itemsChevron = icon('arrow-down-s-line');
     private items = node('div', 'goal-items');
     private editorShell = node('div', 'goal-editor');
     readonly editor = node('textarea');
     private childNodes = new Map<string, HTMLButtonElement>();
-    private treeNodes = new Map<string, { row: HTMLLIElement; toggle: HTMLButtonElement; label: HTMLButtonElement; spacer: HTMLSpanElement }>();
     private itemNodes = new Map<string, { row: HTMLDivElement; icon: HTMLElement; text: HTMLButtonElement; source: HTMLDivElement }>();
     private empty = node('p', 'goal-empty');
     private composing = false;
     private releasingFocus = false;
     private status = node('span', 'goal-status');
     constructor(readonly panel: HTMLElement, readonly actions: Actions) {
-        this.treeToggle = button('All goals', actions.tree, 'btn btn-ghost-sm');
-        this.treeToggle.id = 'goal-tree-toggle'; this.treeToggle.append(icon('arrow-down-s-line'));
+        this.treeToggle = button('Home', actions.home, 'goal-icon', 'home-4-line');
+        this.treeToggle.id = 'goal-home-nav';
         this.content.id = 'goal-content'; this.treeToggle.setAttribute('aria-controls', this.content.id);
-        this.treeToggle.title = 'All goals';
-        this.addRoot = button('New goal', () => actions.edit('root'), 'goal-icon', 'add-line');
-        const header = node('div', 'goal-header'); header.append(this.treeToggle, this.addRoot);
-        this.parent = button('', () => { const goal = this.view.state.goals.find(g => g.id === this.view.selected); if (goal?.parentId) actions.select(goal.parentId); }, 'goal-parent');
-        this.parent.append(icon('arrow-left-s-line'), this.parentText);
+        this.addRoot = button('New goal', actions.create, 'goal-icon goal-action-primary', 'add-line');
+        this.addRoot.id = 'goal-new';
+        this.parent = button('Up one level', actions.up, 'goal-icon', 'arrow-up-line'); this.parent.id = 'goal-up';
+        this.expand = button('Expand goals', actions.expand, 'goal-icon', 'fullscreen-line'); this.expand.id = 'goal-expand'; this.expand.setAttribute('aria-controls','goal-page');
+        const header = node('div', 'goal-header');
+        const navigation = node('div','goal-navigation'), tools = node('div','goal-navigation');
+        navigation.append(this.treeToggle,this.parent);tools.append(this.addRoot,this.expand);header.append(navigation,tools);
         this.title = button('', () => actions.edit('edit'), 'goal-title');
-        this.addChild = button('Add subgoal', () => actions.edit('child'), 'goal-icon', 'add-line');
-        this.current.append(this.title, this.editorShell, this.addChild);
-        this.toggle = button('', actions.items, 'goal-items-toggle'); this.toggle.append(icon('attachment-2'), this.count);
+        this.current.append(this.title, this.editorShell);
+        this.toggle = button('', actions.items, 'goal-items-toggle'); this.toggle.append(this.count, this.itemsChevron);
+        this.items.id = 'goal-linked-items'; this.toggle.setAttribute('aria-controls', this.items.id);
         this.toggle.title = 'Linked notes and highlights';
         this.editor.rows = 1; this.editor.setAttribute('aria-keyshortcuts', 'Escape Control+Enter Meta+Enter');
         this.editorShell.append(this.editor);
@@ -94,14 +94,14 @@ export class GoalUI {
         this.releasingFocus = false;
     }
     announce(text: string) { this.status.textContent = text; }
-    focusEditor() { this.resize(); this.editor.focus({ preventScroll: true }); this.editor.setSelectionRange(this.editor.value.length, this.editor.value.length); }
+    focusEditor() { this.resize(); this.editor.focus({ preventScroll: true }); this.editor.setSelectionRange(this.editor.value.length, this.editor.value.length); this.editor.scrollIntoView?.({block:'nearest'}); }
     private resize() { this.editor.style.height = '0px'; this.editor.style.height = `${Math.max(32, this.editor.scrollHeight)}px`; }
     render(view: GoalView) {
         const priorEdit = this.view?.edit;
         this.view = view;
-        this.treeToggle.firstChild!.textContent = view.allGoals ? 'Current goal' : 'All goals';
-        this.treeToggle.setAttribute('aria-expanded', String(view.allGoals));
-        this.treeToggle.disabled = view.disabled; this.addRoot.disabled = view.disabled;
+        this.treeToggle.setAttribute('aria-current', view.allGoals ? 'page' : 'false');
+        this.treeToggle.disabled = view.disabled || view.allGoals; this.parent.disabled = view.disabled || view.allGoals;
+        this.addRoot.disabled = view.disabled; this.expand.hidden = view.fullPage;
         const editing = !!view.edit;
         this.editorShell.hidden = !editing; this.editor.disabled = view.disabled;
         this.editorShell.classList.toggle('is-new', editing && view.edit?.mode !== 'edit');
@@ -109,56 +109,29 @@ export class GoalUI {
             this.editor.value = view.edit.draft.text;
         }
         if (view.edit) {
-            this.editor.setAttribute('aria-label', view.edit.mode === 'edit' ? 'Edit goal' : view.edit.mode === 'child' ? 'New subgoal' : 'New goal');
-            this.editor.placeholder = view.edit.mode === 'child' ? 'Subgoal' : 'Goal';
+            this.editor.setAttribute('aria-label', view.edit.mode === 'edit' ? 'Edit goal' : 'New goal');
+            this.editor.placeholder = 'Goal';
         }
         const wanted: HTMLElement[] = [];
         if (!view.state.goals.length && !view.edit) { this.empty.textContent = 'Your goals, in your own words.'; wanted.push(this.empty); }
         if (view.allGoals) {
-            const stack = goalChildren(view.state, null).reverse().map(goal => ({ goal, depth: 0 }));
-            const rows: HTMLElement[] = [];
-            while (stack.length) {
-                const { goal, depth } = stack.pop()!;
-                let entry = this.treeNodes.get(goal.id);
-                if (!entry) {
-                    const row = node('li', 'goal-tree-row'), spacer = node('span', 'tree-spacer');
-                    const toggle = button('', () => this.actions.branch(goal.id), 'goal-icon', 'arrow-right-s-line');
-                    const label = button('', () => this.actions.select(goal.id), 'goal-tree-label');
-                    entry = { row, toggle, label, spacer }; this.treeNodes.set(goal.id, entry);
-                }
-                entry.row.style.paddingLeft = `${Math.min(depth, 3) * 14}px`;
-                entry.label.textContent = goal.text; entry.label.setAttribute('aria-current', String(goal.id === view.selected));
-                entry.toggle.setAttribute('aria-label', `${view.expanded.has(goal.id) ? 'Collapse' : 'Expand'} ${goal.text}`);
-                entry.toggle.setAttribute('aria-expanded', String(view.expanded.has(goal.id)));
-                entry.toggle.querySelector('i')!.className = view.expanded.has(goal.id) ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line';
-                const nested = goalChildren(view.state, goal.id);
-                reconcile(entry.row, [nested.length ? entry.toggle : entry.spacer, entry.label]);
-                rows.push(entry.row);
-                if (view.expanded.has(goal.id)) stack.push(...nested.reverse().map(child => ({ goal: child, depth: depth + 1 })));
-            }
-            reconcile(this.tree, rows); wanted.push(this.tree);
+            this.renderChildren(goalChildren(view.state, null)); wanted.push(this.children);
         } else {
             const goal = view.state.goals.find(item => item.id === view.selected);
             if (goal) {
-                const parent = view.state.goals.find(item => item.id === goal.parentId);
-                if (parent) { this.parentText.textContent = parent.text; this.parent.title = parent.text; wanted.push(this.parent); }
                 this.title.textContent = goal.text; this.title.hidden = view.edit?.mode === 'edit'; this.title.disabled = view.disabled;
-                this.addChild.disabled = view.disabled;
                 if (view.edit?.mode === 'edit') {
-                    if (this.editorShell.parentElement !== this.current) this.current.insertBefore(this.editorShell, this.addChild);
+                    if (this.editorShell.parentElement !== this.current) this.current.append(this.editorShell);
                 }
                 wanted.push(this.current);
-                const kids = goalChildren(view.state, goal.id, view.fullPage ? undefined : view.sourcePage, view.sourceBook).map(child => {
-                    let control = this.childNodes.get(child.id);
-                    if (!control) { control = button('', () => this.actions.select(child.id), 'goal-child'); this.childNodes.set(child.id, control); }
-                    control.textContent = child.text; return control;
-                });
-                reconcile(this.children, kids); if (kids.length) wanted.push(this.children);
+                const kids = goalChildren(view.state, goal.id); this.renderChildren(kids); if (kids.length) wanted.push(this.children);
+                if (view.edit?.mode === 'child') wanted.push(this.editorShell);
                 const related = view.state.links.filter(link => link.goalId === goal.id);
                 const annotations = new Map(view.annotations.map(annotation => [annotation.id, annotation]));
                 const live = related;
                 if (live.length) {
-                    this.count.textContent = String(live.length);
+                    this.count.textContent = `${live.length} ${live.length === 1 ? 'item' : 'items'}`;
+                    this.itemsChevron.className = view.itemsOpen ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line';
                     this.toggle.setAttribute('aria-label', `${live.length} linked ${live.length === 1 ? 'item' : 'items'}`);
                     this.toggle.setAttribute('aria-expanded', String(view.itemsOpen)); wanted.push(this.toggle);
                     if (view.itemsOpen) {
@@ -188,8 +161,16 @@ export class GoalUI {
                 }
             }
         }
-        if (view.edit && view.edit.mode !== 'edit') wanted.push(this.editorShell);
+        if (view.edit?.mode === 'root') wanted.push(this.editorShell);
         reconcile(this.content, wanted);
         if (editing) this.resize();
+    }
+    private renderChildren(goals: GoalLibraryState['goals']) {
+        const controls = goals.map(goal => {
+            let control = this.childNodes.get(goal.id);
+            if (!control) { control = button('', () => this.actions.select(goal.id), 'goal-child'); this.childNodes.set(goal.id,control); }
+            control.textContent = goal.text; control.disabled = this.view.disabled; return control;
+        });
+        reconcile(this.children,controls);
     }
 }

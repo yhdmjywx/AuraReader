@@ -4,23 +4,25 @@ import type { AppElements } from '../../app/elements.js';
 import type { ReadingLocation } from '../../domain/book.js';
 import { addGoal, changeGoal, goalOrigin } from '../../domain/goalEngine.js';
 import { normalizeAnnotation } from '../../domain/annotationEngine.js';
-import { bookVersion, onGoalLibraryChanged, operationId } from '../../infrastructure/storageClient.js';
+import { bookVersion, readBooks, onGoalLibraryChanged, operationId } from '../../infrastructure/storageClient.js';
 import { stageLibrary, flushLibrary, loadGoalLibrary, loadGoalMaterials, pendingLibrary, libraryDrafts, storeLibraryDraft, discardLibraryDraft } from '../../infrastructure/goalLibraryRepository.js';
+import { pendingBookIntents, stageBookIntent, acknowledgeBookIntent } from '../../infrastructure/goalLibraryRepository.js';
 import { GoalUI } from './goalUI.js';
 import { GoalSidebar, positionGoals } from './goalLayout.js';
 export interface GoalCallbacks {
     getAnnotations(): Annotation[]; getLocation(): ReadingLocation; getMode(): string;
     showToast(message: string): void; jump(id: string, source?: GoalSourceLink): void | Promise<void>;
-    finishAnnotations(): Promise<void>; annotationsSaved(): Promise<void>;
+    finishAnnotations(): Promise<void>; annotationsSaved(): Promise<void>; onEnterGoalPage?(): void;
     onActionsChanged?(): void; onBeforeSidebarResize?(): void; onSurfaceChanged?(): void; chooseBook?(): void;
 }
 export class GoalController {
     state: GoalLibraryState = { goals: [], links: [] };
-    selected: string | null = null; allGoals = false; itemsOpen = true; expanded = new Set<string>();
+    selected: string | null = null; allGoals = true; itemsOpen = true;
     edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft; lastNonempty: string; previousTree: boolean } | null = null;
     disabled = true; visible = false; page = false;
     elements: AppElements | null = null; ui: GoalUI | null = null; sidebar: GoalSidebar | null = null;
     private dirty = false; private serial = 0; private stagedSerial = -1;
+    private homeHidden = false;
     private linksInFlight = new Set<Promise<void>>(); private timer: ReturnType<typeof setTimeout> | null = null;
     private failure: unknown; private ready: Promise<void> | null = null;
     private materialRequest = 0; private materials: Annotation[] = []; private titles = new Map<string, string>();
@@ -39,33 +41,39 @@ export class GoalController {
             const loaded = await loadGoalLibrary();
             this.state = loaded.state; this.dirty = loaded.pending; this.disabled = !!loaded.error; this.failure = undefined;
             try { this.selected = localStorage.getItem('aura_selected_goal'); } catch { /* Optional selection. */ }
-            this.ensureSelection(); this.expanded = new Set(this.state.goals.filter(g => g.parentId === null).map(g => g.id)); this.resumeDraft();
+            this.ensureSelection(); this.resumeDraft();
             if (loaded.error) throw loaded.error;
             await this.refreshMaterials(); this.render();
         })().catch(error => { this.disabled = true; this.ready = null; this.fail(error); this.render(); });
         return this.ready;
     }
-    private ensureSelection() { if (!this.state.goals.some(g => g.id === this.selected)) this.selected = this.state.goals.find(g => g.parentId === null)?.id || null; }
+    private ensureSelection() { if (!this.state.goals.some(g => g.id === this.selected)) this.selected = null; this.allGoals = this.selected === null; }
     private rememberSelection() { try { if (this.selected) localStorage.setItem('aura_selected_goal', this.selected); else localStorage.removeItem('aura_selected_goal'); } catch { /* Optional UI state. */ } }
     initUI(elements: AppElements) {
         this.elements = elements;
         if (elements.goalPanel) this.ui = new GoalUI(elements.goalPanel, {
-            select: id => this.selectGoal(id), tree: () => { this.endEdit(); this.allGoals = !this.allGoals; this.render(); },
-            branch: id => { if (this.expanded.has(id)) this.expanded.delete(id); else this.expanded.add(id); this.render(); },
+            select: id => this.selectGoal(id), home: () => this.goHome(), up: () => this.goUp(), create: () => this.beginNew(),
+            expand: () => { this.openPage().catch(() => {}); },
             items: () => { this.itemsOpen = !this.itemsOpen; this.render(); }, edit: mode => this.beginEdit(mode), input: text => this.updateDraft(text),
             finish: () => { this.finishInlineEdit().catch(() => {}); },
             unlink: id => { this.endEdit(); this.persist({ ...this.state, links: this.state.links.filter(l => l.goalId !== this.selected || l.annotationId !== id) }); this.render(); this.ui?.announce('Item unlinked from goal'); },
             jump: id => { this.endEdit(); const source = this.state.links.find(l => l.goalId === this.selected && l.annotationId === id); Promise.resolve(this.callbacks.jump(id, source)).catch(error => this.fail(error)); }
         });
         if (elements.goalSidebar) this.sidebar = new GoalSidebar({ ...elements, btnGoals: elements.btnGoalSidebar }, () => this.updateReadingContext(), () => this.finishInlineEdit(), () => this.callbacks.onBeforeSidebarResize?.());
-        elements.btnGoals?.addEventListener('click', () => { this.openPage().catch(() => {}); });
         elements.btnGoalBack?.addEventListener('click', () => { this.returnToReader().catch(() => {}); }); this.updateReadingContext();
     }
-    async openPage() { await this.callbacks.finishAnnotations(); if (this.edit || this.dirty) await this.finishInlineEdit(); await this.initialize(); this.callbacks.onBeforeSidebarResize?.(); this.page = true; this.updateReadingContext(); }
+    async openPage() { await this.callbacks.finishAnnotations(); if (this.edit || this.dirty) await this.finishInlineEdit(); await this.initialize(); this.callbacks.onEnterGoalPage?.(); this.callbacks.onBeforeSidebarResize?.(); this.page = true; this.updateReadingContext(); }
     async returnToReader() { await this.finishInlineEdit(); this.useReadingSurface(); if (!this.callbacks.getLocation().bookId) this.callbacks.chooseBook?.(); }
     useReadingSurface() { const wasPage = this.page; this.page = false; this.updateReadingContext(); if (wasPage) this.callbacks.onSurfaceChanged?.(); }
     async bookChanged() { this.updateReadingContext(); await this.refreshMaterials(); }
     selectGoal(id: string) { this.endEdit(); this.selected = id; this.rememberSelection(); this.allGoals = false; this.itemsOpen = true; this.render(); }
+    goHome() { this.endEdit(); this.selected = null; this.allGoals = true; this.rememberSelection(); this.render(); }
+    goUp() { const parent = this.state.goals.find(g => g.id === this.selected)?.parentId; if (parent) this.selectGoal(parent); else this.goHome(); }
+    beginNew() {
+        const parentId = this.allGoals ? null : this.selected;
+        this.endEdit(); this.selected = parentId; this.allGoals = !parentId; this.rememberSelection();
+        this.beginEdit(parentId ? 'child' : 'root');
+    }
     beginEdit(mode: 'root' | 'child' | 'edit') {
         if (this.disabled) return; this.endEdit(); const goal = this.state.goals.find(g => g.id === this.selected); if (mode !== 'root' && !goal) return;
         const location = this.callbacks.getLocation();
@@ -81,7 +89,7 @@ export class GoalController {
     private endEdit() {
         const edit = this.edit; if (!edit) return; if (this.ui) this.updateDraft(this.ui.editor.value); this.edit = null; this.ui?.releaseEditorFocus();
         if (edit.mode === 'edit') this.persist(changeGoal(this.state, edit.draft.id, edit.draft.text.trim() ? edit.draft.text : edit.lastNonempty));
-        else if (edit.draft.text.trim()) { this.persist(addGoal(this.state, edit.draft)); this.selected = edit.draft.id; this.rememberSelection(); if (edit.draft.parentId) this.expanded.add(edit.draft.parentId); this.allGoals = false; this.itemsOpen = true; }
+        else if (edit.draft.text.trim()) { this.persist(addGoal(this.state, edit.draft)); this.selected = edit.draft.parentId; this.rememberSelection(); this.allGoals = !this.selected; this.itemsOpen = true; }
         else { discardLibraryDraft(edit.draft.id); this.allGoals = edit.previousTree; } this.render();
     }
     private resumeDraft() {
@@ -101,13 +109,41 @@ export class GoalController {
     }
     async flush() {
         if (this.timer) { clearTimeout(this.timer); this.timer = null; } const serial = this.serial;
-        if (this.disabled && this.failure) throw this.failure;
+        if (this.disabled && this.failure && (this.dirty || pendingLibrary().length || libraryDrafts().length)) throw this.failure;
         try { if (this.dirty && this.stagedSerial !== serial) { stageLibrary(this.state); this.stagedSerial = serial; } if (pendingLibrary().length) await flushLibrary(); if (this.serial === serial) { this.dirty = false; this.failure = undefined; } }
         catch (error) { this.fail(error); throw error; }
     }
     async assertWritesSaved() { do { await this.finishInlineEdit(); } while (this.edit); if (this.failure) throw this.failure; }
+    async createRoot(text: string, id = operationId()): Promise<string> {
+        return this.createGoal(text,null,id);
+    }
+    async createGoal(text: string, parentId: string | null, id = operationId()): Promise<string> {
+        await this.initialize(); if (this.disabled) throw this.failure || new Error('Goals are unavailable');
+        await this.assertWritesSaved();
+        this.persist(this.state.goals.some(g => g.id === id) ? changeGoal(this.state, id, text) : addGoal(this.state, { id, parentId, text, origin: null }));
+        this.selected = id; this.allGoals = false; this.rememberSelection(); await this.flush(); this.render(); return id;
+    }
+    async addBook(goalId: string, bookId: string, expectedGeneration?: string) {
+        const version = (await readBooks()).find(b => b.id === bookId);
+        if (!version || version.deleted || (expectedGeneration && version.generation !== expectedGeneration)) throw new Error('This book is no longer available or has changed');
+        const intent = { goalId, bookId, generation: version.generation }; stageBookIntent(intent);
+        await this.assertWritesSaved(); if (this.disabled) throw this.failure || new Error('Goals are unavailable');
+        if (!this.state.goals.some(g => g.id === goalId)) throw new Error('This goal is no longer available');
+        const links = this.state.bookLinks || [];
+        if (!links.some(l => l.goalId === goalId && l.bookId === bookId)) {
+            this.persist({ ...this.state, bookLinks: [...links, { goalId, bookId, generation: version.generation }] });
+        }
+        await this.flush(); acknowledgeBookIntent(intent); this.render();
+    }
+    async recoverBookIntents() { for (const link of pendingBookIntents()) await this.addBook(link.goalId, link.bookId, link.generation); }
+    async removeBook(goalId: string, bookId: string) {
+        await this.assertWritesSaved(); if (this.disabled) throw this.failure || new Error('Goals are unavailable');
+        this.persist({ ...this.state, bookLinks: (this.state.bookLinks || []).filter(l => l.goalId !== goalId || l.bookId !== bookId) });
+        await this.flush(); this.render();
+    }
+    setHomeHidden(hidden: boolean) { this.homeHidden = hidden; this.updateReadingContext(); }
     private fail(error: unknown) { if (this.failure !== error) this.callbacks.showToast(error instanceof Error ? error.message : 'Goal 尚未可靠保存，请保留页面'); this.failure = error; }
-    canLink(id: string) { return !this.page && this.visible && !this.disabled && !!this.selected && this.callbacks.getAnnotations().some(n => n.id === id); }
+    canLink(id: string) { return !this.page && !this.allGoals && this.visible && !this.disabled && !!this.selected && this.callbacks.getAnnotations().some(n => n.id === id); }
     linked(id: string) { return this.state.links.some(l => l.goalId === this.selected && l.annotationId === id); }
     linkAnnotation(id: string): Promise<void> { const task = this.performLink(id); this.linksInFlight.add(task); task.finally(() => this.linksInFlight.delete(task)).catch(() => {}); return task; }
     private async performLink(id: string) {
@@ -124,12 +160,18 @@ export class GoalController {
     }
     updateReadingContext() {
         const e = this.elements;
+        if (this.homeHidden && e) {
+            if (e.readingWorkspace) e.readingWorkspace.hidden = true;
+            if (e.goalPage) e.goalPage.hidden = true;
+            if (e.btnToc) e.btnToc.hidden = true;
+            if (e.btnGoalSidebar) e.btnGoalSidebar.hidden = true;
+            this.visible = false; this.callbacks.onActionsChanged?.(); return;
+        }
         if (e?.goalPage && e.goalSidebar && e.goalPanel) {
             e.readingWorkspace!.hidden = this.page; e.goalPage.hidden = !this.page;
             if (e.btnToc) e.btnToc.hidden = this.page;
             const host = this.page ? e.goalPageContent! : e.goalSidebar;
             if (e.goalPanel.parentElement !== host) host.insertBefore(e.goalPanel, this.page ? null : e.goalResizer || null);
-            if (e.btnGoals) { e.btnGoals.hidden = false; e.btnGoals.setAttribute('aria-current', this.page ? 'page' : 'false'); }
             if (this.page) { e.goalSidebar.hidden = true; e.goalPanel.hidden = false; if (e.btnGoalSidebar) e.btnGoalSidebar.hidden = true; this.visible = true; }
             else this.visible = this.sidebar ? this.sidebar.update(this.callbacks.getMode()) : positionGoals(e, this.callbacks.getMode());
         } else if (e) this.visible = this.sidebar ? this.sidebar.update(this.callbacks.getMode()) : positionGoals(e, this.callbacks.getMode()); this.render();
@@ -137,7 +179,7 @@ export class GoalController {
     refreshAnnotations() { this.render(); }
     render() {
         const annotations = new Map(this.materials.map(n => [n.id, n])); this.callbacks.getAnnotations().forEach(n => annotations.set(n.id, n));
-        this.ui?.render({ state: this.state, selected: this.selected, allGoals: this.allGoals, expanded: this.expanded, itemsOpen: this.itemsOpen, edit: this.edit,
+        this.ui?.render({ state: this.state, selected: this.selected, allGoals: this.allGoals, itemsOpen: this.itemsOpen, edit: this.edit,
             sourcePage: this.callbacks.getLocation().page, sourceBook: this.callbacks.getLocation().bookId, annotations: [...annotations.values()], disabled: this.disabled,
             fullPage: this.page, titles: this.titles, materialStatus: this.materialStatus }); this.callbacks.onActionsChanged?.();
     }

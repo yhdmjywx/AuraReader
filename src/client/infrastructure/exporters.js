@@ -348,7 +348,7 @@ export function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStat
 
     const files = selectedBooks.map(book => {
         const backupPayload = {
-            version: goalGraphs ? "1.2" : "1.1",
+            version: goalGraphs ? "1.3" : "1.1",
             // Keep the existing envelope for compatibility with earlier readers.
             type: "aurareader_full_backup",
             exportedAt,
@@ -357,7 +357,7 @@ export function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStat
             goalStates: goalStates.filter(state => state.bookId === book.id).map(state => includeNotes
                 ? state : { bookId: state.bookId, goals: state.goals })
         };
-        if (goalGraphs) { const graph = goalGraphs.get(book.id) || { goals: [], links: [] }; delete backupPayload.goalStates; backupPayload.goalGraph = includeNotes ? graph : { goals: graph.goals }; }
+        if (goalGraphs) { const graph = goalGraphs.get(book.id) || { goals: [], links: [], bookLinks: [] }; delete backupPayload.goalStates; backupPayload.goalGraph = includeNotes ? graph : { goals: graph.goals, ...(graph.bookLinks !== undefined ? { bookLinks: graph.bookLinks } : {}) }; }
         const bookTitle = String(book.title || book.id || '图书')
             .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_');
         const fileName = `AuraReader_Backup_${bookTitle}_${yyyymmdd}.aurabackup`;

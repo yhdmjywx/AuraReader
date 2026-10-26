@@ -265,6 +265,8 @@ export function updateNoteGoalActions(elements, getGoalAction) {
         control.hidden = !state?.visible; control.disabled = !state || state.disabled;
         control.title = state?.linked ? 'Added to goal' : 'Add to goal';
         control.setAttribute('aria-label', control.title);
+        control.classList.toggle('is-linked', !!state?.linked);
+        const label = control.querySelector('span'); if (label) label.textContent = state?.linked ? 'Linked' : 'Goal';
         control.querySelector('i').className = state?.linked ? 'ri-check-line' : 'ri-links-line';
     }
 }

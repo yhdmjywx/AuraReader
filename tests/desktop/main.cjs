@@ -77,7 +77,10 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     assert.equal(await run(`document.querySelector('button[title="原书字体恢复将在后续支持"]').disabled`), true);
     assert.equal(state.bridge.versions.electron, runtime.electron);
     assert.ok(state.controls && state.icons && state.literals && state.chinese);
-    assert.match(state.title, /危机时代/);
+    assert.match(state.title, /未打开书籍/);
+    assert.equal(await run("document.getElementById('goal-home').hidden"), false);
+    // Existing reader checks use the same explicit demo fixture after onboarding.
+    await run("(async()=>{const a=await import('./main.js');await a.coordinator.openBook('crisis-era')})()");
     assert.ok(state.resources.every(url => url.startsWith('aurareader://app/')));
     assert.ok(!state.resources.some(url => url.includes('/api/')));
     assert.deepEqual(errors, [], 'No initial load or renderer errors');

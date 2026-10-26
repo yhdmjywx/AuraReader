@@ -54,7 +54,7 @@ function createDataStore(directory) {
         throw new StorageError('SQLite 文件丢失或为空；请保留 data 目录并从已验证备份恢复，禁止自动新建空书库', 500);
     }
     const db = new DatabaseSync(filename, { timeout: 5000 });
-    if (db.prepare('PRAGMA user_version').get().user_version > 3) {
+    if (db.prepare('PRAGMA user_version').get().user_version > 4) {
         db.close(); throw new StorageError('数据库版本高于本应用，禁止降级覆盖', 409);
     }
     try { db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;

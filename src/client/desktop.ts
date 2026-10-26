@@ -82,6 +82,7 @@ bridge.lifecycle.onPrepareClose(async requestId => {
     document.body.inert = true;
     try {
         if (boot) await boot;
+        await application?.home?.prepareClose();
         await application?.goals.finishInlineEdit();
         await application?.annotations.finishInlineEdit();
         await application?.annotations.assertInlineWritesSaved();

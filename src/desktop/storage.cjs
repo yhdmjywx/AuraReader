@@ -1,6 +1,5 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 const { createDataStore, StorageError, bookRecord, noteRecord, goalRecord, goalBackupRecord, validateLibrary } = require('../server/dataStore.js');
 const { createMigration } = require('../server/migration.js');
 const { backupDatabase } = require('../server/storageMaintenance.js');
@@ -95,13 +94,12 @@ function createDesktopStorage(directory) {
         if (status().initialized) return { initialized: true };
         if (creating) return creating;
         creating = (async () => {
-            const data = await import(pathToFileURL(path.resolve(__dirname, '../../dist/client/infrastructure/demoData.js')).href);
             if (closed) throw new StorageError('书库已关闭', 503);
             store = store || createDataStore(directory);
             const migration = createMigration(store);
             const snapshot = migration.snapshot(DESKTOP_SOURCE, {
                 origin: 'aurareader://app', indexedDB: { books: [], notes: [] }, caches: {}, pending: {},
-                builtins: { books: Object.entries(data.demoBooks).map(([id, book]) => ({ id, ...book })), notes: data.getSeedNotes() }
+                builtins: { books: [], notes: [] }
             });
             migration.commit(DESKTOP_SOURCE, snapshot.snapshotId);
             return { initialized: true };

@@ -13,6 +13,7 @@ const timer = setTimeout(() => app.exit(1), 85000);
     const window = await startDesktop({ profileDirectory: path.join(output, 'goal-profile') });
     window.setContentSize(1613, 928);
     const wc = window.webContents, run = code => wc.executeJavaScript(code, true);
+    const visibility = [];
     const wait = expression => run(`(async()=>{const until=Date.now()+20000;while(!(${expression})){if(Date.now()>until)throw Error('Goal state timeout: '+${JSON.stringify(expression)});await new Promise(r=>setTimeout(r,20));}})()`);
     await wait("['setup','library'].includes(document.documentElement.dataset.desktopReady)");
     if (await run("document.documentElement.dataset.desktopReady==='setup'")) await run("document.getElementById('desktop-create-library').click()");
@@ -30,6 +31,13 @@ const timer = setTimeout(() => app.exit(1), 85000);
         window.__closeCancelled=null;auraDesktop.lifecycle.onCloseCancelled(message=>window.__closeCancelled=message);
     })()`);
     await wait('!document.getElementById("goal-panel").hidden');
+    await run('window.__auditGoalVisibility=' + require('./goal-visibility.cjs').toString() + ';true');
+    assert.equal(await run(`(()=>{
+        const surface=a.elements.workspaceContainer, r=surface.getBoundingClientRect(), outer=document.getElementById('reading-workspace').getBoundingClientRect(), side=document.getElementById('goal-sidebar').getBoundingClientRect();
+        const style=getComputedStyle(surface);
+        return Math.abs(r.left-side.right-8)<1 && Math.abs(r.top-outer.top-8)<1 && Math.abs(outer.right-r.right-8)<1 && Math.abs(outer.bottom-r.bottom-8)<1
+            && style.borderTopLeftRadius==='12px' && style.boxShadow!=='none' && getComputedStyle(document.getElementById('goal-sidebar')).borderRightWidth==='0px';
+    })()`), true, 'reading and margin notes share one inset surface, without a sidebar divider');
     const click = async selector => {
         const box = await run(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing '+${JSON.stringify(selector)});const r=e.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()`);
         wc.sendInputEvent({ type: 'mouseMove', ...box });
@@ -52,15 +60,18 @@ const timer = setTimeout(() => app.exit(1), 85000);
     await click('#goal-panel [aria-label="New goal"]'); await wait("document.activeElement.matches('.goal-editor textarea')");
     await input('What is time?');
     // Real pointer sequence: blur must not consume the next toolbar click.
-    await run('a.goals.finishInlineEdit()'); await click('#goal-panel [aria-label="Add subgoal"]');
+    await run('a.goals.finishInlineEdit()');assert.equal(await run('a.goals.selected'),null);await click('.goal-child');
+    await click('#goal-new');
     await wait("document.activeElement.matches('.goal-editor textarea')"); await input('How does time relate to change?');
-    await run('a.goals.finishInlineEdit()');
+    await run('a.goals.finishInlineEdit()');await click('.goal-child');
     const geometry = await run(`(()=>{const p=a.elements.bookPaper,r=p.getBoundingClientRect();return [r.x,r.y,p.clientWidth,p.scrollLeft,document.getElementById('reader-viewport').scrollTop];})()`);
     await click('.btn-goal-link'); await run('a.goals.assertWritesSaved()');
     assert.equal(await run("document.querySelectorAll('.goal-item').length"), 1);
     await click('.goal-items-toggle'); assert.equal(await run("document.querySelectorAll('.goal-item').length"), 0);
     await click('.annotation-token.has-highlight'); await wait("document.getElementById('highlight-action-tooltip').style.display==='flex'");
     await click('#btn-annotation-goal'); await run('a.goals.assertWritesSaved()');
+    await click('.annotation-token.has-highlight'); await wait("document.getElementById('highlight-action-tooltip').style.display==='flex'");
+    assert.equal(await run("document.getElementById('btn-annotation-goal').textContent.includes('Linked')"), true);
     assert.equal(await run("document.querySelectorAll('.goal-item').length"), 2);
     assert.deepEqual(await run(`(()=>{const p=a.elements.bookPaper,r=p.getBoundingClientRect();return [r.x,r.y,p.clientWidth,p.scrollLeft,document.getElementById('reader-viewport').scrollTop];})()`), geometry);
     assert.equal(geometry[2], 560);
@@ -69,10 +80,10 @@ const timer = setTimeout(() => app.exit(1), 85000);
     await run('window.__goalEditor=document.activeElement;__goalEditor.setSelectionRange(4,4)');
     await resizeSidebar(420);
     assert.equal(await run('document.activeElement===__goalEditor && __goalEditor.selectionStart===4'), true, 'drag preserves live Goal input');
-    await click('#goal-panel [aria-label="Add subgoal"]');
-    await wait("document.querySelector('.goal-editor textarea').getAttribute('aria-label')==='New subgoal'");
+    await click('#goal-new');
+    await wait("document.querySelector('.goal-editor textarea').getAttribute('aria-label')==='New goal'");
     await input('A deeper question'); await run('a.goals.finishInlineEdit()');
-    await click('.goal-parent'); assert.equal(await run("document.querySelectorAll('.goal-item').length"), 2, await run('JSON.stringify({selected:a.goals.selected,goals:a.goals.state,edit:a.goals.edit})'));
+    await click('.goal-child');await click('#goal-up'); assert.equal(await run("document.querySelectorAll('.goal-item').length"), 2, await run('JSON.stringify({selected:a.goals.selected,goals:a.goals.state,edit:a.goals.edit})'));
     await click('.note-comment-text'); await wait("document.activeElement.matches('.note-editor')");
     await run(`(()=>{window.__noteEditor=document.activeElement;__noteEditor.value='A clock measures change. Does that explain time itself?';__noteEditor.setSelectionRange(4,4);__noteEditor.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     assert.equal(await run('document.activeElement===window.__noteEditor && __noteEditor.selectionStart===4'), true);
@@ -93,8 +104,28 @@ const timer = setTimeout(() => app.exit(1), 85000);
     assert.equal(await run(`(()=>{const r=document.querySelector('.note-card').getBoundingClientRect();return r.left>=640 && r.right<=innerWidth;})()`), true);
     await fs.writeFile(path.join(output, 'goal-wide.png'), (await wc.capturePage()).toPNG());
     await resizeSidebar(280);
+    visibility.push({mode:'sidebar-light',controls:await run('__auditGoalVisibility()')});
+    await resizeSidebar(220);
+    visibility.push({mode:'sidebar-220',controls:await run('__auditGoalVisibility()')});
+    await run("a.goals.allGoals=true;a.goals.render()");
+    visibility.push({mode:'tree-220',controls:await run('__auditGoalVisibility()')});
+    await run("a.goals.allGoals=false;a.goals.render()");
+    await fs.writeFile(path.join(output, 'goal-compact.png'), (await wc.capturePage()).toPNG());
+    await resizeSidebar(280);
     await fs.writeFile(path.join(output, 'goal-default.png'), (await wc.capturePage()).toPNG());
+    await run("a.elements.readerPanel.classList.add('paper-sepia')");
+    await run('new Promise(resolve=>setTimeout(resolve,300))');
+    await fs.writeFile(path.join(output, 'goal-sepia.png'), (await wc.capturePage()).toPNG());
+    await run("a.elements.readerPanel.classList.remove('paper-sepia')");
     window.setContentSize(800, 700); await wait('document.getElementById("goal-panel").hidden');
+    await run('new Promise(resolve=>setTimeout(resolve,300))');
+    await fs.writeFile(path.join(output, 'goal-narrow.png'), (await wc.capturePage()).toPNG());
+    window.setContentSize(1700,928);
+    await run("a.layout.setPageMode('double',a.elements.readerPanel.clientWidth)");
+    await wait('a.elements.workspaceContainer.classList.contains("layout-double")');
+    await run('new Promise(resolve=>setTimeout(resolve,300))');
+    await fs.writeFile(path.join(output, 'goal-double.png'), (await wc.capturePage()).toPNG());
+    await run("a.layout.setPageMode('single',a.elements.readerPanel.clientWidth)");
     window.setContentSize(1613, 928); await wait('!document.getElementById("goal-panel").hidden');
     await run(`(async()=>{a.layout.setPageMode('double',1613);await new Promise(r=>setTimeout(r,80));})()`);
     assert.equal(await run('document.getElementById("goal-panel").hidden'), true);
@@ -103,6 +134,7 @@ const timer = setTimeout(() => app.exit(1), 85000);
     await wait(`getComputedStyle(document.getElementById('goal-panel')).color===getComputedStyle(document.body).color`);
     // Allow the existing paper color transition and responsive refit to settle.
     await run('new Promise(resolve=>setTimeout(resolve,300))');
+    visibility.push({mode:'sidebar-dark',controls:await run('__auditGoalVisibility()')});
     await fs.writeFile(path.join(output,'goal-dark.png'),(await wc.capturePage()).toPNG());
     await run('a.appShell.toggleAppTheme()');
     const previous = live.goalLibrary();
@@ -128,26 +160,69 @@ const timer = setTimeout(() => app.exit(1), 85000);
     await wait("document.querySelectorAll('.goal-item').length===3");
     assert.equal(await run("a.annotations.getNotes().every(n=>n.bookId==='goal-second')"), true);
     const beforeGoalPage = await run("[a.reader.getCurrentPage(),document.getElementById('reader-viewport').scrollTop,a.elements.bookPaper.scrollLeft]");
-    await click('#btn-goals');await wait('a.goals.page');
+    await click('#goal-expand');await wait('a.goals.page');
     await click('#btn-goal-back');await wait('!a.goals.page');
     assert.deepEqual(await run("[a.reader.getCurrentPage(),document.getElementById('reader-viewport').scrollTop,a.elements.bookPaper.scrollLeft]"),beforeGoalPage);
-    await click('#btn-goals'); await wait('a.goals.page');
+    await click('#goal-expand'); await wait('a.goals.page');
     assert.deepEqual(await run(`(()=>({panels:document.querySelectorAll('#goal-panel').length,contents:document.querySelectorAll('#goal-content').length,titles:document.querySelectorAll('.goal-title').length,sidebar:document.getElementById('goal-sidebar').getBoundingClientRect().width,resizer:document.getElementById('goal-resizer').getBoundingClientRect().width,reader:document.getElementById('reading-workspace').hidden}))()`), {panels:1,contents:1,titles:1,sidebar:0,resizer:0,reader:true});
     assert.equal(await run("document.querySelector('#goal-page-content #goal-panel')!==null"), true);
     assert.equal(await run("['btn-goal-sidebar','btn-toc'].every(id=>document.getElementById(id).getBoundingClientRect().width===0)"), true);
     assert.equal(await run("document.querySelector('#goal-page-content').textContent.includes('On Time') && document.querySelector('#goal-page-content').textContent.includes('The Observer')"), true);
     await wait('!document.getElementById("toast-msg").classList.contains("show")');
     await run('new Promise(resolve=>setTimeout(resolve,300))');
+    visibility.push({mode:'page-light',controls:await run('__auditGoalVisibility()')});
     await fs.writeFile(path.join(output,'goal-page.png'),(await wc.capturePage()).toPNG());
+    for (const zoom of [1.25,1.5,2]) {
+        wc.setZoomFactor(zoom);await run('new Promise(resolve=>setTimeout(resolve,100))');
+        visibility.push({mode:'page-zoom-'+zoom,controls:await run('__auditGoalVisibility()')});
+    }
+    wc.setZoomFactor(1);await run('new Promise(resolve=>setTimeout(resolve,100))');
+    await run(`(()=>{
+        window.__visibilityState=a.goals.state;
+        a.goals.state={...a.goals.state,goals:a.goals.state.goals.map(g=>({...g,text:g.text+' — 阅读者的问题与自己的体验 mixed-language long text '.repeat(4)}))};
+        a.goals.render();document.querySelectorAll('.goal-item-source').forEach(e=>e.textContent+=' / A very long source book title 书籍来源'.repeat(4));
+    })()`);
+    visibility.push({mode:'page-long-text',controls:await run('__auditGoalVisibility()')});
+    await run("a.goals.allGoals=true;a.goals.render()");
+    visibility.push({mode:'tree-long-text',controls:await run('__auditGoalVisibility()')});
+    await run("a.goals.state=__visibilityState;a.goals.allGoals=false;a.goals.render()");
+    await run(`(()=>{
+        window.__goalTextSizes=[...document.querySelectorAll('#goal-panel button,#goal-panel textarea,.goal-item-source,#btn-goal-back')].map(e=>[e,e.style.fontSize]);
+        __goalTextSizes.forEach(([e])=>e.style.fontSize=(parseFloat(getComputedStyle(e).fontSize)*2)+'px');
+    })()`);
+    visibility.push({mode:'page-text-200-percent',controls:await run('__auditGoalVisibility()')});
+    await run("__goalTextSizes.forEach(([e,size])=>e.style.fontSize=size)");
+    window.focus();wc.focus();
+    await run("document.querySelector('#goal-panel [aria-label=\"New goal\"]').focus()");
+    wc.sendInputEvent({type:'keyDown',keyCode:'Tab'});wc.sendInputEvent({type:'keyUp',keyCode:'Tab'});
+    await run('new Promise(resolve=>requestAnimationFrame(resolve))');
+    // The OS/device scale can round a declared 2px outline to fractional CSS pixels.
+    assert.equal(await run("document.activeElement.closest('#goal-panel')!==null && document.activeElement.matches(':focus-visible') && parseFloat(getComputedStyle(document.activeElement).outlineWidth)>=1.5"), true, await run("JSON.stringify({focused:document.hasFocus(),tag:document.activeElement.outerHTML,outline:getComputedStyle(document.activeElement).outline,visible:document.activeElement.matches(':focus-visible')})"));
+    await run("document.querySelector('#goal-panel [aria-label=\"New goal\"]').focus()");
+    wc.sendInputEvent({type:'keyDown',keyCode:'Enter'});wc.sendInputEvent({type:'char',keyCode:'\r'});wc.sendInputEvent({type:'keyUp',keyCode:'Enter'});
+    await wait("document.activeElement.matches('.goal-editor textarea')");
+    await run("a.goals.finishInlineEdit()");
+    await run('a.appShell.toggleAppTheme()');await run('new Promise(resolve=>setTimeout(resolve,300))');
+    visibility.push({mode:'page-dark',controls:await run('__auditGoalVisibility()')});
+    await fs.writeFile(path.join(output,'goal-page-dark.png'),(await wc.capturePage()).toPNG());
+    await run('a.appShell.toggleAppTheme()');
     await click('.goal-title');await input('One question across two books');
     assert.equal(await run("document.querySelectorAll('.goal-editor textarea').length"), 1);
+    assert.equal(await run("getComputedStyle(document.querySelector('.goal-editor textarea')).fontSize"), '26px');
     await run('a.goals.finishInlineEdit()');
     window.setContentSize(800,700); await wait('a.goals.page && !document.getElementById("goal-panel").hidden');
     await run("a.layout.setPageMode('double',800)");
     assert.equal(await run('document.getElementById("goal-panel").hidden'), false);
     window.setContentSize(1613,928); await run("a.layout.setPageMode('single',1613)");
+    // BrowserWindow resize and the renderer/compositor settle asynchronously on Windows.
+    await wait('Math.abs(innerWidth-1613)<=1 && Math.abs(innerHeight-928)<=1');
+    await run('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    await fs.writeFile(path.join(output,'goal-before-source-click.png'),(await wc.capturePage()).toPNG());
+    assert.equal(await run(`(()=>{const e=document.querySelector('.goal-item-text[data-annotation-id="goal-note"]'),r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})()`),true,'source button is the visible pointer target after resize');
     await click('.goal-item-text[data-annotation-id="goal-note"]');
-    await wait("a.session.getCurrentBookId()==='goal-fixture' && !a.goals.page");
+    await wait("a.session.getCurrentBookId()==='goal-fixture' && !a.goals.page").catch(async error => {
+        throw new Error(error.message + ' ' + await run("JSON.stringify({book:a.session.getCurrentBookId(),page:a.goals.page,home:a.home?.active,toast:document.getElementById('toast-msg').textContent,links:a.goals.state.links})"));
+    });
     assert.equal(await run('a.goals.selected===__selectedGoal'), true);
     assert.equal(await run('localStorage.getItem("aura_goal_sidebar_width")'), '280');
     await run(`(async()=>{
@@ -165,7 +240,9 @@ const timer = setTimeout(() => app.exit(1), 85000);
     const report = { passed: true, actualElectron: true, isolatedDataOnly: true,
         checks: ['real pointer events and blur-to-subgoal creation', 'automatic link/select expansion', 'retained note editor before resize and exact reading geometry', 'real sidebar drag retains Goal editor/caret; existing note outside-click finish unchanged', 'saved width and hide/show', '640px sidebar uses original reading geometry with notes visible', '1613px/1440px/narrow/mode layouts', 'application theme independent of paper', 'actual SQLite failure, close refusal and exact retry', 'book switching preserves tree and links'],
         crossBookChecks: ['same selected Goal and three materials across two books', 'reader annotations remain book scoped', 'one Goal renderer and editor; hidden sidebar and separator occupy zero width', 'source titles and material click return to original book', 'Goal page remains available in narrow window and double mode', 'latest source navigation wins; ordinary book navigation supersedes pending source jump'],
-        screenshots: ['goal-single.png', 'goal-default.png', 'goal-wide.png', 'goal-dark.png', 'goal-page.png'] };
+        surfaceChecks: ['one inset reading and margin-note surface with rounded corners and subtle shadow', 'no full-height sidebar border', 'surface gutters included in reading-space budget', 'light/dark/sepia, 280/640px sidebar, narrow and double layouts'],
+        screenshots: ['goal-single.png', 'goal-default.png', 'goal-wide.png', 'goal-dark.png', 'goal-page.png', 'goal-sepia.png', 'goal-narrow.png', 'goal-double.png'] };
     await fs.writeFile(path.join(output, 'goal-results.json'), JSON.stringify(report, null, 2));
+    await fs.writeFile(path.join(output, 'goal-visibility-results.json'), JSON.stringify({passed:true,visibility}, null, 2));
     console.log('Goal desktop acceptance passed:', output); clearTimeout(timer); window.destroy(); app.exit(0);
 })().catch(error => { console.error(error); clearTimeout(timer); app.exit(1); });

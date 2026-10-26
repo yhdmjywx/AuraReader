@@ -52,11 +52,14 @@ function jsonSafe(value) {
 export async function migrateLegacyStorage() {
     const status = await storageRequest('migration/status');
     if (status.completed) { await cleanupLegacyBuffers(status.manifest); return status; }
-    const capture = async () => ({
-        origin: typeof location === 'undefined' ? '' : location.origin,
-        indexedDB: await readLegacyDatabase(), ...cacheSnapshot(),
-        builtins: { books: Object.entries(demoBooks).map(([id, b]) => ({ id, ...b })), notes: getSeedNotes() }
-    });
+    const capture = async () => {
+        const indexedDB = await readLegacyDatabase(), buffers = cacheSnapshot();
+        const hasLegacyData = indexedDB.books.length || indexedDB.notes.length || Object.keys(buffers.caches).length || Object.keys(buffers.pending).length;
+        return {
+            origin: typeof location === 'undefined' ? '' : location.origin, indexedDB, ...buffers,
+            builtins: hasLegacyData ? { books: Object.entries(demoBooks).map(([id, b]) => ({ id, ...b })), notes: getSeedNotes() } : { books: [], notes: [] }
+        };
+    };
     const perform = async () => {
         const snapshot = await capture(); jsonSafe(snapshot);
         const archived = await storageRequest('migration/snapshot', snapshot);

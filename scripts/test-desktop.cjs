@@ -8,9 +8,9 @@ fs.mkdirSync(directory, { recursive: true });
 const output = fs.mkdtempSync(path.join(directory, 'run-'));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
-async function run(entry) {
+async function run(entry, args = []) {
     await new Promise((resolve, reject) => {
-        const child = spawn(require('electron'), [path.join(root, 'tests/desktop', entry), output], {
+        const child = spawn(require('electron'), [path.join(root, 'tests/desktop', entry), output, ...args], {
             cwd: root, env, stdio: 'inherit', windowsHide: false
         });
         const timer = setTimeout(() => {
@@ -25,6 +25,13 @@ async function run(entry) {
     });
 }
 (async () => {
+    const selected = process.argv[2];
+    if (selected) {
+        if (!['main.cjs','restart.cjs','note-interaction.cjs','goal-interaction.cjs','goal-home.cjs'].includes(selected)) throw new Error('Unknown desktop test: ' + selected);
+        await run(selected, process.argv.slice(3));
+        console.log('Desktop artifacts:', output);
+        return;
+    }
     await run('main.cjs');
     const report = JSON.parse(fs.readFileSync(path.join(output, 'results.json'), 'utf8'));
     if (report.passed !== true) throw new Error('Desktop report did not pass');
@@ -37,6 +44,12 @@ async function run(entry) {
     await run('goal-interaction.cjs');
     const goals = JSON.parse(fs.readFileSync(path.join(output, 'goal-results.json'), 'utf8'));
     if (goals.passed !== true) throw new Error('Goal desktop report did not pass');
-    console.log(JSON.stringify({ ...report, restart, notes, goals }, null, 2));
+    await run('goal-home.cjs');
+    const home = JSON.parse(fs.readFileSync(path.join(output, 'home-results.json'), 'utf8'));
+    if (home.passed !== true) throw new Error('Goal home desktop report did not pass');
+    await run('goal-home.cjs', ['import-first']);
+    const homeImport = JSON.parse(fs.readFileSync(path.join(output, 'home-import-results.json'), 'utf8'));
+    if (homeImport.passed !== true) throw new Error('Goal home import-first report did not pass');
+    console.log(JSON.stringify({ ...report, restart, notes, goals, home, homeImport }, null, 2));
     console.log('Desktop artifacts:', output);
 })().catch(error => { console.error(error); process.exitCode = 1; });

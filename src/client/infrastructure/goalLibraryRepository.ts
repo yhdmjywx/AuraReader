@@ -1,16 +1,30 @@
-import type { GoalDraft, GoalGraphBackup, GoalLibraryState } from '../domain/goal.js';
+import type { GoalDraft, GoalGraphBackup, GoalLibraryState, GoalBookLink } from '../domain/goal.js';
 import type { SaveGoalLibraryCommand } from '../../shared/storage.js';
 import { acknowledgeGoals, attachGoalCommand, pendingGoals, readGoalDraft, clearGoalDraft } from './goalRecovery.js';
 import { acceptGoalLibrary, bookVersion, cachedGoalLibrary, enqueue, operationId, readBooks, readGoalLibrary, readNotes, storageRequest } from './storageClient.js';
 import { getNotesForBooks } from './annotationRepository.js';
 
 const PENDING = 'aura_goal_library_pending', DRAFTS = 'aura_goal_library_drafts';
+const BOOK_INTENTS = 'aura_goal_book_pending';
 interface Entry { version: string; expected: number; state: GoalLibraryState; command?: SaveGoalLibraryCommand }
 export interface LibraryDraft { draft: GoalDraft; legacyBookId?: string }
 function read<T>(key: string, fallback: T): T {
     const value = localStorage.getItem(key);
     if (value === null) return fallback;
     try { return JSON.parse(value) as T; } catch { throw new Error('Goal 恢复缓冲损坏，请保留站点数据'); }
+}
+export function pendingBookIntents(): GoalBookLink[] {
+    const links = read<GoalBookLink[]>(BOOK_INTENTS, []);
+    if (!Array.isArray(links) || links.some(l => !l?.goalId || !l.bookId || !l.generation)) throw new Error('Invalid pending book association; local data has been preserved');
+    return links;
+}
+export function stageBookIntent(link: GoalBookLink) {
+    const links = pendingBookIntents();
+    if (!links.some(l => l.goalId === link.goalId && l.bookId === link.bookId && l.generation === link.generation)) localStorage.setItem(BOOK_INTENTS, JSON.stringify([...links, link]));
+}
+export function acknowledgeBookIntent(link: GoalBookLink) {
+    const links = pendingBookIntents().filter(l => l.goalId !== link.goalId || l.bookId !== link.bookId || l.generation !== link.generation);
+    if (links.length) localStorage.setItem(BOOK_INTENTS, JSON.stringify(links)); else localStorage.removeItem(BOOK_INTENTS);
 }
 export function pendingLibrary(): Entry[] {
     const entries = read<Entry[]>(PENDING, []);
@@ -47,10 +61,12 @@ export function flushLibrary(): Promise<void> {
             const command = entry.command || { opId: entry.version, expected: entry.expected, state: entry.state };
             if (!entry.command) { const entries = pendingLibrary(); entries[0].command = command; writePending(entries); }
             const result = await storageRequest('goals/library/save', command);
-            acceptGoalLibrary({ id: 'reader-goals', revision: result.revision, deleted: false, value: command.state });
+            if (command.state.bookLinks === undefined) await readGoalLibrary();
+            else acceptGoalLibrary({ id: 'reader-goals', revision: result.revision, deleted: false, value: command.state });
             const remaining = pendingLibrary().filter(e => e.version !== entry.version);
             remaining.forEach(e => { if (!e.command) e.expected = result.revision; }); writePending(remaining);
             for (const item of libraryDrafts()) if (command.state.goals.some(g => g.id === item.draft.id && g.text === item.draft.text)) clearDraft(item.draft.id);
+            for (const link of pendingBookIntents()) if (command.state.bookLinks?.some(l => l.goalId === link.goalId && l.bookId === link.bookId && l.generation === link.generation)) acknowledgeBookIntent(link);
         }
     });
 }
@@ -100,19 +116,19 @@ export async function loadGoalMaterials(state: GoalLibraryState) {
     return { annotations: notes.flatMap(n => n.deleted ? [] : [n.value]), titles: new Map(books.filter(b => !b.deleted).map(b => [b.id, b.deleted ? '' : b.value.title])) };
 }
 export function assertNoLibraryRecovery() {
-    if (pendingLibrary().length || libraryDrafts().length) throw new Error('仍有未确认保存的 Goal，窗口已保留');
+    if (pendingLibrary().length || libraryDrafts().length || pendingBookIntents().length) throw new Error('仍有未确认保存的 Goal，窗口已保留');
 }
 export async function goalGraphsForBooks(bookIds: string[]): Promise<Map<string, GoalGraphBackup>> {
     const loaded = await loadGoalLibrary(); if (loaded.error) throw loaded.error;
-    if (loaded.drafts.length) throw new Error('请先完成 Goal 草稿再导出');
+    if (loaded.drafts.length || pendingBookIntents().length) throw new Error('请先完成 Goal 草稿或待确认书籍关联再导出');
     const state = loaded.state, result = new Map<string, GoalGraphBackup>();
     for (const bookId of bookIds) {
-        const seeds = new Set([...state.links.filter(l => l.bookId === bookId).map(l => l.goalId), ...state.goals.filter(g => g.origin?.bookId === bookId).map(g => g.id)]);
+        const seeds = new Set([...state.links.filter(l => l.bookId === bookId).map(l => l.goalId), ...(state.bookLinks || []).filter(l => l.bookId === bookId).map(l => l.goalId), ...state.goals.filter(g => g.origin?.bookId === bookId).map(g => g.id)]);
         const roots = new Set<string>();
         for (const id of seeds) { let g = state.goals.find(g => g.id === id); while (g?.parentId) g = state.goals.find(p => p.id === g!.parentId); if (g) roots.add(g.id); }
         const included = new Set(roots); let changed = true;
         while (changed) { changed = false; for (const g of state.goals) if (g.parentId && included.has(g.parentId) && !included.has(g.id)) { included.add(g.id); changed = true; } }
-        result.set(bookId, { goals: state.goals.filter(g => included.has(g.id)), links: state.links.filter(l => l.bookId === bookId && included.has(l.goalId)) });
+        result.set(bookId, { goals: state.goals.filter(g => included.has(g.id)), links: state.links.filter(l => l.bookId === bookId && included.has(l.goalId)), bookLinks: (state.bookLinks || []).filter(l => l.bookId === bookId && included.has(l.goalId)) });
     }
     return result;
 }

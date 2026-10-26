@@ -28,6 +28,9 @@ function verifyDatabase(filename) {
                 const b = db.prepare('SELECT generation,deleted FROM books WHERE id=?').get(link.bookId);
                 const n = db.prepare('SELECT book_id,deleted FROM annotations WHERE id=?').get(link.annotationId);
                 return b && !b.deleted && b.generation === link.generation && n && !n.deleted && n.book_id === link.bookId;
+            }, undefined, link => {
+                const b = db.prepare('SELECT generation,deleted FROM books WHERE id=?').get(link.bookId);
+                return b && !b.deleted && b.generation === link.generation;
             });
         }
         return { integrity: 'ok', books: db.prepare('SELECT count(*) AS n FROM books WHERE deleted=0').get().n, notes: db.prepare('SELECT count(*) AS n FROM annotations WHERE deleted=0').get().n };
