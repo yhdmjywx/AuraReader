@@ -1,4 +1,5 @@
 const { validateGoalState } = require('./goalValidation');
+const { createGoalLibrary, validateLibrary, convertLegacy } = require('./goalLibrary');
 const { DatabaseSync } = require('node:sqlite');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -53,7 +54,7 @@ function createDataStore(directory) {
         throw new StorageError('SQLite 文件丢失或为空；请保留 data 目录并从已验证备份恢复，禁止自动新建空书库', 500);
     }
     const db = new DatabaseSync(filename, { timeout: 5000 });
-    if (db.prepare('PRAGMA user_version').get().user_version > 2) {
+    if (db.prepare('PRAGMA user_version').get().user_version > 3) {
         db.close(); throw new StorageError('数据库版本高于本应用，禁止降级覆盖', 409);
     }
     try { db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
@@ -64,7 +65,7 @@ function createDataStore(directory) {
         CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, hash TEXT NOT NULL, result TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS migrations(source_id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, manifest TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS goal_states(book_id TEXT PRIMARY KEY REFERENCES books(id), payload TEXT, revision INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
-        PRAGMA user_version=2; COMMIT;`); }
+        COMMIT;`); }
     catch (error) { if (db.isTransaction) db.exec('ROLLBACK'); db.close(); throw error; }
     if (!fs.existsSync(installed)) fs.writeFileSync(installed, JSON.stringify({ format: 1, database: 'aurareader.sqlite' }), { flag: 'wx' });
     const one = (sql, ...args) => db.prepare(sql).get(...args);
@@ -130,9 +131,10 @@ function createDataStore(directory) {
             return !!row && !row.deleted && row.book_id === bookId;
         }, message => { throw new StorageError(message, 409); });
     }
-    function putGoals(state, revision, generation) {
+    function putGoals(state, revision, generation, restoring = false) {
         activeBook(state?.bookId, generation); validateGoals(state);
         const row = one('SELECT * FROM goal_states WHERE book_id=?', state.bookId); expected(row, revision);
+        if (!restoring) library.legacy(state, row && !row.deleted ? JSON.parse(row.payload) : null, generation);
         run('INSERT INTO goal_states VALUES(?,?,?,0) ON CONFLICT(book_id) DO UPDATE SET payload=excluded.payload, revision=excluded.revision, deleted=0',
             state.bookId, JSON.stringify(state), revision + 1);
         return { revision: revision + 1 };
@@ -162,6 +164,10 @@ function createDataStore(directory) {
             return ids.map(goalRow).filter(Boolean);
         },
         saveGoals(c) { return mutate(c, () => putGoals(c.state, c.expected, c.generation)); },
+        goalLibrary() { return library.read(); },
+        saveGoalLibrary(c) { return mutate(c, () => {
+            expected(library.read(), c.expected); library.write(c.state); return { revision: library.read().revision };
+        }); },
         saveBook(c) { return mutate(c, () => putBook(c.book, c.expected)); },
         saveNote(c) { return mutate(c, () => putNote(c.note, c.expected, c.generation)); },
         deleteNote(c) {
@@ -171,7 +177,8 @@ function createDataStore(directory) {
                 if (row && row.book_id !== c.bookId) throw new StorageError('标注不属于这本书', 409);
                 run(`INSERT INTO annotations VALUES(?,?,NULL,?,1) ON CONFLICT(id) DO UPDATE SET payload=NULL, revision=excluded.revision, deleted=1`, c.id, c.bookId, c.expected + 1);
                 const goalState = pruneGoalLinks(c.bookId, c.id);
-                return { revision: c.expected + 1, ...(goalState ? { goalState } : {}) };
+                const goalLibrary = library.prune(c.bookId, c.id);
+                return { revision: c.expected + 1, ...(goalState ? { goalState } : {}), ...(goalLibrary ? { goalLibrary } : {}) };
             });
         },
         deleteBook(c) {
@@ -182,10 +189,11 @@ function createDataStore(directory) {
                     return { revision: 1 };
                 }
                 if (row.deleted) return { revision: row.revision };
+                const goalLibrary = library.prune(c.id);
                 run('UPDATE goal_states SET payload=NULL, deleted=1, revision=revision+1 WHERE book_id=?', c.id);
                 run('UPDATE annotations SET payload=NULL, deleted=1, revision=revision+1 WHERE book_id=?', c.id);
                 run('UPDATE books SET payload=NULL, deleted=1, revision=revision+1 WHERE id=?', c.id);
-                return { revision: row.revision + 1 };
+                return { revision: row.revision + 1, ...(goalLibrary ? { goalLibrary } : {}) };
             });
         },
         restore(c) {
@@ -224,9 +232,15 @@ function createDataStore(directory) {
                             state.links = state.links.filter(link => !ids.has(link.goalId)).concat(incoming.links);
                         }
                         const book = one('SELECT * FROM books WHERE id=?', incoming.bookId);
-                        putGoals(state, current?.revision || 0, book.generation);
+                        putGoals(state, current?.revision || 0, book.generation, true);
+                        if (c.goalGraph === undefined) {
+                            const graph = convertLegacy({ bookId: incoming.bookId, goals: incoming.goals, links: incoming.links || [] }, book.generation);
+                            if (incoming.links === undefined) delete graph.links;
+                            library.restore(graph, bookIds);
+                        }
                     }
                 }
+                if (c.goalGraph !== undefined) library.restore(c.goalGraph, bookIds);
                 return { books: c.books.length, notes: c.notes.length };
             });
         },
@@ -238,10 +252,14 @@ function createDataStore(directory) {
                 if (!book || book.deleted) throw new StorageError('Goal 缺少有效书籍', 409);
                 validateGoals(record.value);
             }
+            library.validate(library.read().value);
             return { integrity: 'ok', foreignKeys: 0 };
         },
         close() { db.close(); }
     };
+    const library = createGoalLibrary(store, message => { throw new StorageError(message, 409); }, canonical);
+    try { transaction(() => library.initialize()); }
+    catch (error) { db.close(); throw error; }
     return store;
 }
-module.exports = { createDataStore, StorageError, canonical, digest, bookRecord, noteRecord, goalRecord, goalBackupRecord };
+module.exports = { createDataStore, StorageError, canonical, digest, bookRecord, noteRecord, goalRecord, goalBackupRecord, validateLibrary };

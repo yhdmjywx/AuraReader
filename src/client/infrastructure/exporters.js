@@ -341,14 +341,14 @@ function chapterBodyMarkdown(root, notes = []) {
     return { markdown: children(root).trim(), unplacedNotes };
 }
 
-export function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStates = [], includeNotes = true }) {
+export function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStates = [], goalGraphs, includeNotes = true }) {
     const normalizedNotes = (notes || []).map(normalizeAnnotation).filter(Boolean);
     const exportedAt = new Date().toISOString();
     const yyyymmdd = exportedAt.slice(0, 10).replace(/-/g, '');
 
     const files = selectedBooks.map(book => {
         const backupPayload = {
-            version: "1.1",
+            version: goalGraphs ? "1.2" : "1.1",
             // Keep the existing envelope for compatibility with earlier readers.
             type: "aurareader_full_backup",
             exportedAt,
@@ -357,6 +357,7 @@ export function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStat
             goalStates: goalStates.filter(state => state.bookId === book.id).map(state => includeNotes
                 ? state : { bookId: state.bookId, goals: state.goals })
         };
+        if (goalGraphs) { const graph = goalGraphs.get(book.id) || { goals: [], links: [] }; delete backupPayload.goalStates; backupPayload.goalGraph = includeNotes ? graph : { goals: graph.goals }; }
         const bookTitle = String(book.title || book.id || '图书')
             .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_');
         const fileName = `AuraReader_Backup_${bookTitle}_${yyyymmdd}.aurabackup`;

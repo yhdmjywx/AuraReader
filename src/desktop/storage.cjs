@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { createDataStore, StorageError, bookRecord, noteRecord, goalRecord, goalBackupRecord } = require('../server/dataStore.js');
+const { createDataStore, StorageError, bookRecord, noteRecord, goalRecord, goalBackupRecord, validateLibrary } = require('../server/dataStore.js');
 const { createMigration } = require('../server/migration.js');
 const { backupDatabase } = require('../server/storageMaintenance.js');
 
@@ -113,7 +113,7 @@ function createDesktopStorage(directory) {
         async call(action, body) {
             // This dispatcher is main-process-only; no renderer-controlled action channel is registered.
             const operation = (async () => {
-                if (['status', 'createLibrary', 'listBooks', 'backup'].includes(action) && body !== undefined) throw new StorageError('请求不接受参数');
+                if (['status', 'createLibrary', 'listBooks', 'backup', 'queryGoalLibrary'].includes(action) && body !== undefined) throw new StorageError('请求不接受参数');
                 if (action === 'status') return status();
                 if (action === 'createLibrary') return initialize();
                 const current = readyStore();
@@ -131,6 +131,11 @@ function createDesktopStorage(directory) {
                         const c = command(body, ['bookIds']);
                         if (!Array.isArray(c.bookIds)) throw new StorageError('无效书籍列表');
                         return { records: current.goals(c.bookIds.map(identifier)) };
+                    }
+                    case 'queryGoalLibrary': return current.goalLibrary();
+                    case 'saveGoalLibrary': {
+                        const c = command(body, ['opId', 'expected', 'state']);
+                        return current.saveGoalLibrary({ ...writeVersion(c), state: validateLibrary(c.state) });
                     }
                     case 'saveGoals': {
                         const c = command(body, ['opId', 'expected', 'generation', 'state']);
@@ -151,10 +156,11 @@ function createDesktopStorage(directory) {
                     }
                     case 'restore': {
                         const withGoals = !!body && Object.hasOwn(body, 'goalStates');
-                        const c = command(body, ['opId', 'books', 'notes', ...(withGoals ? ['goalStates'] : [])]);
+                        const withGraph = !!body && Object.hasOwn(body, 'goalGraph');
+                        const c = command(body, ['opId', 'books', 'notes', ...(withGoals ? ['goalStates'] : []), ...(withGraph ? ['goalGraph'] : [])]);
                         if (!Array.isArray(c.books) || !Array.isArray(c.notes)) throw new StorageError('备份必须包含书籍和标注数组');
                         if (withGoals && !Array.isArray(c.goalStates)) throw new StorageError('无效 Goal 备份');
-                        return current.restore({ opId: identifier(c.opId), books: c.books.map(bookRecord), notes: c.notes.map(noteRecord), ...(withGoals ? { goalStates: /** @type {unknown[]} */ (c.goalStates).map(goalBackupRecord) } : {}) });
+                        return current.restore({ opId: identifier(c.opId), books: c.books.map(bookRecord), notes: c.notes.map(noteRecord), ...(withGoals ? { goalStates: /** @type {unknown[]} */ (c.goalStates).map(goalBackupRecord) } : {}), ...(withGraph ? { goalGraph: /** @type {import('../client/domain/goal.js').GoalGraphBackup} */ (c.goalGraph) } : {}) });
                     }
                     case 'backup': {
                         const result = await backupDatabase(directory);

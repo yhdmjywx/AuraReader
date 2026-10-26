@@ -18,8 +18,10 @@ const { createDataStore } = require('../../src/server/dataStore');
         const route = url.split('/').at(-1), command = options.body ? JSON.parse(options.body) : null;
         if (route === 'session') return response({ token: 'test' });
         if (url.endsWith('migration/status')) return response({ completed: true });
-        if (url.endsWith('goals/save') && gate) { const current = gate; gate = null; current.enter(); await current.wait; }
+        if (url.endsWith('goals/library/save') && gate) { const current = gate; gate = null; current.enter(); await current.wait; }
         try {
+            if (url.endsWith('goals/library')) return response(store.goalLibrary());
+            if (url.endsWith('goals/library/save')) return response(store.saveGoalLibrary(command));
             if (url.endsWith('goals/query')) return response({ records: store.goals(command.bookIds) });
             if (url.endsWith('goals/save')) return response(store.saveGoals(command));
             if (url.endsWith('notes/save')) return response(store.saveNote(command));
@@ -38,8 +40,7 @@ const { createDataStore } = require('../../src/server/dataStore');
     notes.forEach(note => store.saveNote({ opId: randomUUID(), expected: 0, generation: version.generation, note }));
     const { GoalController } = await import('../../dist/client/features/goals/goalController.js');
     const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
-    const { loadGoalsForBook } = await import('../../dist/client/infrastructure/goalRepository.js');
-    const { pendingGoals, readGoalDraft } = await import('../../dist/client/infrastructure/goalRecovery.js');
+    const { pendingLibrary, libraryDrafts } = await import('../../dist/client/infrastructure/goalLibraryRepository.js');
     const elements = { goalPanel: document.getElementById('goal-panel'), workspaceContainer: document.getElementById('workspace-container'),
         goalSidebar: document.getElementById('goal-sidebar'), goalResizer: document.getElementById('goal-resizer'),
         btnGoals: document.getElementById('btn-goals'), readingWorkspace: document.getElementById('reading-workspace'),
@@ -52,15 +53,15 @@ const { createDataStore } = require('../../src/server/dataStore');
         getMode: () => mode, showToast: text => failures.push(text), jump: id => { assert.ok(['h', 'n'].includes(id)); },
         finishAnnotations: () => annotations.finishInlineEdit(), annotationsSaved: () => annotations.assertInlineWritesSaved() });
     annotations.callbacks.onAnnotationContentChanged = () => goals.refreshAnnotations();
-    goals.initUI(elements); goals.setStateForBook(await loadGoalsForBook('a'));
+    goals.initUI(elements); await goals.initialize();
     const click = selector => { const control = document.querySelector(selector); assert.ok(control, selector); control.click(); };
     const input = text => { goals.ui.editor.value = text; goals.ui.editor.dispatchEvent(new window.Event('input', { bubbles: true })); };
     click('[aria-label="New goal"]'); input('What do I want to understand?\n我的问题');
-    assert.ok(readGoalDraft('a')); assert.equal(store.goals(['a']).length, 0, 'new drafts are not committed nodes');
+    assert.equal(libraryDrafts().length, 1); assert.equal(store.goalLibrary().value.goals.length, 0, 'new drafts are not committed nodes');
     goals.edit = null; goals.render();
-    goals.setStateForBook(await loadGoalsForBook('a'));
+    goals.ready = null; await goals.initialize();
     assert.equal(goals.ui.editor.value, 'What do I want to understand?\n我的问题', 'uncommitted draft restores into the existing editor');
-    await goals.finishInlineEdit(); assert.equal(store.goals(['a'])[0].value.goals.length, 1); assert.equal(readGoalDraft('a'), null);
+    await goals.finishInlineEdit(); assert.equal(store.goalLibrary().value.goals.length, 1); assert.equal(libraryDrafts().length, 0);
     const parent = goals.selected;
     click('[aria-label="Add subgoal"]'); input('A child question'); await goals.finishInlineEdit();
     const child = goals.selected; assert.notEqual(child, parent);
@@ -68,7 +69,7 @@ const { createDataStore } = require('../../src/server/dataStore');
     assert.equal(document.querySelector('.goal-items-toggle').getAttribute('aria-expanded'), 'true');
     click('.goal-items-toggle'); assert.equal(document.querySelectorAll('.goal-item').length, 0);
     await goals.linkAnnotation('h'); assert.equal(document.querySelectorAll('.goal-item').length, 2);
-    await goals.linkAnnotation('h'); assert.equal(store.goals(['a'])[0].value.links.length, 2);
+    await goals.linkAnnotation('h'); assert.equal(store.goalLibrary().value.links.length, 2);
     goals.selectGoal(parent); assert.equal(document.querySelector('.goal-items-toggle'), null);
     goals.selectGoal(child); assert.equal(document.querySelectorAll('.goal-item').length, 2);
     click('.goal-title'); const editor = goals.ui.editor; input('A changed child'); editor.setSelectionRange(3, 3);
@@ -107,12 +108,12 @@ const { createDataStore } = require('../../src/server/dataStore');
     gate = { enter, wait: new Promise(resolve => { release = resolve; }) };
     click('.goal-title'); input('First pending'); const saving = goals.flush(); await entered;
     input('Newest pending\n'); release(); await saving; await goals.finishInlineEdit();
-    assert.equal(store.goals(['a'])[0].value.goals.find(goal => goal.id === child).text, 'Newest pending\n');
-    assert.equal(pendingGoals('a').length, 0);
-    const confirmed = store.goals(['a'])[0];
-    store.saveGoals({ opId: randomUUID(), expected: confirmed.revision, generation: version.generation, state: confirmed.value });
+    assert.equal(store.goalLibrary().value.goals.find(goal => goal.id === child).text, 'Newest pending\n');
+    assert.equal(pendingLibrary().length, 0);
+    const confirmed = store.goalLibrary();
+    store.saveGoalLibrary({ opId: randomUUID(), expected: confirmed.revision, state: confirmed.value });
     click('.goal-title'); input('Conflict retained');
-    await assert.rejects(goals.flush()); assert.equal(pendingGoals('a').at(-1).state.goals.find(goal => goal.id === child).text, 'Conflict retained');
+    await assert.rejects(goals.flush()); assert.equal(pendingLibrary().at(-1).state.goals.find(goal => goal.id === child).text, 'Conflict retained');
     await assert.rejects(goals.assertWritesSaved()); assert.ok(failures.length);
     if (goals.timer) clearTimeout(goals.timer);
     dom.window.close(); store.close();

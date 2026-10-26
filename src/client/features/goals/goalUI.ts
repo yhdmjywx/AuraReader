@@ -1,10 +1,11 @@
 import type { Annotation } from '../../domain/annotation.js';
-import type { BookGoalState, GoalDraft } from '../../domain/goal.js';
+import type { GoalLibraryState, GoalDraft } from '../../domain/goal.js';
 import { goalChildren } from '../../domain/goalEngine.js';
 export interface GoalView {
-    state: BookGoalState; selected: string | null; allGoals: boolean; expanded: Set<string>;
+    state: GoalLibraryState; selected: string | null; allGoals: boolean; expanded: Set<string>;
     itemsOpen: boolean; edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft } | null;
     sourcePage: number; annotations: Annotation[]; disabled: boolean;
+    sourceBook: string; fullPage: boolean; titles: Map<string, string>; materialStatus: 'ready' | 'loading' | 'error';
 }
 interface Actions {
     select(id: string): void; tree(): void; branch(id: string): void; items(): void;
@@ -46,7 +47,8 @@ export class GoalUI {
     readonly editor = node('textarea');
     private childNodes = new Map<string, HTMLButtonElement>();
     private treeNodes = new Map<string, { row: HTMLLIElement; toggle: HTMLButtonElement; label: HTMLButtonElement; spacer: HTMLSpanElement }>();
-    private itemNodes = new Map<string, { row: HTMLDivElement; icon: HTMLElement; text: HTMLButtonElement }>();
+    private itemNodes = new Map<string, { row: HTMLDivElement; icon: HTMLElement; text: HTMLButtonElement; source: HTMLDivElement }>();
+    private empty = node('p', 'goal-empty');
     private composing = false;
     private releasingFocus = false;
     private status = node('span', 'goal-status');
@@ -111,6 +113,7 @@ export class GoalUI {
             this.editor.placeholder = view.edit.mode === 'child' ? 'Subgoal' : 'Goal';
         }
         const wanted: HTMLElement[] = [];
+        if (!view.state.goals.length && !view.edit) { this.empty.textContent = 'Your goals, in your own words.'; wanted.push(this.empty); }
         if (view.allGoals) {
             const stack = goalChildren(view.state, null).reverse().map(goal => ({ goal, depth: 0 }));
             const rows: HTMLElement[] = [];
@@ -145,7 +148,7 @@ export class GoalUI {
                     if (this.editorShell.parentElement !== this.current) this.current.insertBefore(this.editorShell, this.addChild);
                 }
                 wanted.push(this.current);
-                const kids = goalChildren(view.state, goal.id, view.sourcePage).map(child => {
+                const kids = goalChildren(view.state, goal.id, view.fullPage ? undefined : view.sourcePage, view.sourceBook).map(child => {
                     let control = this.childNodes.get(child.id);
                     if (!control) { control = button('', () => this.actions.select(child.id), 'goal-child'); this.childNodes.set(child.id, control); }
                     control.textContent = child.text; return control;
@@ -153,26 +156,31 @@ export class GoalUI {
                 reconcile(this.children, kids); if (kids.length) wanted.push(this.children);
                 const related = view.state.links.filter(link => link.goalId === goal.id);
                 const annotations = new Map(view.annotations.map(annotation => [annotation.id, annotation]));
-                const live = related.filter(link => annotations.has(link.annotationId));
+                const live = related;
                 if (live.length) {
                     this.count.textContent = String(live.length);
                     this.toggle.setAttribute('aria-label', `${live.length} linked ${live.length === 1 ? 'item' : 'items'}`);
                     this.toggle.setAttribute('aria-expanded', String(view.itemsOpen)); wanted.push(this.toggle);
                     if (view.itemsOpen) {
                         const rows = live.map(link => {
-                            const annotation = annotations.get(link.annotationId)!;
+                            const annotation = annotations.get(link.annotationId);
                             let entry = this.itemNodes.get(link.annotationId);
                             if (!entry) {
                                 const row = node('div', 'goal-item'), kind = icon('mark-pen-line');
                                 const text = button('', () => this.actions.jump(link.annotationId), 'goal-item-text');
+                                const source = node('div', 'goal-item-source');
                                 text.dataset.annotationId = link.annotationId;
-                                row.append(kind, text, button('Unlink', () => this.actions.unlink(link.annotationId), 'goal-icon', 'close-line'));
-                                entry = { row, icon: kind, text }; this.itemNodes.set(link.annotationId, entry);
+                                const detail = node('div', 'goal-item-detail'); detail.append(text, source);
+                                row.append(kind, detail, button('Unlink', () => this.actions.unlink(link.annotationId), 'goal-icon', 'close-line'));
+                                entry = { row, icon: kind, text, source }; this.itemNodes.set(link.annotationId, entry);
                             }
-                            const text = annotation.kind === 'note' ? annotation.comment : annotation.quote;
-                            entry.icon.className = annotation.kind === 'note' ? 'ri-sticky-note-line' : 'ri-mark-pen-line';
+                            const text = annotation ? annotation.kind === 'note' ? annotation.comment : annotation.quote : view.materialStatus === 'loading' ? 'Loading…' : 'Source unavailable';
+                            entry.text.disabled = !annotation;
+                            entry.icon.className = annotation?.kind === 'note' ? 'ri-sticky-note-line' : 'ri-mark-pen-line';
                             if (entry.text.textContent !== text) entry.text.textContent = text;
-                            entry.text.title = text; entry.text.setAttribute('aria-label', `${annotation.kind}: ${text}`);
+                            entry.text.title = text; entry.text.setAttribute('aria-label', `${annotation?.kind || 'Source'}: ${text}`);
+                            entry.source.textContent = view.titles.get(link.bookId) || link.bookId;
+                            entry.source.hidden = !view.fullPage && link.bookId === view.sourceBook;
                             return entry.row;
                         });
                         reconcile(this.items, rows); wanted.push(this.items);

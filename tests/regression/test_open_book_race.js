@@ -52,8 +52,8 @@ function deferred() {
             return gate;
         };
         const session = new Session('old');
-        let goalBook = 'old';
-        const goals = { finishInlineEdit: async () => {}, setStateForBook: loaded => { goalBook = loaded.state.bookId; } };
+        let goalBook = 'independent-goal';
+        const goals = { finishInlineEdit: async () => {}, useReadingSurface() {}, bookChanged: async () => {} };
         const annotations = new AnnotationController({ callbacks: { getCurrentBookId: () => session.getCurrentBookId() } });
         annotations.setNotesForBook([{ id: 'note-old', bookId: 'old', quote: 'old', comment: 'old' }]);
         const renders = [];
@@ -67,7 +67,7 @@ function deferred() {
             notes: annotations.getNotes().map(note => note.bookId)
         });
         const notifications = [];
-        session.subscribe(() => { if (withGoals) assert.equal(goalBook, session.getCurrentBookId(), 'Goal installs before session notification'); notifications.push(snapshot()); });
+        session.subscribe(() => { if (withGoals) assert.equal(goalBook, 'independent-goal', 'book installation never replaces the selected Goal'); notifications.push(snapshot()); });
         const dom = new JSDOM('<main id="reader"></main><aside id="notes"></aside><button id="shelf">Shelf</button>');
         const shell = new AppShell();
         shell.elements = {
@@ -163,11 +163,11 @@ function deferred() {
 
     const lateGoals = harness(true);
     try {
-        const a = lateGoals.hold('goals', 'A');
+        const a = lateGoals.hold('notes', 'A');
         const openingA = lateGoals.coordinator.openBook('A'); await a.started.promise;
         await lateGoals.coordinator.openBook('B');
         a.result.resolve(); await openingA;
-        assert.equal(lateGoals.goalBook(), 'B'); assert.equal(lateGoals.snapshot().book, 'B');
+        assert.equal(lateGoals.goalBook(), 'independent-goal'); assert.equal(lateGoals.snapshot().book, 'B');
     } finally { lateGoals.close(); }
     recoveryDOM.window.close();
     const app = await import('../../dist/client/app.js');

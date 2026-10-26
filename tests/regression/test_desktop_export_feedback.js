@@ -35,7 +35,8 @@ const { JSDOM } = require('jsdom');
         dom.window.auraDesktop.storage = {
             status: async () => ({ ok: true, value: { initialized: true } }),
             listBooks: async () => ({ ok: true, value: { records: books.map(book => ({ id: book.id, revision: 1, generation: book.id, deleted: false, value: book })) } }),
-            queryGoals: async () => ({ ok: true, value: { records: [] } })
+            queryGoals: async () => ({ ok: true, value: { records: [] } }),
+            queryGoalLibrary: async () => ({ ok: true, value: { id: 'reader-goals', revision: 0, deleted: false, value: { goals: [], links: [] } } })
         };
         saves = 0;
         await controller.executeSelectiveBackupExport();

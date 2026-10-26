@@ -4,6 +4,10 @@ export interface AppElements {
     goalSidebar?: HTMLElement | null;
     goalResizer?: HTMLElement | null;
     btnGoals?: HTMLButtonElement | null;
+    btnGoalSidebar?: HTMLButtonElement | null;
+    btnGoalBack?: HTMLButtonElement | null;
+    goalPage?: HTMLElement | null;
+    goalPageContent?: HTMLElement | null;
     readingWorkspace?: HTMLElement | null;
     btnAnnotationGoal?: HTMLButtonElement | null;
     appHeader?: HTMLElement | null;

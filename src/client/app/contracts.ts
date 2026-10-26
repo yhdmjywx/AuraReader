@@ -84,7 +84,7 @@ export interface ShelfCallbacks {
     onOpenBook?: AsyncAction<[id: string]>;
     onDeleteBook?: AsyncAction<[id: string]>;
 }
-export interface BackupData { books?: Book[]; notes?: import('../../shared/storage.js').StoredAnnotation[]; goalStates?: import('../domain/goal.js').GoalBackupState[] }
+export interface BackupData { books?: Book[]; notes?: import('../../shared/storage.js').StoredAnnotation[]; goalStates?: import('../domain/goal.js').GoalBackupState[]; goalGraph?: import('../domain/goal.js').GoalGraphBackup }
 export interface BackupCallbacks {
     showToast?: (message: string) => void;
     getCurrentBook?: () => Book | null;

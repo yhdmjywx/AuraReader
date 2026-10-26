@@ -1,5 +1,6 @@
 import type { GoalStateRecord, SaveGoalsCommand, NoteDeleteRevision } from '../../shared/storage.js';
-import type { GoalBackupState } from '../domain/goal.js';
+import type { GoalLibraryRecord, SaveGoalLibraryCommand } from '../../shared/storage.js';
+import type { GoalBackupState, GoalGraphBackup } from '../domain/goal.js';
 import type { Book } from '../domain/book.js';
 import type { BookRecord, BookRevision, MigrationStatus, NoteRecord, Revision, StorageRoutes, StoredAnnotation } from '../../shared/storage.js';
 import { StorageClientError } from './storageError.js';
@@ -14,6 +15,8 @@ let forceHttp = false;
 const bookVersions = new Map<string, BookRevision & { deleted: boolean }>();
 const noteVersions = new Map<string, Revision & { bookId: string; deleted: boolean }>();
 const goalVersions = new Map<string, GoalStateRecord>();
+let libraryVersion: GoalLibraryRecord | undefined;
+const libraryListeners = new Set<(record: GoalLibraryRecord) => void>();
 const goalListeners = new Set<(record: GoalStateRecord) => void>();
 const queues = new Map<string, Promise<unknown>>();
 export const operationId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -22,6 +25,7 @@ export function configureStorage({ baseUrl = '/api/storage', fetch: fetcher = (.
     forceHttp = true;
     base = baseUrl; transport = fetcher; token = null; source = sourceId; ready = null;
     bookVersions.clear(); noteVersions.clear(); goalVersions.clear(); queues.clear();
+    libraryVersion = undefined;
 }
 function desktopStorage(): DesktopStorage | undefined {
     return !forceHttp && typeof window !== 'undefined' ? window.auraDesktop?.storage : undefined;
@@ -41,6 +45,8 @@ async function desktopRequest<R extends keyof StorageRoutes>(bridge: DesktopStor
         case 'books/delete': result = unwrapDesktop(await bridge.deleteBook(body as StorageRoutes['books/delete']['request'])); break;
         case 'goals/query': result = unwrapDesktop(await bridge.queryGoals(body as StorageRoutes['goals/query']['request'])); break;
         case 'goals/save': result = unwrapDesktop(await bridge.saveGoals(body as SaveGoalsCommand)); break;
+        case 'goals/library': result = unwrapDesktop(await bridge.queryGoalLibrary()); break;
+        case 'goals/library/save': result = unwrapDesktop(await bridge.saveGoalLibrary(body as SaveGoalLibraryCommand)); break;
         case 'notes/query': result = unwrapDesktop(await bridge.queryNotes(body as StorageRoutes['notes/query']['request'])); break;
         case 'notes/save': result = unwrapDesktop(await bridge.saveNote(body as StorageRoutes['notes/save']['request'])); break;
         case 'notes/delete': result = unwrapDesktop(await bridge.deleteNote(body as StorageRoutes['notes/delete']['request'])); break;
@@ -142,11 +148,13 @@ export async function noteVersion(id: string, bookId: string): Promise<Revision>
     return noteVersions.get(id) || { revision: 0 };
 }
 export function acceptBook(id: string, result: BookRevision, deleted = false) {
+    if (result.goalLibrary) acceptGoalLibrary(result.goalLibrary, true);
     const prior = bookVersions.get(id) || {};
     bookVersions.set(id, { ...prior, ...result, deleted });
     if (deleted) for (const [key, row] of noteVersions) if (row.bookId === id) noteVersions.delete(key);
 }
 export function acceptNote(id: string, bookId: string, result: NoteDeleteRevision, deleted = false) {
+    if (result.goalLibrary) acceptGoalLibrary(result.goalLibrary, true);
     if ((noteVersions.get(id)?.revision || 0) <= result.revision) noteVersions.set(id, { revision: result.revision, bookId, deleted });
     if (result.goalState) acceptGoals(result.goalState, true);
 }
@@ -165,9 +173,20 @@ export async function readGoals(bookIds: string[] = []) {
 export function cachedGoals(bookId: string) { return goalVersions.get(bookId); }
 export function forgetGoals(bookId: string) { goalVersions.delete(bookId); }
 
-export async function restoreRecords(books: Book[], notes: StoredAnnotation[], opId = operationId(), goalStates?: GoalBackupState[]) {
+export function acceptGoalLibrary(record: GoalLibraryRecord, notify = false) {
+    if (libraryVersion && libraryVersion.revision > record.revision) return;
+    libraryVersion = record;
+    if (notify) libraryListeners.forEach(listener => listener(record));
+}
+export const cachedGoalLibrary = () => libraryVersion;
+export function onGoalLibraryChanged(listener: (record: GoalLibraryRecord) => void) { libraryListeners.add(listener); return () => libraryListeners.delete(listener); }
+export async function readGoalLibrary() {
+    await initializeStorage(); const record = await storageRequest('goals/library', undefined); acceptGoalLibrary(record); return record;
+}
+export async function restoreRecords(books: Book[], notes: StoredAnnotation[], opId = operationId(), goalStates?: GoalBackupState[], goalGraph?: GoalGraphBackup) {
     await initializeStorage(); await drainStorage();
-    const result = await storageRequest('restore', { opId, books, notes, ...(goalStates !== undefined ? { goalStates } : {}) });
+    const result = await storageRequest('restore', { opId, books, notes, ...(goalStates !== undefined ? { goalStates } : {}), ...(goalGraph !== undefined ? { goalGraph } : {}) });
     await readBooks(); await readNotes(); if (goalStates !== undefined) await readGoals();
+    if (goalGraph !== undefined || goalStates !== undefined) acceptGoalLibrary(await readGoalLibrary(), true);
     return result;
 }

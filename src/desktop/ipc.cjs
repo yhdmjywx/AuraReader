@@ -47,7 +47,7 @@ function registerFileIpc(window, files) {
 
 /** @param {import('electron').BrowserWindow} window @param {ReturnType<typeof import('./storage.cjs').createDesktopStorage>} storage */
 function registerStorageIpc(window, storage) {
-    const actions = ['status', 'createLibrary', 'listBooks', 'saveBook', 'deleteBook', 'queryGoals', 'saveGoals', 'queryNotes', 'saveNote', 'deleteNote', 'restore', 'backup'];
+    const actions = ['status', 'createLibrary', 'listBooks', 'saveBook', 'deleteBook', 'queryGoals', 'saveGoals', 'queryGoalLibrary', 'saveGoalLibrary', 'queryNotes', 'saveNote', 'deleteNote', 'restore', 'backup'];
     for (const action of actions) {
         ipcMain.handle('aura:storage:' + action, async (event, ...args) => {
             try {

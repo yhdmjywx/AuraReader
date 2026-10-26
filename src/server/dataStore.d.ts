@@ -1,5 +1,7 @@
 import type { BookGoalState, GoalBackupState } from '../client/domain/goal.js';
 import type { GoalStateRecord, SaveGoalsCommand, NoteDeleteRevision } from '../shared/storage.js';
+import type { GoalLibraryRecord, SaveGoalLibraryCommand } from '../shared/storage.js';
+import type { GoalLibraryState } from '../client/domain/goal.js';
 import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import type { Book } from '../client/domain/book.js';
 import type { BookRecord, BookRevision, DeleteBookCommand, DeleteNoteCommand, NoteRecord, RestoreCommand, Revision, SaveBookCommand, SaveNoteCommand, StoredAnnotation } from '../shared/storage.js';
@@ -21,6 +23,8 @@ export interface DataStore {
     notes(bookIds?: string[]): NoteRecord[];
     goals(bookIds?: string[]): GoalStateRecord[];
     saveGoals(command: SaveGoalsCommand): Revision;
+    goalLibrary(): GoalLibraryRecord;
+    saveGoalLibrary(command: SaveGoalLibraryCommand): Revision;
     saveBook(command: SaveBookCommand): BookRevision;
     saveNote(command: SaveNoteCommand): Revision;
     deleteBook(command: DeleteBookCommand): Revision;
@@ -37,3 +41,4 @@ export function noteRecord(value: unknown): StoredAnnotation;
 
 export function goalRecord(value: unknown): BookGoalState;
 export function goalBackupRecord(value: unknown): GoalBackupState;
+export function validateLibrary(value: unknown): GoalLibraryState;

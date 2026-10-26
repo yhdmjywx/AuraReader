@@ -1,5 +1,6 @@
 import type { GoalController } from '../features/goals/goalController.js';
-import { loadGoalsForBook } from '../infrastructure/goalRepository.js';
+import type { GoalSourceLink } from '../domain/goal.js';
+import { bookVersion, readBooks } from '../infrastructure/storageClient.js';
 import type { Session } from './session.js';
 import type { ReaderController } from '../features/reader/readerController.js';
 import type { AnnotationController } from '../features/annotations/annotationController.js';
@@ -76,8 +77,10 @@ export class AppCoordinator {
         this.openBookRequestId = 0;
     }
 
-    async openBook(bookId: string) {
+    async openBook(bookId: string, sourceRequestId?: number) {
         if (!bookId) return;
+        if (sourceRequestId === undefined) this.sourceRequest++;
+        else if (sourceRequestId !== this.sourceRequest) return;
         const requestId = ++this.openBookRequestId;
         this.shell?.setBookLoading?.(true);
 
@@ -103,17 +106,15 @@ export class AppCoordinator {
             const notes = await loadNotesForBook(bookId);
             if (requestId !== this.openBookRequestId) return;
 
-            const goalState = this.goals ? await loadGoalsForBook(bookId) : null;
-            if (requestId !== this.openBookRequestId) return;
-
             // No await between installing the complete data and rendering it.
             // Session subscribers see the matching reader and annotations.
             this.annotations.setNotesForBook(notes);
             this.reader.setBook(bookId, book);
-            if (goalState) this.goals?.setStateForBook(goalState);
+            this.goals?.useReadingSurface();
             this.session.setCurrentBookId(bookId);
             this.reader.renderPage(1, false, this.annotations.getNotes());
             this.annotations.refreshVisibleNotes();
+            this.goals?.bookChanged();
 
             if (this.shelf) await this.shelf.refreshShelf();
             if (requestId === this.openBookRequestId) {
@@ -208,6 +209,20 @@ export class AppCoordinator {
         }
     }
 
+    async jumpToGoalSource(source: GoalSourceLink) {
+        const request = ++this.sourceRequest;
+        await this.goals?.finishInlineEdit();
+        await readBooks();
+        const book = await bookVersion(source.bookId);
+        if (request !== this.sourceRequest) return;
+        if (book.generation !== source.generation) { this.shell?.showToast('原文来源已删除或变化'); return; }
+        if (this.session.getCurrentBookId() !== source.bookId) await this.openBook(source.bookId, request);
+        if (request !== this.sourceRequest || this.session.getCurrentBookId() !== source.bookId) return;
+        if ((await bookVersion(source.bookId)).generation !== source.generation || request !== this.sourceRequest) { this.shell?.showToast('原文来源已变化'); return; }
+        if (!this.annotations.getNotes().some(n => n.id === source.annotationId)) { this.shell?.showToast('原文标注已不存在'); return; }
+        this.goals?.useReadingSurface(); this.jumpToAnnotation(source.annotationId);
+    }
+    private sourceRequest = 0;
     jumpToAnnotation(annotationId: string, options: { showMenu?: boolean } = {}) {
         if (!this.annotations) return;
         const notes = this.annotations.getNotes();

@@ -1,4 +1,5 @@
 const { validateGoalState } = require('./goalValidation');
+const { validateLibrary } = require('./goalLibrary');
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
@@ -20,6 +21,14 @@ function verifyDatabase(filename) {
                     return !!note && !note.deleted && note.book_id === bookId;
                 });
             }
+        }
+        if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='goal_library'").get()) {
+            const state = JSON.parse(db.prepare('SELECT payload FROM goal_library WHERE id=1').get().payload);
+            validateLibrary(state, link => {
+                const b = db.prepare('SELECT generation,deleted FROM books WHERE id=?').get(link.bookId);
+                const n = db.prepare('SELECT book_id,deleted FROM annotations WHERE id=?').get(link.annotationId);
+                return b && !b.deleted && b.generation === link.generation && n && !n.deleted && n.book_id === link.bookId;
+            });
         }
         return { integrity: 'ok', books: db.prepare('SELECT count(*) AS n FROM books WHERE deleted=0').get().n, notes: db.prepare('SELECT count(*) AS n FROM annotations WHERE deleted=0').get().n };
     } finally { db.close(); }

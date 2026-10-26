@@ -34,6 +34,9 @@ export function queryElements(): AppElements {
         goalSidebar: document.getElementById('goal-sidebar'),
         goalResizer: document.getElementById('goal-resizer'),
         btnGoals: document.getElementById('btn-goals') as HTMLButtonElement | null,
+        btnGoalSidebar: document.getElementById('btn-goal-sidebar') as HTMLButtonElement | null,
+        btnGoalBack: document.getElementById('btn-goal-back') as HTMLButtonElement | null,
+        goalPage: document.getElementById('goal-page'), goalPageContent: document.getElementById('goal-page-content'),
         readingWorkspace: document.getElementById('reading-workspace'),
         btnAnnotationGoal: document.getElementById('btn-annotation-goal') as HTMLButtonElement | null,
 
@@ -195,15 +198,15 @@ export function bootstrapApp() {
         }
     });
 
-    const goals = new GoalController({
+    const goals: GoalController = new GoalController({
         getAnnotations: () => annotations.getNotes(), getLocation: () => reader.getLocation(),
         getMode: () => layout.getLayoutMode(), showToast: message => appShell.showToast(message),
-        jump: id => coordinator.jumpToAnnotation(id),
+        jump: (id, source) => source ? coordinator.jumpToGoalSource(source) : coordinator.jumpToAnnotation(id),
         finishAnnotations: () => annotations.finishInlineEdit(), annotationsSaved: () => annotations.assertInlineWritesSaved()
     });
 
     // 2. Create Central Coordinator
-    const coordinator = new AppCoordinator({
+    const coordinator: AppCoordinator = new AppCoordinator({
         session,
         goalController: elements.goalPanel ? goals : undefined,
         readerController: reader,
@@ -226,6 +229,8 @@ export function bootstrapApp() {
         updateNoteGoalActions(elements, goalAction); selection.refreshGoalAction();
     };
     goals.callbacks.onBeforeSidebarResize = () => reader.rememberAnchor();
+    goals.callbacks.chooseBook = () => shelf.openShelf();
+    goals.callbacks.onSurfaceChanged = () => requestAnimationFrame(() => appShell.callbacks.onWindowResize?.(false));
 
     // 3. Connect Cross-Module Callbacks
     shelf.callbacks.onImportFile = file => coordinator.importBook(file);
@@ -325,6 +330,7 @@ export function bootstrapApp() {
     backup.callbacks.beforeExport = finishReadingEdits;
 
     const syncReaderLayout = () => {
+        if (goals.page) return;
         layout.updateLayoutClasses(elements);
         const notes = annotations.getNotes();
         if (reader.isChapterFlow()) reader.refitChapter(notes);
@@ -365,9 +371,10 @@ export function bootstrapApp() {
         appShell.init(elements, {
             onThemeChanged: () => { positionMarginNotes(elements); goals.updateReadingContext(); },
             onOpenPanel: () => shelf.closeShelf(),
-            onPrevPage: () => reader.prevPage(annotations.getNotes()),
-            onNextPage: () => reader.nextPage(annotations.getNotes()),
+            onPrevPage: () => { if (!goals.page) reader.prevPage(annotations.getNotes()); },
+            onNextPage: () => { if (!goals.page) reader.nextPage(annotations.getNotes()); },
             onTogglePageMode: () => {
+                if (goals.page) return;
                 const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
                     ? elements.readerPanel.clientWidth
                     : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
@@ -379,6 +386,7 @@ export function bootstrapApp() {
             },
             onImportFile: (file) => coordinator.importBook(file),
             onWindowResize: (notify) => {
+                if (goals.page) return;
                 const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
                     ? elements.readerPanel.clientWidth
                     : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
@@ -396,6 +404,7 @@ export function bootstrapApp() {
             let resizeTimer: ReturnType<typeof setTimeout>;
             new ResizeObserver(() => {
                 const next = elements.workspaceContainer!.clientWidth;
+                if (goals.page || next === 0) return;
                 if (next === width) return;
                 width = next;
                 clearTimeout(resizeTimer);
@@ -463,6 +472,7 @@ export async function startApp() {
         throw error;
     }
     await appInstance.reader.fonts.ready;
+    if (appInstance.elements.goalPanel) await appInstance.goals.initialize();
     await appInstance.coordinator.openBook('crisis-era');
     return appInstance;
 }

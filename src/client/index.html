@@ -24,7 +24,8 @@
                 <i class="ri-book-open-fill brand-icon"></i>
                 <span class="brand-name">AuraReader</span>
             </div>
-            <button id="btn-goals" class="btn btn-ghost-sm" type="button" aria-label="Toggle goals sidebar" aria-expanded="true" aria-controls="goal-sidebar" hidden><i class="ri-side-bar-line" aria-hidden="true"></i><span>Goals</span></button>
+            <button id="btn-goals" class="btn btn-ghost-sm" type="button" aria-controls="goal-page"><span>Goals</span></button>
+            <button id="btn-goal-sidebar" class="btn btn-icon-sm" type="button" aria-label="Toggle goals sidebar" aria-expanded="true" aria-controls="goal-sidebar" hidden><i class="ri-side-bar-line" aria-hidden="true"></i></button>
         </div>
 
         <div class="header-center">
@@ -266,6 +267,11 @@
         </section>
     </main>
     </div>
+
+    <main id="goal-page" class="goal-page" aria-label="Goals" hidden>
+        <button id="btn-goal-back" class="btn btn-ghost-sm" type="button"><i class="ri-arrow-left-line" aria-hidden="true"></i> Back to reading</button>
+        <div id="goal-page-content" class="goal-page-content"></div>
+    </main>
 
     <!-- Modal: Selective Book Backup Dialog -->
     <div class="modal-overlay" id="backup-select-modal">
