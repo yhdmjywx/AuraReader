@@ -1748,11 +1748,21 @@ mark.hl-active {
 .immersive-notes .margin-highlight-label { font-size: 12px; color: var(--text-muted); }
 
 
-/* Goal module: the approved single-page margin design. */
-.goal-panel { position:absolute; top:58px; bottom:70px; left:0; width:260px; padding:0 5px; overflow:auto; scrollbar-width:thin; z-index:3; color:var(--bg-paper-text); font-size:14px; line-height:1.8; }
+/* Goal sidebar owns its space; the existing reader/notes geometry uses the rest. */
+.reading-workspace { flex:1; min-height:0; min-width:0; display:flex; overflow:hidden; }
+.reading-workspace > .workspace-container { min-width:0; height:100%; }
+.goal-sidebar { position:relative; flex:none; width:280px; height:100%; min-height:0; background:var(--bg-app); border-right:1px solid var(--border-color); }
+.goal-sidebar[hidden] { display:none; }
+.goal-panel { height:100%; padding:28px 24px; overflow:auto; scrollbar-width:thin; color:var(--text-primary); font-size:14px; line-height:1.8; }
+.goal-resizer { position:absolute; top:0; bottom:0; right:-4px; width:8px; z-index:15; cursor:col-resize; touch-action:none; }
+.goal-resizer::after { content:''; position:absolute; top:0; bottom:0; left:3px; width:2px; background:transparent; }
+.goal-resizer:hover::after,.goal-resizer:focus-visible::after,.goal-sidebar.is-resizing .goal-resizer::after { background:var(--primary); }
+.goal-resizer:focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
+#btn-goals { margin-left:20px; gap:6px; }
+#btn-goals[aria-expanded="true"] { color:var(--primary); background:var(--primary-light); }
+body.theme-dark #btn-goals[aria-expanded="true"] { background:var(--nav-pill-bg); }
 .goal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
 .goal-header .btn { color:var(--text-secondary); }
-#tree-toggle { padding-left:0; font-size:12px; gap:5px; }
 .goal-icon { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border:0; background:transparent; color:var(--text-secondary); border-radius:4px; cursor:pointer; flex:none; }
 .goal-icon:hover { background:var(--nav-pill-bg); color:var(--primary); }
 .goal-parent { display:flex; gap:5px; align-items:center; width:100%; border:0; background:none; color:var(--text-secondary); text-align:left; font-size:12px; line-height:1.6; padding:0 0 12px; cursor:pointer; }

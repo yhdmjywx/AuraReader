@@ -1,6 +1,10 @@
 /** Known application elements; optional for headless and partial test mounts. */
 export interface AppElements {
     goalPanel?: HTMLElement | null;
+    goalSidebar?: HTMLElement | null;
+    goalResizer?: HTMLElement | null;
+    btnGoals?: HTMLButtonElement | null;
+    readingWorkspace?: HTMLElement | null;
     btnAnnotationGoal?: HTMLButtonElement | null;
     appHeader?: HTMLElement | null;
     workspaceContainer?: HTMLElement | null;

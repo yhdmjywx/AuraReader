@@ -51,7 +51,7 @@ export class GoalUI {
     private releasingFocus = false;
     private status = node('span', 'goal-status');
     constructor(readonly panel: HTMLElement, readonly actions: Actions) {
-        this.treeToggle = button('Goals', actions.tree, 'btn btn-ghost-sm');
+        this.treeToggle = button('All goals', actions.tree, 'btn btn-ghost-sm');
         this.treeToggle.id = 'goal-tree-toggle'; this.treeToggle.append(icon('arrow-down-s-line'));
         this.content.id = 'goal-content'; this.treeToggle.setAttribute('aria-controls', this.content.id);
         this.treeToggle.title = 'All goals';
@@ -97,6 +97,7 @@ export class GoalUI {
     render(view: GoalView) {
         const priorEdit = this.view?.edit;
         this.view = view;
+        this.treeToggle.firstChild!.textContent = view.allGoals ? 'Current goal' : 'All goals';
         this.treeToggle.setAttribute('aria-expanded', String(view.allGoals));
         this.treeToggle.disabled = view.disabled; this.addRoot.disabled = view.disabled;
         const editing = !!view.edit;

@@ -31,6 +31,10 @@ export function queryElements(): AppElements {
         readerPanel: document.getElementById('reader-panel'),
         notesPanel: document.getElementById('notes-panel'),
         goalPanel: document.getElementById('goal-panel'),
+        goalSidebar: document.getElementById('goal-sidebar'),
+        goalResizer: document.getElementById('goal-resizer'),
+        btnGoals: document.getElementById('btn-goals') as HTMLButtonElement | null,
+        readingWorkspace: document.getElementById('reading-workspace'),
         btnAnnotationGoal: document.getElementById('btn-annotation-goal') as HTMLButtonElement | null,
 
         // Reader Controls
@@ -221,6 +225,7 @@ export function bootstrapApp() {
     goals.callbacks.onActionsChanged = () => {
         updateNoteGoalActions(elements, goalAction); selection.refreshGoalAction();
     };
+    goals.callbacks.onBeforeSidebarResize = () => reader.rememberAnchor();
 
     // 3. Connect Cross-Module Callbacks
     shelf.callbacks.onImportFile = file => coordinator.importBook(file);
@@ -383,6 +388,20 @@ export function bootstrapApp() {
                 }
             }
         });
+
+        // Sidebar sizing changes only the available reading viewport. Reuse
+        // the same responsive layout/refit path as a normal window resize.
+        if (elements.workspaceContainer && typeof ResizeObserver !== 'undefined') {
+            let width = elements.workspaceContainer.clientWidth;
+            let resizeTimer: ReturnType<typeof setTimeout>;
+            new ResizeObserver(() => {
+                const next = elements.workspaceContainer!.clientWidth;
+                if (next === width) return;
+                width = next;
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => appShell.callbacks.onWindowResize?.(false), 60);
+            }).observe(elements.workspaceContainer);
+        }
 
         // 5. Initial Execution & Mounting
         layout.updateLayoutClasses(elements);

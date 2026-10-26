@@ -38,6 +38,17 @@ const timer = setTimeout(() => app.exit(1), 85000);
         await run('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     };
     const input = text => run(`(()=>{const e=document.querySelector('.goal-editor textarea');e.value=${JSON.stringify(text)};e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    const resizeSidebar = async width => {
+        const box = await run(`(()=>{const r=document.getElementById('goal-resizer').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()`);
+        const start = await run('document.getElementById("goal-sidebar").getBoundingClientRect().width');
+        wc.sendInputEvent({ type: 'mouseMove', ...box });
+        wc.sendInputEvent({ type: 'mouseDown', ...box, button: 'left', clickCount: 1 });
+        wc.sendInputEvent({ type: 'mouseMove', x: box.x + width - start, y: box.y });
+        wc.sendInputEvent({ type: 'mouseUp', x: box.x + width - start, y: box.y, button: 'left', clickCount: 1 });
+        wc.sendInputEvent({ type: 'mouseMove', x: 20, y: 20 });
+        await wait(`Number(document.getElementById('goal-resizer').getAttribute('aria-valuenow'))===${width}`);
+        await run('new Promise(resolve=>setTimeout(resolve,120))');
+    };
     await click('#goal-panel [aria-label="New goal"]'); await wait("document.activeElement.matches('.goal-editor textarea')");
     await input('What is time?');
     // Real pointer sequence: blur must not consume the next toolbar click.
@@ -55,6 +66,9 @@ const timer = setTimeout(() => app.exit(1), 85000);
     assert.equal(geometry[2], 560);
     await click('.goal-title'); await wait("document.activeElement.matches('.goal-editor textarea')");
     await input('A changed question');
+    await run('window.__goalEditor=document.activeElement;__goalEditor.setSelectionRange(4,4)');
+    await resizeSidebar(420);
+    assert.equal(await run('document.activeElement===__goalEditor && __goalEditor.selectionStart===4'), true, 'drag preserves live Goal input');
     await click('#goal-panel [aria-label="Add subgoal"]');
     await wait("document.querySelector('.goal-editor textarea').getAttribute('aria-label')==='New subgoal'");
     await input('A deeper question'); await run('a.goals.finishInlineEdit()');
@@ -62,9 +76,23 @@ const timer = setTimeout(() => app.exit(1), 85000);
     await click('.note-comment-text'); await wait("document.activeElement.matches('.note-editor')");
     await run(`(()=>{window.__noteEditor=document.activeElement;__noteEditor.value='A clock measures change. Does that explain time itself?';__noteEditor.setSelectionRange(4,4);__noteEditor.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     assert.equal(await run('document.activeElement===window.__noteEditor && __noteEditor.selectionStart===4'), true);
+    await resizeSidebar(500);
+    await wait('!document.querySelector(".note-editor")');
+    assert.equal(await run('a.annotations.getNotes().find(n=>n.id==="goal-note").comment'), 'A clock measures change. Does that explain time itself?', 'existing outside-click finish preserves the latest note text');
     await run('a.annotations.finishInlineEdit()');
+    await wait('!document.getElementById("toast-msg").classList.contains("show")');
     await fs.writeFile(path.join(output, 'goal-single.png'), (await wc.capturePage()).toPNG());
+    const savedWidth = await run('localStorage.getItem("aura_goal_sidebar_width")'); assert.equal(savedWidth, '500');
+    await click('#btn-goals'); await wait('document.getElementById("goal-sidebar").hidden');
+    await click('#btn-goals'); await wait('!document.getElementById("goal-sidebar").hidden');
+    assert.equal(await run('document.getElementById("goal-sidebar").getBoundingClientRect().width'), 500);
     window.setContentSize(1440, 960); await wait('!document.getElementById("goal-panel").hidden');
+    await resizeSidebar(640);
+    const narrowGeometry = await run(`(async()=>{const {marginGeometry}=await import('./features/layout/marginNotesLayout.js');return [a.elements.bookPaper.clientWidth,marginGeometry(a.elements.workspaceContainer.clientWidth,'single').readingWidth];})()`);
+    assert.equal(narrowGeometry[0], narrowGeometry[1], 'wide sidebar uses the original narrow-reader geometry at the actual device scale');
+    assert.equal(await run(`(()=>{const r=document.querySelector('.note-card').getBoundingClientRect();return r.left>=640 && r.right<=innerWidth;})()`), true);
+    await fs.writeFile(path.join(output, 'goal-wide.png'), (await wc.capturePage()).toPNG());
+    await resizeSidebar(280);
     await fs.writeFile(path.join(output, 'goal-default.png'), (await wc.capturePage()).toPNG());
     window.setContentSize(800, 700); await wait('document.getElementById("goal-panel").hidden');
     window.setContentSize(1613, 928); await wait('!document.getElementById("goal-panel").hidden');
@@ -72,8 +100,9 @@ const timer = setTimeout(() => app.exit(1), 85000);
     assert.equal(await run('document.getElementById("goal-panel").hidden'), true);
     await run(`a.layout.setPageMode('single',1613)`); await wait('!document.getElementById("goal-panel").hidden');
     await run('a.appShell.toggleAppTheme()');
-    // The paper animates its color for 200ms; compare after that transition.
-    await wait(`getComputedStyle(document.getElementById('goal-panel')).color===getComputedStyle(a.elements.bookPaper).color`);
+    await wait(`getComputedStyle(document.getElementById('goal-panel')).color===getComputedStyle(document.body).color`);
+    // Allow the existing paper color transition and responsive refit to settle.
+    await run('new Promise(resolve=>setTimeout(resolve,300))');
     await fs.writeFile(path.join(output,'goal-dark.png'),(await wc.capturePage()).toPNG());
     await run('a.appShell.toggleAppTheme()');
     const previous = live.goals(['goal-fixture'])[0];
@@ -87,8 +116,8 @@ const timer = setTimeout(() => app.exit(1), 85000);
     await run(`(async()=>{await a.coordinator.openBook('crisis-era');await a.coordinator.openBook('goal-fixture');})()`);
     assert.equal(live.goals(['goal-fixture'])[0].value.links.length, 2);
     const report = { passed: true, actualElectron: true, isolatedDataOnly: true,
-        checks: ['real pointer events and blur-to-subgoal creation', 'automatic link/select expansion', 'retained note editor and exact reading geometry', '1613px/1440px/narrow/mode layouts', 'actual SQLite failure, close refusal and exact retry', 'book switching preserves tree and links'],
-        screenshots: ['goal-single.png', 'goal-default.png', 'goal-dark.png'] };
+        checks: ['real pointer events and blur-to-subgoal creation', 'automatic link/select expansion', 'retained note editor before resize and exact reading geometry', 'real sidebar drag retains Goal editor/caret; existing note outside-click finish unchanged', 'saved width and hide/show', '640px sidebar uses original reading geometry with notes visible', '1613px/1440px/narrow/mode layouts', 'application theme independent of paper', 'actual SQLite failure, close refusal and exact retry', 'book switching preserves tree and links'],
+        screenshots: ['goal-single.png', 'goal-default.png', 'goal-wide.png', 'goal-dark.png'] };
     await fs.writeFile(path.join(output, 'goal-results.json'), JSON.stringify(report, null, 2));
     console.log('Goal desktop acceptance passed:', output); clearTimeout(timer); window.destroy(); app.exit(0);
 })().catch(error => { console.error(error); clearTimeout(timer); app.exit(1); });

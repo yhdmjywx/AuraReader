@@ -41,6 +41,8 @@ const { createDataStore } = require('../../src/server/dataStore');
     const { loadGoalsForBook } = await import('../../dist/client/infrastructure/goalRepository.js');
     const { pendingGoals, readGoalDraft } = await import('../../dist/client/infrastructure/goalRecovery.js');
     const elements = { goalPanel: document.getElementById('goal-panel'), workspaceContainer: document.getElementById('workspace-container'),
+        goalSidebar: document.getElementById('goal-sidebar'), goalResizer: document.getElementById('goal-resizer'),
+        btnGoals: document.getElementById('btn-goals'), readingWorkspace: document.getElementById('reading-workspace'),
         bookPaper: document.getElementById('book-paper'), notesList: document.getElementById('notes-list') };
     Object.defineProperty(elements.workspaceContainer, 'clientWidth', { value: 1613, configurable: true });
     let page = 1, mode = 'single'; const failures = [];

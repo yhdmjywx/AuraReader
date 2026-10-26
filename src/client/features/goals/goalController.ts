@@ -7,7 +7,7 @@ import { onGoalsChanged, operationId } from '../../infrastructure/storageClient.
 import { prepareGoalWrite, flushGoals, loadGoalsForBook } from '../../infrastructure/goalRepository.js';
 import { clearGoalDraft, pendingGoals, storeGoalDraft } from '../../infrastructure/goalRecovery.js';
 import { GoalUI } from './goalUI.js';
-import { positionGoals } from './goalLayout.js';
+import { GoalSidebar, positionGoals } from './goalLayout.js';
 
 export interface GoalCallbacks {
     getAnnotations(): Annotation[];
@@ -18,6 +18,7 @@ export interface GoalCallbacks {
     finishAnnotations(): Promise<void>;
     annotationsSaved(): Promise<void>;
     onActionsChanged?(): void;
+    onBeforeSidebarResize?(): void;
 }
 export class GoalController {
     state: BookGoalState = emptyGoals('');
@@ -31,6 +32,7 @@ export class GoalController {
     visible = false;
     elements: AppElements | null = null;
     ui: GoalUI | null = null;
+    sidebar: GoalSidebar | null = null;
     private dirty = false;
     private serial = 0;
     private stagedSerial = -1;
@@ -59,6 +61,7 @@ export class GoalController {
             unlink: id => { this.endEdit(); if (this.selected) this.persist(unlinkGoal(this.state, this.selected, id)); this.render(); this.ui?.announce('Item unlinked from goal'); },
             jump: id => { this.endEdit(); this.callbacks.jump(id); }
         });
+        if (elements.goalSidebar) this.sidebar = new GoalSidebar(elements, () => this.updateReadingContext(), () => this.finishInlineEdit(), () => this.callbacks.onBeforeSidebarResize?.());
         this.updateReadingContext();
     }
     setStateForBook(loaded: Awaited<ReturnType<typeof loadGoalsForBook>>) {
@@ -174,7 +177,7 @@ export class GoalController {
     }
     updateReadingContext() {
         if (this.elements) {
-            const visible = positionGoals(this.elements, this.callbacks.getMode());
+            const visible = this.sidebar ? this.sidebar.update(this.callbacks.getMode()) : positionGoals(this.elements, this.callbacks.getMode());
             if (this.visible && !visible) this.finishInlineEdit().catch(() => {});
             this.visible = visible;
         }
