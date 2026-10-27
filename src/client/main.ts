@@ -233,6 +233,7 @@ export function bootstrapApp() {
     }
     coordinator.onBookOpened = () => home?.leave();
     goals.callbacks.onEnterGoalPage = () => home?.leave();
+    goals.callbacks.openCollection = area => { if (home) void home.open().then(() => home.showArea(area)).catch(error => appShell.showToast(errorMessage(error, 'Could not open goals'))); };
 
     const goalAction = (id: string) => ({ visible: goals.visible, disabled: !goals.canLink(id) || goals.linked(id), linked: goals.linked(id) });
     annotations.callbacks.getGoalAction = goalAction;

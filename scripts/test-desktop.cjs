@@ -27,7 +27,7 @@ async function run(entry, args = []) {
 (async () => {
     const selected = process.argv[2];
     if (selected) {
-        if (!['main.cjs','restart.cjs','note-interaction.cjs','goal-interaction.cjs','goal-home.cjs'].includes(selected)) throw new Error('Unknown desktop test: ' + selected);
+        if (!['main.cjs','restart.cjs','note-interaction.cjs','goal-interaction.cjs','goal-home.cjs','goal-lifecycle.cjs'].includes(selected)) throw new Error('Unknown desktop test: ' + selected);
         await run(selected, process.argv.slice(3));
         console.log('Desktop artifacts:', output);
         return;
@@ -50,6 +50,9 @@ async function run(entry, args = []) {
     await run('goal-home.cjs', ['import-first']);
     const homeImport = JSON.parse(fs.readFileSync(path.join(output, 'home-import-results.json'), 'utf8'));
     if (homeImport.passed !== true) throw new Error('Goal home import-first report did not pass');
-    console.log(JSON.stringify({ ...report, restart, notes, goals, home, homeImport }, null, 2));
+    await run('goal-lifecycle.cjs');
+    const lifecycle = JSON.parse(fs.readFileSync(path.join(output, 'lifecycle-results.json'), 'utf8'));
+    if (lifecycle.passed !== true) throw new Error('Goal lifecycle desktop report did not pass');
+    console.log(JSON.stringify({ ...report, restart, notes, goals, home, homeImport, lifecycle }, null, 2));
     console.log('Desktop artifacts:', output);
 })().catch(error => { console.error(error); process.exitCode = 1; });

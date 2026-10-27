@@ -11,6 +11,9 @@ function validateGoalState(state, annotationExists = () => true, fail = message 
             || typeof goal.updatedAt !== 'string' || !Number.isFinite(Date.parse(goal.updatedAt))) return fail('无效或重复 Goal 节点');
         if (goal.origin !== null && (!goal.origin || !Number.isSafeInteger(goal.origin.sourcePage) || goal.origin.sourcePage < 1
             || typeof goal.origin.sectionId !== 'string' || typeof goal.origin.chapter !== 'string')) return fail('无效 Goal 来源');
+        for (const field of ['completedAt', 'archivedAt', 'deletedAt']) {
+            if (goal[field] !== undefined && (typeof goal[field] !== 'string' || !Number.isFinite(Date.parse(goal[field])))) return fail('无效 Goal 状态');
+        }
         nodes.set(goal.id, goal);
     }
     // Each node is visited at most twice, even for a very deep tree.

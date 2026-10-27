@@ -217,7 +217,7 @@ export class AppShell {
                 return;
             }
             const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-            if (tag === 'input' || tag === 'textarea' || (document.activeElement as HTMLElement | null)?.isContentEditable) {
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || (document.activeElement as HTMLElement | null)?.isContentEditable) {
                 return;
             }
 
