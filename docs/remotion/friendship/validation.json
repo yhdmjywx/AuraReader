@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "books": 2,
+  "verifiedQuotations": 2,
+  "annotations": 4,
+  "linkedNotes": 2,
+  "goalCount": 1,
+  "checks": [
+    "Official complete EPUBs parsed with AuraReader importer",
+    "Exact source ranges resolve for both highlight and note",
+    "Two per-book backups restore to one Goal with two cross-book notes",
+    "Actual SQLite integrity check passes"
+  ]
+}

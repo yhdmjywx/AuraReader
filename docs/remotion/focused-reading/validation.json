@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "books": 2,
+  "exactSourceSelections": 4,
+  "highlights": 2,
+  "notes": 2,
+  "goalLinkedNotes": 2,
+  "checks": [
+    "Both official EPUBs parse with AuraReader’s existing importer and retain their complete contents.",
+    "All four selections resolve to exact source ranges and real TOC chapter anchors.",
+    "Highlight and note ranges do not overlap within either book.",
+    "Both final per-book backups restore into one Goal, two explicit book links and two cross-book notes; generation values are rebound by the real importer.",
+    "The real SQLite integrity and Goal relationship validation passes."
+  ],
+  "limitation": "This validates parsing, source offsets and storage restore. No fresh visual desktop playback or Remotion render was performed."
+}

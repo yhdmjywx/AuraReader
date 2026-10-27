@@ -1,0 +1,74 @@
+[
+  {
+    "id": "remotion-friendship-anne-highlight",
+    "bookId": "remotion-friendship-anne",
+    "kind": "highlight",
+    "quote": "do you think that I shall\never have a bosom friend in Avonlea?",
+    "comment": "",
+    "color": "yellow",
+    "page": 10,
+    "chapter": "VIII · Anne’s Bringing-up Is Begun",
+    "timestamp": "2026-10-27T08:00:00.000Z",
+    "location": {
+      "sectionId": "chapter-10",
+      "page": 10,
+      "offset": 8407,
+      "start": 8407,
+      "end": 8469
+    }
+  },
+  {
+    "id": "remotion-friendship-anne-note",
+    "bookId": "remotion-friendship-anne",
+    "kind": "note",
+    "quote": "do you think that I shall\never have a bosom friend in Avonlea?",
+    "comment": "I want someone I can really talk to.",
+    "color": "green",
+    "page": 10,
+    "chapter": "VIII · Anne’s Bringing-up Is Begun",
+    "timestamp": "2026-10-27T08:00:00.000Z",
+    "location": {
+      "sectionId": "chapter-10",
+      "page": 10,
+      "offset": 8407,
+      "start": 8407,
+      "end": 8469
+    }
+  },
+  {
+    "id": "remotion-friendship-conversation-highlight",
+    "bookId": "remotion-friendship-conversation",
+    "kind": "highlight",
+    "quote": "Choose subject of mutual interest.",
+    "comment": "",
+    "color": "yellow",
+    "page": 2,
+    "chapter": "Golden Rule Number VII",
+    "timestamp": "2026-10-27T08:00:00.000Z",
+    "location": {
+      "sectionId": "chapter-2",
+      "page": 2,
+      "offset": 29134,
+      "start": 29134,
+      "end": 29168
+    }
+  },
+  {
+    "id": "remotion-friendship-conversation-note",
+    "bookId": "remotion-friendship-conversation",
+    "kind": "note",
+    "quote": "Choose subject of mutual interest.",
+    "comment": "I could ask her what she’s reading.",
+    "color": "green",
+    "page": 2,
+    "chapter": "Golden Rule Number VII",
+    "timestamp": "2026-10-27T08:00:00.000Z",
+    "location": {
+      "sectionId": "chapter-2",
+      "page": 2,
+      "offset": 29134,
+      "start": 29134,
+      "end": 29168
+    }
+  }
+]

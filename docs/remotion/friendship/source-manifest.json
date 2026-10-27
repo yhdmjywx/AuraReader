@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Anne of Green Gables",
+    "author": "L. M. Montgomery",
+    "catalog": "https://www.gutenberg.org/ebooks/45",
+    "epub": "https://www.gutenberg.org/ebooks/45.epub3.images",
+    "copyright": "Public domain in the USA.",
+    "license": "https://www.gutenberg.org/policy/license.html",
+    "sha256": "8156c4733c5983e6efc12f40fbfa4c8a8b1e632e64f6938579c12434ba40679f"
+  },
+  {
+    "title": "The Art of Conversation: Twelve Golden Rules",
+    "author": "Josephine Turck Baker",
+    "catalog": "https://www.gutenberg.org/ebooks/63995",
+    "epub": "https://www.gutenberg.org/ebooks/63995.epub3.images",
+    "copyright": "Public domain in the USA.",
+    "license": "https://www.gutenberg.org/policy/license.html",
+    "sha256": "d6102e1a2ec6f3db5f1bd9f9afe18b6da486255b67ab69e0829249416ad95ff3"
+  }
+]
