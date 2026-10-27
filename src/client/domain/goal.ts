@@ -6,6 +6,10 @@ export interface Goal {
     origin: GoalOrigin | null;
     createdAt: string;
     updatedAt: string;
+    completedAt?: string;
+    /** A marker on a branch root; descendants inherit visibility, not this field. */
+    archivedAt?: string;
+    deletedAt?: string;
 }
 export interface GoalLink { goalId: string; annotationId: string }
 export interface BookGoalState { bookId: string; goals: Goal[]; links: GoalLink[] }

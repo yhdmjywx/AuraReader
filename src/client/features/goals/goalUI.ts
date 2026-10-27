@@ -1,6 +1,6 @@
 import type { Annotation } from '../../domain/annotation.js';
 import type { GoalLibraryState, GoalDraft } from '../../domain/goal.js';
-import { goalChildren } from '../../domain/goalEngine.js';
+import { areaGoals, type GoalFilter, type GoalArea } from '../../domain/goalLifecycle.js';
 export interface GoalView {
     state: GoalLibraryState; selected: string | null; allGoals: boolean;
     itemsOpen: boolean; edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft } | null;
@@ -11,6 +11,8 @@ interface Actions {
     select(id: string): void; home(): void; up(): void; create(): void; expand(): void; items(): void;
     edit(mode: 'root' | 'child' | 'edit'): void; input(text: string): void; finish(): void;
     unlink(id: string): void; jump(id: string): void;
+    menu?(id: string, anchor: HTMLElement, point?: { x: number; y: number }): void;
+    collection?(area: GoalArea): void;
 }
 const node = <T extends keyof HTMLElementTagNameMap>(tag: T, className = '') => {
     const result = document.createElement(tag); result.className = className; return result;
@@ -45,11 +47,16 @@ export class GoalUI {
     private editorShell = node('div', 'goal-editor');
     readonly editor = node('textarea');
     private childNodes = new Map<string, HTMLButtonElement>();
+    private childRows = new Map<string, { row: HTMLDivElement; badge: HTMLSpanElement; more: HTMLButtonElement }>();
     private itemNodes = new Map<string, { row: HTMLDivElement; icon: HTMLElement; text: HTMLButtonElement; source: HTMLDivElement }>();
     private empty = node('p', 'goal-empty');
     private composing = false;
     private releasingFocus = false;
     private status = node('span', 'goal-status');
+    private filter = node('select', 'goal-filter');
+    private completion = node('span', 'goal-completion');
+    private more: HTMLButtonElement;
+    private collections = node('div', 'goal-collections');
     constructor(readonly panel: HTMLElement, readonly actions: Actions) {
         this.treeToggle = button('Home', actions.home, 'goal-icon', 'home-4-line');
         this.treeToggle.id = 'goal-home-nav';
@@ -62,7 +69,16 @@ export class GoalUI {
         const navigation = node('div','goal-navigation'), tools = node('div','goal-navigation');
         navigation.append(this.treeToggle,this.parent);tools.append(this.addRoot,this.expand);header.append(navigation,tools);
         this.title = button('', () => actions.edit('edit'), 'goal-title');
-        this.current.append(this.title, this.editorShell);
+        this.more = button('Goal actions', () => { if (this.view.selected) actions.menu?.(this.view.selected, this.more); }, 'goal-icon', 'more-line');
+        this.more.setAttribute('aria-haspopup', 'menu');
+        const titleRow = node('div', 'goal-title-row'); titleRow.append(this.title, this.more);
+        this.current.append(titleRow, this.completion, this.editorShell);
+        this.current.addEventListener('contextmenu', event => { if (this.view.selected && !(event.target as Element).closest('textarea')) { event.preventDefault(); actions.menu?.(this.view.selected, this.more, { x: event.clientX, y: event.clientY }); } });
+        this.filter.setAttribute('aria-label', 'Filter goals by completion');
+        for (const [value, label] of [['all', 'All goals'], ['ongoing', 'In progress'], ['completed', 'Completed']]) { const option = node('option'); option.value = value; option.textContent = label; this.filter.append(option); }
+        this.filter.addEventListener('change', () => this.render(this.view));
+        this.collections.append(button('Archive', () => actions.collection?.('archive'), 'goal-action', 'archive-line'), button('Recently deleted', () => actions.collection?.('trash'), 'goal-action', 'delete-bin-line'));
+        this.collections.children[0].append(document.createTextNode('Archive')); this.collections.children[1].append(document.createTextNode('Recently deleted'));
         this.toggle = button('', actions.items, 'goal-items-toggle'); this.toggle.append(this.count, this.itemsChevron);
         this.items.id = 'goal-linked-items'; this.toggle.setAttribute('aria-controls', this.items.id);
         this.toggle.title = 'Linked notes and highlights';
@@ -102,6 +118,7 @@ export class GoalUI {
         this.treeToggle.setAttribute('aria-current', view.allGoals ? 'page' : 'false');
         this.treeToggle.disabled = view.disabled || view.allGoals; this.parent.disabled = view.disabled || view.allGoals;
         this.addRoot.disabled = view.disabled; this.expand.hidden = view.fullPage;
+        this.more.disabled = view.disabled; this.filter.disabled = view.disabled;
         const editing = !!view.edit;
         this.editorShell.hidden = !editing; this.editor.disabled = view.disabled;
         this.editorShell.classList.toggle('is-new', editing && view.edit?.mode !== 'edit');
@@ -113,18 +130,20 @@ export class GoalUI {
             this.editor.placeholder = 'Goal';
         }
         const wanted: HTMLElement[] = [];
+        wanted.push(this.filter);
         if (!view.state.goals.length && !view.edit) { this.empty.textContent = 'Your goals, in your own words.'; wanted.push(this.empty); }
         if (view.allGoals) {
-            this.renderChildren(goalChildren(view.state, null)); wanted.push(this.children);
+            this.renderChildren(areaGoals(view.state, 'library', null, '', this.filter.value as GoalFilter)); wanted.push(this.children, this.collections);
         } else {
             const goal = view.state.goals.find(item => item.id === view.selected);
             if (goal) {
                 this.title.textContent = goal.text; this.title.hidden = view.edit?.mode === 'edit'; this.title.disabled = view.disabled;
+                this.completion.textContent = goal.completedAt ? '✓ Completed' : ''; this.completion.hidden = !goal.completedAt;
                 if (view.edit?.mode === 'edit') {
                     if (this.editorShell.parentElement !== this.current) this.current.append(this.editorShell);
                 }
                 wanted.push(this.current);
-                const kids = goalChildren(view.state, goal.id); this.renderChildren(kids); if (kids.length) wanted.push(this.children);
+                const kids = areaGoals(view.state, 'library', goal.id, '', this.filter.value as GoalFilter); this.renderChildren(kids); if (kids.length) wanted.push(this.children);
                 if (view.edit?.mode === 'child') wanted.push(this.editorShell);
                 const related = view.state.links.filter(link => link.goalId === goal.id);
                 const annotations = new Map(view.annotations.map(annotation => [annotation.id, annotation]));
@@ -169,7 +188,17 @@ export class GoalUI {
         const controls = goals.map(goal => {
             let control = this.childNodes.get(goal.id);
             if (!control) { control = button('', () => this.actions.select(goal.id), 'goal-child'); this.childNodes.set(goal.id,control); }
-            control.textContent = goal.text; control.disabled = this.view.disabled; return control;
+            control.textContent = goal.text; control.disabled = this.view.disabled;
+            let entry = this.childRows.get(goal.id);
+            if (!entry) {
+                const row = node('div', 'goal-row'), badge = node('span', 'goal-completion');
+                const more = button(`Actions for ${goal.text}`, () => this.actions.menu?.(goal.id, more), 'goal-icon', 'more-line'); more.setAttribute('aria-haspopup', 'menu');
+                row.addEventListener('contextmenu', event => { event.preventDefault(); this.actions.menu?.(goal.id, more, { x: event.clientX, y: event.clientY }); });
+                row.append(control, badge, more); entry = {row, badge, more}; this.childRows.set(goal.id, entry);
+            }
+            entry.badge.textContent = goal.completedAt ? '✓' : ''; entry.badge.title = 'Completed'; entry.badge.hidden = !goal.completedAt;
+            entry.more.disabled = this.view.disabled; entry.more.setAttribute('aria-label', `Actions for ${goal.text}`); entry.more.title = `Actions for ${goal.text}`;
+            return entry.row;
         });
         reconcile(this.children,controls);
     }
