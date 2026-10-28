@@ -1,0 +1,102 @@
+[
+  {
+    "repo": "AyingAI/deepread",
+    "url": "https://github.com/AyingAI/deepread",
+    "license": "MIT",
+    "default_branch": "main",
+    "pushed_at": "2026-07-18T03:10:57Z",
+    "archived": false,
+    "release": null,
+    "accessed": "2026-10-27 Asia/Shanghai",
+    "classification": "concept-reference-only",
+    "runtimeValidation": "not independently verified",
+    "userReportedIssue": "User reports installation followed by runtime failure and no expandable Purpose workflow.",
+    "correction": "Excluded from core competitor and capability comparisons on 2026-10-27; repository/license metadata is not functional acceptance.",
+    "reviewedCommit": "5c1e46c9a5cb8eaa2b88a561febf693267378e19"
+  },
+  {
+    "repo": "readest/readest",
+    "url": "https://github.com/readest/readest",
+    "license": "AGPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-10-26T18:25:07Z",
+    "archived": false,
+    "release": {
+      "repo": "readest/readest",
+      "tag": "v0.12.16",
+      "date": "2026-10-13T22:34:40Z",
+      "url": "https://github.com/readest/readest/releases/tag/v0.12.16"
+    },
+    "accessed": "2026-10-27 Asia/Shanghai"
+  },
+  {
+    "repo": "koodo-reader/koodo-reader",
+    "url": "https://github.com/koodo-reader/koodo-reader",
+    "license": "AGPL-3.0",
+    "default_branch": "dev",
+    "pushed_at": "2026-10-26T10:11:31Z",
+    "archived": false,
+    "release": {
+      "repo": "koodo-reader/koodo-reader",
+      "tag": "v2.4.6",
+      "date": "2026-10-07T00:29:56Z",
+      "url": "https://github.com/koodo-reader/koodo-reader/releases/tag/v2.4.6"
+    },
+    "accessed": "2026-10-27 Asia/Shanghai"
+  },
+  {
+    "repo": "zotero/zotero",
+    "url": "https://github.com/zotero/zotero",
+    "license": "AGPL-3.0 (verified in COPYING)",
+    "default_branch": "main",
+    "pushed_at": "2026-10-26T16:19:43Z",
+    "archived": false,
+    "release": null,
+    "accessed": "2026-10-27 Asia/Shanghai"
+  },
+  {
+    "repo": "windingwind/zotero-better-notes",
+    "url": "https://github.com/windingwind/zotero-better-notes",
+    "license": "AGPL-3.0",
+    "default_branch": "master",
+    "pushed_at": "2026-08-24T13:21:23Z",
+    "archived": false,
+    "release": {
+      "repo": "windingwind/zotero-better-notes",
+      "tag": "v3.3.3",
+      "date": "2026-08-24T13:25:16Z",
+      "url": "https://github.com/windingwind/zotero-better-notes/releases/tag/v3.3.3"
+    },
+    "accessed": "2026-10-27 Asia/Shanghai"
+  },
+  {
+    "repo": "johnfactotum/foliate",
+    "url": "https://github.com/johnfactotum/foliate",
+    "license": "GPL-3.0",
+    "default_branch": "gtk4",
+    "pushed_at": "2026-04-08T15:11:30Z",
+    "archived": false,
+    "release": {
+      "repo": "johnfactotum/foliate",
+      "tag": "3.3.0",
+      "date": "2025-04-01T07:09:41Z",
+      "url": "https://github.com/johnfactotum/foliate/releases/tag/3.3.0"
+    },
+    "accessed": "2026-10-27 Asia/Shanghai"
+  },
+  {
+    "repo": "edrlab/thorium-reader",
+    "url": "https://github.com/edrlab/thorium-reader",
+    "license": "BSD-3-Clause",
+    "default_branch": "develop",
+    "pushed_at": "2026-10-26T16:50:19Z",
+    "archived": false,
+    "release": {
+      "repo": "edrlab/thorium-reader",
+      "tag": "v3.5.1",
+      "date": "2026-09-02T17:50:14Z",
+      "url": "https://github.com/edrlab/thorium-reader/releases/tag/v3.5.1"
+    },
+    "accessed": "2026-10-27 Asia/Shanghai"
+  }
+]

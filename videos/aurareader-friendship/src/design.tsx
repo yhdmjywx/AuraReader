@@ -2,6 +2,7 @@ import React from "react";
 import { Easing, interpolate, staticFile } from "remotion";
 import { loadFont } from "@remotion/fonts";
 import content from "./content.json";
+import { APP } from "./layout";
 export const C = {
   navy: "#0f172a",
   ink: "#1d2129",
@@ -149,10 +150,10 @@ export function AppChrome({ t, reading }: { t: number; reading: boolean }) {
     <div
       style={{
         position: "absolute",
-        left: 112,
-        top: 284,
-        width: 1696,
-        height: 684,
+        left: APP.left,
+        top: APP.top,
+        width: APP.width,
+        height: APP.height,
         background: C.app,
         borderRadius: 18,
         boxShadow: "0 28px 100px #00000035",
@@ -163,7 +164,7 @@ export function AppChrome({ t, reading }: { t: number; reading: boolean }) {
     >
       <div
         style={{
-          height: 72,
+          height: APP.header,
           background: "white",
           borderBottom: `1px solid ${C.line}`,
           display: "flex",
@@ -177,10 +178,10 @@ export function AppChrome({ t, reading }: { t: number; reading: boolean }) {
           <div
             style={{
               position: "absolute",
-              left: 520,
-              right: 240,
+              left: 350,
+              right: 150,
               textAlign: "center",
-              fontSize: 20,
+              fontSize: 18,
               color: C.ink,
               display: "flex",
               justifyContent: "center",
@@ -201,9 +202,9 @@ export function AppChrome({ t, reading }: { t: number; reading: boolean }) {
       <div
         style={{
           position: "absolute",
-          left: reading ? 390 : 12,
+          left: reading ? APP.sidebar : 12,
           right: 12,
-          top: 84,
+          top: APP.header + 12,
           bottom: 12,
           background: "white",
           borderRadius: 12,
@@ -214,16 +215,16 @@ export function AppChrome({ t, reading }: { t: number; reading: boolean }) {
         <div
           style={{
             position: "absolute",
-            left: 28,
-            top: 108,
+            left: 24,
+            top: 96,
             display: "flex",
-            gap: 20,
+            gap: 14,
             color: C.muted,
           }}
         >
           <Icon name="home" />
           <Icon name="up" />
-          <span style={{ width: 145 }} />
+          <span style={{ width: 72 }} />
           <Icon name="plus" color={C.action} />
           <Icon name="expand" />
         </div>
@@ -249,23 +250,31 @@ export function Caption({
           ? 12
           : Number(number) === 5
             ? 18
-            : 29;
+            : 29.5;
   if (number === "01" || number === "07") return null;
+  const compact = number !== "06";
+  const fade =
+    number === "04"
+      ? 1 - tween(t, 16.8, 17.4)
+      : number === "05"
+        ? 1 - tween(t, 20.2, 21)
+        : 1;
   return (
     <div
       style={{
         position: "absolute",
-        left: 120,
-        top: 91,
+        left: compact ? 56 : 120,
+        top: compact ? 98 : 91,
+        width: compact ? 242 : 1640,
         color: "#f8fafc",
-        opacity: tween(t, start, start + 0.4),
+        opacity: tween(t, start, start + 0.4) * fade,
         translate: `0 ${tween(t, start, start + 0.55, 12, 0)}px`,
       }}
     >
       <div
         style={{
-          fontSize: 15,
-          letterSpacing: 4,
+          fontSize: compact ? 13 : 15,
+          letterSpacing: compact ? 2 : 4,
           color: "#91a8d0",
           fontWeight: 550,
           marginBottom: 17,
@@ -275,10 +284,10 @@ export function Caption({
       </div>
       <div
         style={{
-          fontSize: number === "06" ? 66 : 78,
+          fontSize: compact ? 40 : 66,
           fontWeight: 550,
-          lineHeight: 1.1,
-          letterSpacing: -3,
+          lineHeight: 1.2,
+          letterSpacing: compact ? -1.3 : -3,
         }}
       >
         {title}
@@ -340,33 +349,37 @@ function Material({
   );
 }
 export function GoalAnchor({ t }: { t: number }) {
-  const times = [0, 2.45, 3.15, 5.5, 6.7, 10.65, 11.75, 28.8, 29.8, 35, 35.55];
+  const times = [
+    0, 1.9, 2.45, 3.15, 5.5, 6.7, 10.65, 11.75, 28.8, 29.8, 35, 35.55,
+  ];
   const lerp = (values: number[]) =>
     interpolate(t, times, values, {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
       easing: ease,
     });
-  const left = lerp([650, 650, 372, 372, 226, 226, 151, 151, 360, 360, 360]),
-    top = lerp([410, 410, 410, 410, 421, 421, 440, 440, 352, 352, 352]),
-    width = lerp([
-      620, 620, 1176, 1176, 1200, 1200, 300, 300, 1200, 1200, 1200,
+  const left = lerp([
+      440, 440, 650, 500, 500, 445, 445, 390, 390, 360, 360, 360,
     ]),
-    fontSize = lerp([38, 38, 62, 62, 48, 48, 34, 34, 56, 56, 56]);
+    top = lerp([485, 485, 410, 330, 330, 250, 250, 235, 235, 352, 352, 352]),
+    width = lerp([
+      1160, 1160, 620, 1150, 1150, 1170, 1170, 236, 236, 1200, 1200, 1200,
+    ]),
+    fontSize = lerp([84, 84, 38, 52, 52, 44, 44, 29, 29, 56, 56, 56]);
   const cardWeight = 1 - tween(t, 5.4, 6.6) + tween(t, 29, 29.8),
     large = t >= 29.45;
+  const shellWeight = cardWeight * tween(t, 2.05, 2.6);
+  const labelWeight = cardWeight * tween(t, 2.7, 3.15);
   let title =
-    t < 5.2
-      ? typed(data.initialGoal, t, 3.35, 4.85)
-      : t < 25.8
-        ? data.initialGoal
-        : t < 26.25
-          ? data.initialGoal.slice(
-              0,
-              Math.floor(linear(t, 25.8, 26.25, data.initialGoal.length, 0)),
-            )
-          : typed(data.evolvedGoal, t, 26.25, 28.2);
-  if (t < 3.35) title = "I have an idea.";
+    t < 25.8
+      ? data.initialGoal
+      : t < 26.25
+        ? data.initialGoal.slice(
+            0,
+            Math.floor(linear(t, 25.8, 26.25, data.initialGoal.length, 0)),
+          )
+        : typed(data.evolvedGoal, t, 26.25, 28.2);
+  if (t < 1.35) title = typed(data.initialGoal, t, 0.3, 1.35);
   const editing = (t >= 3.15 && t < 5.15) || (t >= 25.8 && t < 28.3),
     count = t >= 23.1 ? 2 : t >= 16.4 ? 1 : 0;
   const materialOpacity =
@@ -380,22 +393,22 @@ export function GoalAnchor({ t }: { t: number }) {
         top,
         width,
         boxSizing: "border-box",
-        color: C.ink,
-        opacity: tween(t, 2.5, 3.05) * (1 - tween(t, 35, 35.5)),
-        padding: `${36 * cardWeight}px ${40 * cardWeight}px`,
-        background: `rgba(255,255,255,${cardWeight})`,
-        borderRadius: 18 * cardWeight,
-        boxShadow: `0 24px 100px rgba(0,0,0,${cardWeight * 0.125})`,
+        color: t < 2.6 && shellWeight < 0.45 ? "#f8fafc" : C.ink,
+        opacity: tween(t, 0.2, 0.6) * (1 - tween(t, 35, 35.5)),
+        padding: `${36 * shellWeight}px ${40 * shellWeight}px`,
+        background: `rgba(255,255,255,${shellWeight})`,
+        borderRadius: 18 * shellWeight,
+        boxShadow: `0 24px 100px rgba(0,0,0,${shellWeight * 0.125})`,
       }}
     >
       <div
         style={{
           fontSize: 18,
           color: editing ? C.action : C.muted,
-          height: 22 * cardWeight,
-          opacity: cardWeight,
+          height: 22 * labelWeight,
+          opacity: labelWeight,
           overflow: "hidden",
-          marginBottom: 17 * cardWeight,
+          marginBottom: 17 * labelWeight,
           fontWeight: 500,
           display: "flex",
           alignItems: "center",
@@ -403,7 +416,7 @@ export function GoalAnchor({ t }: { t: number }) {
         }}
       >
         <Icon name={editing ? "pen" : "folder"} size={22} />
-        {editing ? "New goal" : "Goal"}
+        {t < 5.15 ? "New goal" : "Goal"}
       </div>
       <div
         style={{
@@ -539,9 +552,21 @@ export function Canvas({
         }}
       />
       <Caption title={title} number={number} t={t} />
-      <AppChrome t={t} reading={t >= 11.7 && t < 29.45} />
-      {children}
-      <GoalAnchor t={t} />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          transformOrigin: "1080px 540px",
+          scale:
+            1 +
+            0.035 * tween(t, 12.1, 14) * (1 - tween(t, 16.8, 18)) +
+            0.025 * tween(t, 20, 21.6) * (1 - tween(t, 24.7, 25.7)),
+        }}
+      >
+        <AppChrome t={t} reading={t >= 11.7 && t < 29.45} />
+        {children}
+        <GoalAnchor t={t} />
+      </div>
     </div>
   );
 }

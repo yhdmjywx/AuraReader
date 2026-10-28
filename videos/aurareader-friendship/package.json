@@ -28,6 +28,9 @@
     "dev": "remotion studio",
     "start": "remotion studio --no-open",
     "review": "node scripts/check-frames.cjs",
+    "prepare:pages": "node scripts/prepare-reading-pages.cjs",
+    "prepare:covers": "node scripts/prepare-covers.cjs",
+    "export:media": "node scripts/export-media.cjs",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"

@@ -32,7 +32,7 @@ const root = path.resolve(__dirname, "..");
     assert.equal(composition.fps, 30);
     assert.equal(composition.width, 1920);
     assert.equal(composition.height, 1080);
-    const output = path.join(root, "out/review");
+    const output = path.join(root, process.env.AURA_REVIEW_DIR || "out/review");
     fs.mkdirSync(output, { recursive: true });
     const frames = process.argv.slice(2).length
       ? process.argv.slice(2).map(Number)
