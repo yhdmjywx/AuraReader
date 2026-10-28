@@ -221,8 +221,7 @@ export class SelectionController {
 
         const selectedText = selection.toString().trim();
         const isInLeft = this.elements.bookPaper && this.elements.bookPaper.contains(selection.anchorNode);
-        const isInRight = this.elements.bookPaperRight && this.elements.bookPaperRight.contains(selection.anchorNode);
-        if (!selectedText || (!isInLeft && !isInRight)) {
+        if (!selectedText || !isInLeft) {
             this.hideSelectionTooltip();
             return;
         }
@@ -234,10 +233,8 @@ export class SelectionController {
         if (rect.width === 0 && rect.height === 0) return;
 
         const ctx = this.callbacks.getReadingContext ? this.callbacks.getReadingContext() : { currentPage: 1 };
-        let effectivePage = ctx.chapterFlow
-            ? (ctx.currentPage || 1)
-            : (isInRight ? (ctx.currentRightPage || (ctx.currentPage + 1)) : (ctx.currentLeftPage || ctx.currentPage));
-        let root = isInRight ? this.elements.bookPaperRight : this.elements.bookPaper;
+        let effectivePage = ctx.currentPage || 1;
+        let root = this.elements.bookPaper;
         if (!root) return;
         const dividerAt = (node: Node) => (node.nodeType === 1 ? node as Element : node.parentElement)?.closest<HTMLElement>('[data-volume-title-page]');
         const startDivider = dividerAt(range.startContainer);
@@ -310,7 +307,6 @@ export class SelectionController {
         };
 
         bindPaper(elements.bookPaper);
-        bindPaper(elements.bookPaperRight);
 
         document.querySelectorAll('.tooltip-btn[data-color]').forEach(btn => {
             btn.addEventListener('click', (e) => {

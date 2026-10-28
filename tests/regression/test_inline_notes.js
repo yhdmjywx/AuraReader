@@ -25,7 +25,7 @@ const { JSDOM } = require('jsdom');
         elements.workspaceContainer.getBoundingClientRect = () => box(0, 0, width, 800);
         byId('reader-viewport').getBoundingClientRect = () => box(0, 0, width, 760);
         elements.bookPaper.getBoundingClientRect = () => box(210, 0, 1192, 760);
-        applyMarginGeometry(elements, 'double');
+        applyMarginGeometry(elements);
         const session = new Session('inline-a');
         const focusFrames = [];
         window.requestAnimationFrame = callback => { focusFrames.push(callback); return focusFrames.length; };
@@ -104,7 +104,7 @@ const { JSDOM } = require('jsdom');
         current.dispatchEvent(new window.CompositionEvent('compositionend', { bubbles: true }));
         for (const nextWidth of [1440, 1366, 1920]) {
             width = nextWidth;
-            applyMarginGeometry(elements, 'double'); positionMarginNotes(elements);
+            applyMarginGeometry(elements); positionMarginNotes(elements);
             assert.equal(editor(), current);
             assert.equal(document.activeElement, current, '笔记侧边／底部重排保留焦点');
             assert.equal(current.selectionStart, 2);

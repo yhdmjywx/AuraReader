@@ -30,9 +30,9 @@ const watchdog = setTimeout(() => app.exit(1), 45000);
         const { AnnotationController } = await import(${JSON.stringify(modules)} + 'features/annotations/annotationController.js');
         const byId = id => document.getElementById(id);
         const elements = { bookPaper: byId('paper'), paperContainer: byId('container'), notesList: byId('list') };
-        let mode = 'double';
+        let mode = 'single';
         const reader = new ReaderController({ layoutController: {
-            getEffectiveReaderMode: () => mode, updateLayoutClasses() {}
+            getLayoutMode: () => mode, updateLayoutClasses() {}
         } });
         reader.elements = elements;
         const pages = [Array.from({length: 80}, (_, i) => '<p id="p' + i + '">第' + i + '段。选中文字之后创建笔记，应保持相同的换行、字距和阅读位置。English words for wrapping and typography verification.</p>').join('')];
@@ -54,11 +54,11 @@ const watchdog = setTimeout(() => app.exit(1), 45000);
             return boxes;
         };
         const checks = [];
-        for (mode of ['scroll', 'single', 'double']) {
+        for (mode of ['scroll', 'single']) {
             reader.setBook('layout', { format:'EPUB', readerFlow:'chapter', pages });
             reader.renderPage(1);
             if (mode === 'scroll') byId('reader-viewport').scrollTop = 780;
-            else elements.bookPaper.scrollLeft = mode === 'double' ? 1264 : 1192;
+            else elements.bookPaper.scrollLeft = 560;
             reader.flowAnchorText = '';
             const source = byId('p20');
             const before = JSON.stringify(geometry());

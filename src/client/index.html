@@ -114,10 +114,7 @@
             <span>版式</span>
             <div class="reader-mode-group">
                 <button id="btn-mode-scroll" class="btn btn-icon-sm mode-choice" type="button" title="连续滚动">滚动</button>
-                <button id="btn-page-mode" class="btn btn-icon-sm mode-choice" type="button" title="切换单页 / 双页阅读模式 (快捷键: D)">
-                    <i class="ri-book-read-line" id="icon-page-mode"></i>
-                    <span id="text-page-mode">单页</span>
-                </button>
+                <button id="btn-mode-single" class="btn btn-icon-sm mode-choice" type="button" title="单页阅读">单页</button>
             </div>
         </div>
         <div class="appearance-row">
@@ -193,20 +190,13 @@
 
             <!-- Book Content Viewport -->
             <div class="reader-viewport" id="reader-viewport">
-                <!-- Book Paper Container (supports Single Page and Double Page Spread) -->
+                <!-- Reading page -->
                 <div class="paper-container" id="paper-container">
                     <!-- Left / Primary Book Page Paper Canvas -->
-                    <article class="book-paper book-paper-left" id="book-paper">
+                    <article class="book-paper" id="book-paper">
                         <!-- Content populated dynamically by JS -->
                     </article>
 
-                    <!-- Spread spine divider between left & right pages -->
-                    <div class="spread-spine" id="spread-spine"></div>
-
-                    <!-- Right / Secondary Book Page Paper Canvas (Double Page Spread) -->
-                    <article class="book-paper book-paper-right" id="book-paper-right">
-                        <!-- Content populated dynamically by JS -->
-                    </article>
                 </div>
             </div>
 

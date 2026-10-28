@@ -1,6 +1,6 @@
 /* ==========================================================================
    Chapter column view - DOM layout for one EPUB chapter strip.
-   scroll: vertical strip. single: 1 column. double: 2 columns.
+   scroll: vertical strip. single: one column per screen.
    ========================================================================== */
 
 import {
@@ -20,7 +20,7 @@ export function clearChapterFlow(elements) {
     if (viewport) viewport.classList.remove('chapter-paged', 'chapter-scroll');
     if (elements.paperContainer) elements.paperContainer.classList.remove('chapter-flow');
     if (elements.bookPaper) {
-        elements.bookPaper.classList.remove('chapter-flow', 'mode-scroll', 'mode-single', 'mode-double');
+        elements.bookPaper.classList.remove('chapter-flow', 'mode-scroll', 'mode-single');
         elements.bookPaper.style.columnWidth = '';
         elements.bookPaper.style.columnGap = '';
         elements.bookPaper.style.columnFill = '';
@@ -39,11 +39,8 @@ export function layoutChapterStrip(elements, mode) {
 
     viewport.classList.remove('chapter-paged', 'chapter-scroll');
     container.classList.add('chapter-flow');
-    container.classList.remove('spread-active');
     paper.classList.add('chapter-flow');
-    paper.classList.remove('mode-scroll', 'mode-single', 'mode-double');
-    if (elements.bookPaperRight) elements.bookPaperRight.style.display = 'none';
-    if (elements.spreadSpine) elements.spreadSpine.style.display = 'none';
+    paper.classList.remove('mode-scroll', 'mode-single');
 
     if (mode === 'scroll') {
         viewport.classList.add('chapter-scroll');
@@ -58,7 +55,7 @@ export function layoutChapterStrip(elements, mode) {
     }
 
     viewport.classList.add('chapter-paged');
-    paper.classList.add(mode === 'double' ? 'mode-double' : 'mode-single');
+    paper.classList.add('mode-single');
     const hostHeight = container.clientHeight || viewport.clientHeight;
     const hostWidth = container.clientWidth || viewport.clientWidth;
     paper.style.boxSizing = 'border-box';
@@ -70,7 +67,6 @@ export function layoutChapterStrip(elements, mode) {
     paper.style.columnFill = 'auto';
     paper.style.columnWidth = `${metrics.colWidth}px`;
     paper.style.columnGap = `${metrics.gap}px`;
-    balanceDoubleTail(paper, mode);
     return { mode, metrics, hostWidth, hostHeight };
 }
 
@@ -111,14 +107,11 @@ export function placeSentenceAtTopLeft(root, viewport, sentence, mode) {
         return true;
     }
     if (isDocumentStart(root, pos.node, pos.offset)) {
-        balanceDoubleTail(root, mode);
         root.scrollLeft = 0;
         return true;
     }
     const block = insertColumnBreak(root, pos.node, pos.offset);
     if (!block) return false;
-    pushSentenceToLeftColumn(root, block, mode);
-    balanceDoubleTail(root, mode);
     snapBlockToScreen(root, block, mode);
     return true;
 }
@@ -230,8 +223,7 @@ export function writeChapterIndicator(elements, mode) {
         total = contentTotal;
         current = columnFromScroll(paper.scrollLeft, metrics.stride, contentTotal);
         if (current > contentTotal) current = contentTotal;
-        const right = current + metrics.columns - 1;
-        label = (mode === 'double' && right > current && right <= contentTotal) ? `${current}–${right}` : String(current);
+        label = String(current);
         if (elements.pageUnit) elements.pageUnit.textContent = '栏';
     }
     elements.currentPageSpan.textContent = label;
@@ -339,7 +331,6 @@ function isDocumentStart(root, node, offset) {
 
 function contentColumnCount(paper, metrics) {
     let total = countColumns(paper.scrollWidth, metrics.stride);
-    if (paper.querySelector('.flow-tail') && total > 1 && total % 2 === 0) total -= 1;
     return Math.max(1, total);
 }
 
@@ -396,22 +387,6 @@ function liftToColumnChild(paper, textNode) {
     return node;
 }
 
-function pushSentenceToLeftColumn(paper, block, mode) {
-    if (mode !== 'double' || !block || !block.parentNode) return;
-    const metrics = columnMetrics(paper.clientWidth, mode);
-    const stride = Math.max(1, metrics.stride);
-    const rect = block.getBoundingClientRect();
-    const host = paper.getBoundingClientRect();
-    const contentX = paper.scrollLeft + rect.left - host.left;
-    const zeroBased = Math.max(0, Math.round(contentX / stride));
-    if (zeroBased % 2 === 0) return;
-    if (block.previousElementSibling && block.previousElementSibling.classList.contains('flow-pad')) return;
-    const pad = document.createElement('div');
-    pad.className = 'flow-pad';
-    pad.setAttribute('aria-hidden', 'true');
-    block.parentNode.insertBefore(pad, block);
-}
-
 function snapBlockToScreen(paper, block, mode) {
     const metrics = columnMetrics(paper.clientWidth, mode);
     const stride = Math.max(1, metrics.stride);
@@ -423,23 +398,5 @@ function snapBlockToScreen(paper, block, mode) {
 }
 
 function removeFlowBreak(root) {
-    root.querySelectorAll('.flow-break, .flow-tail, .flow-pad').forEach(node => node.remove());
     root.querySelectorAll('.flow-start').forEach(node => node.classList.remove('flow-start'));
-}
-
-function balanceDoubleTail(paper, mode) {
-    if (!paper) return;
-    paper.querySelectorAll('.flow-tail').forEach(node => node.remove());
-    if (mode !== 'double') {
-        delete paper.dataset.contentColumns;
-        return;
-    }
-    const metrics = columnMetrics(paper.clientWidth, mode);
-    const total = countColumns(paper.scrollWidth, metrics.stride);
-    paper.dataset.contentColumns = String(total);
-    if (total % 2 === 0) return;
-    const tail = document.createElement('div');
-    tail.className = 'flow-tail';
-    tail.setAttribute('aria-hidden', 'true');
-    paper.appendChild(tail);
 }

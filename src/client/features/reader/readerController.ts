@@ -7,7 +7,7 @@ import type { ReaderCallbacks, ChapterRenderOptions } from '../../app/contracts.
 import type { LayoutController } from '../layout/layoutController.js';
 /* ==========================================================================
    ReaderController - Reading Interaction & View Management Feature Controller
-   Authority owner of: currentPage, currentLeftPage, currentRightPage,
+   Authority owner of: currentPage,
    font & paper settings (fontSize, fontFamily, textIndent, paperTheme).
    Coordinates ReaderEngine, PaperRenderer, TocUI.
    ========================================================================== */
@@ -19,7 +19,7 @@ import { buildBookStructure, readingUnitForPage } from '../../infrastructure/boo
 import { resolveTargetPage, ensureTocHierarchy } from '../../domain/readingLocation.js';
 import { isChapterFlowBook } from '../../domain/chapterFlow.js';
 import {
-    renderPaperSpread,
+    renderPaper,
     applyHighlightsToPaper,
     scrollToAnchor as domScrollToAnchor,
     interceptInTextLinks
@@ -52,8 +52,6 @@ export class ReaderController {
     textIndent: string;
     paperTheme: string;
     currentPage: number;
-    currentLeftPage: number;
-    currentRightPage: number | null;
     totalPages: number;
     elements: AppElements | null;
     flowAnchorText: string;
@@ -79,8 +77,6 @@ export class ReaderController {
         this.paperTheme = 'white';
 
         this.currentPage = 1;
-        this.currentLeftPage = 1;
-        this.currentRightPage = null;
         this.totalPages = 1;
         this.elements = null;
         this.flowAnchorText = '';
@@ -108,8 +104,6 @@ export class ReaderController {
         this.bookStructure = buildBookStructure(bookObj);
         const loc = this.engine.getLocation();
         this.currentPage = loc.page;
-        this.currentLeftPage = loc.page;
-        this.currentRightPage = null;
         this.totalPages = loc.totalPages;
         this.flowAnchorText = '';
         this._flowPage = 0;
@@ -134,21 +128,13 @@ export class ReaderController {
         clearTimeout(this._anchorTimer);
         this.engine.setBook('', null);
         this.bookStructure = null; this.flowAnchorText = ''; this._flowPage = 0; this._volumeTitlePages = [];
-        this.currentPage = this.currentLeftPage = this.totalPages = 1; this.currentRightPage = null;
-        for (const paper of [this.elements?.bookPaper, this.elements?.bookPaperRight]) paper?.replaceChildren();
+        this.currentPage = this.totalPages = 1;
+        for (const paper of [this.elements?.bookPaper]) paper?.replaceChildren();
         if (this.elements?.currentBookTitle) this.elements.currentBookTitle.textContent = '未打开书籍';
         this.renderTOC([]);
     }
 
     closeTOC() { if (this.elements) domCloseTOC(this.elements); }
-
-    getCurrentLeftPage() {
-        return this.currentLeftPage;
-    }
-
-    getCurrentRightPage() {
-        return this.currentRightPage;
-    }
 
     getTotalPages() {
         return this.totalPages;
@@ -166,7 +152,7 @@ export class ReaderController {
         const elements = this.elements;
         if (!elements || typeof document === 'undefined') return new Set<string>();
         return collectVisibleAnnotationIds(
-            [elements.bookPaper, elements.bookPaperRight],
+            [elements.bookPaper],
             document.getElementById('reader-viewport')
         );
     }
@@ -187,10 +173,10 @@ export class ReaderController {
     }
 
     effectiveReaderMode() {
-        if (!this.layoutController || typeof this.layoutController.getEffectiveReaderMode !== 'function') {
+        if (!this.layoutController || typeof this.layoutController.getLayoutMode !== 'function') {
             return 'single';
         }
-        return this.layoutController.getEffectiveReaderMode();
+        return this.layoutController.getLayoutMode();
     }
 
     rememberAnchor() {
@@ -208,23 +194,12 @@ export class ReaderController {
         if (!preserveScroll) notes = this.callbacks.beforeNavigate?.() || notes;
         const loc = this.engine.goToPage(pageNum);
         this.currentPage = loc.page;
-        this.currentLeftPage = loc.page;
         this.totalPages = this.engine.getTotalPages();
 
-        const isDouble = this.layoutController ? this.layoutController.isDoublePageEffective() : false;
-        if (isDouble) {
-            const spread = this.engine.getSpreadPages(loc.page);
-            this.currentLeftPage = spread.leftPage;
-            this.currentRightPage = spread.rightPage;
-        } else {
-            this.currentRightPage = null;
-        }
-
         if (this.elements) {
-            renderPaperSpread({
+            renderPaper({
                 elements: this.elements,
                 readerEngine: this.engine,
-                layoutSystem: this.layoutController,
                 notes,
                 textIndent: this.textIndent,
                 preserveScroll,
@@ -254,16 +229,13 @@ export class ReaderController {
         const elements = this.elements;
         if (!elements) return;
         const viewport = elements.bookPaper?.ownerDocument.getElementById('reader-viewport');
-        const surfaces = [viewport, elements.bookPaper, elements.bookPaperRight].filter((node): node is HTMLElement => !!node);
+        const surfaces = [viewport, elements.bookPaper].filter((node): node is HTMLElement => !!node);
         const positions = surfaces.map(node => ({ node, left: node.scrollLeft, top: node.scrollTop }));
         if (elements.bookPaper) {
-            applyHighlightsToPaper(elements.bookPaper, this.currentLeftPage, notes);
+            applyHighlightsToPaper(elements.bookPaper, this.currentPage, notes);
             for (const title of elements.bookPaper.querySelectorAll<HTMLElement>('[data-volume-title-page]')) {
                 applyHighlightsToPaper(title, Number(title.dataset.volumeTitlePage), notes);
             }
-        }
-        if (!this.isChapterFlow() && elements.bookPaperRight && this.currentRightPage) {
-            applyHighlightsToPaper(elements.bookPaperRight, this.currentRightPage, notes);
         }
         for (const { node, left, top } of positions) {
             node.scrollLeft = left;
@@ -274,15 +246,13 @@ export class ReaderController {
 
     nextPage(notes: Annotation[] = []): ReadingLocation {
         if (this.isChapterFlow()) return this.stepChapter(1, notes);
-        const isDouble = this.layoutController ? this.layoutController.isDoublePageEffective() : false;
-        const loc = this.engine.nextPage(isDouble);
+        const loc = this.engine.nextPage();
         return this.renderPage(loc.page, false, notes);
     }
 
     prevPage(notes: Annotation[] = []): ReadingLocation {
         if (this.isChapterFlow()) return this.stepChapter(-1, notes);
-        const isDouble = this.layoutController ? this.layoutController.isDoublePageEffective() : false;
-        const loc = this.engine.prevPage(isDouble);
+        const loc = this.engine.prevPage();
         return this.renderPage(loc.page, false, notes);
     }
 
@@ -328,8 +298,7 @@ export class ReaderController {
 
     scrollToAnnotation(annotationId: string) {
         if (!this.elements || !annotationId) return null;
-        const token = findAnnotationToken(this.elements.bookPaper, annotationId)
-            || findAnnotationToken(this.elements.bookPaperRight, annotationId);
+        const token = findAnnotationToken(this.elements.bookPaper, annotationId);
         if (!token) return null;
         token.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return token;
@@ -477,7 +446,7 @@ export class ReaderController {
     applyTypography() {
         const elements = this.elements;
         if (!elements) return;
-        const papers = [elements.bookPaper, elements.bookPaperRight];
+        const papers = [elements.bookPaper];
         papers.forEach(paper => {
             if (!paper) return;
             paper.style.fontSize = `${this.fontSize}px`;
@@ -520,8 +489,6 @@ export class ReaderController {
         const loc = this.engine.goToPage(flow.page);
         this._volumeTitlePages = flow.prefixPages;
         this.currentPage = loc.page;
-        this.currentLeftPage = loc.page;
-        this.currentRightPage = null;
         this.totalPages = this.engine.getTotalPages();
         this.paintChapter(loc.page, notes);
         const anchorText = options.anchorText || (preserveScroll ? this.flowAnchorText : '');

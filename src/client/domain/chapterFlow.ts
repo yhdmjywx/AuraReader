@@ -46,18 +46,7 @@ export function sentenceSlice(text: string, index: number) {
 
 export function columnMetrics(viewWidth: number, mode: ReaderMode): ColumnMetrics {
     const width = Math.max(1, Math.floor(Number(viewWidth) || 1));
-    const columns = mode === 'double' ? 2 : 1;
-    let gap = columns === 2 ? 72 : 0;
-    if (gap >= width) gap = 0;
-    const colWidth = Math.max(1, Math.floor((width - gap) / columns));
-    const screenWidth = columns * colWidth + gap;
-    return {
-        columns,
-        gap,
-        colWidth,
-        stride: colWidth + (columns === 2 ? gap : 0),
-        screenWidth
-    };
+    return { columns: 1, gap: 0, colWidth: width, stride: width, screenWidth: width };
 }
 
 export function countColumns(scrollWidth: number, stride: number) {
@@ -73,18 +62,12 @@ export function columnFromScroll(scrollLeft: number, stride: number, total: numb
     return Math.max(1, Math.min(max, index));
 }
 
-// One screen shows `columns` columns, but the next screen starts after the gap
-// that follows the right column. That step is columns*stride, which is one gap
-// wider than the visible width. Scrolling by the visible width walks into the
-// middle of a column and shows a clipped third column.
 export function screenStep(metrics: ColumnMetrics) {
-    const columns = Math.max(1, Number(metrics && metrics.columns) || 1);
     const stride = Math.max(1, Number(metrics && metrics.stride) || 1);
-    return columns * stride;
+    return stride;
 }
 
 export function screenStartForColumn(columnIndex: number, metrics: ColumnMetrics) {
-    const per = Math.max(1, Number(metrics && metrics.columns) || 1);
-    const screenIndex = Math.floor((Math.max(1, Number(columnIndex) || 1) - 1) / per);
+    const screenIndex = Math.max(1, Number(columnIndex) || 1) - 1;
     return screenIndex * screenStep(metrics);
 }

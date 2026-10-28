@@ -843,28 +843,9 @@ body.theme-dark .export-backup-action i {
     height: auto;
     overflow: visible;
 }
-.flow-break,
-.flow-tail,
-.flow-pad,
 .flow-start {
     break-before: column;
     -webkit-column-break-before: always;
-}
-.flow-break,
-.flow-tail,
-.flow-pad {
-    display: block;
-    width: 0;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-}
-.flow-break {
-    height: 0;
-}
-.flow-tail,
-.flow-pad {
-    height: 100%;
 }
 
 .reader-pagination {
@@ -898,7 +879,7 @@ body.theme-dark .export-backup-action i {
     cursor: default;
 }
 
-/* Paper Container (Single vs Double Page Spread) */
+/* Reading page container */
 .paper-container {
     width: 100%;
     max-width: 780px;
@@ -907,123 +888,6 @@ body.theme-dark .export-backup-action i {
     align-items: stretch;
     margin: 0 auto;
     min-height: calc(100% - 16px);
-}
-
-.paper-container:not(.spread-active) .book-paper-right {
-    display: none !important;
-}
-
-.paper-container:not(.spread-active) .spread-spine {
-    display: none !important;
-}
-
-.paper-container.spread-active {
-    max-width: 1400px;
-    background-color: var(--bg-paper);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    box-shadow: var(--shadow-md);
-    position: relative;
-    overflow: hidden;
-}
-
-.paper-container.spread-active .book-paper {
-    flex: 1 1 0;
-    min-width: 0;
-    max-width: none;
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
-    min-height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.paper-container.spread-active .book-paper-left {
-    border-top-left-radius: 12px;
-    border-bottom-left-radius: 12px;
-    padding: 44px 38px 48px 52px;
-}
-
-.paper-container.spread-active .book-paper-right {
-    border-top-right-radius: 12px;
-    border-bottom-right-radius: 12px;
-    padding: 44px 52px 48px 38px;
-    display: flex;
-}
-
-/* Spread Spine Divider */
-.spread-spine {
-    display: none;
-    width: 14px;
-    flex-shrink: 0;
-    position: relative;
-    user-select: none;
-    background: linear-gradient(to right, 
-        rgba(0, 0, 0, 0.03) 0%, 
-        rgba(0, 0, 0, 0.10) 40%, 
-        rgba(0, 0, 0, 0.20) 50%, 
-        rgba(0, 0, 0, 0.10) 60%, 
-        rgba(0, 0, 0, 0.03) 100%
-    );
-    box-shadow: inset 1px 0 2px rgba(0, 0, 0, 0.05), inset -1px 0 2px rgba(0, 0, 0, 0.05);
-}
-
-.paper-container.spread-active .spread-spine {
-    display: block;
-}
-
-.reader-panel.paper-sepia .spread-spine {
-    background: linear-gradient(to right, 
-        rgba(100, 60, 20, 0.03) 0%, 
-        rgba(100, 60, 20, 0.12) 40%, 
-        rgba(80, 50, 15, 0.22) 50%, 
-        rgba(100, 60, 20, 0.12) 60%, 
-        rgba(100, 60, 20, 0.03) 100%
-    );
-    box-shadow: inset 1px 0 2px rgba(80, 50, 15, 0.08), inset -1px 0 2px rgba(80, 50, 15, 0.08);
-}
-
-body.theme-dark .spread-spine,
-.reader-panel.paper-dark .spread-spine {
-    background: linear-gradient(to right, 
-        rgba(255, 255, 255, 0.02) 0%, 
-        rgba(0, 0, 0, 0.45) 50%, 
-        rgba(255, 255, 255, 0.02) 100%
-    );
-    box-shadow: inset 1px 0 2px rgba(0, 0, 0, 0.4), inset -1px 0 2px rgba(0, 0, 0, 0.4);
-}
-
-.spread-blank-page {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 400px;
-    height: 100%;
-    color: var(--text-muted);
-    user-select: none;
-    padding: 40px 20px;
-    text-align: center;
-    opacity: 0.65;
-}
-
-.spread-blank-page i {
-    font-size: 38px;
-    margin-bottom: 12px;
-    color: var(--border-hover);
-}
-
-.spread-blank-title {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 6px;
-    color: var(--text-secondary);
-}
-
-.spread-blank-sub {
-    font-size: 13px;
-    color: var(--text-muted);
 }
 
 .book-paper {
@@ -1042,12 +906,12 @@ body.theme-dark .spread-spine,
 }
 
 /* Centered paged reading surface. Scroll mode keeps its existing geometry. */
-.workspace-container:is(.layout-single, .layout-double) .reader-panel {
+.workspace-container.layout-single .reader-panel {
     background-color: var(--bg-paper);
 }
 
-.workspace-container:is(.layout-single, .layout-double) .paper-container,
-.workspace-container:is(.layout-single, .layout-double) .book-paper {
+.workspace-container.layout-single .paper-container,
+.workspace-container.layout-single .book-paper {
     background: transparent;
     border: none;
     border-radius: 0;
@@ -1059,23 +923,9 @@ body.theme-dark .spread-spine,
     margin: 0 auto;
 }
 
-.workspace-container.layout-double .paper-container {
-    max-width: 1192px;
-    margin: 0 auto;
-}
-
-.workspace-container:is(.layout-single, .layout-double) .book-paper {
+.workspace-container.layout-single .book-paper {
     padding-left: 0;
     padding-right: 0;
-}
-
-/* Legacy spreads use two elements; EPUB chapter flow uses CSS columns. */
-.workspace-container.layout-double .paper-container.spread-active {
-    gap: 72px;
-}
-
-.workspace-container:is(.layout-single, .layout-double) .spread-spine {
-    display: none !important;
 }
 
 .book-paper h1, .book-paper h2, .book-paper h3 {

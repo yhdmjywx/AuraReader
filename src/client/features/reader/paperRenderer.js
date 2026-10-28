@@ -1,17 +1,16 @@
 /* ==========================================================================
    PaperRenderer - Canvas DOM Renderer for Reader (Feature Layer)
-   Handles single/double spread pages, center crease spine, highlight mounting,
+   Handles the reading page, highlight mounting,
    inline link interception, and smooth anchor scrolling.
    ========================================================================== */
 
 import { clearChapterFlow } from './chapterColumnView.js';
 import { renderAnnotationTokens } from './annotationRenderer.js';
 
-/** @param {import('../../app/contracts.js').PaperSpreadOptions} options */
-export function renderPaperSpread({
+/** @param {import('../../app/contracts.js').PaperOptions} options */
+export function renderPaper({
     elements,
     readerEngine,
-    layoutSystem,
     notes = [],
     textIndent = '2em',
     preserveScroll = false,
@@ -26,75 +25,21 @@ export function renderPaperSpread({
 
     const currentPage = readerEngine.getCurrentPage();
     const totalPages = readerEngine.getTotalPages();
-    const isDouble = (layoutSystem && typeof layoutSystem.isDoublePageEffective === 'function')
-        ? layoutSystem.isDoublePageEffective()
-        : false;
+    if (elements.currentPageSpan) elements.currentPageSpan.textContent = currentPage;
+    if (elements.totalPagesSpan) elements.totalPagesSpan.textContent = totalPages;
+    if (elements.pageUnit) elements.pageUnit.textContent = '页';
 
-    if (!isDouble) {
-        // SINGLE PAGE MODE
-        if (elements.currentPageSpan) elements.currentPageSpan.textContent = currentPage;
-        if (elements.totalPagesSpan) elements.totalPagesSpan.textContent = totalPages;
-        if (elements.pageUnit) elements.pageUnit.textContent = '页';
 
-        if (elements.bookPaperRight) elements.bookPaperRight.style.display = 'none';
-        if (elements.spreadSpine) elements.spreadSpine.style.display = 'none';
-        if (elements.paperContainer) elements.paperContainer.classList.remove('spread-active');
+    const htmlContent = readerEngine.getPageContent(currentPage);
 
-        const htmlContent = readerEngine.getPageContent(currentPage);
-
-        if (elements.bookPaper) {
-            elements.bookPaper.innerHTML = htmlContent;
-            elements.bookPaper.style.setProperty('--book-text-indent', textIndent);
-            applyHighlightsToPaper(elements.bookPaper, currentPage, notes);
-        }
-
-        if (elements.btnPrevPage) elements.btnPrevPage.disabled = (currentPage <= 1);
-        if (elements.btnNextPage) elements.btnNextPage.disabled = (currentPage >= totalPages);
-    } else {
-        // DOUBLE PAGE SPREAD MODE
-        const spread = readerEngine.getSpreadPages(currentPage);
-        const leftPage = spread.leftPage;
-        const rightPage = spread.rightPage;
-
-        if (elements.currentPageSpan) {
-            elements.currentPageSpan.textContent = String(spread.label).replace('-', '–');
-        }
-        if (elements.totalPagesSpan) elements.totalPagesSpan.textContent = totalPages;
-        if (elements.pageUnit) elements.pageUnit.textContent = '页';
-
-        if (elements.paperContainer) elements.paperContainer.classList.add('spread-active');
-        if (elements.spreadSpine) elements.spreadSpine.style.display = 'block';
-        if (elements.bookPaperRight) elements.bookPaperRight.style.display = 'block';
-
-        // Render Left Page
-        const leftHtml = readerEngine.getPageContent(leftPage);
-        if (elements.bookPaper) {
-            elements.bookPaper.innerHTML = leftHtml;
-            elements.bookPaper.style.setProperty('--book-text-indent', textIndent);
-            applyHighlightsToPaper(elements.bookPaper, leftPage, notes);
-        }
-
-        // Render Right Page
-        if (rightPage && rightPage <= totalPages) {
-            const rightHtml = readerEngine.getPageContent(rightPage);
-            if (elements.bookPaperRight) {
-                elements.bookPaperRight.innerHTML = rightHtml;
-                elements.bookPaperRight.style.setProperty('--book-text-indent', textIndent);
-                applyHighlightsToPaper(elements.bookPaperRight, rightPage, notes);
-            }
-        } else if (elements.bookPaperRight) {
-            elements.bookPaperRight.innerHTML = `
-                <div class="spread-blank-page">
-                    <i class="ri-book-open-line"></i>
-                    <span class="spread-blank-title">全书完</span>
-                    <p class="spread-blank-sub">已到达本书最后一页</p>
-                </div>
-            `;
-        }
-
-        if (elements.btnPrevPage) elements.btnPrevPage.disabled = (leftPage <= 1);
-        if (elements.btnNextPage) elements.btnNextPage.disabled = (leftPage + 1 >= totalPages);
+    if (elements.bookPaper) {
+        elements.bookPaper.innerHTML = htmlContent;
+        elements.bookPaper.style.setProperty('--book-text-indent', textIndent);
+        applyHighlightsToPaper(elements.bookPaper, currentPage, notes);
     }
+
+    if (elements.btnPrevPage) elements.btnPrevPage.disabled = (currentPage <= 1);
+    if (elements.btnNextPage) elements.btnNextPage.disabled = (currentPage >= totalPages);
 
     interceptInTextLinks(elements, readerEngine.getCurrentBook(), onLinkClick);
 
@@ -138,11 +83,7 @@ export function hideHighlightActionTooltip(elements) {
  * @param {import('../../domain/book.js').Book | null} currentBookObj
  * @param {((href: string) => void) | null} onLinkClick */
 export function interceptInTextLinks(elements, currentBookObj, onLinkClick) {
-    const linkSelector = (elements.bookPaperRight && elements.bookPaperRight.style.display !== 'none')
-        ? '#book-paper a[href], #book-paper-right a[href]'
-        : '#book-paper a[href]';
-
-    document.querySelectorAll(linkSelector).forEach(a => {
+    document.querySelectorAll('#book-paper a[href]').forEach(a => {
         const href = a.getAttribute('href');
         if (!href) return;
 
@@ -169,11 +110,6 @@ export function scrollToAnchor(anchor, elements) {
             || elements.bookPaper.querySelector(`[id*="${anchor}"]`)
         ) : null;
 
-        if (!targetEl && elements.bookPaperRight) {
-            targetEl = elements.bookPaperRight.querySelector(`#${CSS.escape(anchor)}`)
-                || elements.bookPaperRight.querySelector(`[name="${anchor}"]`)
-                || elements.bookPaperRight.querySelector(`[id*="${anchor}"]`);
-        }
 
         if (targetEl) {
             targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });

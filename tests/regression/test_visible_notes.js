@@ -138,7 +138,7 @@ const { JSDOM } = require('jsdom');
         assert.equal(annotations.getNotes().length, before);
 
         const reader = new ReaderController();
-        reader.elements = { bookPaper: paper, bookPaperRight: right };
+        reader.elements = { bookPaper: paper };
         assert.deepEqual([...reader.getVisibleAnnotationIds()], []);
         let changed = 0;
         reader.callbacks.onViewportChange = () => changed++;
@@ -153,7 +153,7 @@ const { JSDOM } = require('jsdom');
 
         const html = fs.readFileSync(path.join(__dirname, '../../src/client/index.html'), 'utf8');
         assert.ok(!html.includes('id="quick-note-input"') && !html.includes('id="btn-save-quick-note"'), '页面不再提供独立随笔输入框');
-        console.log('✅ 当前屏幕笔记：单双页、跨屏/跨行片段、滚动、范围切换、全书数据保留及引用约束全部通过');
+        console.log('✅ 当前屏幕笔记：单页、跨屏/跨行片段、滚动、范围切换、全书数据保留及引用约束全部通过');
     } finally {
         await storage?.drain();
         await storage?.close();

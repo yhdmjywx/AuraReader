@@ -95,7 +95,7 @@ const { createDataStore } = require('../../src/server/dataStore');
     await annotations.finishInlineEdit(); await annotations.assertInlineWritesSaved();
     page = 2; goals.selectGoal(parent); goals.updateReadingContext(); assert.equal(document.querySelectorAll('.goal-child').length, 1,'folder contents do not disappear on chapter changes');
     page = 1; goals.updateReadingContext(); assert.equal(document.querySelectorAll('.goal-child').length, 1);
-    mode = 'double'; goals.updateReadingContext(); assert.equal(elements.goalPanel.hidden, true);
+    mode = 'scroll'; goals.updateReadingContext(); assert.equal(elements.goalPanel.hidden, true);
     mode = 'single'; goals.updateReadingContext(); assert.equal(elements.goalPanel.hidden, false);
     goals.selectGoal(child); click('[aria-label="Unlink"]'); await goals.flush(); assert.equal(store.notes(['a']).filter(row => !row.deleted).length, 2);
     // The target belongs to the user's click, even if selection changes while

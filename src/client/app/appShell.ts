@@ -263,9 +263,6 @@ export class AppShell {
             } else if (e.key === 'ArrowRight') {
                 e.preventDefault();
                 if (this.callbacks.onNextPage) this.callbacks.onNextPage();
-            } else if (e.key === 'd' || e.key === 'D') {
-                e.preventDefault();
-                if (this.callbacks.onTogglePageMode) this.callbacks.onTogglePageMode();
             }
         });
 

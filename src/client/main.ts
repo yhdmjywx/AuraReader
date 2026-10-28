@@ -43,9 +43,7 @@ export function queryElements(): AppElements {
 
         // Reader Controls
         bookPaper: document.getElementById('book-paper'),
-        bookPaperRight: document.getElementById('book-paper-right'),
         paperContainer: document.getElementById('paper-container'),
-        spreadSpine: document.getElementById('spread-spine'),
         currentBookTitle: document.getElementById('current-book-title'),
         currentPageSpan: document.getElementById('current-page'),
         totalPagesSpan: document.getElementById('total-pages'),
@@ -53,9 +51,7 @@ export function queryElements(): AppElements {
         btnModeScroll: document.getElementById('btn-mode-scroll') as HTMLButtonElement | null,
         btnPrevPage: document.getElementById('btn-prev-page') as HTMLButtonElement | null,
         btnNextPage: document.getElementById('btn-next-page') as HTMLButtonElement | null,
-        btnPageMode: document.getElementById('btn-page-mode') as HTMLButtonElement | null,
-        textPageMode: document.getElementById('text-page-mode'),
-        iconPageMode: document.getElementById('icon-page-mode'),
+        btnModeSingle: document.getElementById('btn-mode-single') as HTMLButtonElement | null,
         fontFamilySelect: document.getElementById('font-family-select') as HTMLButtonElement | null,
         fontPicker: document.getElementById('font-picker'),
         fontMenu: document.getElementById('font-menu'),
@@ -173,8 +169,6 @@ export function bootstrapApp() {
     const selection = new SelectionController({
         callbacks: {
             getReadingContext: () => ({
-                currentLeftPage: reader.getCurrentLeftPage(),
-                currentRightPage: reader.getCurrentRightPage(),
                 currentPage: reader.getCurrentPage(),
                 chapterFlow: reader.isChapterFlow(),
                 sectionId: reader.getLocation().sectionId,
@@ -361,23 +355,7 @@ export function bootstrapApp() {
     layout.callbacks.beforeGeometryChange = () => { goals.finishInlineEdit().catch(() => {}); reader.rememberAnchor(); };
     layout.callbacks.onLayoutChange = (res) => {
         syncReaderLayout();
-        if (appShell) {
-            if (res.layoutMode === 'scroll') {
-                appShell.showToast('已切换为连续滚动');
-            } else if (res.layoutMode === 'double' && res.isAutoDowngraded) {
-                appShell.showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
-            } else {
-                appShell.showToast(res.layoutMode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
-            }
-        }
-    };
-    layout.callbacks.onResponsiveChange = (res) => {
-        syncReaderLayout();
-        if (res.isAutoDowngraded) {
-            appShell.showToast('可用空间不足，已自适应降级为单页展示');
-        } else {
-            appShell.showToast('可用空间充足，已自动恢复双页展开模式');
-        }
+        appShell.showToast(res.layoutMode === 'scroll' ? '已切换为连续滚动' : '已切换为单页阅读模式');
     };
     // 4. Initialize UI Listeners (Browser DOM only)
     if (typeof document !== 'undefined') {
@@ -395,13 +373,6 @@ export function bootstrapApp() {
             onOpenPanel: () => shelf.closeShelf(),
             onPrevPage: () => { if (!goals.page && !home?.active) reader.prevPage(annotations.getNotes()); },
             onNextPage: () => { if (!goals.page && !home?.active) reader.nextPage(annotations.getNotes()); },
-            onTogglePageMode: () => {
-                if (goals.page || home?.active) return;
-                const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
-                    ? elements.readerPanel.clientWidth
-                    : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
-                layout.togglePageMode(availWidth);
-            },
             onSwitchDemo: () => {
                 const nextKey = session.getCurrentBookId() === 'crisis-era' ? 'deep-work' : 'crisis-era';
                 coordinator.openBook(nextKey);
@@ -409,13 +380,8 @@ export function bootstrapApp() {
             onImportFile: (file) => coordinator.importBook(file),
             onWindowResize: (notify) => {
                 if (goals.page || home?.active) return;
-                const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
-                    ? elements.readerPanel.clientWidth
-                    : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
-                const resp = layout.checkResponsiveLayout(availWidth);
-                if (!resp || !resp.changed) {
-                    syncReaderLayout();
-                }
+
+                syncReaderLayout();
             }
         });
 
@@ -436,10 +402,7 @@ export function bootstrapApp() {
 
         // 5. Initial Execution & Mounting
         layout.updateLayoutClasses(elements);
-        const initWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
-            ? elements.readerPanel.clientWidth
-            : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
-        layout.checkResponsiveLayout(initWidth);
+
     }
 
     return {

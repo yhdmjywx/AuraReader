@@ -31,10 +31,4 @@ export interface ReadingLocation {
     sectionId: string;
     offset: number;
 }
-export interface SpreadPages {
-    leftPage: number;
-    rightPage: number | null;
-    isDouble: true;
-    label: string;
-}
-export type ReaderMode = 'single' | 'double' | 'scroll';
+export type ReaderMode = 'single' | 'scroll';

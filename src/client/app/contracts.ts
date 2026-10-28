@@ -13,8 +13,6 @@ export interface PendingSelection {
 }
 export interface ReadingContext {
     currentPage: number;
-    currentLeftPage?: number;
-    currentRightPage?: number | null;
     chapterFlow?: boolean;
     sectionId?: string;
     chapter?: string;
@@ -63,12 +61,10 @@ export interface SelectionCallbacks {
     onAnnotationActivated?: (context: ActiveAnnotationContext) => void;
     onClearFocus?: () => void;
 }
-export interface LayoutChange { layoutMode: ReaderMode; isAutoDowngraded: boolean; isDoubleEffective: boolean }
-export interface ResponsiveChange { changed: boolean; isAutoDowngraded: boolean; reason?: string }
+export interface LayoutChange { layoutMode: ReaderMode }
 export interface LayoutCallbacks {
     beforeGeometryChange?: () => void;
     onLayoutChange?: (change: LayoutChange) => void;
-    onResponsiveChange?: (change: ResponsiveChange) => void;
 }
 export interface FontCallbacks {
     getBook?: () => Book | null;
@@ -100,7 +96,6 @@ export interface ShellCallbacks {
     onOpenPanel?: () => void;
     onPrevPage?: () => void;
     onNextPage?: () => void;
-    onTogglePageMode?: () => void;
     onSwitchDemo?: () => void;
     onImportFile?: AsyncAction<[file: File]>;
     onWindowResize?: (notify: boolean) => void;
@@ -126,10 +121,9 @@ export interface NotesRenderOptions {
     onEdit?: ((note: Annotation) => void) | null;
     onDelete?: ((note: Annotation) => void) | null;
 }
-export interface PaperSpreadOptions {
+export interface PaperOptions {
     elements: import('./elements.js').AppElements;
     readerEngine: import('../domain/readerEngine.js').ReaderEngine;
-    layoutSystem?: import('../features/layout/layoutController.js').LayoutController | null;
     notes?: Annotation[];
     textIndent?: string;
     preserveScroll?: boolean;

@@ -16,7 +16,7 @@ const { JSDOM } = require('jsdom');
         const { showHighlightActionTooltip } = await import('../../dist/client/features/annotations/selectionTooltipUI.js');
         const byId = id => document.getElementById(id);
         const elements = {
-            readerPanel: byId('reader-panel'), bookPaper: byId('book-paper'), bookPaperRight: byId('book-paper-right'),
+            readerPanel: byId('reader-panel'), bookPaper: byId('book-paper'),
             selectionTooltip: byId('selection-tooltip'), highlightActionTooltip: byId('highlight-action-tooltip'),
             btnAddNote: byId('btn-add-note'), btnHlRemove: byId('btn-hl-remove'), btnNoteRemove: byId('btn-note-remove'),
             notesList: byId('notes-list'), emptyNotesState: byId('empty-notes-state'), workspaceContainer: byId('workspace-container')

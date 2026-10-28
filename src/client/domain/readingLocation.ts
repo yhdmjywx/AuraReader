@@ -1,7 +1,7 @@
-import type { ReadingLocation, SpreadPages, TocEntry } from './book.js';
+import type { ReadingLocation, TocEntry } from './book.js';
 /* ==========================================================================
    ReadingLocation - Pure Reading Position & Navigation Model (Domain Layer)
-   Zero DOM dependencies. Handles page boundary clamping, spread pagination,
+   Zero DOM dependencies. Handles page boundary clamping,
    chapter matching & internal link resolution.
    ========================================================================== */
 
@@ -29,21 +29,6 @@ export function createReadingLocation({
 export function clampPage(page: number | string, totalPages: number): number {
     const total = Math.max(1, totalPages || 1);
     return Math.max(1, Math.min(Number(page) || 1, total));
-}
-
-export function calcSpreadPages(currentPage: number, totalPages: number): SpreadPages {
-    const total = Math.max(1, totalPages || 1);
-    const validCurrent = clampPage(currentPage, total);
-    const leftPage = (validCurrent % 2 === 1) ? validCurrent : Math.max(1, validCurrent - 1);
-    const rightPage = leftPage + 1;
-    const hasRight = rightPage <= total;
-
-    return {
-        leftPage,
-        rightPage: hasRight ? rightPage : null,
-        isDouble: true,
-        label: hasRight ? `${leftPage}-${rightPage}` : `${leftPage}`
-    };
 }
 
 export function resolveTargetPage(href: string, hrefToPageMap: Record<string, number> = {}, currentPage = 1): number {

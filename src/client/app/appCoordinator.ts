@@ -305,22 +305,8 @@ export class AppCoordinator {
             return;
         }
 
-        const isDouble = this.layout ? this.layout.isDoublePageEffective() : false;
-        let needsRender = false;
-
+        const needsRender = this.reader.getCurrentPage() !== note.page;
         if (this.reader) {
-            if (isDouble) {
-                const currentLeft = this.reader.getCurrentLeftPage() || 1;
-                const currentRight = this.reader.getCurrentRightPage() || 2;
-                if (note.page !== currentLeft && note.page !== currentRight) {
-                    needsRender = true;
-                }
-            } else {
-                if (this.reader.getCurrentPage() !== note.page) {
-                    needsRender = true;
-                }
-            }
-
             if (needsRender) {
                 this.reader.renderPage(note.page, false, notes);
             }
@@ -377,19 +363,7 @@ export class AppCoordinator {
 
     changeReadingLayout(mode: ReaderMode) {
         if (!this.layout) return;
-        const width = (typeof document !== 'undefined' && document.getElementById('reader-panel'))
-            ? document.getElementById('reader-panel')!.clientWidth
-            : ((typeof window !== 'undefined') ? window.innerWidth : 1200);
-        const res = this.layout.setPageMode(mode, width);
-
-        if (this.shell) {
-            if (mode === 'double' && res.isAutoDowngraded) {
-                this.shell.showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
-            } else {
-                this.shell.showToast(mode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
-            }
-        }
-
+        this.layout.setPageMode(mode);
         this.reader.renderPage(this.reader.getCurrentPage(), true, this.annotations.getNotes());
     }
 }
