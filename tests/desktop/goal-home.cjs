@@ -19,7 +19,13 @@ const timer = setTimeout(() => app.exit(1), 85000);
     const capture = async name => {
         await wait("!document.getElementById('toast-msg').classList.contains('show')");
         // Match the existing desktop acceptance: DOM readiness precedes the first compositor frame.
-        await run(`(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await Promise.all(document.getAnimations().map(a=>a.finished));await new Promise(r=>requestAnimationFrame(r));})()`);
+        await run(`(async()=>{
+            const within=async(promise,phase)=>{let timer;try{await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Capture '+${JSON.stringify(name)}+' stalled: '+phase)),5000)})])}finally{clearTimeout(timer)}};
+            await within(document.fonts.ready,'fonts');
+            await within(new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),'initial frame');
+            await within(Promise.allSettled(document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).map(a=>a.finished)),'finite animations');
+            await within(new Promise(r=>requestAnimationFrame(r)),'final frame');
+        })()`);
         const image = await wc.capturePage(undefined,{stayAwake:true});assert.equal(image.isEmpty(),false);
         await fs.writeFile(path.join(output,name),image.toPNG());
     };
@@ -28,6 +34,7 @@ const timer = setTimeout(() => app.exit(1), 85000);
     await run("(async()=>{window.a=await import('./main.js')})()");
     assert.equal(await run('a.home.active'), true); assert.equal(live.books().filter(b => !b.deleted).length, 0, 'first launch does not silently install demo books');
     assert.equal(await run("document.getElementById('home-welcome').hidden"), false);
+    assert.equal(await run("document.getElementById('home-status').textContent"), '', 'healthy startup has no stale Goal warning');
     await capture('home-welcome.png');
     const pointer = async selector => {
         const position = await run(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing pointer target');e.scrollIntoView({block:'nearest'});const r=e.getBoundingClientRect(),x=Math.round(r.x+r.width/2),y=Math.round(r.y+r.height/2);if(!r.width||!r.height||!e.contains(document.elementFromPoint(x,y)))throw Error('Pointer target is not visible: '+${JSON.stringify(selector)});return {x,y};})()`);
@@ -45,9 +52,10 @@ const timer = setTimeout(() => app.exit(1), 85000);
         assert.equal(live.goalLibrary().value.goals.length, 0); assert.equal(live.books().filter(b => !b.deleted).length, 1);
         const bookId = await run('a.session.getCurrentBookId()');
         const loaded = once(wc, 'did-finish-load'); wc.reload(); await loaded; await wait("document.documentElement.dataset.desktopReady==='library'"); await run("(async()=>{window.a=await import('./main.js')})()");
-        assert.equal(await run('a.session.getCurrentBookId()'), bookId); assert.equal(live.books().filter(b => !b.deleted).length, 1);
+        assert.equal(await run('a.session.getCurrentBookId()'), ''); assert.equal(await run('a.home.active'), true); assert.equal(live.books().filter(b => !b.deleted).length, 1);
+        assert.equal(await run("document.getElementById('home-continue').hidden"), true);
         await pointer('.brand');await wait('a.home.active');assert.equal(await run("document.querySelectorAll('#home-books .goal-home-book').length"),1);await capture('home-import-first-library.png');
-        await fs.writeFile(path.join(output, 'home-import-results.json'), JSON.stringify({passed:true,checks:['import-first opens original reading without a Goal', 'restart uses saved book without inserting demos']}));
+        await fs.writeFile(path.join(output, 'home-import-results.json'), JSON.stringify({passed:true,checks:['import-first opens original reading without a Goal', 'restart opens Home with saved books and no selected reading or inserted demos']}));
         console.log('Goal home import-first passed:', output);clearTimeout(timer);window.destroy();app.exit(0);return;
     }
     await click('home-start-goal'); await draft('What makes time feel different?\n自己的阅读意图');
@@ -77,6 +85,21 @@ const timer = setTimeout(() => app.exit(1), 85000);
     assert.equal(await run('a.goals.selected'), other); assert.equal(await run("document.getElementById('goal-sidebar').hidden"), false);
     assert.equal(await run("document.querySelector('#reading-workspace #home-books')"), null);
     await capture('home-existing-reader.png');
+    await run('a.reader.nextPage(a.annotations.getNotes())');
+    const readingPosition = await run("({book:a.session.getCurrentBookId(),goal:a.goals.selected,page:a.reader.getCurrentPage(),anchor:a.reader.rememberAnchor()})");
+    await pointer('.brand'); await wait('a.home.active'); await enter(parent);
+    assert.equal(await run('a.goals.selected'), other, 'Home browsing keeps the active reading intention');
+    await click('home-continue'); await wait("a.navigation.surface==='reader'");
+    assert.deepEqual(await run("({book:a.session.getCurrentBookId(),goal:a.goals.selected,page:a.reader.getCurrentPage(),anchor:a.reader.rememberAnchor()})"), readingPosition);
+    await wait("document.activeElement.id==='reader-panel'");
+    await pointer('#goal-expand'); await wait('a.goals.page'); await click('btn-goal-back'); await wait("a.navigation.surface==='reader'");
+    assert.deepEqual(await run("({book:a.session.getCurrentBookId(),goal:a.goals.selected,page:a.reader.getCurrentPage(),anchor:a.reader.rememberAnchor()})"), readingPosition);
+    await capture('home-resumed-reading.png');
+    await pointer('.brand'); await wait('a.home.active');
+    assert.equal(await run("(async()=> (await a.coordinator.openBook('missing-navigation-source',undefined,{goalId:null})).status)()"), 'failed');
+    assert.equal(await run('a.navigation.surface'), 'home'); assert.equal(await run('a.goals.selected'), other);
+    await wait("document.activeElement.id==='home-goal-title'"); await capture('home-open-failed.png');
+    await click('home-continue'); await wait("a.navigation.surface==='reader'");
     await run("(async()=>{a.goals.beginNew();a.goals.ui.editor.value='A question while reading';a.goals.updateDraft(a.goals.ui.editor.value);window.__newChild=a.goals.edit.draft.id;await a.goals.finishInlineEdit();a.goals.selectGoal(__newChild)})()");
     const child = await run('a.goals.selected'); assert.equal(await run('a.session.getCurrentBookId()'), 'a'); assert.equal(live.goalLibrary().value.bookLinks.length, 2);
     await pointer('.brand'); await wait('a.home.active');await enter(parent);await enter(other);await enter(child);await click('home-add-book');

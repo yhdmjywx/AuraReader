@@ -92,7 +92,7 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     const capture = async name => {
         await run(`(async () => {
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-            await Promise.all(document.getAnimations().map(animation => animation.finished));
+            await Promise.allSettled(document.getAnimations().map(animation => animation.finished));
             await new Promise(resolve => requestAnimationFrame(resolve));
         })()`);
         const image = await wc.capturePage(undefined, { stayAwake: true });
@@ -141,7 +141,10 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
         const frame = document.createElement('iframe'); frame.src = location.href; document.body.append(frame);
         const network = await blocked('http://127.0.0.1:8095/api/health');
         const file = await blocked('file:///C:/Windows/win.ini');
-        const permission = await new Promise(resolve => navigator.geolocation.getCurrentPosition(() => resolve('granted'), error => resolve(error.code)));
+        const permission = await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Geolocation denial probe did not settle')), 6000);
+            navigator.geolocation.getCurrentPosition(() => { clearTimeout(timer); resolve('granted'); }, error => { clearTimeout(timer); resolve(error.code); }, { timeout: 4000 });
+        });
         await new Promise(resolve => setTimeout(resolve, 100));
         frame.remove(); inline.remove();
         return { inline: window.__inlineProbe, network, file, permission, csp,
@@ -163,7 +166,8 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     wc.reload(); await loaded;
     await waitFor(`document.documentElement.dataset.desktopReady === 'library'`);
     assert.deepEqual(errors.slice(offlineErrors), []);
-    checks.push('offline reader reload through IPC without HTTP service');
+    assert.equal(await run("(async()=>{const a=await import('./main.js');return a.home.active && a.session.getCurrentBookId()===''})()"), true);
+    checks.push('offline reload opens Home through IPC without automatically selecting a book');
     const closeNoteId = await run(`(async () => {
         const app = await import('./main.js'); await app.coordinator.openBook('desktop-ipc');
         app.annotations.setNotesScope('book');

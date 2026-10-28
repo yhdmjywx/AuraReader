@@ -11,6 +11,7 @@ import { GoalUI } from './goalUI.js';
 import { GoalSidebar, positionGoals } from './goalLayout.js';
 import { goalBranch, goalEditable, operateGoal, type GoalArea, type GoalOperation } from '../../domain/goalLifecycle.js';
 import { GoalActions } from './goalActions.js';
+import { AppNavigation } from '../../app/navigation.js';
 export interface GoalCallbacks {
     getAnnotations(): Annotation[]; getLocation(): ReadingLocation; getMode(): string;
     showToast(message: string): void; jump(id: string, source?: GoalSourceLink): void | Promise<void>;
@@ -22,10 +23,10 @@ export class GoalController {
     state: GoalLibraryState = { goals: [], links: [] };
     selected: string | null = null; allGoals = true; itemsOpen = true;
     edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft; lastNonempty: string; previousTree: boolean } | null = null;
-    disabled = true; visible = false; page = false;
+    disabled = true; visible = false;
+    get page() { return this.navigation.surface === 'goal'; }
     elements: AppElements | null = null; ui: GoalUI | null = null; sidebar: GoalSidebar | null = null;
     private dirty = false; private serial = 0; private stagedSerial = -1;
-    private homeHidden = false;
     private linksInFlight = new Set<Promise<void>>(); private timer: ReturnType<typeof setTimeout> | null = null;
     private failure: unknown; private ready: Promise<void> | null = null;
     get saveError() { return this.failure; }
@@ -35,7 +36,8 @@ export class GoalController {
     undoChange: { before: Goal[]; after: Goal[]; message: string } | null = null;
     private actionUI: GoalActions | null = null;
     get actions() { return this.actionUI ||= new GoalActions(this); }
-    constructor(readonly callbacks: GoalCallbacks) {
+    constructor(readonly callbacks: GoalCallbacks, readonly navigation = new AppNavigation()) {
+        navigation.subscribe(() => { this.updateReadingContext(); this.callbacks.onSurfaceChanged?.(); });
         onGoalLibraryChanged(record => {
             if (record.deleted) return;
             if (this.dirty || pendingLibrary().length) { this.disabled = true; this.fail(Object.assign(new Error('Goal 数据已变化，未保存内容已保留；请重新载入处理冲突'), { status: 409 })); }
@@ -72,9 +74,25 @@ export class GoalController {
         if (elements.goalSidebar) this.sidebar = new GoalSidebar({ ...elements, btnGoals: elements.btnGoalSidebar }, () => this.updateReadingContext(), () => this.finishInlineEdit(), () => this.callbacks.onBeforeSidebarResize?.());
         elements.btnGoalBack?.addEventListener('click', () => { this.returnToReader().catch(() => {}); }); this.updateReadingContext();
     }
-    async openPage() { await this.callbacks.finishAnnotations(); if (this.edit || this.dirty) await this.finishInlineEdit(); await this.initialize(); this.callbacks.onEnterGoalPage?.(); this.callbacks.onBeforeSidebarResize?.(); this.page = true; this.updateReadingContext(); }
-    async returnToReader() { await this.finishInlineEdit(); this.useReadingSurface(); if (!this.callbacks.getLocation().bookId) this.callbacks.chooseBook?.(); }
-    useReadingSurface() { const wasPage = this.page; this.page = false; this.updateReadingContext(); if (wasPage) this.callbacks.onSurfaceChanged?.(); }
+    async openPage() {
+        const request = this.navigation.begin();
+        await this.callbacks.finishAnnotations(); await this.callbacks.annotationsSaved();
+        await this.assertWritesSaved(); await this.initialize();
+        if (!this.navigation.isCurrent(request)) return;
+        this.callbacks.onBeforeSidebarResize?.();
+        this.navigation.commit('goal', request);
+        this.callbacks.onEnterGoalPage?.();
+    }
+    async returnToReader() {
+        const request = this.navigation.begin();
+        await this.assertWritesSaved(); await this.callbacks.finishAnnotations(); await this.callbacks.annotationsSaved();
+        if (!this.navigation.isCurrent(request)) return;
+        if (this.navigation.returnTarget === 'home' || !this.callbacks.getLocation().bookId) {
+            if (this.callbacks.chooseBook) this.callbacks.chooseBook();
+            else this.navigation.commit('home', request);
+        } else this.navigation.commit('reader', request);
+    }
+    useReadingSurface() { this.navigation.show(this.callbacks.getLocation().bookId ? 'reader' : 'home'); }
     async bookChanged() { this.updateReadingContext(); await this.refreshMaterials(); }
     selectGoal(id: string) { if (!goalEditable(this.state, id)) return; this.endEdit(); this.selected = id; this.rememberSelection(); this.allGoals = false; this.itemsOpen = true; this.render(); }
     goHome() { this.endEdit(); this.selected = null; this.allGoals = true; this.rememberSelection(); this.render(); }
@@ -153,7 +171,6 @@ export class GoalController {
         this.persist({ ...this.state, bookLinks: (this.state.bookLinks || []).filter(l => l.goalId !== goalId || l.bookId !== bookId) });
         await this.flush(); this.render();
     }
-    setHomeHidden(hidden: boolean) { this.homeHidden = hidden; this.updateReadingContext(); }
     private fail(error: unknown) { if (this.failure !== error) this.callbacks.showToast(error instanceof Error ? error.message : 'Goal 尚未可靠保存，请保留页面'); this.failure = error; }
     canLink(id: string) { return !this.lifecycleBusy && !this.page && !this.allGoals && this.visible && !this.disabled && goalEditable(this.state, this.selected) && this.callbacks.getAnnotations().some(n => n.id === id); }
     linked(id: string) { return this.state.links.some(l => l.goalId === this.selected && l.annotationId === id); }
@@ -172,7 +189,7 @@ export class GoalController {
     }
     updateReadingContext() {
         const e = this.elements;
-        if (this.homeHidden && e) {
+        if (this.navigation.surface === 'home' && e) {
             if (e.readingWorkspace) e.readingWorkspace.hidden = true;
             if (e.goalPage) e.goalPage.hidden = true;
             if (e.btnToc) e.btnToc.hidden = true;
@@ -193,7 +210,7 @@ export class GoalController {
         const annotations = new Map(this.materials.map(n => [n.id, n])); this.callbacks.getAnnotations().forEach(n => annotations.set(n.id, n));
         return this.state.links.filter(link => link.goalId === goalId).map(link => ({ link, annotation: annotations.get(link.annotationId), title: this.titles.get(link.bookId) || link.bookId }));
     }
-    async jumpMaterial(source: GoalSourceLink) { this.goHome(); await this.callbacks.jump(source.annotationId, source); }
+    async jumpMaterial(source: GoalSourceLink) { await this.callbacks.jump(source.annotationId, source); }
     async operate(id: string, operation: GoalOperation) {
         if (this.lifecycleBusy || this.disabled) throw new Error('Goals are busy or unavailable');
         this.lifecycleBusy = true; this.render();

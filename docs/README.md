@@ -14,6 +14,8 @@
 
 ## 产品与技术实现
 
+- [统一首页与导航](home-navigation-verification-2026-10-28.md)：启动首页、选书与阅读 Goal 提交、返回阅读、删除／恢复落点，以及当前验收边界；[设计计划](home-navigation-change-plan-2026-10-28.md)。
+
 - [PRD](prd_v0_5.md)：产品定位、Goal 可选性、功能规格与验收要求。
 - [Goal 书籍模块](goal-books-implementation.md)：Library、书籍关联与文件夹式导航。
 - [跨书 Goal](goal-cross-book-implementation.md)：材料关联、数据与历史迁移。

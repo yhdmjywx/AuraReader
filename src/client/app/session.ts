@@ -18,6 +18,12 @@ export class Session {
         return this.currentBookId;
     }
 
+    clearBook() {
+        const previousBookId = this.currentBookId;
+        this.currentBookId = '';
+        this.notify({ currentBookId: '', previousBookId });
+    }
+
     setCurrentBookId(bookId: string) {
         if (!bookId || this.currentBookId === bookId) return;
         const prev = this.currentBookId;

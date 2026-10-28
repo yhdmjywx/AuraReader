@@ -1932,3 +1932,15 @@ mark.hl-active {
 .goal-lifecycle-notice button { flex:none; }
 .goal-lifecycle-notice [hidden] { display:none; }
 @media (max-width:560px) { .goal-home .home-heading { flex-wrap:wrap; } .home-goal-filters { width:100%; } .home-goal-filters input { flex:1; min-width:100px; } .goal-lifecycle-notice { flex-wrap:wrap; } }
+/* Startup stays independent of the reader, including the first desktop library setup. */
+.app-status { margin: auto; padding: 40px 24px; max-width: 640px; }
+#btn-shelf[hidden], #btn-export-markdown[hidden], #chapter-export-entry[hidden] { display: none !important; }
+#home-goal-title:focus, #reader-panel:focus, #goal-panel:focus { outline: none; }
+html[data-app-surface="loading"] .reading-workspace,
+html[data-app-surface="loading"] .goal-page,
+html[data-app-surface="loading"] .goal-home,
+html[data-app-surface="loading"] .app-header { display: none; }
+html[data-app-surface="home"] .header-center,
+html[data-app-surface="goal"] .header-center { visibility: hidden; }
+html[data-app-surface="home"] #appearance-panel .appearance-row:not(:last-child),
+html[data-app-surface="goal"] #appearance-panel .appearance-row:not(:last-child) { display: none; }

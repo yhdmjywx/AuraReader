@@ -87,6 +87,7 @@ console.log('=== AuraReader 章节纸条计算 ===');
     assert.strictEqual(rendered, 1, '章节分页渲染后必须触发 UI 分支的标注恢复回调');
 
     const { AppCoordinator } = await import('../../dist/client/app/appCoordinator.js');
+    const { Session } = await import('../../dist/client/app/session.js');
     const activated = [];
     const shown = [];
     const focused = [];
@@ -95,6 +96,7 @@ console.log('=== AuraReader 章节纸条计算 ===');
         { id: 'standalone-note', kind: 'note', page: 2, quote: '', comment: '独立笔记' }
     ];
     const coordinator = new AppCoordinator({
+        session: new Session('chapter-merge-test'),
         readerController: { isChapterFlow: () => true, showQuote: (...args) => shown.push(args) },
         annotationController: { getNotes: () => notes, focusNotes: ids => focused.push(ids) },
         selectionController: { activateAnnotationId: (...args) => activated.push(args) }

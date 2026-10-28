@@ -1,6 +1,5 @@
 import { GoalController } from './features/goals/goalController.js';
 import { GoalHome } from './features/goals/goalHome.js';
-import { getAllBooksFromDB } from './infrastructure/bookRepository.js';
 import { updateNoteGoalActions } from './features/annotations/notesUI.js';
 import type { AppElements } from './app/elements.js';
 import { errorMessage } from './infrastructure/storageError.js';
@@ -24,6 +23,7 @@ import { ShelfController } from './features/shelf/shelfController.js';
 import { BackupController } from './features/backup/backupController.js';
 import { AppShell } from './app/appShell.js';
 import { AppCoordinator } from './app/appCoordinator.js';
+import { AppNavigation } from './app/navigation.js';
 
 export function queryElements(): AppElements {
     if (typeof document === 'undefined') return {};
@@ -153,6 +153,7 @@ export function bootstrapApp() {
     const layout = new LayoutController();
     const session = new Session('');
     const appShell = new AppShell();
+    const navigation = new AppNavigation('home');
 
     const reader = new ReaderController({
         readerEngine,
@@ -204,7 +205,7 @@ export function bootstrapApp() {
         getMode: () => layout.getLayoutMode(), showToast: message => appShell.showToast(message),
         jump: (id, source) => source ? coordinator.jumpToGoalSource(source) : coordinator.jumpToAnnotation(id),
         finishAnnotations: () => annotations.finishInlineEdit(), annotationsSaved: () => annotations.assertInlineWritesSaved()
-    });
+    }, navigation);
 
     // 2. Create Central Coordinator
     const coordinator: AppCoordinator = new AppCoordinator({
@@ -216,7 +217,8 @@ export function bootstrapApp() {
         layoutController: layout,
         selectionController: selection,
         backupController: backup,
-        appShell
+        appShell,
+        navigation
     });
     const homeHost = typeof document !== 'undefined' ? document.getElementById('goal-home') : null;
     const home = homeHost ? new GoalHome(homeHost, {
@@ -231,8 +233,14 @@ export function bootstrapApp() {
         brand.addEventListener('click', openHome);
         brand.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openHome(); } });
     }
-    coordinator.onBookOpened = () => home?.leave();
-    goals.callbacks.onEnterGoalPage = () => home?.leave();
+    coordinator.onBookRemoved = async () => { await home?.open(); };
+    navigation.subscribe(surface => {
+        shelf.closeShelf(); reader.closeTOC(); appShell.closeAppearance(); appShell.closeExportPanel();
+        selection.hideSelectionTooltip(); selection.hideHighlightAction(); goals.actions.close(false);
+        appShell.setBookLoading(false);
+        if (elements.btnGoalBack) elements.btnGoalBack.setAttribute('aria-label', navigation.returnTarget === 'home' || !session.getCurrentBookId() ? 'Back to home' : 'Back to reading');
+        appShell.presentSurface(surface);
+    });
     goals.callbacks.openCollection = area => { if (home) void home.open().then(() => home.showArea(area)).catch(error => appShell.showToast(errorMessage(error, 'Could not open goals'))); };
 
     const goalAction = (id: string) => ({ visible: goals.visible, disabled: !goals.canLink(id) || goals.linked(id), linked: goals.linked(id) });
@@ -247,7 +255,7 @@ export function bootstrapApp() {
         home?.changed();
     };
     goals.callbacks.onBeforeSidebarResize = () => reader.rememberAnchor();
-    goals.callbacks.chooseBook = () => shelf.openShelf();
+    goals.callbacks.chooseBook = () => { void home?.open().catch(error => appShell.showToast(errorMessage(error, 'Could not open reading home'))); };
     goals.callbacks.onSurfaceChanged = () => requestAnimationFrame(() => appShell.callbacks.onWindowResize?.(false));
 
     // 3. Connect Cross-Module Callbacks
@@ -334,14 +342,10 @@ export function bootstrapApp() {
     };
 
     backup.callbacks.onRestoreBackup = async ({ data, importedBooksCount, importedNotesCount }) => {
-        if (data.books && data.books.length > 0 && data.books[0].id) {
-            await coordinator.openBook(data.books[0].id);
-        } else {
-            await coordinator.openBook('crisis-era');
-        }
+        if (data.books?.some(book => book.id === session.getCurrentBookId())) coordinator.clearReadingSession();
         await shelf.refreshShelf();
-        const activeTitle = reader.getCurrentBook() ? reader.getCurrentBook()?.title : '恢复图书';
-        appShell.showToast(`🎉 成功从备份恢复！已为您自动打开《${activeTitle}》，加载 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
+        await home?.open();
+        appShell.showToast(`成功从备份恢复 ${importedBooksCount} 本图书、${importedNotesCount} 条标注，请在首页选择书籍。`);
     };
     const finishReadingEdits = async () => { await goals.finishInlineEdit(); await annotations.finishInlineEdit(); await annotations.assertInlineWritesSaved(); await goals.assertWritesSaved(); };
     backup.callbacks.beforeRestore = finishReadingEdits;
@@ -450,6 +454,7 @@ export function bootstrapApp() {
         appShell,
         goals,
         home,
+        navigation,
         elements
     };
 }
@@ -467,14 +472,19 @@ export const {
     appShell,
     goals,
     home,
+    navigation,
     elements
 } = appInstance;
 
-let isStarted = false;
+let startup: Promise<ReturnType<typeof bootstrapApp>> | null = null;
 
-export async function startApp() {
-    if (isStarted) return appInstance;
-    isStarted = true;
+export function startApp(): Promise<ReturnType<typeof bootstrapApp>> {
+    if (startup) return startup;
+    startup = initializeApp().catch(error => { startup = null; throw error; });
+    return startup;
+}
+
+async function initializeApp() {
 
     try {
         localStorage.removeItem('aura_sync_secret');
@@ -486,7 +496,6 @@ export async function startApp() {
 
     try { await initDB(); }
     catch (error) {
-        isStarted = false;
         appInstance.appShell.showToast(errorMessage(error, '数据库迁移未完成，旧数据已保留'));
         console.error('数据库启动／迁移停止', error);
         throw error;
@@ -497,10 +506,18 @@ export async function startApp() {
         try { await appInstance.goals.recoverBookIntents(); }
         catch (error) { appInstance.appShell.showToast(errorMessage(error, 'Book association needs a retry in reading home')); }
     }
-    const books = await getAllBooksFromDB();
-    if (appInstance.home && !books.length) await appInstance.home.open();
-    else await appInstance.coordinator.openBook(books.find(b => b.id === 'crisis-era')?.id || books[0].id);
+    if (appInstance.home) await appInstance.home.open();
     return appInstance;
+}
+
+function showStartupError(error: unknown) {
+    const host = document.getElementById('app-status');
+    if (!host) return;
+    host.hidden = false;
+    const message = document.createElement('p'); message.textContent = errorMessage(error, '书库暂时不可用，请重试');
+    const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '重试';
+    retry.addEventListener('click', () => { retry.disabled = true; void startApp().catch(showStartupError); });
+    host.replaceChildren(message, retry);
 }
 
 if (typeof document !== 'undefined') {
@@ -508,10 +525,10 @@ if (typeof document !== 'undefined') {
         window.__AURA_BOOTSTRAPPED__ = true;
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', async () => {
-                await startApp().catch(() => {});
+                await startApp().catch(showStartupError);
             });
         } else {
-            startApp().catch(() => {});
+            startApp().catch(showStartupError);
         }
     }
 }

@@ -2,6 +2,7 @@ import { eventElement } from './dom.js';
 import { unwrapDesktop } from '../infrastructure/storageClient.js';
 import type { AppElements } from './elements.js';
 import type { ShellCallbacks } from './contracts.js';
+import type { AppSurface } from './navigation.js';
 /* ==========================================================================
    AppShell - Application Shell & Global Presentation / Input Dispatcher
    Authority owner of: appTheme ('light' | 'dark').
@@ -39,6 +40,28 @@ export class AppShell {
             panel.inert = loading;
             panel.setAttribute('aria-busy', String(loading));
         }
+    }
+
+    presentSurface(surface: AppSurface) {
+        if (typeof document === 'undefined') return;
+        document.documentElement.dataset.appSurface = surface;
+        const e = this.elements;
+        const home = document.getElementById('goal-home');
+        if (home) home.hidden = surface !== 'home';
+        if (e?.readingWorkspace) e.readingWorkspace.hidden = surface !== 'reader';
+        if (e?.goalPage) e.goalPage.hidden = surface !== 'goal';
+        for (const control of [e?.btnToc, e?.btnShelf]) if (control) control.hidden = surface !== 'reader';
+        for (const control of [e?.btnExportMarkdown, e?.chapterExportEntry]) if (control) control.hidden = surface !== 'reader';
+        const status = document.getElementById('app-status');
+        if (status) { status.hidden = true; status.replaceChildren(); }
+        const back = e?.btnGoalBack;
+        if (back) { back.title = back.getAttribute('aria-label') || '返回'; }
+        requestAnimationFrame(() => {
+            if (document.documentElement.dataset.appSurface !== surface || document.body.inert) return;
+            const target = surface === 'home' ? document.getElementById('home-goal-title')
+                : surface === 'goal' ? e?.goalPanel : e?.readerPanel;
+            if (target) { target.tabIndex = -1; target.focus({ preventScroll: true }); }
+        });
     }
 
     toggleAppTheme() {
@@ -210,6 +233,7 @@ export class AppShell {
 
         // Global Keyboard Shortcuts
         document.addEventListener('keydown', (e) => {
+            if (e.defaultPrevented || e.isComposing) return;
             if (e.key === 'Escape' && elements.exportPanel && elements.exportPanel.classList.contains('open')) {
                 e.preventDefault();
                 this.closeExportPanel();
@@ -230,6 +254,8 @@ export class AppShell {
                 this.closeAppearance();
                 return;
             }
+
+            if (document.documentElement.dataset.appSurface && document.documentElement.dataset.appSurface !== 'reader') return;
 
             if (e.key === 'ArrowLeft') {
                 e.preventDefault();

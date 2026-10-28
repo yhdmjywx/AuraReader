@@ -36,10 +36,11 @@ function gate(message: string, create = false) {
         try {
             if (create) unwrapDesktop(await bridge!.storage.createLibrary());
             await load();
-        } catch (error) { gate(error instanceof Error ? error.message : '本地书库不可用，原数据未清除'); }
+        } catch (error) { document.documentElement.dataset.desktopReady = 'error'; gate(error instanceof Error ? error.message : '本地书库不可用，原数据未清除'); }
     });
     panel.append(title, text, button);
-    document.getElementById('book-paper')?.replaceChildren(panel);
+    const host = document.getElementById('app-status');
+    if (host) { host.hidden = false; host.replaceChildren(panel); }
 }
 
 async function start() {

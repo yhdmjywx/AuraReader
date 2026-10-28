@@ -14,6 +14,7 @@ import type { AppShell } from './appShell.js';
 import type { ReaderMode } from '../domain/book.js';
 import type { NoteDraft } from './contracts.js';
 import { errorMessage } from '../infrastructure/storageError.js';
+import { AppNavigation } from './navigation.js';
 interface CoordinatorDependencies {
     goalController?: GoalController;
     session: Session;
@@ -24,7 +25,10 @@ interface CoordinatorDependencies {
     selectionController?: SelectionController;
     backupController?: BackupController;
     appShell?: AppShell;
+    navigation?: AppNavigation;
 }
+export type OpenBookResult = { status: 'opened' } | { status: 'superseded' } | { status: 'failed'; message: string };
+interface OpenBookOptions { goalId?: string | null; navigationRequest?: number; source?: GoalSourceLink }
 export type AnnotationDraft = NoteDraft & { type?: 'note' | 'highlight'; color?: string; comment?: string };
 /* ==========================================================================
    AppCoordinator - Cross-Module Task Coordinator
@@ -58,6 +62,8 @@ export class AppCoordinator {
     goals?: GoalController;
     private openBookRequestId: number;
     onBookOpened?: () => void;
+    onBookRemoved?: () => Promise<void>;
+    navigation: AppNavigation;
     constructor({
         session,
         readerController,
@@ -67,7 +73,8 @@ export class AppCoordinator {
         selectionController,
         backupController,
         appShell,
-        goalController
+        goalController,
+        navigation
     }: CoordinatorDependencies) {
         this.session = session;
         this.reader = readerController;
@@ -78,14 +85,18 @@ export class AppCoordinator {
         this.backup = backupController;
         this.shell = appShell;
         this.goals = goalController;
+        this.navigation = navigation || goalController?.navigation || new AppNavigation();
         this.openBookRequestId = 0;
     }
 
-    async openBook(bookId: string, sourceRequestId?: number) {
-        if (!bookId) return;
+    async openBook(bookId: string, sourceRequestId?: number, options: OpenBookOptions = {}): Promise<OpenBookResult> {
+        if (!bookId) return { status: 'failed', message: '请选择书籍' };
+        if (options.navigationRequest !== undefined && !this.navigation.isCurrent(options.navigationRequest)) return { status: 'superseded' };
         if (sourceRequestId === undefined) this.sourceRequest++;
-        else if (sourceRequestId !== this.sourceRequest) return;
+        else if (sourceRequestId !== this.sourceRequest) return { status: 'superseded' };
+        const navigationRequest = options.navigationRequest ?? this.navigation.begin();
         const requestId = ++this.openBookRequestId;
+        const current = () => requestId === this.openBookRequestId && this.navigation.isCurrent(navigationRequest);
         this.shell?.setBookLoading?.(true);
 
         try {
@@ -93,47 +104,60 @@ export class AppCoordinator {
             // the session. Reads below must not replace any current UI state.
             await this.goals?.finishInlineEdit();
             await this.annotations.finishInlineEdit();
-            if (requestId !== this.openBookRequestId) return;
+            await this.annotations.assertInlineWritesSaved?.();
+            await this.goals?.assertWritesSaved?.();
+            if (!current()) return { status: 'superseded' };
 
             let book = await loadBookFromDB(bookId);
-            if (requestId !== this.openBookRequestId) return;
+            if (!current()) return { status: 'superseded' };
             if (!book && demos[bookId]) {
                 book = { id: bookId, ...demos[bookId] };
                 await saveBookToDB(book);
-                if (requestId !== this.openBookRequestId) return;
+                if (!current()) return { status: 'superseded' };
                 // Factory examples are installed only when explicitly opened.
                 for (const note of (getSeedNotes() as StoredAnnotation[]).filter(note => note.bookId === bookId)) await saveNoteToDB(note);
-                if (requestId !== this.openBookRequestId) return;
+                if (!current()) return { status: 'superseded' };
             }
             if (!book) {
-                this.shell?.showToast('未能载入图书，请重新导入');
-                return;
+                throw new Error('未能载入图书，请重新导入');
             }
 
             const notes = await loadNotesForBook(bookId);
-            if (requestId !== this.openBookRequestId) return;
+            if (!current()) return { status: 'superseded' };
+            if (options.source && ((await bookVersion(bookId)).generation !== options.source.generation || !notes.some(n => n.id === options.source!.annotationId))) {
+                throw new Error('原文来源已删除或变化');
+            }
+            if (!current()) return { status: 'superseded' };
 
             // No await between installing the complete data and rendering it.
             // Session subscribers see the matching reader and annotations.
             this.annotations.setNotesForBook(notes);
             this.reader.setBook(bookId, book);
-            this.onBookOpened?.();
-            this.goals?.useReadingSurface();
+            if (options.goalId !== undefined) {
+                if (options.goalId) this.goals?.selectGoal(options.goalId);
+                else this.goals?.goHome();
+            }
             this.session.setCurrentBookId(bookId);
+            this.navigation.commit('reader', navigationRequest);
+            this.onBookOpened?.();
             this.reader.renderPage(1, false, this.annotations.getNotes());
             this.annotations.refreshVisibleNotes();
             this.goals?.bookChanged();
 
-            if (this.shelf) await this.shelf.refreshShelf();
+            try { await this.shelf?.refreshShelf(); }
+            catch (error) { this.shell?.showToast(errorMessage(error, '书籍已打开，书库列表暂时未能刷新')); }
             if (requestId === this.openBookRequestId) {
                 this.shell?.showToast(`已成功加载图书：《${book.title}》`);
             }
+            return { status: 'opened' };
         } catch (error) {
             // A superseded request may fail after the latest book has opened.
-            if (requestId === this.openBookRequestId) {
+            if (current()) {
                 console.error('图书载入失败:', error);
                 this.shell?.showToast(errorMessage(error, '图书载入失败，请重试'));
+                return { status: 'failed', message: errorMessage(error, '图书载入失败，请重试') };
             }
+            return { status: 'superseded' };
         } finally {
             if (requestId === this.openBookRequestId) this.shell?.setBookLoading?.(false);
         }
@@ -141,6 +165,7 @@ export class AppCoordinator {
 
     async importBook(file: File, targetGoalId?: string): Promise<string | undefined> {
         if (!file) return;
+        const navigationRequest = this.navigation.begin();
 
         if (this.shell) {
             this.shell.showToast(`正在导入图书: ${file.name}...`);
@@ -175,7 +200,8 @@ export class AppCoordinator {
                 catch (error) { throw new Error(`Book saved in the library. Goal association is pending: ${errorMessage(error, 'Please retry adding the book')}`); }
                 await this.shelf?.refreshShelf(); return bookObj.id;
             }
-            await this.openBook(bookObj.id);
+            const opened = await this.openBook(bookObj.id, undefined, { navigationRequest, ...(this.navigation.surface === 'home' ? { goalId: null } : {}) });
+            if (opened.status === 'failed') throw new Error(`书籍已入库，但未能打开：${opened.message}`);
 
             if (this.shell) {
                 this.shell.showToast(`成功解析并入库《${bookObj.title}》！`);
@@ -230,20 +256,33 @@ export class AppCoordinator {
 
     async jumpToGoalSource(source: GoalSourceLink) {
         const request = ++this.sourceRequest;
+        const navigationRequest = this.navigation.begin();
+        const fromHome = this.navigation.surface === 'home';
         await this.goals?.finishInlineEdit();
+        await this.annotations.finishInlineEdit(); await this.annotations.assertInlineWritesSaved();
+        await this.goals?.assertWritesSaved();
         await readBooks();
         const book = await bookVersion(source.bookId);
-        if (request !== this.sourceRequest) return;
+        if (request !== this.sourceRequest || !this.navigation.isCurrent(navigationRequest)) return;
         if (book.generation !== source.generation) { this.shell?.showToast('原文来源已删除或变化'); return; }
-        if (this.session.getCurrentBookId() !== source.bookId) await this.openBook(source.bookId, request);
-        if (request !== this.sourceRequest || this.session.getCurrentBookId() !== source.bookId) return;
-        if ((await bookVersion(source.bookId)).generation !== source.generation || request !== this.sourceRequest) { this.shell?.showToast('原文来源已变化'); return; }
+        if (this.session.getCurrentBookId() !== source.bookId) {
+            const result = await this.openBook(source.bookId, request, { navigationRequest, source, ...(fromHome ? { goalId: null } : {}) });
+            if (result.status !== 'opened') return;
+        }
+        if (request !== this.sourceRequest || !this.navigation.isCurrent(navigationRequest) || this.session.getCurrentBookId() !== source.bookId) return;
+        const latest = await bookVersion(source.bookId);
+        if (request !== this.sourceRequest || !this.navigation.isCurrent(navigationRequest)) return;
+        if (latest.generation !== source.generation) { this.shell?.showToast('原文来源已变化'); return; }
         if (!this.annotations.getNotes().some(n => n.id === source.annotationId)) { this.shell?.showToast('原文标注已不存在'); return; }
-        this.goals?.useReadingSurface(); this.jumpToAnnotation(source.annotationId);
+        if (fromHome) this.goals?.goHome();
+        this.navigation.commit('reader', navigationRequest); this.jumpToAnnotation(source.annotationId);
     }
     private sourceRequest = 0;
     jumpToAnnotation(annotationId: string, options: { showMenu?: boolean } = {}) {
         if (!this.annotations) return;
+        const request = this.navigation.request, bookId = this.session.getCurrentBookId();
+        const current = () => this.navigation.isCurrent(request) && this.navigation.surface === 'reader' && this.session.getCurrentBookId() === bookId;
+        if (!current()) return;
         const notes = this.annotations.getNotes();
         const note = notes.find(n => n.id === annotationId);
         if (!note) return;
@@ -260,7 +299,7 @@ export class AppCoordinator {
         if (this.reader && this.reader.isChapterFlow && this.reader.isChapterFlow()) {
             this.reader.showQuote(note.page, quote, notes);
             if (this.selection && typeof this.selection.activateAnnotationId === 'function') {
-                setTimeout(() => this.selection?.activateAnnotationId(note.id, { notify: false, showMenu }), 30);
+                setTimeout(() => { if (current()) this.selection?.activateAnnotationId(note.id, { notify: false, showMenu }); }, 30);
             }
             if (this.shell) this.shell.showToast(`跳转至第 ${note.page} 章原文所在位置`);
             return;
@@ -289,6 +328,7 @@ export class AppCoordinator {
             const scroll = this.reader.scrollToAnnotation || this.reader.scrollToHighlight;
             if (typeof scroll === 'function') {
                 setTimeout(() => {
+                    if (!current()) return;
                     scroll.call(this.reader, note.id);
                     if (this.selection && typeof this.selection.activateAnnotationId === 'function') {
                         this.selection.activateAnnotationId(note.id, { notify: false, showMenu });
@@ -306,14 +346,28 @@ export class AppCoordinator {
         if (!bookId) return;
         if (this.session.getCurrentBookId() === bookId) await this.annotations.finishInlineEdit?.();
         if (this.session.getCurrentBookId() === bookId) await this.goals?.finishInlineEdit();
+        if (this.session.getCurrentBookId() === bookId) {
+            await this.annotations.assertInlineWritesSaved(); await this.goals?.assertWritesSaved();
+        }
         await deleteBookFromDB(bookId);
         if (this.shelf) {
             await this.shelf.refreshShelf();
         }
 
         if (this.session.getCurrentBookId() === bookId) {
-            await this.openBook('crisis-era');
+            this.clearReadingSession();
+            if (this.onBookRemoved) await this.onBookRemoved();
+            else this.navigation.show('home');
         }
+    }
+
+    clearReadingSession() {
+        const request = this.navigation.begin(); this.openBookRequestId++; this.sourceRequest++;
+        this.shell?.setBookLoading(false);
+        this.annotations.setNotesForBook([]);
+        this.reader.clearBook();
+        this.session.clearBook();
+        this.navigation.commit('home', request);
     }
 
     async restoreBackup(file: File) {

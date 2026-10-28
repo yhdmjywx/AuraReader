@@ -18,6 +18,7 @@ const timer = setTimeout(() => app.exit(1), 30000);
     const files = JSON.parse(await fs.readFile(path.join(output, 'file-results.json'), 'utf8'));
     const persisted = await window.webContents.executeJavaScript(`(async () => {
         const a = await import('./main.js'); await a.reader.fonts.ready;
+        if (!a.home.active || a.session.getCurrentBookId() !== '') throw new Error('Restart must open Home without selecting a book');
         const books = await auraDesktop.storage.listBooks();
         return { books: books.value.records.map(r => r.id), fontId: a.reader.fonts.choice.id,
             failed: a.reader.fonts.failed, imported: a.reader.fonts.imported.map(f => f.id) };

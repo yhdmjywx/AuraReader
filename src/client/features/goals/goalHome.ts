@@ -23,7 +23,7 @@ function glyph(name: string) { const e = element('i', '', `ri-${name}`); e.setAt
 
 /** A separate reading-start surface. Existing GoalUI and reader DOM stay intact. */
 export class GoalHome {
-    active = false;
+    get active() { return this.deps.goals.navigation.surface === 'home'; }
     private books: Book[] = [];
     private chosen: string | null = null;
     private picking: string | null = null;
@@ -55,6 +55,11 @@ export class GoalHome {
     private query = '';
 
     constructor(readonly host: HTMLElement, readonly deps: HomeDependencies) {
+        deps.goals.navigation.subscribe(() => {
+            host.hidden = !this.active;
+            if (this.active) this.render();
+            else { this.request++; this.picking = null; }
+        });
         host.innerHTML = `
           <div class="goal-home-inner">
             <header class="goal-home-top"><nav aria-label="Goal location"><button id="home-root" class="home-icon" type="button" aria-label="Home" title="Home"><i class="ri-home-4-line" aria-hidden="true"></i></button><button id="home-up" class="home-icon" type="button" aria-label="Up one level" title="Up one level"><i class="ri-arrow-up-line" aria-hidden="true"></i></button><div id="home-path" class="home-path"></div></nav><button id="home-continue" class="home-resume" type="button"></button></header>
@@ -101,7 +106,11 @@ export class GoalHome {
         on('home-cancel-picker', () => { this.picking = null; this.render(); get('home-add-book').focus(); });
         on('home-import-book', () => { void this.chooseImport(this.picking || undefined); });
         on('home-cancel-goal', () => { this.clearDraft(); this.render(); (this.welcome.hidden ? get('home-new-goal') : get('home-start-goal')).focus(); });
-        on('home-continue', () => { this.leave(); deps.goals.useReadingSurface(); });
+        on('home-continue', () => { void this.perform(async () => {
+            const nav = deps.goals.navigation, request = nav.begin();
+            await deps.goals.assertWritesSaved(); await deps.finishAnnotations();
+            if (deps.currentBookId()) nav.commit('reader', request);
+        }); });
         on('home-retry', () => { void this.perform(async () => { await deps.goals.initialize(); await deps.goals.assertWritesSaved(); await deps.goals.recoverBookIntents(); this.picking = null; await this.refresh(); }); });
         this.form.addEventListener('submit', event => {
             event.preventDefault(); if (!this.draft.value.trim() || this.busy) { this.draft.focus(); return; }
@@ -158,13 +167,17 @@ export class GoalHome {
         if (this.active) await this.refresh().catch(() => {});
     }
     async open() {
-        await this.deps.goals.finishInlineEdit(); await this.deps.finishAnnotations();
-        this.deps.beforeOpen(); this.active = true; this.host.hidden = false; this.deps.goals.setHomeHidden(true);
-        this.area = 'library'; this.query = ''; this.filter = 'all';
-        this.chosen = this.form.hidden ? null : this.draftParent; await this.refresh();
+        const nav = this.deps.goals.navigation, request = nav.begin();
+        await this.deps.goals.assertWritesSaved(); await this.deps.finishAnnotations();
+        await this.refresh();
+        if (!nav.isCurrent(request)) return;
+        this.deps.beforeOpen();
+        this.area = 'library'; this.query = ''; this.filter = 'all'; this.picking = null;
+        this.chosen = this.form.hidden ? null : this.draftParent;
+        nav.commit('home', request);
         try { await this.deps.goals.recoverBookIntents(); } catch (error) { this.status.textContent = error instanceof Error ? error.message : 'Book association needs a retry'; this.render(); }
     }
-    leave() { if (!this.active) return; this.active = false; this.request++; this.picking = null; this.host.hidden = true; this.deps.goals.setHomeHidden(false); }
+    leave() { if (this.active && this.deps.currentBookId()) this.deps.goals.navigation.show('reader'); }
     async refresh() {
         const request = ++this.request;
         try { const books = await getAllBooksFromDB(); if (request !== this.request) return; this.books = books; this.render(); }
@@ -186,7 +199,7 @@ export class GoalHome {
         return [...new Set([...priority, ...this.books.map(b => b.id)])].map(id => this.books.find(b => b.id === id)).filter((b): b is Book => !!b);
     }
     private render() {
-        if (!this.active) return;
+        if (!this.active || this.host.hidden) return;
         const goals = this.deps.goals.state.goals;
         const state = this.deps.goals.state;
         if (!goals.some(g => g.id === this.chosen) || (this.chosen && goalArea(state, this.chosen) !== this.area)) this.chosen = null;
@@ -254,9 +267,8 @@ export class GoalHome {
             const open = action('', () => {
                 const goalId = this.chosen;
                 void this.perform(async () => {
-                    if (goalId && this.area === 'library') this.deps.goals.selectGoal(goalId);
-                    else this.deps.goals.goHome();
-                    await this.deps.coordinator.openBook(id);
+                    const result = await this.deps.coordinator.openBook(id, undefined, { goalId: goalId && this.area === 'library' ? goalId : null });
+                    if (result.status === 'failed') throw new Error(result.message);
                 });
             }, 'goal-home-book');
             const cover = element('span','','home-book-cover');cover.append(glyph('book-2-line'));

@@ -130,6 +130,18 @@ export class ReaderController {
         return this.currentPage;
     }
 
+    clearBook() {
+        clearTimeout(this._anchorTimer);
+        this.engine.setBook('', null);
+        this.bookStructure = null; this.flowAnchorText = ''; this._flowPage = 0; this._volumeTitlePages = [];
+        this.currentPage = this.currentLeftPage = this.totalPages = 1; this.currentRightPage = null;
+        for (const paper of [this.elements?.bookPaper, this.elements?.bookPaperRight]) paper?.replaceChildren();
+        if (this.elements?.currentBookTitle) this.elements.currentBookTitle.textContent = '未打开书籍';
+        this.renderTOC([]);
+    }
+
+    closeTOC() { if (this.elements) domCloseTOC(this.elements); }
+
     getCurrentLeftPage() {
         return this.currentLeftPage;
     }
