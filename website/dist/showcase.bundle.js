@@ -627,6 +627,7 @@ class AnnotationController {
         if (!note || id !== note.id || note.comment === comment)
             return;
         note.comment = comment;
+        this.callbacks.onAnnotationContentChanged?.(note);
         note.timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
         const exists = this.notes.some(item => item.id === id);
         if (!exists && !comment.trim())
@@ -761,6 +762,7 @@ class AnnotationController {
         await this.deleteHighlights([id]);
     }
     async deleteHighlights(ids = []) {
+        await this.callbacks.beforeDeleteAnnotations?.();
         const idSet = new Set(ids.filter(Boolean));
         const removed = this.notes.filter(n => idSet.has(n.id) && (0, annotationEngine_js_1.isHighlight)(n));
         if (removed.length === 0)
@@ -785,6 +787,7 @@ class AnnotationController {
         await this.deleteAnnotation(id, '已删除笔记');
     }
     async deleteAnnotation(id, toastMessage = '已删除标注') {
+        await this.callbacks.beforeDeleteAnnotations?.();
         if (!id)
             return;
         if (this.editingNoteId === id)
@@ -895,6 +898,8 @@ class AnnotationController {
         (0, notesUI_js_1.renderNotesList)({
             elements: this.elements,
             notes: sidebarNotes,
+            getGoalAction: this.callbacks.getGoalAction,
+            onLinkGoal: this.callbacks.onLinkGoal ? id => { Promise.resolve(this.callbacks.onLinkGoal?.(id)).catch(error => this.callbacks.showToast?.(String(error.message || error))); } : null,
             notesScope: this.notesScope,
             showHighlightsInSidebar: this.showHighlightsInSidebar,
             focusedNoteIds: this.focusedNoteIds,
@@ -1574,11 +1579,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.renderNotesList = renderNotesList;
 exports.highlightNoteCard = highlightNoteCard;
 exports.focusInlineEditor = focusInlineEditor;
+exports.updateNoteGoalActions = updateNoteGoalActions;
 const annotationEngine_js_1 = require("src/client/domain/annotationEngine.ts");
 const marginNotesLayout_js_1 = require("src/client/features/layout/marginNotesLayout.js");
 const noteCaret_js_1 = require("src/client/features/annotations/noteCaret.js");
 /** @param {import('../../app/contracts.js').NotesRenderOptions} options */
-function renderNotesList({ elements, notes = [], notesScope = 'page', showHighlightsInSidebar = false, focusedNoteIds = [], focusedHighlightIds = [], onJump = null, onEdit = null, onDelete = null, editingNoteId = null, onInput = null, onFinish = null }) {
+function renderNotesList({ elements, notes = [], notesScope = 'page', showHighlightsInSidebar = false, focusedNoteIds = [], focusedHighlightIds = [], onJump = null, onEdit = null, onDelete = null, editingNoteId = null, onInput = null, onFinish = null, getGoalAction = null, onLinkGoal = null }) {
     if (!elements || !elements.notesList)
         return;
     // Never detach the active textarea: autosave and reader refreshes must not
@@ -1688,7 +1694,7 @@ function renderNotesList({ elements, notes = [], notesScope = 'page', showHighli
             card.setAttribute('aria-label', highlight ? '高亮操作' : '关联正文的笔记');
         }
         card.addEventListener('click', (e) => {
-            if (e.target.closest('.btn-delete-note') || e.target.closest('.note-editor'))
+            if (e.target.closest('button') || e.target.closest('.note-editor'))
                 return;
             if (noteKind && typeof onEdit === 'function')
                 onEdit(note);
@@ -1711,6 +1717,15 @@ function renderNotesList({ elements, notes = [], notesScope = 'page', showHighli
                 if (typeof onDelete === 'function')
                     onDelete(note);
             });
+        }
+        if (onLinkGoal) {
+            const linkButton = document.createElement('button');
+            linkButton.className = 'btn btn-ghost-sm btn-goal-link';
+            linkButton.type = 'button';
+            linkButton.dataset.annotationId = note.id;
+            linkButton.innerHTML = '<i class="ri-links-line" aria-hidden="true"></i><span>Goal</span>';
+            linkButton.addEventListener('click', event => { event.stopPropagation(); onLinkGoal(note.id); });
+            card.querySelector('.note-card-actions').appendChild(linkButton);
         }
         elements.notesList.appendChild(card);
         if (note.id === editingNoteId)
@@ -1801,6 +1816,20 @@ function escapeHtml(str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+function updateNoteGoalActions(elements, getGoalAction) {
+    for (const control of elements?.notesList?.querySelectorAll('.btn-goal-link') || []) {
+        const state = getGoalAction?.(control.dataset.annotationId);
+        control.hidden = !state?.visible;
+        control.disabled = !state || state.disabled;
+        control.title = state?.linked ? 'Added to goal' : 'Add to goal';
+        control.setAttribute('aria-label', control.title);
+        control.classList.toggle('is-linked', !!state?.linked);
+        const label = control.querySelector('span');
+        if (label)
+            label.textContent = state?.linked ? 'Linked' : 'Goal';
+        control.querySelector('i').className = state?.linked ? 'ri-check-line' : 'ri-links-line';
+    }
 }
 
 },
@@ -2257,6 +2286,7 @@ class SelectionController {
         if (!target)
             return;
         this.activeAnnotationContext.targetElement = target;
+        this.refreshGoalAction();
         this.menuOpen = true;
         this.hideSelectionTooltip();
         (0, selectionTooltipUI_js_1.showHighlightActionTooltip)(this.elements, target, this.activeAnnotationContext);
@@ -2330,6 +2360,25 @@ class SelectionController {
             (0, selectionTooltipUI_js_1.showSelectionTooltip)(this.elements, rect);
         }
     }
+    refreshGoalAction() {
+        const control = this.elements?.btnAnnotationGoal;
+        if (!control)
+            return;
+        const context = this.activeAnnotationContext;
+        const ids = [...new Set([...(context?.highlightIds || []), ...(context?.noteIds || [])])];
+        const state = ids.length === 1 ? this.callbacks.getGoalAction?.(ids[0]) : undefined;
+        control.hidden = !state?.visible;
+        control.disabled = !state || state.disabled;
+        control.title = state?.linked ? 'Added to goal' : 'Add to goal';
+        control.setAttribute('aria-label', control.title);
+        control.classList.toggle('is-linked', !!state?.linked);
+        const label = control.querySelector('span');
+        if (label)
+            label.textContent = state?.linked ? 'Linked' : 'Goal';
+        const glyph = control.querySelector('i');
+        if (glyph)
+            glyph.className = state?.linked ? 'ri-check-line' : 'ri-links-line';
+    }
     initUI(elements) {
         this.elements = elements;
         if (!elements || typeof document === 'undefined')
@@ -2392,6 +2441,16 @@ class SelectionController {
                 }
             });
         }
+        elements.btnAnnotationGoal?.addEventListener('click', event => {
+            event.stopPropagation();
+            const context = this.activeAnnotationContext;
+            const ids = [...new Set([...(context?.highlightIds || []), ...(context?.noteIds || [])])];
+            if (ids.length !== 1 || elements.btnAnnotationGoal?.disabled)
+                return;
+            const result = this.callbacks.onLinkGoal?.(ids[0]);
+            this.clearAnnotationContext();
+            Promise.resolve(result).catch(error => console.error('Goal 归入失败', error));
+        });
         if (elements.btnHlRemove) {
             elements.btnHlRemove.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2927,7 +2986,7 @@ function sameIdList(left, right) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.readerTemplate = void 0;
-exports.readerTemplate = "<header class=\"app-header\">\n        <div class=\"header-side header-brand\">\n            <div class=\"brand\">\n                <i class=\"ri-book-open-fill brand-icon\"></i>\n                <span class=\"brand-name\">AuraReader</span>\n            </div>\n        </div>\n\n        <div class=\"header-center\">\n            <button id=\"btn-toc\" class=\"book-nav-btn\" type=\"button\" title=\"打开章节目录\" aria-disabled=\"true\" data-preview-only=\"\" tabindex=\"-1\">\n                <i class=\"ri-list-unordered\"></i>\n                <span id=\"current-book-title\" class=\"book-nav-title\">Alice's Adventures in Wonderland</span>\n                <i class=\"ri-arrow-down-s-line book-nav-caret\"></i>\n            </button>\n        </div>\n\n        <div class=\"header-side header-actions\">\n            <button id=\"btn-shelf\" class=\"btn btn-icon nav-icon\" type=\"button\" title=\"我的书库\" aria-haspopup=\"dialog\" aria-disabled=\"true\" data-preview-only=\"\" tabindex=\"-1\">\n                <i class=\"ri-book-shelf-line\"></i>\n                <span class=\"badge-count\" id=\"shelf-book-count\" hidden=\"\">0</span>\n            </button>\n            <button id=\"btn-appearance\" class=\"btn btn-icon nav-icon\" type=\"button\" title=\"视觉偏好\" aria-disabled=\"true\" data-preview-only=\"\" tabindex=\"-1\">\n                <i class=\"ri-palette-line\"></i>\n            </button>\n            <button id=\"btn-export-menu\" class=\"btn btn-icon nav-icon\" type=\"button\" title=\"导出与备份\" aria-label=\"导出与备份\" aria-expanded=\"false\" aria-controls=\"export-panel\">\n                <i class=\"ri-download-line\" aria-hidden=\"true\"></i>\n            </button>\n            <button id=\"btn-fullscreen\" class=\"btn btn-icon nav-icon\" type=\"button\" title=\"全屏阅读\" aria-disabled=\"true\" data-preview-only=\"\" tabindex=\"-1\">\n                <i class=\"ri-fullscreen-line\"></i>\n            </button>\n        </div>\n    </header><section id=\"export-panel\" class=\"export-panel\" role=\"dialog\" aria-labelledby=\"export-panel-title\" aria-hidden=\"true\">\n        <div class=\"export-panel-heading\">\n            <h2 id=\"export-panel-title\">导出与备份</h2>\n            <p>当前书籍 · <span id=\"export-book-title\">未打开书籍</span></p>\n        </div>\n        <h3 class=\"export-section-title\">导出</h3>\n        <button id=\"btn-export-markdown\" class=\"export-menu-action\" type=\"button\" data-export-action=\"\">\n            <i class=\"ri-file-text-line\" aria-hidden=\"true\"></i>\n            <span class=\"export-action-label\">笔记摘要</span><span class=\"export-extension\">.md</span>\n        </button>\n        <div id=\"chapter-export-entry\" class=\"chapter-export-entry\">\n            <button id=\"btn-export-chapters\" class=\"export-menu-action\" type=\"button\" aria-expanded=\"false\" aria-controls=\"chapter-export-options\">\n                <i class=\"ri-folder-download-line\" aria-hidden=\"true\"></i>\n                <span class=\"export-action-label\">按章节导出</span><span class=\"export-extension\">.md</span>\n            </button>\n            <div id=\"chapter-export-options\" class=\"chapter-export-options\" hidden=\"\">\n                <button id=\"btn-collapse-chapter-export\" class=\"chapter-export-back\" type=\"button\" aria-label=\"返回导出菜单\"><i class=\"ri-arrow-left-s-line\" aria-hidden=\"true\"></i>按章节导出</button>\n                <button id=\"btn-export-current-chapter\" class=\"chapter-export-range\" type=\"button\">当前章节</button>\n                <button id=\"btn-export-all-chapters\" class=\"chapter-export-range\" type=\"button\">全部章节</button>\n                <button id=\"btn-select-chapters\" class=\"chapter-export-range\" type=\"button\" aria-expanded=\"false\" aria-controls=\"chapter-export-custom\">选择章节<i class=\"ri-arrow-right-s-line\" aria-hidden=\"true\"></i></button>\n                <div id=\"chapter-export-custom\" hidden=\"\">\n                    <div id=\"chapter-export-list\" class=\"chapter-export-list\" role=\"group\" aria-label=\"选择需要导出的章节\"></div>\n                    <div class=\"chapter-export-actions\">\n                        <button id=\"btn-cancel-chapter-export\" class=\"btn btn-ghost-sm\" type=\"button\">取消</button>\n                        <button id=\"btn-confirm-chapter-export\" class=\"btn btn-primary\" type=\"button\" disabled=\"\">导出</button>\n                    </div>\n                </div>\n            </div>\n        </div>\n        <hr class=\"export-panel-divider\">\n        <h3 class=\"export-section-title\">书籍备份与恢复</h3>\n        <button id=\"btn-export-full-backup\" class=\"export-menu-action export-backup-action\" type=\"button\" data-export-action=\"\">\n            <i class=\"ri-archive-line\" aria-hidden=\"true\"></i>\n            <span class=\"export-action-label\">导出书籍备份</span><span class=\"export-extension\">.aurabackup</span>\n        </button>\n        <button id=\"btn-import-full-backup\" class=\"export-menu-action export-backup-action\" type=\"button\" data-export-action=\"\">\n            <i class=\"ri-upload-line\" aria-hidden=\"true\"></i>\n            <span class=\"export-action-label\">从备份恢复书籍</span>\n        </button>\n        <p class=\"export-panel-note\">每本书一个备份文件 · 包含高亮与笔记</p>\n        <input type=\"file\" id=\"backup-file-input\" accept=\".aurabackup,.json\" hidden=\"\">\n    </section><main class=\"workspace-container immersive-notes layout-single\" id=\"workspace-container\"><section class=\"reader-panel\" id=\"reader-panel\"><div class=\"reader-viewport\" id=\"reader-viewport\"><div class=\"paper-container\" id=\"paper-container\"><article class=\"book-paper book-paper-left\" id=\"book-paper\"></article></div></div><div class=\"selection-tooltip\" id=\"selection-tooltip\">\n                <button class=\"tooltip-btn hl-yellow\" data-color=\"yellow\" title=\"高亮标记\"><i class=\"ri-mark-pen-line\"></i> 高亮</button>\n                <button class=\"tooltip-btn\" id=\"btn-add-note\" title=\"添加随笔\"><i class=\"ri-sticky-note-line\"></i> 笔记</button>\n            </div><div class=\"selection-tooltip\" id=\"highlight-action-tooltip\">\n                <button class=\"tooltip-btn\" id=\"btn-hl-remove\" type=\"button\" style=\"color: #fca5a5;\" title=\"只移除黄色高亮\"><i class=\"ri-delete-bin-line\"></i> 删除高亮</button>\n                <button class=\"tooltip-btn\" id=\"btn-note-remove\" type=\"button\" style=\"color: #fca5a5;\" title=\"只删除此处关联的笔记\"><i class=\"ri-delete-bin-line\"></i> <span>删除笔记</span></button>\n            </div></section><section class=\"notes-panel\" id=\"notes-panel\"><div class=\"notes-list\" id=\"notes-list\"><div class=\"empty-state\" id=\"empty-notes-state\"><p></p></div></div></section></main>";
+exports.readerTemplate = "<header class=\"app-header\">\n        <div class=\"header-side header-brand\">\n            <div class=\"brand\">\n                <i class=\"ri-book-open-fill brand-icon\"></i>\n                <span class=\"brand-name\">AuraReader</span>\n            </div>\n            <button id=\"btn-goal-sidebar\" class=\"btn btn-icon-sm\" type=\"button\" aria-label=\"Toggle goals sidebar\" hidden=\"\" aria-disabled=\"true\" data-preview-only=\"\" tabindex=\"-1\"><i class=\"ri-side-bar-line\" aria-hidden=\"true\"></i></button>\n        </div>\n\n        <div class=\"header-center\">\n            <button id=\"btn-toc\" class=\"book-nav-btn\" type=\"button\" title=\"打开章节目录\" aria-disabled=\"true\" data-preview-only=\"\" tabindex=\"-1\">\n                <i class=\"ri-list-unordered\"></i>\n                <span id=\"current-book-title\" class=\"book-nav-title\">Alice's Adventures in Wonderland</span>\n                <i class=\"ri-arrow-down-s-line book-nav-caret\"></i>\n            </button>\n        </div>\n\n        <div class=\"header-side header-actions\">\n            <button id=\"btn-shelf\" class=\"btn btn-icon nav-icon\" type=\"button\" title=\"我的书库\" aria-haspopup=\"dialog\" aria-disabled=\"true\" data-preview-only=\"\" tabindex=\"-1\">\n                <i class=\"ri-book-shelf-line\"></i>\n                <span class=\"badge-count\" id=\"shelf-book-count\" hidden=\"\">0</span>\n            </button>\n            <button id=\"btn-appearance\" class=\"btn btn-icon nav-icon\" type=\"button\" title=\"视觉偏好\" aria-disabled=\"true\" data-preview-only=\"\" tabindex=\"-1\">\n                <i class=\"ri-palette-line\"></i>\n            </button>\n            <button id=\"btn-export-menu\" class=\"btn btn-icon nav-icon\" type=\"button\" title=\"导出与备份\" aria-label=\"导出与备份\" aria-expanded=\"false\" aria-controls=\"export-panel\">\n                <i class=\"ri-download-line\" aria-hidden=\"true\"></i>\n            </button>\n            <button id=\"btn-fullscreen\" class=\"btn btn-icon nav-icon\" type=\"button\" title=\"全屏阅读\" aria-disabled=\"true\" data-preview-only=\"\" tabindex=\"-1\">\n                <i class=\"ri-fullscreen-line\"></i>\n            </button>\n        </div>\n    </header><section id=\"export-panel\" class=\"export-panel\" role=\"dialog\" aria-labelledby=\"export-panel-title\" aria-hidden=\"true\">\n        <div class=\"export-panel-heading\">\n            <h2 id=\"export-panel-title\">导出与备份</h2>\n            <p>当前书籍 · <span id=\"export-book-title\">未打开书籍</span></p>\n        </div>\n        <h3 class=\"export-section-title\">导出</h3>\n        <button id=\"btn-export-markdown\" class=\"export-menu-action\" type=\"button\" data-export-action=\"\">\n            <i class=\"ri-file-text-line\" aria-hidden=\"true\"></i>\n            <span class=\"export-action-label\">笔记摘要</span><span class=\"export-extension\">.md</span>\n        </button>\n        <div id=\"chapter-export-entry\" class=\"chapter-export-entry\">\n            <button id=\"btn-export-chapters\" class=\"export-menu-action\" type=\"button\" aria-expanded=\"false\" aria-controls=\"chapter-export-options\">\n                <i class=\"ri-folder-download-line\" aria-hidden=\"true\"></i>\n                <span class=\"export-action-label\">按章节导出</span><span class=\"export-extension\">.md</span>\n            </button>\n            <div id=\"chapter-export-options\" class=\"chapter-export-options\" hidden=\"\">\n                <button id=\"btn-collapse-chapter-export\" class=\"chapter-export-back\" type=\"button\" aria-label=\"返回导出菜单\"><i class=\"ri-arrow-left-s-line\" aria-hidden=\"true\"></i>按章节导出</button>\n                <button id=\"btn-export-current-chapter\" class=\"chapter-export-range\" type=\"button\">当前章节</button>\n                <button id=\"btn-export-all-chapters\" class=\"chapter-export-range\" type=\"button\">全部章节</button>\n                <button id=\"btn-select-chapters\" class=\"chapter-export-range\" type=\"button\" aria-expanded=\"false\" aria-controls=\"chapter-export-custom\">选择章节<i class=\"ri-arrow-right-s-line\" aria-hidden=\"true\"></i></button>\n                <div id=\"chapter-export-custom\" hidden=\"\">\n                    <div id=\"chapter-export-list\" class=\"chapter-export-list\" role=\"group\" aria-label=\"选择需要导出的章节\"></div>\n                    <div class=\"chapter-export-actions\">\n                        <button id=\"btn-cancel-chapter-export\" class=\"btn btn-ghost-sm\" type=\"button\">取消</button>\n                        <button id=\"btn-confirm-chapter-export\" class=\"btn btn-primary\" type=\"button\" disabled=\"\">导出</button>\n                    </div>\n                </div>\n            </div>\n        </div>\n        <hr class=\"export-panel-divider\">\n        <h3 class=\"export-section-title\">书籍备份与恢复</h3>\n        <button id=\"btn-export-full-backup\" class=\"export-menu-action export-backup-action\" type=\"button\" data-export-action=\"\">\n            <i class=\"ri-archive-line\" aria-hidden=\"true\"></i>\n            <span class=\"export-action-label\">导出书籍备份</span><span class=\"export-extension\">.aurabackup</span>\n        </button>\n        <button id=\"btn-import-full-backup\" class=\"export-menu-action export-backup-action\" type=\"button\" data-export-action=\"\">\n            <i class=\"ri-upload-line\" aria-hidden=\"true\"></i>\n            <span class=\"export-action-label\">从备份恢复书籍</span>\n        </button>\n        <p class=\"export-panel-note\">每本书一个备份文件 · 包含高亮与笔记</p>\n        <input type=\"file\" id=\"backup-file-input\" accept=\".aurabackup,.json\" hidden=\"\">\n    </section><main class=\"workspace-container immersive-notes layout-single\" id=\"workspace-container\"><section class=\"reader-panel\" id=\"reader-panel\"><div class=\"reader-viewport\" id=\"reader-viewport\"><div class=\"paper-container\" id=\"paper-container\"><article class=\"book-paper book-paper-left\" id=\"book-paper\"></article></div></div><div class=\"selection-tooltip\" id=\"selection-tooltip\">\n                <button class=\"tooltip-btn hl-yellow\" data-color=\"yellow\" title=\"高亮标记\"><i class=\"ri-mark-pen-line\"></i> 高亮</button>\n                <button class=\"tooltip-btn\" id=\"btn-add-note\" title=\"添加随笔\"><i class=\"ri-sticky-note-line\"></i> 笔记</button>\n            </div><div class=\"selection-tooltip\" id=\"highlight-action-tooltip\">\n                <button class=\"tooltip-btn\" id=\"btn-hl-remove\" type=\"button\" style=\"color: #fca5a5;\" title=\"只移除黄色高亮\"><i class=\"ri-delete-bin-line\"></i> 删除高亮</button>\n                <button class=\"tooltip-btn\" id=\"btn-note-remove\" type=\"button\" style=\"color: #fca5a5;\" title=\"只删除此处关联的笔记\"><i class=\"ri-delete-bin-line\"></i> <span>删除笔记</span></button>\n                <button class=\"tooltip-btn\" id=\"btn-annotation-goal\" type=\"button\" hidden=\"\" aria-label=\"Add to goal\"><i class=\"ri-links-line\" aria-hidden=\"true\"></i><span>Goal</span></button>\n            </div></section><section class=\"notes-panel\" id=\"notes-panel\"><div class=\"notes-list\" id=\"notes-list\"><div class=\"empty-state\" id=\"empty-notes-state\"><p></p></div></div></section></main>";
 
 },
 "website/demo/export-preview.js":function(module,exports,require,localStorage){
@@ -3828,19 +3887,26 @@ function chapterBodyMarkdown(root, notes = []) {
     }
     return { markdown: children(root).trim(), unplacedNotes };
 }
-function exportSelectiveBackup({ selectedBooks = [], notes = [] }) {
+function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStates = [], goalGraphs, includeNotes = true }) {
     const normalizedNotes = (notes || []).map(annotationEngine_js_1.normalizeAnnotation).filter(Boolean);
     const exportedAt = new Date().toISOString();
     const yyyymmdd = exportedAt.slice(0, 10).replace(/-/g, '');
     const files = selectedBooks.map(book => {
         const backupPayload = {
-            version: "1.0",
+            version: goalGraphs ? "1.3" : "1.1",
             // Keep the existing envelope for compatibility with earlier readers.
             type: "aurareader_full_backup",
             exportedAt,
             books: [book],
-            notes: normalizedNotes.filter(note => note.bookId === book.id)
+            notes: normalizedNotes.filter(note => note.bookId === book.id),
+            goalStates: goalStates.filter(state => state.bookId === book.id).map(state => includeNotes
+                ? state : { bookId: state.bookId, goals: state.goals })
         };
+        if (goalGraphs) {
+            const graph = goalGraphs.get(book.id) || { goals: [], links: [], bookLinks: [] };
+            delete backupPayload.goalStates;
+            backupPayload.goalGraph = includeNotes ? graph : { goals: graph.goals, ...(graph.bookLinks !== undefined ? { bookLinks: graph.bookLinks } : {}) };
+        }
         const bookTitle = String(book.title || book.id || '图书')
             .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_');
         const fileName = `AuraReader_Backup_${bookTitle}_${yyyymmdd}.aurabackup`;
