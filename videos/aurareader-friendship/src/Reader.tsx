@@ -9,7 +9,10 @@ import {
   cursorVisible,
   Pointer,
 } from "./design";
+import pages from "./reading-pages.json";
+import { READING } from "./layout";
 export function Reader({ t, book }: { t: number; book: 0 | 1 }) {
+  const page = pages[book];
   const m = data.materials[book],
     start = book === 0 ? 11.55 : 18.7,
     select = book === 0 ? 12.25 : 20,
@@ -22,7 +25,8 @@ export function Reader({ t, book }: { t: number; book: 0 | 1 }) {
       (1 - tween(t, highlight, highlight + 0.2)),
     highlighted = tween(t, highlight, highlight + 0.4),
     typedNote = typed(m.note, t, note + 0.12, finish - 0.15),
-    quoteTop = book === 0 ? 593 : 519;
+    quoteTop = page.quoteTop;
+  const noteTop = quoteTop + 10;
   return (
     <div
       style={{
@@ -36,21 +40,19 @@ export function Reader({ t, book }: { t: number; book: 0 | 1 }) {
       <div
         style={{
           position: "absolute",
-          left: 552,
-          top: 395,
-          width: 800,
-          maxHeight: 485,
-          overflow: "hidden",
+          left: READING.left,
+          top: 180,
+          width: READING.width,
           color: C.ink,
         }}
       >
         <div
           style={{
-            fontSize: 17,
+            fontSize: 15,
             letterSpacing: 1.7,
             color: C.muted,
             textTransform: "uppercase",
-            marginBottom: 23,
+            marginBottom: 14,
           }}
         >
           {book === 0 ? "CHAPTER VIII" : "GOLDEN RULE NUMBER VII"}
@@ -58,75 +60,71 @@ export function Reader({ t, book }: { t: number; book: 0 | 1 }) {
         <div
           style={{
             fontFamily: serif,
-            fontSize: book === 0 ? 34 : 39,
+            fontSize: 30,
             fontWeight: 500,
             lineHeight: 1.35,
-            marginBottom: 34,
+            marginBottom: 20,
           }}
         >
           {book === 0
             ? "Anne’s Bringing-up Is Begun"
             : "The Art of Conversation"}
         </div>
-        {book === 0 && (
-          <div
-            style={{
-              fontFamily: serif,
-              fontSize: 22,
-              lineHeight: 1.65,
-              color: "#78818d",
-              marginBottom: 24,
-            }}
-          >
-            Anne tipped the vase of apple blossoms near enough to bestow a soft
-            kiss on a pink-cupped bud, and then studied diligently for some
-            moments longer.
-          </div>
-        )}
-        <div
-          style={{
-            fontFamily: serif,
-            fontSize: book === 0 ? 34 : 40,
-            lineHeight: 1.7,
-            color: C.ink,
-            marginBottom: 28,
-          }}
-        >
-          {m.before}
-          <span
-            style={{
-              background:
-                selection > 0
-                  ? `rgba(59,130,246,${selection * 0.28})`
-                  : `rgba(254,240,138,${highlighted * 0.75})`,
-              boxDecorationBreak: "clone",
-              padding: "3px 1px",
-              borderBottom:
-                t >= note ? "2px solid #d95353" : "2px solid transparent",
-            }}
-          >
-            {m.quote}
-          </span>
-          {m.after}
-        </div>
-        <div
-          style={{
-            fontFamily: serif,
-            fontSize: 27,
-            lineHeight: 1.7,
-            color: "#84909e",
-            marginBottom: 20,
-          }}
-        >
-          {m.nextParagraph}
-        </div>
+      </div>
+      <div
+        data-reading-body={book}
+        style={{
+          position: "absolute",
+          left: READING.left,
+          top: READING.top,
+          width: READING.width,
+          fontFamily: serif,
+          fontSize: READING.fontSize,
+          lineHeight: `${READING.lineHeight}px`,
+          color: C.ink,
+        }}
+      >
+        {page.paragraphs.map((paragraph, index) => {
+          const at = paragraph.indexOf(m.quote);
+          return (
+            <p
+              key={index}
+              data-reading-paragraph
+              style={{ margin: `0 0 ${READING.paragraphGap}px` }}
+            >
+              {at < 0 ? (
+                paragraph
+              ) : (
+                <>
+                  {paragraph.slice(0, at)}
+                  <span
+                    style={{
+                      background:
+                        selection > 0
+                          ? `rgba(59,130,246,${selection * 0.28})`
+                          : `rgba(254,240,138,${highlighted * 0.75})`,
+                      boxDecorationBreak: "clone",
+                      borderBottom:
+                        t >= note
+                          ? "2px solid #d95353"
+                          : "2px solid transparent",
+                    }}
+                  >
+                    {m.quote}
+                  </span>
+                  {paragraph.slice(at + m.quote.length)}
+                </>
+              )}
+            </p>
+          );
+        })}
       </div>
       {t > select && t < note && (
         <div
           style={{
             position: "absolute",
-            left: 870,
-            top: quoteTop - 62,
+            left: 885,
+            top: quoteTop - 54,
             display: "flex",
             alignItems: "center",
             gap: 22,
@@ -151,19 +149,19 @@ export function Reader({ t, book }: { t: number; book: 0 | 1 }) {
       <div
         style={{
           position: "absolute",
-          left: 1418,
-          top: book === 0 ? 582 : 514,
-          width: 300,
+          left: 1435,
+          top: noteTop,
+          width: 280,
           borderLeft: "1px solid #e5e6eb",
-          paddingLeft: 27,
+          paddingLeft: 25,
           opacity: tween(t, note, note + 0.3),
           translate: `0 ${tween(t, note, note + 0.45, 12, 0)}px`,
         }}
       >
         <div
           style={{
-            fontSize: 27,
-            lineHeight: 1.65,
+            fontSize: 24,
+            lineHeight: 1.6,
             color: "#66717e",
             minHeight: 100,
           }}
@@ -204,14 +202,14 @@ export function Reader({ t, book }: { t: number; book: 0 | 1 }) {
       <div
         style={{
           position: "absolute",
-          left: 550,
-          top: 916,
-          right: 160,
+          left: 700,
+          top: 982,
+          right: 150,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           color: "#86909c",
-          fontSize: 16,
+          fontSize: 13,
         }}
       >
         <Icon name="chevron" size={17} />
@@ -224,8 +222,8 @@ export function Reader({ t, book }: { t: number; book: 0 | 1 }) {
       </div>
       {t >= finish && t < link + 0.5 && (
         <Pointer
-          x={1450}
-          y={book === 0 ? 719 : 651}
+          x={1470}
+          y={noteTop + 130}
           click={t > link - 0.2 && t < link + 0.1}
           opacity={1 - tween(t, link + 0.2, link + 0.5)}
         />

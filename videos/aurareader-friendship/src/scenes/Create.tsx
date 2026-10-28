@@ -9,12 +9,12 @@ export const CreateScene = () => {
       <div
         style={{
           position: "absolute",
-          left: 410,
-          top: 666,
+          left: 540,
+          top: 590,
           display: "flex",
           gap: 23,
           alignItems: "center",
-          opacity: 1 - tween(t, 5.1, 5.5),
+          opacity: tween(t, 3.35, 3.65) * (1 - tween(t, 5.1, 5.5)),
         }}
       >
         <div
@@ -34,8 +34,8 @@ export const CreateScene = () => {
         <div
           style={{
             position: "absolute",
-            left: 228,
-            top: 371,
+            left: 445,
+            top: 176,
             color: C.action,
             display: "flex",
             gap: 23,
@@ -50,8 +50,8 @@ export const CreateScene = () => {
         <div
           style={{
             position: "absolute",
-            left: 230,
-            top: 592,
+            left: 445,
+            top: 390,
             color: C.muted,
             fontSize: 24,
             opacity: tween(t, 5.25, 5.8),
@@ -61,8 +61,8 @@ export const CreateScene = () => {
         </div>
       )}
       <Pointer
-        x={tween(t, 5.3, 5.95, 485, 830)}
-        y={tween(t, 5.3, 5.95, 698, 472)}
+        x={tween(t, 5.3, 5.95, 600, 930)}
+        y={tween(t, 5.3, 5.95, 618, 290)}
         click={(t > 5.06 && t < 5.24) || (t > 6 && t < 6.2)}
         opacity={tween(t, 4.85, 5.05) * (1 - tween(t, 6.5, 6.9))}
       />

@@ -196,6 +196,11 @@
         "annotationId": "remotion-friendship-conversation-note"
       }
     ],
-    "bookLinks": []
+    "bookLinks": [
+      {
+        "goalId": "remotion-friendship-goal",
+        "bookId": "remotion-friendship-conversation"
+      }
+    ]
   }
 }

@@ -45,7 +45,7 @@ function write(relative,data){const f=path.join(root,relative);fs.mkdirSync(path
   annotations.push(...own);books.push(book);match.body.ownerDocument.defaultView.close();
  }
  const makeGoal=text=>({id:goalId,parentId:null,text,origin:null,createdAt:stamp,updatedAt:stamp});
- function backup(book,phase){const included=phase==='clean'?[]:annotations.filter(a=>a.bookId===book.id);const hasGoal=phase!=='clean';return {version:'1.3',type:'aurareader_full_backup',exportedAt:stamp,books:[book],notes:included,goalGraph:{goals:hasGoal?[makeGoal(phase==='final'?evolved:initial)]:[],links:included.filter(a=>a.kind==='note').map(a=>({goalId,bookId:book.id,annotationId:a.id})),bookLinks:hasGoal&&book.id===books[0].id?[{goalId,bookId:book.id}]:[]}};}
+ function backup(book,phase){const included=phase==='clean'?[]:annotations.filter(a=>a.bookId===book.id);const hasGoal=phase!=='clean';return {version:'1.3',type:'aurareader_full_backup',exportedAt:stamp,books:[book],notes:included,goalGraph:{goals:hasGoal?[makeGoal(phase==='final'?evolved:initial)]:[],links:included.filter(a=>a.kind==='note').map(a=>({goalId,bookId:book.id,annotationId:a.id})),bookLinks:hasGoal?[{goalId,bookId:book.id}]:[]}};}
  for(let i=0;i<books.length;i++){write('imports/00-clean/'+definitions[i].key+'.aurabackup',backup(books[i],'clean'));write('imports/02-final/'+definitions[i].key+'.aurabackup',backup(books[i],'final'));}
  write('imports/01-after-anne/anne.aurabackup',backup(books[0],'after-a'));
  const demo={goalId,initialGoal:initial,evolvedGoal:evolved,durationSeconds:39,materials,sources,

@@ -1,0 +1,24 @@
+[
+  {
+    "bookId": "remotion-friendship-anne",
+    "title": "Anne of Green Gables",
+    "author": "L. M. Montgomery",
+    "file": "covers/anne.jpg",
+    "sourceEpub": "Anne of Green Gables.epub",
+    "sourceEntry": "OEBPS/8250992642682620366_cover.jpg",
+    "catalog": "https://www.gutenberg.org/ebooks/45",
+    "sha256": "e0e1b91a866adb18c933667b8bd3bb75bc8c071a37cff038153e9a56c71ca7d2",
+    "note": "Unmodified cover image declared in the preserved official EPUB. No third-party edition or generated replacement."
+  },
+  {
+    "bookId": "remotion-friendship-conversation",
+    "title": "The Art of Conversation: Twelve Golden Rules",
+    "author": "Josephine Turck Baker",
+    "file": "covers/conversation.jpg",
+    "sourceEpub": "The Art of Conversation - Twelve Golden Rules.epub",
+    "sourceEntry": "OEBPS/82048628547805570_cover.jpg",
+    "catalog": "https://www.gutenberg.org/ebooks/63995",
+    "sha256": "439dc8ea7b19a47ecdf6580de4e01eb5317df9f3aeff3f91712901830c76b951",
+    "note": "Unmodified cover image declared in the preserved official EPUB. No third-party edition or generated replacement."
+  }
+]

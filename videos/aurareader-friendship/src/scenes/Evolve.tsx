@@ -1,6 +1,7 @@
 import { useCurrentFrame, useVideoConfig } from "remotion";
-import { Canvas, C, Icon, Pointer, data, tween } from "../design";
+import { Canvas, C, Pointer, data, tween } from "../design";
 import { Reader } from "../Reader";
+import { BookCover } from "../BookCover";
 export const EvolveScene = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -13,9 +14,9 @@ export const EvolveScene = () => {
         <div
           style={{
             position: "absolute",
-            left: 1115,
-            top: 362,
-            width: 620,
+            left: 1040,
+            top: 142,
+            width: 700,
             padding: "23px 25px",
             background: "white",
             boxShadow: "0 12px 35px #00000020",
@@ -36,7 +37,7 @@ export const EvolveScene = () => {
               padding: "12px 0",
             }}
           >
-            <Icon name="book" color={C.blue} />
+            <BookCover index={0} width={40} height={60} />
             {data.materials[0].title}
           </div>
           <div
@@ -51,7 +52,7 @@ export const EvolveScene = () => {
               color: C.ink,
             }}
           >
-            <Icon name="book" color={C.blue} />
+            <BookCover index={1} width={40} height={60} />
             {data.materials[1].title}
           </div>
         </div>
@@ -59,12 +60,12 @@ export const EvolveScene = () => {
       {t < 19.45 && (
         <Pointer
           x={1390}
-          y={524}
+          y={328}
           click={t > 18.75 && t < 18.95}
           opacity={tween(t, 18.2, 18.5) * (1 - tween(t, 19.15, 19.45))}
         />
       )}
-      {t > 25.5 && t < 26 && <Pointer x={320} y={513} click={t > 25.7} />}
+      {t > 25.5 && t < 26 && <Pointer x={490} y={290} click={t > 25.7} />}
     </Canvas>
   );
 };

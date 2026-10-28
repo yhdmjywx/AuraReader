@@ -11,7 +11,7 @@ export const FriendshipFilm = () => {
   return (
     <Series>
       <Series.Sequence
-        name="01 · I have an idea"
+        name="01 · I want to make a new friend"
         durationInFrames={3 * fps}
         premountFor={fps}
       >
