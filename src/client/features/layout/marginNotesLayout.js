@@ -2,35 +2,30 @@
 // with the existing controllers and repositories.
 import { intersectVisibleRects } from '../reader/visibleAnnotations.js';
 
+// Two 560px columns, a 72px gap, and room for notes on both sides.
+export const DOUBLE_PAGE_MIN_WIDTH = 1612;
+
 export function marginGeometry(width, mode = 'single') {
     const w = Math.max(1, Number(width) || 1);
-    const double = mode === 'double';
-    const readingWidth = double ? 1192 : Math.min(560, Math.max(1, w - 32));
+    const double = mode === 'double' && w >= DOUBLE_PAGE_MIN_WIDTH;
+    let readingWidth = double ? 1192 : Math.min(560, Math.max(1, w - 32));
     let placement = 'right', noteWidth = 260, gap = 48;
     let readingLeft = (w - readingWidth) / 2;
     if (double) {
         gap = 24;
-        if (w >= 1612) {
-            placement = 'flanks';
-            noteWidth = Math.min(260, (w - 1260) / 2);
-        } else if (w >= 1424) {
-            noteWidth = Math.min(220, w - 1248);
-            readingLeft = (w - readingWidth - gap - noteWidth) / 2;
-        } else placement = 'bottom';
+        placement = 'flanks';
+        noteWidth = Math.min(260, (w - 1260) / 2);
     } else if (readingLeft + readingWidth + gap + noteWidth > w - 24) {
         gap = 32;
         noteWidth = 220;
+        // In narrow windows keep notes beside the text, without a bottom band.
+        readingWidth = Math.min(readingWidth, Math.max(1, w - 32 - gap - noteWidth));
         readingLeft = (w - readingWidth - gap - noteWidth) / 2;
-        if (readingLeft < 16) {
-            placement = 'bottom';
-            readingLeft = (w - readingWidth) / 2;
-        }
     }
     return {
         placement, readingWidth, readingLeft, noteWidth, gap,
         leftNoteLeft: readingLeft - gap - noteWidth,
-        rightNoteLeft: readingLeft + readingWidth + gap,
-        bandHeight: placement === 'bottom' ? 168 : 0
+        rightNoteLeft: readingLeft + readingWidth + gap
     };
 }
 
@@ -47,7 +42,6 @@ export function applyMarginGeometry(elements, mode) {
     workspace.style.setProperty('--reading-width', `${geometry.readingWidth}px`);
     workspace.style.setProperty('--reading-left', `${geometry.readingLeft}px`);
     workspace.style.setProperty('--reading-right', `${Math.max(0, width - geometry.readingLeft - geometry.readingWidth)}px`);
-    workspace.style.setProperty('--note-band-height', `${geometry.bandHeight}px`);
     workspace._marginGeometry = geometry;
 }
 
@@ -90,8 +84,8 @@ export function positionMarginNotes(elements) {
         elements.notesPanel.style.setProperty('--margin-note-color', paperStyle.getPropertyValue('--bg-paper-text').trim() || paperStyle.color);
     }
     const anchors = annotationAnchors(elements, view, bounds.left + geometry.readingLeft + geometry.readingWidth / 2);
-    const top = geometry.placement === 'bottom' ? view.bottom - bounds.top + 12 : view.top - bounds.top + 32;
-    const height = geometry.placement === 'bottom' ? 144 : Math.max(1, view.bottom - bounds.top - top - 32);
+    const top = view.top - bounds.top + 32;
+    const height = Math.max(1, view.bottom - bounds.top - top - 32);
     const lane = side => {
         let node = list.querySelector(`[data-margin-side="${side}"]`);
         if (!node) {
@@ -102,10 +96,9 @@ export function positionMarginNotes(elements) {
             node.setAttribute('aria-label', side === 'left' ? '左页笔记' : '当前可见正文的笔记');
             list.appendChild(node);
         }
-        const bottom = geometry.placement === 'bottom';
-        node.style.left = `${bottom ? 16 : side === 'left' ? geometry.leftNoteLeft : geometry.rightNoteLeft}px`;
+        node.style.left = `${side === 'left' ? geometry.leftNoteLeft : geometry.rightNoteLeft}px`;
         node.style.top = `${top}px`;
-        node.style.width = `${bottom ? Math.max(1, workspace.clientWidth - 32) : geometry.noteWidth}px`;
+        node.style.width = `${geometry.noteWidth}px`;
         node.style.height = `${height}px`;
         return node;
     };
@@ -130,10 +123,6 @@ export function positionMarginNotes(elements) {
             const pos = Math.max(bottom, Math.min(Math.max(0, y), Math.max(0, height - card.offsetHeight)));
             card.style.top = `${pos}px`;
             bottom = pos + card.offsetHeight + 24;
-        }
-        if (geometry.placement === 'bottom') {
-            // Flex order follows source order without moving an active node.
-            entries.forEach(({ card }, order) => card.style.order = String(order));
         }
     }
 }

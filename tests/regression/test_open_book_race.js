@@ -8,6 +8,8 @@ function deferred() {
 }
 
 (async () => {
+    const recoveryDOM = new JSDOM('', { url: 'http://localhost' });
+    global.localStorage = recoveryDOM.window.localStorage;
     const { configureStorage } = await import('../../dist/client/infrastructure/storageClient.js');
     const { AppCoordinator } = await import('../../dist/client/app/appCoordinator.js');
     const { Session } = await import('../../dist/client/app/session.js');
@@ -15,8 +17,8 @@ function deferred() {
     const { ReaderController } = await import('../../dist/client/features/reader/readerController.js');
     const { AnnotationController } = await import('../../dist/client/features/annotations/annotationController.js');
 
-    function harness() {
-        const gates = { books: [], notes: [] };
+    function harness(withGoals = false) {
+        const gates = { books: [], notes: [], goals: [] };
         const requests = [];
         const response = (value, status = 200) => ({ ok: status === 200, status, json: async () => value });
         const books = ['old', 'A', 'B'].map(id => ({
@@ -26,9 +28,9 @@ function deferred() {
         configureStorage({ sourceId: 'open-book-race-test', fetch: async (url, options = {}) => {
             if (url.endsWith('/session')) return response({ token: 'test' });
             if (url.endsWith('/migration/status')) return response({ completed: true });
-            const kind = url.endsWith('/books') ? 'books' : 'notes';
-            assert.ok(url.endsWith('/books') || url.endsWith('/notes/query'), `Unexpected request: ${url}`);
-            const bookId = kind === 'notes' ? JSON.parse(options.body).bookIds[0] : null;
+            const kind = url.endsWith('/books') ? 'books' : url.endsWith('/goals/query') ? 'goals' : 'notes';
+            assert.ok(url.endsWith('/books') || url.endsWith('/notes/query') || url.endsWith('/goals/query'), `Unexpected request: ${url}`);
+            const bookId = kind !== 'books' ? JSON.parse(options.body).bookIds[0] : null;
             requests.push({ kind, bookId });
             const index = gates[kind].findIndex(gate => kind === 'books' || gate.bookId === bookId);
             let result;
@@ -38,6 +40,7 @@ function deferred() {
                 result = await gate.result.promise;
             }
             if (result?.error) return response({ error: result.error }, 500);
+            if (kind === 'goals') return response({ records: [{ id: bookId, bookId, revision: 1, deleted: false, value: { bookId, goals: [], links: [] } }] });
             return response({ records: kind === 'books' ? books : [{
                 id: `note-${bookId}`, bookId, revision: 1,
                 value: { id: `note-${bookId}`, bookId, kind: 'note', page: 1, quote: bookId, comment: result?.comment || bookId }
@@ -49,6 +52,8 @@ function deferred() {
             return gate;
         };
         const session = new Session('old');
+        let goalBook = 'independent-goal';
+        const goals = { finishInlineEdit: async () => {}, useReadingSurface() {}, bookChanged: async () => {} };
         const annotations = new AnnotationController({ callbacks: { getCurrentBookId: () => session.getCurrentBookId() } });
         annotations.setNotesForBook([{ id: 'note-old', bookId: 'old', quote: 'old', comment: 'old' }]);
         const renders = [];
@@ -62,7 +67,7 @@ function deferred() {
             notes: annotations.getNotes().map(note => note.bookId)
         });
         const notifications = [];
-        session.subscribe(() => notifications.push(snapshot()));
+        session.subscribe(() => { if (withGoals) assert.equal(goalBook, 'independent-goal', 'book installation never replaces the selected Goal'); notifications.push(snapshot()); });
         const dom = new JSDOM('<main id="reader"></main><aside id="notes"></aside><button id="shelf">Shelf</button>');
         const shell = new AppShell();
         shell.elements = {
@@ -71,7 +76,7 @@ function deferred() {
         };
         const toasts = [];
         shell.showToast = message => toasts.push(message);
-        const coordinator = new AppCoordinator({ session, readerController: reader, annotationController: annotations, appShell: shell });
+        const coordinator = new AppCoordinator({ session, readerController: reader, annotationController: annotations, appShell: shell, ...(withGoals ? { goalController: goals } : {}) });
         const locked = () => {
             assert.equal(shell.elements.readerPanel.inert, true);
             assert.equal(shell.elements.notesPanel.inert, true);
@@ -81,7 +86,7 @@ function deferred() {
             assert.equal(shell.elements.readerPanel.inert, false);
             assert.equal(shell.elements.notesPanel.getAttribute('aria-busy'), 'false');
         };
-        return { coordinator, annotations, snapshot, notifications, renders, toasts, hold, requests, locked, unlocked, close: () => dom.window.close() };
+        return { coordinator, annotations, snapshot, notifications, renders, toasts, hold, requests, locked, unlocked, goalBook: () => goalBook, close: () => dom.window.close() };
     }
 
     // B opens while A's annotations are still in flight.
@@ -156,6 +161,15 @@ function deferred() {
         assert.equal(sameBook.renders.length, 1);
     } finally { sameBook.close(); }
 
+    const lateGoals = harness(true);
+    try {
+        const a = lateGoals.hold('notes', 'A');
+        const openingA = lateGoals.coordinator.openBook('A'); await a.started.promise;
+        await lateGoals.coordinator.openBook('B');
+        a.result.resolve(); await openingA;
+        assert.equal(lateGoals.goalBook(), 'independent-goal'); assert.equal(lateGoals.snapshot().book, 'B');
+    } finally { lateGoals.close(); }
+    recoveryDOM.window.close();
     const app = await import('../../dist/client/app.js');
     const originalOpen = app.appCoordinator.openBook;
     try {

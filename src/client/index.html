@@ -24,6 +24,7 @@
                 <i class="ri-book-open-fill brand-icon"></i>
                 <span class="brand-name">AuraReader</span>
             </div>
+            <button id="btn-goal-sidebar" class="btn btn-icon-sm" type="button" aria-label="Toggle goals sidebar" aria-expanded="true" aria-controls="goal-sidebar" hidden><i class="ri-side-bar-line" aria-hidden="true"></i></button>
         </div>
 
         <div class="header-center">
@@ -136,14 +137,25 @@
             <i class="ri-file-text-line" aria-hidden="true"></i>
             <span class="export-action-label">笔记摘要</span><span class="export-extension">.md</span>
         </button>
-        <button id="btn-export-chapter-zip" class="export-menu-action" type="button" data-export-action>
-            <i class="ri-file-zip-line" aria-hidden="true"></i>
-            <span class="export-action-label">分章节正文与笔记</span><span class="export-extension">.zip</span>
-        </button>
-        <button id="btn-export-standalone-html" class="export-menu-action" type="button" data-export-action>
-            <i class="ri-book-open-line" aria-hidden="true"></i>
-            <span class="export-action-label">带标注离线电子书</span><span class="export-extension">.html</span>
-        </button>
+        <div id="chapter-export-entry" class="chapter-export-entry">
+            <button id="btn-export-chapters" class="export-menu-action" type="button" aria-expanded="false" aria-controls="chapter-export-options">
+                <i class="ri-folder-download-line" aria-hidden="true"></i>
+                <span class="export-action-label">按章节导出</span><span class="export-extension">.md</span>
+            </button>
+            <div id="chapter-export-options" class="chapter-export-options" hidden>
+                <button id="btn-collapse-chapter-export" class="chapter-export-back" type="button" aria-label="返回导出菜单"><i class="ri-arrow-left-s-line" aria-hidden="true"></i>按章节导出</button>
+                <button id="btn-export-current-chapter" class="chapter-export-range" type="button">当前章节</button>
+                <button id="btn-export-all-chapters" class="chapter-export-range" type="button">全部章节</button>
+                <button id="btn-select-chapters" class="chapter-export-range" type="button" aria-expanded="false" aria-controls="chapter-export-custom">选择章节<i class="ri-arrow-right-s-line" aria-hidden="true"></i></button>
+                <div id="chapter-export-custom" hidden>
+                    <div id="chapter-export-list" class="chapter-export-list" role="group" aria-label="选择需要导出的章节"></div>
+                    <div class="chapter-export-actions">
+                        <button id="btn-cancel-chapter-export" class="btn btn-ghost-sm" type="button">取消</button>
+                        <button id="btn-confirm-chapter-export" class="btn btn-primary" type="button" disabled>导出</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <hr class="export-panel-divider">
         <h3 class="export-section-title">书籍备份与恢复</h3>
         <button id="btn-export-full-backup" class="export-menu-action export-backup-action" type="button" data-export-action>
@@ -158,6 +170,11 @@
         <input type="file" id="backup-file-input" accept=".aurabackup,.json" hidden>
     </section>
 
+    <div class="reading-workspace" id="reading-workspace">
+        <aside class="goal-sidebar" id="goal-sidebar" aria-label="Goals sidebar" hidden>
+            <div class="goal-panel" id="goal-panel" aria-label="Reading goals" hidden></div>
+            <div class="goal-resizer" id="goal-resizer" role="separator" tabindex="0" aria-label="Resize goals sidebar" aria-orientation="vertical" aria-controls="goal-sidebar"></div>
+        </aside>
     <!-- Reading surface with always-visible margin notes. -->
     <main class="workspace-container immersive-notes" id="workspace-container">
         <!-- Left Panel: Reader (75%) -->
@@ -206,10 +223,11 @@
                 <button class="tooltip-btn" id="btn-add-note" title="添加随笔"><i class="ri-sticky-note-line"></i> 笔记</button>
             </div>
 
-            <!-- Existing annotations expose only their independent delete actions. -->
+            <!-- Existing annotation actions; Goal links to the current reading intent. -->
             <div class="selection-tooltip" id="highlight-action-tooltip">
                 <button class="tooltip-btn" id="btn-hl-remove" type="button" style="color: #fca5a5;" title="只移除黄色高亮"><i class="ri-delete-bin-line"></i> 删除高亮</button>
                 <button class="tooltip-btn" id="btn-note-remove" type="button" style="color: #fca5a5;" title="只删除此处关联的笔记"><i class="ri-delete-bin-line"></i> <span>删除笔记</span></button>
+                <button class="tooltip-btn" id="btn-annotation-goal" type="button" hidden aria-label="Add to goal"><i class="ri-links-line" aria-hidden="true"></i><span>Goal</span></button>
             </div>
         </section>
 
@@ -247,6 +265,14 @@
 
         </section>
     </main>
+    </div>
+
+    <main id="goal-page" class="goal-page" aria-label="Goals" hidden>
+        <button id="btn-goal-back" class="btn btn-icon-sm" type="button" aria-label="Back to reading" title="Back to reading"><i class="ri-fullscreen-exit-line" aria-hidden="true"></i></button>
+        <div id="goal-page-content" class="goal-page-content"></div>
+    </main>
+
+    <main id="goal-home" class="goal-home" aria-label="Reading home" hidden></main>
 
     <!-- Modal: Selective Book Backup Dialog -->
     <div class="modal-overlay" id="backup-select-modal">

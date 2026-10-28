@@ -7,6 +7,7 @@
 
 import { filterNotes, isHighlight, isNote } from '../../domain/annotationEngine.js';
 import { isImmersiveNotes, positionMarginNotes, moveNoteCard } from '../layout/marginNotesLayout.js';
+import { attachNoteCaret } from './noteCaret.js';
 
 /** @param {import('../../app/contracts.js').NotesRenderOptions} options */
 export function renderNotesList({
@@ -21,7 +22,9 @@ export function renderNotesList({
     onDelete = null,
     editingNoteId = null,
     onInput = null,
-    onFinish = null
+    onFinish = null,
+    getGoalAction = null,
+    onLinkGoal = null
 }) {
     if (!elements || !elements.notesList) return;
 
@@ -136,7 +139,7 @@ export function renderNotesList({
         }
 
         card.addEventListener('click', (e) => {
-            if (e.target.closest('.btn-delete-note') || e.target.closest('.note-editor')) return;
+            if (e.target.closest('button') || e.target.closest('.note-editor')) return;
             if (noteKind && typeof onEdit === 'function') onEdit(note);
             else if (typeof onJump === 'function') onJump(note);
         });
@@ -158,6 +161,14 @@ export function renderNotesList({
             });
         }
 
+        if (onLinkGoal) {
+            const linkButton = document.createElement('button');
+            linkButton.className = 'btn btn-ghost-sm btn-goal-link'; linkButton.type = 'button';
+            linkButton.dataset.annotationId = note.id;
+            linkButton.innerHTML = '<i class="ri-links-line" aria-hidden="true"></i><span>Goal</span>';
+            linkButton.addEventListener('click', event => { event.stopPropagation(); onLinkGoal(note.id); });
+            card.querySelector('.note-card-actions').appendChild(linkButton);
+        }
         elements.notesList.appendChild(card);
         if (note.id === editingNoteId) startInlineEditor({ card, note, elements, onInput, onFinish });
     });
@@ -202,12 +213,17 @@ function startInlineEditor({ card, note, elements, onInput, onFinish }) {
     editor.setAttribute('aria-keyshortcuts', 'Escape Control+Enter Meta+Enter');
     editor.rows = 1;
     editor.value = note.comment || '';
-    text.replaceChildren(editor);
+    const shell = document.createElement('div');
+    shell.className = 'note-editor-shell';
+    shell.appendChild(editor);
+    text.replaceChildren(shell);
+    const updateCaret = attachNoteCaret(editor, shell);
     card.querySelector('.note-card-actions').hidden = true;
     const resize = () => {
         editor.style.height = '0px';
         editor.style.height = `${Math.max(editor.scrollHeight, 25.2)}px`;
         positionMarginNotes(elements);
+        updateCaret();
     };
     let composing = false;
     editor.addEventListener('compositionstart', () => { composing = true; });
@@ -241,4 +257,16 @@ function escapeHtml(str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+export function updateNoteGoalActions(elements, getGoalAction) {
+    for (const control of elements?.notesList?.querySelectorAll('.btn-goal-link') || []) {
+        const state = getGoalAction?.(control.dataset.annotationId);
+        control.hidden = !state?.visible; control.disabled = !state || state.disabled;
+        control.title = state?.linked ? 'Added to goal' : 'Add to goal';
+        control.setAttribute('aria-label', control.title);
+        control.classList.toggle('is-linked', !!state?.linked);
+        const label = control.querySelector('span'); if (label) label.textContent = state?.linked ? 'Linked' : 'Goal';
+        control.querySelector('i').className = state?.linked ? 'ri-check-line' : 'ri-links-line';
+    }
 }

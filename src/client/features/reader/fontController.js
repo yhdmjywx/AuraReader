@@ -1,4 +1,5 @@
 import { SYSTEM_FALLBACK, normalizeFontChoice, quoteFamily, resolveFont } from '../../domain/fontCatalog.js';
+import { unwrapDesktop } from '../../infrastructure/storageClient.js';
 
 const PREFERENCE_KEY = 'aura_font_preference';
 const SEARCH_KEY = 'aura_font_search';
@@ -150,7 +151,7 @@ export class FontController {
             this.renderBrowser();
         });
         elements.btnReadSystemFonts.addEventListener('click', () => this.readSystemFonts());
-        elements.btnImportFont.addEventListener('click', () => elements.fontFileInput.click());
+        elements.btnImportFont.addEventListener('click', () => window.auraDesktop ? this.importFile() : elements.fontFileInput.click());
         elements.fontFileInput.addEventListener('change', async () => {
             const file = elements.fontFileInput.files[0];
             elements.fontFileInput.value = '';
@@ -230,6 +231,11 @@ export class FontController {
     }
 
     async loadImports() {
+        if (typeof window !== 'undefined' && window.auraDesktop) {
+            const data = unwrapDesktop(await window.auraDesktop.fonts.list());
+            this.imported = data.fonts.filter(font => /^aurareader:\/\/app\/user-fonts\/[a-f0-9]{64}\.(ttf|otf|woff2)$/.test(font.url));
+            return;
+        }
         try {
             const response = await fetch('/api/fonts');
             if (!response.ok) throw new Error();
@@ -243,11 +249,15 @@ export class FontController {
         this.elements.btnReadSystemFonts.disabled = true;
         this.status('正在读取本机字体…');
         try {
-            const response = await fetch('/api/fonts/system');
-            const data = response.ok ? await response.json() : { supported: false };
+            let data;
+            if (window.auraDesktop) data = unwrapDesktop(await window.auraDesktop.fonts.system());
+            else {
+                const response = await fetch('/api/fonts/system');
+                data = response.ok ? await response.json() : { supported: false };
+            }
             if (data.supported) {
                 this.systemFamilies = data.fonts;
-            } else if (typeof window.queryLocalFonts === 'function') {
+            } else if (!window.auraDesktop && typeof window.queryLocalFonts === 'function') {
                 const fonts = await window.queryLocalFonts();
                 this.systemFamilies = [...new Set(fonts.map(font => font.family))];
             } else {
@@ -260,17 +270,26 @@ export class FontController {
         } finally { this.elements.btnReadSystemFonts.disabled = false; }
     }
 
+    /** @param {File} [file] */
     async importFile(file) {
         this.elements.btnImportFont.disabled = true;
         this.status('正在导入字体…');
         try {
-            if (!/\.(ttf|otf|woff2)$/i.test(file.name)) throw new Error('请选择 TTF、OTF 或 WOFF2 文件');
-            if (!file.size || file.size > 64 * 1024 * 1024) throw new Error('字体文件为空或超过 64MB');
-            const response = await fetch(`/api/fonts/import?name=${encodeURIComponent(file.name)}`, {
-                method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || '字体导入失败');
+            let data;
+            if (window.auraDesktop) {
+                const result = unwrapDesktop(await window.auraDesktop.fonts.importFont());
+                if (result.canceled) { this.status('已取消导入字体'); return; }
+                data = { font: result.font };
+            } else {
+                if (!file) throw new Error('请选择字体文件');
+                if (!/\.(ttf|otf|woff2)$/i.test(file.name)) throw new Error('请选择 TTF、OTF 或 WOFF2 文件');
+                if (!file.size || file.size > 64 * 1024 * 1024) throw new Error('字体文件为空或超过 64MB');
+                const response = await fetch(`/api/fonts/import?name=${encodeURIComponent(file.name)}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file
+                });
+                data = await response.json();
+                if (!response.ok) throw new Error(data.error || '字体导入失败');
+            }
             await this.loadImports();
             this.renderBrowser();
             this.status(`已导入 ${data.font.name}`);

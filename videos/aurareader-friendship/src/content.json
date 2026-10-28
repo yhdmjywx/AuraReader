@@ -1,0 +1,79 @@
+{
+  "goalId": "remotion-friendship-goal",
+  "initialGoal": "I want to make a new friend.",
+  "evolvedGoal": "Find a friend I can talk about books with.",
+  "durationSeconds": 39,
+  "materials": [
+    {
+      "key": "anne",
+      "pg": "45",
+      "file": "Anne of Green Gables.epub",
+      "title": "Anne of Green Gables",
+      "author": "L. M. Montgomery",
+      "chapter": "VIII · Anne’s Bringing-up Is Begun",
+      "quote": "do you think that I shall ever have a bosom friend in Avonlea?",
+      "note": "I want someone I can really talk to.",
+      "noteZh": "我想有个能真正谈心的人。",
+      "bookId": "remotion-friendship-anne",
+      "sourcePage": 10,
+      "location": {
+        "sectionId": "chapter-10",
+        "page": 10,
+        "offset": 8407,
+        "start": 8407,
+        "end": 8469
+      },
+      "chapterAnchor": "",
+      "before": "“Marilla,” she demanded presently, “",
+      "after": "”",
+      "nextParagraph": "“A—a what kind of friend?”",
+      "sourceUrl": "https://www.gutenberg.org/cache/epub/45/pg45-images.html"
+    },
+    {
+      "key": "conversation",
+      "pg": "63995",
+      "file": "The Art of Conversation - Twelve Golden Rules.epub",
+      "title": "The Art of Conversation: Twelve Golden Rules",
+      "author": "Josephine Turck Baker",
+      "chapter": "Golden Rule Number VII",
+      "quote": "Choose subject of mutual interest.",
+      "note": "I could ask her what she’s reading.",
+      "noteZh": "我可以问问她在读什么。",
+      "bookId": "remotion-friendship-conversation",
+      "sourcePage": 2,
+      "location": {
+        "sectionId": "chapter-2",
+        "page": 2,
+        "offset": 29134,
+        "start": 29134,
+        "end": 29168
+      },
+      "chapterAnchor": "pgepubid00038",
+      "before": "",
+      "after": "",
+      "nextParagraph": "He.—And here we are again at one of your charming \"at homes,\" and I, as usual, am the only guest.",
+      "sourceUrl": "https://www.gutenberg.org/cache/epub/63995/pg63995-images.html"
+    }
+  ],
+  "sources": [
+    {
+      "title": "Anne of Green Gables",
+      "author": "L. M. Montgomery",
+      "catalog": "https://www.gutenberg.org/ebooks/45",
+      "epub": "https://www.gutenberg.org/ebooks/45.epub3.images",
+      "copyright": "Public domain in the USA.",
+      "license": "https://www.gutenberg.org/policy/license.html",
+      "sha256": "8156c4733c5983e6efc12f40fbfa4c8a8b1e632e64f6938579c12434ba40679f"
+    },
+    {
+      "title": "The Art of Conversation: Twelve Golden Rules",
+      "author": "Josephine Turck Baker",
+      "catalog": "https://www.gutenberg.org/ebooks/63995",
+      "epub": "https://www.gutenberg.org/ebooks/63995.epub3.images",
+      "copyright": "Public domain in the USA.",
+      "license": "https://www.gutenberg.org/policy/license.html",
+      "sha256": "d6102e1a2ec6f3db5f1bd9f9afe18b6da486255b67ab69e0829249416ad95ff3"
+    }
+  ],
+  "noteProvenance": "Fictional reader notes written for this demonstration. The books do not contain these notes or promise a friendship outcome."
+}

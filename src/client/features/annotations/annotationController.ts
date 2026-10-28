@@ -1,4 +1,5 @@
 import { eventElement } from '../../app/dom.js';
+import { pendingNoteWrites } from '../../infrastructure/annotationRecovery.js';
 import type { Annotation, AnnotationInput } from '../../domain/annotation.js';
 import type { AnnotationCallbacks, NoteDraft } from '../../app/contracts.js';
 import type { AppElements } from '../../app/elements.js';
@@ -33,6 +34,7 @@ export class AnnotationController {
     editingNoteId: string | null;
     inlineEdit: { note: Annotation; opening: boolean } | null;
     _inlineWrites: Promise<void>;
+    private inlineWriteErrors = new Map<string, { bookId: string; recoveryAvailable: boolean }>();
     showHighlightsInSidebar: boolean;
     notesScope: 'page' | 'book';
     _renderedSidebarIds: string | null;
@@ -204,7 +206,9 @@ export class AnnotationController {
         this.renderNotesUI();
         // Include unsaved drafts only in the reading surface, never in exports
         // or storage. This also gives the new editor its existing margin anchor.
-        this.callbacks.onNotesChanged?.(this.getRenderingNotes());
+        if (!this.notes.some(item => item.id === note.id)) {
+            this.callbacks.onNotesChanged?.(this.getRenderingNotes());
+        }
         if (this.inlineEdit !== editSession) return;
         editSession.opening = false;
         // The body and margin lanes are now mounted in their final positions.
@@ -221,6 +225,7 @@ export class AnnotationController {
         const note = this.inlineEdit?.note;
         if (!note || id !== note.id || note.comment === comment) return;
         note.comment = comment;
+        this.callbacks.onAnnotationContentChanged?.(note);
         note.timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
         const exists = this.notes.some(item => item.id === id);
         if (!exists && !comment.trim()) return;
@@ -237,7 +242,10 @@ export class AnnotationController {
         const write = remove
             ? repoDeleteNote(snapshot.id, snapshot.bookId)
             : repoSaveNote(snapshot);
-        this._inlineWrites = Promise.all([this._inlineWrites, write]).then(() => undefined).catch(error => {
+        this._inlineWrites = Promise.all([this._inlineWrites, write]).then(() => {
+            this.inlineWriteErrors.delete(snapshot.id);
+        }).catch(error => {
+            this.inlineWriteErrors.set(snapshot.id, { bookId: snapshot.bookId, recoveryAvailable: error.recoveryAvailable === true });
             console.error('笔记持久化失败', error);
             this.callbacks.showToast?.(error.recoveryAvailable === false
                 ? '笔记尚未可靠保存，请暂勿关闭页面'
@@ -265,6 +273,16 @@ export class AnnotationController {
         this.renderNotesUI();
         if (blank) this.callbacks.onNotesChanged?.(this.notes);
         return this._inlineWrites;
+    }
+
+    async assertInlineWritesSaved() {
+        await this._inlineWrites;
+        // Durable entries are removed by the repository only after acknowledgment.
+        // A later recovery must release the close guard; non-durable failures stay.
+        for (const [id, failure] of this.inlineWriteErrors) {
+            if (failure.recoveryAvailable && !pendingNoteWrites(failure.bookId).some(entry => entry.id === id)) this.inlineWriteErrors.delete(id);
+        }
+        if (this.inlineWriteErrors.size) throw new Error('存在保存失败的笔记，窗口已保留；请处理冲突或恢复写入后重试。');
     }
 
     async saveModalNote({ quote = '', comment = '', page = 1, chapter = '章节选区', location = null }: NoteDraft & { comment?: string } = {}) {
@@ -343,6 +361,7 @@ export class AnnotationController {
     }
 
     async deleteHighlights(ids: string[] = []) {
+        await this.callbacks.beforeDeleteAnnotations?.();
         const idSet = new Set(ids.filter(Boolean));
         const removed = this.notes.filter(n => idSet.has(n.id) && isHighlight(n));
         if (removed.length === 0) return;
@@ -369,6 +388,7 @@ export class AnnotationController {
     }
 
     async deleteAnnotation(id: string, toastMessage = '已删除标注') {
+        await this.callbacks.beforeDeleteAnnotations?.();
         if (!id) return;
         if (this.editingNoteId === id) await this.finishInlineEdit();
         const existed = this.notes.some(n => n.id === id);
@@ -482,6 +502,8 @@ export class AnnotationController {
         renderNotesList({
             elements: this.elements,
             notes: sidebarNotes,
+            getGoalAction: this.callbacks.getGoalAction,
+            onLinkGoal: this.callbacks.onLinkGoal ? id => { Promise.resolve(this.callbacks.onLinkGoal?.(id)).catch(error => this.callbacks.showToast?.(String(error.message || error))); } : null,
             notesScope: this.notesScope,
             showHighlightsInSidebar: this.showHighlightsInSidebar,
             focusedNoteIds: this.focusedNoteIds,

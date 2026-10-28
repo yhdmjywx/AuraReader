@@ -46,11 +46,15 @@ function createStorageApi(store) {
             if (req.method === 'POST' && url.pathname === '/api/storage/migration/commit') return reply(200, migration.commit(source, (await readJson(req)).snapshotId));
             if (!migration.status(source).completed) throw new StorageError('旧数据尚未迁移，请先完成迁移校验', 423);
             if (req.method === 'GET' && url.pathname === '/api/storage/books') return reply(200, { records: store.books() });
+            if (req.method === 'GET' && url.pathname === '/api/storage/goals/library') return reply(200, store.goalLibrary());
             if (req.method === 'POST') {
                 const body = await readJson(req);
                 const actions = {
                     '/api/storage/books/save': () => store.saveBook(body),
                     '/api/storage/books/delete': () => store.deleteBook(body),
+                    '/api/storage/goals/query': () => ({ records: store.goals(body.bookIds) }),
+                    '/api/storage/goals/save': () => store.saveGoals(body),
+                    '/api/storage/goals/library/save': () => store.saveGoalLibrary(body),
                     '/api/storage/notes/query': () => ({ records: store.notes(body.bookIds) }),
                     '/api/storage/notes/save': () => store.saveNote(body),
                     '/api/storage/notes/delete': () => store.deleteNote(body),

@@ -1,0 +1,33 @@
+{
+  "preparedOn": "2026-10-27",
+  "books": [
+    {
+      "title": "How to Live on 24 Hours a Day",
+      "author": "Arnold Bennett",
+      "authorDates": "1867–1931",
+      "catalogUrl": "https://www.gutenberg.org/ebooks/2274",
+      "epubUrl": "https://www.gutenberg.org/ebooks/2274.epub3.images",
+      "copyrightStatement": "Public domain in the USA.",
+      "language": "English",
+      "termsUrl": "https://www.gutenberg.org/policy/license.html",
+      "localEpub": "sources/01-how-to-live-on-24-hours-a-day.epub",
+      "sha256": "ceef6557ddda1d770f0af3b5ef508a24f93d043aa7422e32e05188320ff49e33",
+      "bytes": 109408,
+      "sourceNote": "Unmodified official EPUB preserved with its original notices. No modern translation or third-party cover added."
+    },
+    {
+      "title": "Talks To Teachers On Psychology; And To Students On Some Of Life's Ideals",
+      "author": "William James",
+      "authorDates": "1842–1910",
+      "catalogUrl": "https://www.gutenberg.org/ebooks/16287",
+      "epubUrl": "https://www.gutenberg.org/ebooks/16287.epub3.images",
+      "copyrightStatement": "Public domain in the USA.",
+      "language": "English",
+      "termsUrl": "https://www.gutenberg.org/policy/license.html",
+      "localEpub": "sources/02-talks-to-teachers-on-psychology.epub",
+      "sha256": "ece1e89371f988643630fb19150a67247793a3850a5ffaa6413ad64b674f9d33",
+      "bytes": 261500,
+      "sourceNote": "Unmodified official EPUB preserved with its original notices. No modern translation or third-party cover added."
+    }
+  ]
+}

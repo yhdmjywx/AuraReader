@@ -1,3 +1,5 @@
+import { clearBookGoals } from './goalRecovery.js';
+import { forgetGoals } from './storageClient.js';
 import type { Book } from '../domain/book.js';
 import { clearStoredBookNotes } from './annotationRecovery.js';
 import { initializeStorage, readBooks, enqueue, bookVersion, storageRequest, operationId, acceptBook } from './storageClient.js';
@@ -25,6 +27,6 @@ export function deleteBookFromDB(bookId: string) {
         await initializeStorage();
         const current = await bookVersion(bookId);
         const result = await storageRequest('books/delete', { opId: operationId(), id: bookId, expected: current.revision });
-        acceptBook(bookId, result, true); clearStoredBookNotes(bookId); return result;
+        acceptBook(bookId, result, true); clearStoredBookNotes(bookId); clearBookGoals(bookId); forgetGoals(bookId); return result;
     });
 }

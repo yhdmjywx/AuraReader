@@ -188,6 +188,7 @@ export class SelectionController {
         const target = this.activeAnnotationContext.targetElement || findTokensByKey(this.activeAnnotationContext.key)[0];
         if (!target) return;
         this.activeAnnotationContext.targetElement = target;
+        this.refreshGoalAction();
         this.menuOpen = true;
         this.hideSelectionTooltip();
         showHighlightActionTooltip(this.elements, target, this.activeAnnotationContext);
@@ -266,6 +267,20 @@ export class SelectionController {
         }
     }
 
+    refreshGoalAction() {
+        const control = this.elements?.btnAnnotationGoal;
+        if (!control) return;
+        const context = this.activeAnnotationContext;
+        const ids = [...new Set([...(context?.highlightIds || []), ...(context?.noteIds || [])])];
+        const state = ids.length === 1 ? this.callbacks.getGoalAction?.(ids[0]!) : undefined;
+        control.hidden = !state?.visible; control.disabled = !state || state.disabled;
+        control.title = state?.linked ? 'Added to goal' : 'Add to goal';
+        control.setAttribute('aria-label', control.title);
+        control.classList.toggle('is-linked', !!state?.linked);
+        const label = control.querySelector('span'); if (label) label.textContent = state?.linked ? 'Linked' : 'Goal';
+        const glyph = control.querySelector('i'); if (glyph) glyph.className = state?.linked ? 'ri-check-line' : 'ri-links-line';
+    }
+
     initUI(elements: AppElements) {
         this.elements = elements;
         if (!elements || typeof document === 'undefined') return;
@@ -328,6 +343,15 @@ export class SelectionController {
             });
         }
 
+        elements.btnAnnotationGoal?.addEventListener('click', event => {
+            event.stopPropagation();
+            const context = this.activeAnnotationContext;
+            const ids = [...new Set([...(context?.highlightIds || []), ...(context?.noteIds || [])])];
+            if (ids.length !== 1 || elements.btnAnnotationGoal?.disabled) return;
+            const result = this.callbacks.onLinkGoal?.(ids[0]!);
+            this.clearAnnotationContext();
+            Promise.resolve(result).catch(error => console.error('Goal 归入失败', error));
+        });
         if (elements.btnHlRemove) {
             elements.btnHlRemove.addEventListener('click', (e) => {
                 e.stopPropagation();

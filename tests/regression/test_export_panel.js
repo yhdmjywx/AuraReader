@@ -90,11 +90,13 @@ const path = require('path');
         assert.ok(header.indexOf('id="btn-appearance"') < header.indexOf('id="btn-export-menu"'));
         assert.ok(header.indexOf('id="btn-export-menu"') < header.indexOf('id="btn-fullscreen"'));
         const panel = html.slice(html.indexOf('<section id="export-panel"'), html.indexOf('<!-- Main Workspace'));
-        for (const id of ['btn-export-markdown', 'btn-export-chapter-zip', 'btn-export-standalone-html', 'btn-export-full-backup', 'btn-import-full-backup', 'backup-file-input']) {
+        for (const id of ['btn-export-markdown', 'btn-export-chapters', 'btn-export-current-chapter', 'btn-export-all-chapters', 'btn-select-chapters', 'btn-export-full-backup', 'btn-import-full-backup', 'backup-file-input']) {
             assert.strictEqual(html.split(`id="${id}"`).length - 1, 1, `${id} 必须保持唯一，避免重复绑定`);
             assert.ok(panel.includes(`id="${id}"`), `${id} 必须迁入顶栏面板`);
         }
         assert.ok(!html.includes('tab-settings'), '右侧不得残留重复导出页');
+        assert.ok(!html.includes('btn-export-standalone-html'), '废弃 HTML 导出入口');
+        assert.ok(!html.includes('chapter-export-modal') && !html.includes('btn-export-chapter-zip'), '章节导出只能在菜单内原位展开');
         console.log('PASS: 顶栏导出位置、现有入口迁移、面板关闭、偏好互斥和键盘焦点');
     } finally {
         if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);

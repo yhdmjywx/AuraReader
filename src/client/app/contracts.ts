@@ -1,3 +1,4 @@
+export interface GoalActionState { visible: boolean; disabled: boolean; linked: boolean }
 import type { Annotation, AnnotationLocation } from '../domain/annotation.js';
 import type { Book, ReaderMode } from '../domain/book.js';
 
@@ -35,6 +36,10 @@ export interface ReaderCallbacks {
     onMarkClick?: (element: HTMLElement, annotation: Annotation) => void;
 }
 export interface AnnotationCallbacks {
+    getGoalAction?: (id: string) => GoalActionState;
+    onLinkGoal?: AsyncAction<[id: string]>;
+    beforeDeleteAnnotations?: AsyncAction;
+    onAnnotationContentChanged?: (note: Annotation) => void;
     showToast?: (message: string) => void;
     getCurrentBookId?: () => string;
     getVisibleAnnotationIds?: () => Set<string>;
@@ -47,6 +52,8 @@ export interface AnnotationCallbacks {
     onFocusAnnotation?: (note: Annotation) => void;
 }
 export interface SelectionCallbacks {
+    getGoalAction?: (id: string) => GoalActionState;
+    onLinkGoal?: AsyncAction<[id: string]>;
     getReadingContext?: () => ReadingContext;
     onCreateHighlight?: AsyncAction<[color: string, selection: PendingSelection]>;
     onCreateNote?: (draft: NoteDraft) => void;
@@ -71,20 +78,25 @@ export interface FontCallbacks {
     notify?: (message: string) => void;
 }
 export interface ShelfCallbacks {
+    onImportFile?: AsyncAction<[file: File]>;
     showToast?: (message: string) => void;
     onOpen?: () => void;
     onOpenBook?: AsyncAction<[id: string]>;
     onDeleteBook?: AsyncAction<[id: string]>;
 }
-export interface BackupData { books?: Book[]; notes?: import('../../shared/storage.js').StoredAnnotation[] }
+export interface BackupData { books?: Book[]; notes?: import('../../shared/storage.js').StoredAnnotation[]; goalStates?: import('../domain/goal.js').GoalBackupState[]; goalGraph?: import('../domain/goal.js').GoalGraphBackup }
 export interface BackupCallbacks {
     showToast?: (message: string) => void;
     getCurrentBook?: () => Book | null;
     getCurrentNotes?: () => Annotation[];
+    getCurrentPage?: () => number;
+    closeExportPanel?: () => void;
     beforeRestore?: AsyncAction;
+    beforeExport?: AsyncAction;
     onRestoreBackup?: AsyncAction<[{ data: BackupData; importedBooksCount: number; importedNotesCount: number }]>;
 }
 export interface ShellCallbacks {
+    onThemeChanged?: () => void;
     onOpenPanel?: () => void;
     onPrevPage?: () => void;
     onNextPage?: () => void;
@@ -99,6 +111,8 @@ export interface ChapterRenderOptions {
 }
 
 export interface NotesRenderOptions {
+    getGoalAction?: ((id: string) => GoalActionState) | null;
+    onLinkGoal?: ((id: string) => void) | null;
     elements: import('./elements.js').AppElements;
     notes?: Annotation[];
     notesScope?: 'page' | 'book';

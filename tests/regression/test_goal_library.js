@@ -1,0 +1,31 @@
+const assert=require('node:assert/strict'), fs=require('node:fs'), path=require('node:path');
+const {randomUUID}=require('node:crypto'); const {DatabaseSync}=require('node:sqlite');
+const {createDataStore}=require('../../src/server/dataStore'); const {legacyGoalId}=require('../../src/server/goalLibrary');
+const {backupDatabase,verifyDatabase}=require('../../src/server/storageMaintenance');
+(async()=>{
+ const parent=path.resolve('.commandcode/goal-library');fs.mkdirSync(parent,{recursive:true});const dir=fs.mkdtempSync(path.join(parent,'run-'));
+ let s=createDataStore(dir);const now=new Date().toISOString();const goal=(id,parentId=null)=>({id,parentId,text:'Why?\n自己的问题',origin:null,createdAt:now,updatedAt:now});
+ const books=['a','b'].map(id=>({id,title:id,pages:['<p>Source</p>']}));const versions={};const legacyCommands=[];
+ for(const book of books){versions[book.id]=s.saveBook({opId:randomUUID(),expected:0,book});s.saveNote({opId:randomUUID(),expected:0,generation:versions[book.id].generation,note:{id:'n-'+book.id,bookId:book.id,kind:'note',quote:'Source',comment:book.id}});const c={opId:randomUUID(),expected:0,generation:versions[book.id].generation,state:{bookId:book.id,goals:[goal('same'),goal('child','same')],links:[{goalId:'child',annotationId:'n-'+book.id}]}};s.saveGoals(c);legacyCommands.push(c);}
+ const oldBooks=s.books(),oldNotes=s.notes();s.close();const raw=new DatabaseSync(path.join(dir,'aurareader.sqlite'));raw.exec('DROP TABLE goal_library;PRAGMA user_version=2');raw.close();
+ s=createDataStore(dir);assert.equal(s.one('PRAGMA user_version').user_version,4);assert.deepEqual(s.books(),oldBooks);assert.deepEqual(s.notes(),oldNotes);
+ let r=s.goalLibrary();assert.equal(r.value.goals.length,4);assert.equal(new Set(r.value.goals.map(g=>g.id)).size,4);assert.equal(r.value.goals.find(g=>g.id===legacyGoalId('a','same')).origin.sourcePage,null);
+ assert.deepEqual(s.saveGoals(legacyCommands[0]),{revision:1},'lost legacy response replays original op without duplicating migrated nodes');
+ const selected=legacyGoalId('a','child');let state={...r.value,links:[...r.value.links,{goalId:selected,annotationId:'n-b',bookId:'b',generation:versions.b.generation}]};
+ const c={opId:randomUUID(),expected:r.revision,state};const saved=s.saveGoalLibrary(c);assert.deepEqual(s.saveGoalLibrary(c),saved);assert.throws(()=>s.saveGoalLibrary({...c,opId:randomUUID()}),{status:409});
+ r=s.goalLibrary();assert.equal(r.value.links.filter(l=>l.goalId===selected).length,2);
+ assert.throws(()=>s.saveGoalLibrary({opId:randomUUID(),expected:r.revision,state:{...r.value,links:[...r.value.links,{goalId:selected,annotationId:'n-a',bookId:'b',generation:versions.b.generation}]}}));
+ s.saveGoalLibrary({opId:randomUUID(),expected:r.revision,state:{...r.value,goals:r.value.goals.map(g=>g.id===selected?{...g,text:'A global change'}:g)}});
+ assert.throws(()=>s.saveGoals({...legacyCommands[0],opId:randomUUID(),expected:1}),{status:409},'old unsent state cannot overwrite a global edit');
+ const aGraph={goals:s.goalLibrary().value.goals.filter(g=>g.origin.bookId==='a'),links:s.goalLibrary().value.links.filter(l=>l.bookId==='a')};
+ s.restore({opId:randomUUID(),books:[books[0]],notes:[],goalGraph:aGraph});assert.ok(s.goalLibrary().value.links.some(l=>l.goalId===selected&&l.bookId==='b'),'partial A restore preserves B association');
+ const before=JSON.stringify(s.goalLibrary());assert.throws(()=>s.restore({opId:randomUUID(),books:[{...books[0],title:'rollback'}],notes:[],goalGraph:{goals:[goal('bad','missing')],links:[]}}));assert.equal(JSON.stringify(s.goalLibrary()),before);assert.equal(s.books().find(b=>b.id==='a').value.title,'a');
+ const deletion=s.deleteNote({opId:randomUUID(),expected:1,generation:versions.a.generation,bookId:'a',id:'n-a'});assert.ok(deletion.goalLibrary);assert.equal(s.goalLibrary().value.goals.length,4);
+ s.deleteBook({opId:randomUUID(),expected:s.books().find(b=>b.id==='b').revision,id:'b'});assert.equal(s.goalLibrary().value.goals.length,4);assert.equal(s.goalLibrary().value.links.length,0);
+ r=s.goalLibrary();s.saveGoalLibrary({opId:randomUUID(),expected:r.revision,state:{...r.value,goals:[...r.value.goals,goal('independent-without-source')]}});
+ assert.deepEqual(s.check(),{integrity:'ok',foreignKeys:0});const backup=await backupDatabase(dir);assert.equal(verifyDatabase(backup.filename).integrity,'ok');const savedDB=new DatabaseSync(backup.filename,{readOnly:true});const savedGraph=JSON.parse(savedDB.prepare('SELECT payload FROM goal_library').get().payload);assert.equal(savedGraph.goals.find(g=>g.id==='independent-without-source').origin,null,'SQLite backup includes unbound reader intentions');savedDB.close();s.close();s=createDataStore(dir);assert.equal(s.goalLibrary().value.goals.length,5);s.close();
+ const broken=fs.mkdtempSync(path.join(parent,'invalid-'));s=createDataStore(broken);s.saveBook({opId:randomUUID(),expected:0,book:books[0]});s.close();
+ const db=new DatabaseSync(path.join(broken,'aurareader.sqlite'));const invalid={bookId:'wrong-book',goals:[goal('untouched')],links:[]};db.prepare('INSERT INTO goal_states VALUES(?,?,1,0)').run('a',JSON.stringify(invalid));db.exec('DROP TABLE goal_library;PRAGMA user_version=2');db.close();
+ assert.throws(()=>createDataStore(broken),/来源不一致/);const unchanged=new DatabaseSync(path.join(broken,'aurareader.sqlite'));assert.equal(unchanged.prepare('PRAGMA user_version').get().user_version,2);assert.equal(unchanged.prepare("SELECT 1 FROM sqlite_master WHERE name='goal_library'").get(),undefined);assert.equal(unchanged.prepare('SELECT payload FROM goal_states').get().payload,JSON.stringify(invalid));assert.equal(JSON.parse(unchanged.prepare('SELECT payload FROM books').get().payload).title,'a');unchanged.close();
+ console.log('Global Goal library: actual v2 migration/IDs, lost legacy ACK/conflict, global CAS, cross-book links, partial restore/rollback, source deletion preserves intent and SQLite backup passed.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

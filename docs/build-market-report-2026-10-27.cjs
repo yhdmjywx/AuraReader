@@ -1,0 +1,219 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const root = __dirname;
+const sources = [
+['canto','Canto · 当前美区 App Store','https://apps.apple.com/us/app/canto-book-tracker-journal/id6771089037','2026-10-27 经只读抓取核查：1.6.0、5.0/3 Ratings；版本历史与功能为厂商声明，未安装实测'],
+['cantohome','Canto · 官网','https://readcanto.com/','读后问答、AI 反思和画像；页面样本来自开发者本人，非独立用户案例'],
+['cantoprivacy','Canto · 隐私说明','https://readcanto.com/privacy','2026-09 版本；Apple 登录、单书选择理由、Supabase 存储、Claude 生成及图片分享'],
+['cantoterms','Canto · 服务条款','https://readcanto.com/terms','2026-10 版本，经只读抓取；年/月付价格、免费边界和不会自动收费的 30 天权限'],
+['cantoold','Canto · 旧标题商店缓存（仅历史对照）','https://apps.apple.com/us/app/canto-reading-journal/id6771089037','检索缓存仍为 1.1.0；不能作为当前摘录收费边界、评分或版本依据'],
+['deep','Deepread · README','https://github.com/AyingAI/deepread','作者自述的功能设计；未通过安装运行与端到端交互核验，不作已交付能力证据'],
+['deepui','Deepread · ReadingView.tsx（固定提交）','https://github.com/AyingAI/deepread/blob/5c1e46c9a5cb8eaa2b88a561febf693267378e19/components/ReadingView.tsx','2026-10-27 纠错复核：621–631 行编辑保存，930–940 行 Purpose 文本控件；无层级 Goal 交互证明，未运行验收'],
+['deepmodel','Deepread · types.ts','https://github.com/AyingAI/deepread/blob/main/types.ts','静态模型：Book.intention 字段、ThoughtCard.bookId；仅能证明结构，不能证明可用产品流程'],
+['rwbase','Readwise Reader · Basics','https://docs.readwise.io/reader/docs/faqs','官方文档；平台、离线、账号、订阅'],
+['rwtag','Readwise · Highlights, Tags, and Notes','https://docs.readwise.io/reader/docs/faqs/highlights-tags-notes','官方文档；页边笔记、跨文档标签、原文跳转'],
+['rworg','Readwise · Organizing Content','https://docs.readwise.io/reader/docs/organizing-content','官方文档；文档标签、摘录标签、过滤视图'],
+['rwexport','Readwise · Exporting','https://docs.readwise.io/reader/docs/faqs/exporting','官方文档；Markdown、标签集合导出、全文备份、带标注打印'],
+['rwfull','Readwise · January 2025 update','https://blog.readwise.io/update-jan2025/','2025-01-30；文章全文导出与高亮问答发布记录'],
+['rwobs','Readwise · Obsidian integration','https://docs.readwise.io/readwise/docs/exporting-highlights/obsidian','官方文档；全文和高亮分文件、模板与同步边界'],
+['rwprice','Readwise · Pricing','https://readwise.io/pricing/reader','官方定价，结合 Basics 核对 Full 计划'],
+['mn','MarginNote · Product','https://www.marginnote.com/en/index.html','官方产品说明；学习集、卡片、脑图、复习'],
+['mncn','MarginNote · 中文首页','https://www.marginnote.com/index.html','厂商自报 MN3+MN4 评分数；地区与去重口径不明'],
+['mnprice','MarginNote · Pricing','https://www.marginnote.com/en/pricing/index.html','官方价格与 Apple 平台授权边界'],
+['lt','LiquidText · Product','https://www.liquidtext.net/','官方产品说明；跨文档联系、来源、Windows、导出'],
+['ltscale','LiquidText · Company','https://law.liquidtext.net/company/','厂商自报 600 万下载、2 万以上法律月用户；页面未注明统计时点'],
+['zscale','Sean Takats · Zotero at Twenty','https://quintessenceofham.org/zotero-at-twenty/','2026-10-05；项目创始成员自报超过 2000 万用户，非 MAU 披露'],
+['zannual','Digital Scholar · 2025 Annual Report','https://digitalscholar.org/assets/downloads/2025%20Digital%20Scholar%20Annual%20Report.pdf','已打开原始 PDF，第 16–17 页：2025 年 1730 万 Users；历史时点，非 MAU'],
+['zcoll','Zotero · Collections and Tags','https://www.zotero.org/support/collections_and_tags','官方文档；层级集合、同资料多集合、不复制'],
+['znotes','Zotero · Notes','https://www.zotero.org/support/notes','官方文档；独立笔记及关联'],
+['zreader','Zotero · Reader and Note Editor','https://www.zotero.org/support/pdf_reader','官方文档；跨资料注释入笔记、返回来源、引文'],
+['zepub','Zotero · EPUB reader announcement','https://forums.zotero.org/discussion/106716/available-for-beta-testing-updated-reader-with-epub-snapshot-support-and-new-annotation-types','官方开发者公告，2023-08-07；EPUB 支持起点'],
+['zlicense','Zotero · Licensing','https://www.zotero.org/support/licensing','官方许可页，并核对当前仓库 COPYING 为 AGPLv3'],
+['flex','Flexcil · Product','https://www.flexcil.com/','官方；PDF、笔记、参考链接，首页已展示 Web 版'],
+['flexscale','Flexcil · Board info','https://www.flexcil.com/flexcilboardinfo/','厂商自报 950 万以上 Global users；总产品口径，非活跃度，非 Board 用户数'],
+['flexlink','Flexcil · Reference Link','https://support.flexcil.com/hc/en-us/articles/8427582550553-What-is-a-Reference-Link','官方帮助；2023-07-17；多文档摘要和双向来源导航'],
+['good','Goodnotes · Press kit','https://www.goodnotes.com/press','厂商自报超过 2500 万月活；页面统计时点未注明'],
+['hepta','Heptabase · Product','https://heptabase.com/','官方；白板、卡片、PDF、双链、离线、AI'],
+['heptawork','Heptabase · Getting started','https://wiki.heptabase.com/getting-started-with-heptabase','官方；关心的问题、复杂主题、生活反思等使用目的'],
+['heptaepub','Heptabase · Whole book / long PDF','https://support.heptabase.com/en/articles/16762580-how-do-i-use-a-whole-book-or-long-pdf-with-heptabase-ai','官方明确当前不支持原生 EPUB，建议转 PDF 或文本'],
+['heptaprice','Heptabase · Plans and pricing','https://support.heptabase.com/en/articles/12990121-plans-and-pricing','官方当前定价；Pro、Premium、Premium+'],
+['marginalia','Marginalia · Product','https://usemarginalia.app/','官方，版本 1.1.2 / 2026-10；本地 Markdown、免费导出、量化阅读目标'],
+['readest','Readest · Reading','https://www.readest.com/docs/reading','官方文档；标注导出、深链接与原文上下文'],
+['bookx','BookxNote · 荔枝软件商店','https://lizhi.shop/products/bookxnote-pro','经销商二级证据；功能可作线索。页面已下架，不能据此判定产品停止'],
+['paid','Readwise 用户：续费还是返回免费工具','https://www.reddit.com/r/readwise/comments/1oblyn1/convince_me_to_stay_with_paid_readwise_reader/','约 2025 年帖；用户自述及正反回复，非代表性样本'],
+['lifetime','Readwise 用户：永久许可诉求','https://www.reddit.com/r/readwise/comments/1npydnt/any_possibility_of_a_lifetime_subscription/','约 2025 年帖；跨端价值、长期访问担忧、订阅疲劳'],
+['metadata','Readwise 付费用户：元数据问题','https://www.reddit.com/r/readwise/comments/1r72fc4/paying_user_frustrated_by_lack_of_basic_metadata/','约 2026-02；付费用户自述，不代表全部用户'],
+['reliable','LiquidText 用户：可靠性讨论','https://www.reddit.com/r/LiquidText/comments/17p8veb/reliability_and_daily_use_issues/','约 2023-11；历史风险信号，不能证明当前版本仍有同一问题'],
+['bn','Better Notes · README','https://github.com/windingwind/zotero-better-notes','当前官方仓库；跨资料模板、笔记链接、Markdown 双向同步'],
+['koodo','Koodo Reader · README','https://github.com/koodo-reader/koodo-reader','当前官方仓库；多格式、多平台、笔记导出'],
+['foliate','Foliate · Repository','https://github.com/johnfactotum/foliate','官方仓库；GPLv3+、阅读与标注'],
+['thorium','Thorium Reader · Repository','https://github.com/edrlab/thorium-reader','官方仓库；BSD-3-Clause、可访问性、EPUB、LCP 组件边界'],
+['readestrepo','Readest · Repository','https://github.com/readest/readest','官方仓库；AGPLv3+，多平台、并行阅读'],
+['leaf','Leaf · Reading goals','https://readwithleaf.app/features/reading-goals/','厂商说明；页数/日期目标，用于辨别关键词伪同类']
+].map(([id,title,url,note],i)=>({id,index:i+1,title,url,note,accessed:'2026-10-27 (Asia/Shanghai)'}));
+const byId=Object.fromEntries(sources.map(s=>[s.id,s]));
+const ref=(...ids)=>'<span class="refs">'+ids.map(id=>{if(!byId[id])throw Error(id);return `<a href="#source-${id}" title="${byId[id].title}">[${byId[id].index}]</a>`}).join(' ')+'</span>';
+const table=(heads,rows)=>`<div class="table-wrap" tabindex="0"><table><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+const sections=[];
+function section(id,kicker,title,body){sections.push({id,title,html:`<section id="${id}"><div class="eyebrow">${kicker}</div><h2>${title}</h2>${body}</section>`});}
+
+section('verdict','01 / 结论','先明确读者意图，再判断哪些产品能够替代',`
+<p class="lead">AuraReader 已经可以被准确描述为：<strong>以读者意图为中心的本地阅读工作台</strong>。意图的内容只有读者自己知道；产品允许读者表达、改写和展开它，并由读者主动建立与书籍、摘录及笔记的联系。意图可以先于书籍出现，也可以在阅读中产生。这个方向值得继续验证，但公开证据不足以支持“没有竞品”“首次处理为什么阅读”或“用户必然愿意买单”。</p>
+<div class="callout"><b>定位校正：</b>Goal 的含义由读者自己决定，无法由设计者预先穷举。此前用反思、推荐或其他已知用途解释 Goal，偏离了设计基准。系统提供表达、改写、展开与关联的能力，不替读者规定意图内容、阅读方向或产出。下文具体情境只是检查操作能力的样例，不能代表 Goal 的定义或据此圈定全部用户。<a href="goal-positioning-correction-2026-10-27.md">设计依据与校正记录</a>。</div>
+<div class="callout"><b>2026-10-27 纠错：</b>初版把 Deepread 的 README 与数据字段提升为可用竞品流程，证据不足。现撤回其“直接近似竞品”定位，移出核心工作流及能力矩阵；仅在开源附录保留概念参照。用户反馈安装后运行失败、Purpose 缺乏展开交互；本次复核未重现运行环境，不能判定失败原因。<a href="market-research-2026-10-27-correction.md">详细纠错记录</a>。</div>
+<div class="verdict-grid"><article><span class="tag amber">候选待验</span><h3>有意图概念线索，尚无等价流程证明</h3><p>Canto 的公开流程围绕反思、画像和推荐，属于外围阅读辅助参照。出现 intention 一词不能证明其与读者自主定义、持续展开意图的工作台同类。</p>${ref('canto')}</article><article><span class="tag">已证实</span><h3>原文与思考关联已有成熟替代</h3><p>Zotero、LiquidText、MarginNote、Readwise 均覆盖重要环节。用户可以用集合、笔记、脑图或标签搭出接近的工作方式。</p>${ref('zcoll','zreader','lt','mn','rwtag')}</article><article><span class="tag amber">待验证</span><h3>购买理由仍需验证</h3><p>首先验证用户是否需要在阅读中持续表达、改变和展开自己的意图，并自主建立材料关系。少切换、少搭建可能帮助交付这种价值，但不能代替产品核心或被当作已证实的主要购买原因。</p></article></div>
+<div class="callout"><strong>目前最可信的卖点组合：</strong>由读者定义意图 → 在阅读中改写和展开 → 主动建立意图与书籍、摘录及笔记的联系。另有正文旁笔记和章节 Markdown 导出能力。<br>最后一步目前仍以书籍/章节为单位；<b>还不能把整个 Goal 自动导出成跨书成果包。</b></div>
+<p>本报告直接回答六个问题，另外把“规模大”与“流程相近”分开：前者用于看市场边界，后者才决定产品该如何竞争。整个调研没有购买产品、登录第三方账号或实际操作竞品，能力结论来自公开官方文档及少量源码，体验优劣均标明为推断。</p>`);
+
+section('baseline','02 / 实际产品','现在的 Goal，究竟改变了什么',`
+<p>本地代码基线：<code>b6ac96f97a2944455c006a3154cf2f744b1b7018</code>，2026-10-27 核对工作区。检查了 Goal 数据模型、首页、控制器、布局与导出器，以及最新实现记录；没有重跑业务测试。历史 status.md 的旧存储/成熟度描述不作为依据。</p>
+${table(['已实现的行为','实际意义','本地证据'],[
+['无书也可写自由文字 Goal；有父子关系，可原位改写','意图本身是对象，并非给摘录起的分类名','<a href="../src/client/domain/goal.ts">goal.ts</a>；<a href="../src/client/domain/goalEngine.ts">goalEngine.ts</a>'],
+['从 Goal 选书；一本书可主动关联多个 Goal；子 Goal 不自动继承书单','问题可以决定选书，且不被某一本书占有','<a href="../src/client/features/goals/goalHome.ts">goalHome.ts</a>；<a href="goal-books-implementation.md">最新实现记录</a>'],
+['在阅读中把高亮/笔记归入当前 Goal；跨书显示来源并跳回原文','同一意图持续积累不同文本中的材料','<a href="../src/client/features/goals/goalController.ts">goalController.ts</a>'],
+['页边笔记随当前可见原文显示；单页、双页与滚动阅读','思考不必先进入独立整理页面才发生','<a href="../src/client/features/annotations/notesUI.js">notesUI.js</a>；<a href="../README.md">README</a>'],
+['章节正文保留高亮，并在相应段落后放置笔记；本地 Markdown 文件/目录保存','保留阅读上下文，供外部编辑与使用','<a href="../src/client/infrastructure/exporters.js">exporters.js</a>'],
+['本地 SQLite、每书备份含相关 Goal 图；独立 Goal 由数据库一致性备份覆盖','意图和材料可保留，但每书备份不等于全局 Goal 导出','<a href="../README.md">README 数据与备份</a>']])}
+<div class="flow" aria-label="实际阅读流程"><div><b>我的问题</b><small>可先于书籍存在</small></div><span>→</span><div><b>选书与阅读</b><small>同一书服务多个意图</small></div><span>→</span><div><b>摘录与思考</b><small>归入 Goal · 可回原文</small></div><span>→</span><div><b>继续使用</b><small>当前按章节导出</small></div></div>
+<h3>影响定位的真实边界</h3><ul><li><strong>阅读材料边界：</strong>EPUB/TXT 已支持，PDF 正文解析未实现；因此当前不适合把“论文/法律案卷研究”设为主要市场。</li><li><strong>意图演化边界：</strong>改写和建立子 Goal 已实现；没有 Goal 移动/删除、修订历史、独立综合正文或跨书 Goal 成果导出。不能把“完整思想演化记录”当作已交付。</li><li><strong>界面边界：</strong>源码中的侧栏只在单页且可用宽度至少 940 CSS 像素时出现；归入材料要求侧栏可见。双页/滚动并非所有 Goal 操作都同样可达。独立 Goal 页面能浏览，但不能抹去阅读时的操作条件。</li><li><strong>发布边界：</strong>Windows Electron 候选版、未签名、尚未公开发布；不提供云同步或内置 AI。README 仍明确重载不会自动恢复上次阅读位置。它们影响付费转化与持续使用。</li></ul>
+<p class="caption">依据：<a href="../src/client/features/goals/goalLayout.ts">goalLayout.ts</a> 的 available 条件、控制器 canLink、<a href="goal-books-implementation.md">范围说明</a>及 README。上述属于源码/文档核查，不宣称本次重新通过端到端验收。</p>`);
+
+section('landscape','03 / 竞争边界','相似产品按用户工作分层，不能只比有没有 Goal 按钮',`
+<p>首先判断意图由谁定义、如何继续变化，以及材料关系由谁决定；再核查独立存在、层级展开、跨书关联和回原文的实际机制。一个输入框或同名 intention 功能不足以证明同类。下表仍包含外围替代与预算参照，不能把它们一并视为 Goal 直接竞品。</p>
+${table(['竞争层','代表产品','为什么相关','与 AuraReader 的主要区别'],[
+['外围阅读辅助参照','Canto '+ref('canto','cantohome','cantoprivacy'),'记录阅读生活，AI 生成单书反思、读者画像与跨书洞见','商店发布可确认；完整交互未实测，未证明可替代独立、层级、跨书 Goal 工作流'],
+['核心工作流竞争','Readwise Reader、MarginNote、LiquidText、Zotero '+ref('rwtag','mn','lt','zreader'),'阅读、标注、整理、回到来源与复用','标签/学习集/项目/集合可以承载问题，但入口、结构与操作习惯不同'],
+['理解与综合替代','Heptabase；Zotero + Better Notes '+ref('heptawork','bn'),'先有主题和自己的文字，再聚合多份资料','可自由表达问题，综合写作能力更强；Heptabase 原生 EPUB 缺位，BN 需插件'],
+['阅读体验与价格替代','Readest、Koodo、Foliate、Thorium、Marginalia '+ref('readest','koodo','foliate','thorium','marginalia'),'用户可能只需要读书、做笔记和导出','免费/开源/多平台形成价格压力；本轮未确认同等全局 Goal 流程'],
+['大规模相邻市场','Goodnotes、Flexcil '+ref('good','flex'),'在文本旁思考、回看材料，争夺学习预算与注意力','以数字纸张/PDF/手写为主；不能因为规模大就当作完全同类'],
+['中国 Windows 必须关注','BookxNote Pro '+ref('bookx'),'EPUB/PDF、摘录与脑图、外部导出','当前只取得经销商证据；官网抓取超时，商品页下架，功能与销售现状须进一步实测'],
+['关键词相似、任务不同','Leaf 等 reading-goal 追踪器 '+ref('leaf'),'同样使用 goal/intention 语言','页数、截止日期、完成节奏，不能替代自由阅读意图']])}
+<div id="canto-audit"><h3>Canto 专项复核：有发布证据，尚无 Goal 等价性证据</h3>
+<p>针对初版仅凭商店文字作出的判断，本次补查了当前商店、官网、隐私说明、条款和版本记录。结论为<strong>已发布的 AI 阅读反思产品，仅作外围参照</strong>。不能将它与运行状态未验证的概念仓库混为一谈，也不能因为它使用 intention 一词，就确认有 AuraReader 的完整 Goal 系统。<a href="canto-product-audit-2026-10-27.md">完整专项核查与未完成事项</a>。</p>
+${table(['具体问题','取得的证据','判断'],[
+['产品与版本','同一 App ID 6771089037，John Zerbe；当前美区 1.6.0、iPhone、英文 '+ref('canto'),'有发布与更新记录；本次未安装，不等于稳定性验收'],
+['意图的位置','隐私说明将其描述为附在书上的选择理由 '+ref('cantoprivacy'),'没有无书意图、子意图、同书多意图的实现或交互证据'],
+['跨书到底指什么','Claude 生成反思、画像、跨书洞见与推荐 '+ref('cantoprivacy'),'AI 生成内容不等于用户可管理的意图层级和跨书摘录归属'],
+['导入与反思展开','1.5.0 导入书目 CSV；1.2.0 增加按角度继续单书问答 '+ref('canto'),'都不能证明 EPUB 正文阅读、子 Goal 或原文定位'],
+['原文与导出','披露了保存摘录与图片分享；完整正文阅读及 Markdown 导出未取得证据 '+ref('cantoprivacy'),'未证实；不使用“肯定没有”措辞'],
+['本地性','条款要求账号；隐私说明为 Apple 登录、云存储与 AI 处理 '+ref('cantoterms','cantoprivacy'),'与本地免云账户路径不同；不能把 private 理解为纯本地'],
+['用户与商业证据','美区三个评分；官网样本来自开发者本人 '+ref('canto','cantohome'),'不能证明规模、独立用户成功或真实支付意愿']])}
+<p class="caption">纠正缓存：旧 URL 的搜索结果仍停留在 1.1.0；当前直接抓取为 1.6.0，摘录已免费，并有年付方案。页面访问日期不等于内容新鲜度。${ref('cantoold','canto','cantoterms')}</p>
+<p class="caption">证据边界：未取得可核验的官方源码或逐步独立实测；未运行 iPhone App。截图操作被自动审批因用量限制拒绝，没有绕过。以上为来源交叉核查，不是交互验收。</p></div>
+<p><strong>中文市场的现实对照：</strong>“Windows 能用”“有脑图”“支持 Markdown”都不足以排除 BookxNote 和免费阅读器。本文没有拿官网不可访问或经销商下架推导产品死亡，也没有把免费软件自动当成开源。</p>`);
+
+section('scale','04 / 用户规模','公开数据不能产生可信的同类用户量排行榜',`
+<p class="lead">严格的“读者意图中心”品类，尚无可比的公开活跃用户数据，<strong>无法证实用户最多的前三名</strong>。若扩大到阅读、批注与笔记，本次样本中公开规模数字最大的三个候选是 Goodnotes、Zotero、Flexcil；它们的指标口径不同，下列顺序只是披露数值的顺序。</p>
+<div class="scale-grid"><article><small>Goodnotes · 厂商披露</small><strong>2500 万+</strong><p>月活跃用户</p><span>相邻数字笔记市场</span>${ref('good')}</article><article><small>Zotero · 创始成员披露</small><strong>2000 万+</strong><p>Users，非 MAU 定义</p><span>2026-10-05</span>${ref('zscale')}</article><article><small>Flexcil · 厂商披露</small><strong>950 万+</strong><p>Global users，未定义活跃度</p><span>总产品口径，非 Board 单品</span>${ref('flexscale')}</article></div>
+${table(['产品','其他公开规模信号','证据限制 / 排名处理'],[
+['LiquidText','600 万下载；2 万以上每月法律用户 '+ref('ltscale'),'下载不是去重用户；法律月用户只是细分群体。保留为核心流程标杆，不伪造总月活'],
+['MarginNote','中文页称 MN3+MN4 合计 18.8 万评分；英文页显示另一组商店评分数 '+ref('mncn','mn'),'地区/版本口径不一致，评分不能换算用户量，也不能相加得到去重用户'],
+['Readwise Reader','本轮未获得可核验、同口径的当前总用户数','不使用第三方 SEO 页估算、社区成员或官网访问量替代用户数'],
+['Canto','当前美区显示 5.0 / 3 Ratings '+ref('canto'),'三个评分不等于三个用户，不能证明规模、留存或付费；旧缓存“评分不足”已撤回。Deepread 不参与规模比较'],
+['Heptabase / BookxNote','本轮未取得可用于排名的总用户数据','不能因缺数字认定小，也不能凭知名度冠以前三']])}
+<h3>三个规模候选与我们分别服务什么</h3>
+${table(['候选','已核实的特征','用户可能为它选择/付费','AuraReader 的对应位置'],[
+['Goodnotes','数字纸张、手写检索、PDF 批注，已向白板、文本文档与 AI 扩展 '+ref('good'),'延续纸笔习惯、课堂/工作笔记和设备生态（动机推断）','适合键鼠阅读可重排文本；不应向手写、教学白板和笔迹识别正面竞争'],
+['Zotero','层级集合、同资料多集合、独立笔记、跨资料注释与来源链接；EPUB 已进入阅读器 '+ref('zcoll','znotes','zreader','zepub'),'免费核心、文献与引文闭环；现有库和生态带来迁移成本','Goal 让目的与选书/归入材料更集中；优势是流程假设，不是能否表达问题的能力差'],
+['Flexcil','PDF 与笔记并置，跨文档参考链接；平板之外官网已有 Web 版 '+ref('flex','flexlink'),'直接拖取材料、保留来源、手写复习（动机推断）','EPUB 重排阅读、文字型意图与章节 Markdown 更契合当前方向；不能笼统宣传对方没有 PC 入口']])}
+<div class="callout muted"><b>口径敏感性：</b>纳入泛笔记就会引入 Goodnotes，扩大到所有文档工具还会引入更宽泛的市场；只看专门的阅读研究流程，则应深入比较 Readwise、MarginNote、LiquidText、Zotero。本文没有“选三个熟悉名字后宣称它们用户最多”。规模不是产品相似度，也不是可获得市场规模。</div>`);
+
+section('workflow','05 / 深度比较','把同一段真实阅读任务交给不同工具',`
+<p><strong>测试情境：</strong>“我想理解为什么组织会压制异议。”还没选书时先写下问题；加入两本 EPUB；阅读 A 时形成“激励结构”和“群体认同”两个子问题；把 A/B 的相关段落与自己的笔记放进对应问题；一周后回来找原文，并把阅读积累带出。这是桌面研究中的标准化比较情境，<b>不是已执行的竞品实测</b>。</p>
+${table(['产品','按公开能力重建的完成路径','最强替代点','与 AuraReader 的区别或待核实处'],[
+['Readwise Reader','用文档标签/视图组织两书，摘录标签归集材料，在标签笔记本查看并回源；外部笔记应用写长问题 '+ref('rworg','rwtag'),'已支持跨书摘录、页边笔记和带标签摘录导出；把它说成只会收集是失实','独立且可递归展开的自由 Goal 未在所查原生文档中确认；可通过外部笔记补齐，不等于做不到'],
+['MarginNote','将材料放进学习集，摘录成卡；用脑图节点组织问题/论点，再关联和回顾 '+ref('mn'),'层级结构和来源连接都已成熟；能承载问题、自己的文字和材料','它强调卡片/脑图/复习；AuraReader 是问题→书单→阅读。无需复习的用户是否觉得更轻，需真实测量'],
+['LiquidText','创建主题项目，收集多文档摘录，在工作区写问题、分组连线并回源 '+ref('lt'),'跨文档分析与自由工作区直接替代 Goal 材料组织','公开页主要描述 PDF/文档流程；本轮未证实原生 EPUB。不能把未证实改写成永久不支持'],
+['Zotero + Better Notes','以问题命名集合/子集合，建立独立问题笔记；加两书，读后将注释加入笔记，BN 负责结构与 Markdown '+ref('zcoll','znotes','zreader','bn'),'免费核心已覆盖大部分底层关系；BN 补齐笔记链接、模板和双向 Markdown 同步','需要在集合与笔记间维持对应关系；AuraReader 把意图与书/材料关系收在同一对象，但综合正文能力更弱'],
+['Heptabase','先写问题卡片/白板，再放入文献高亮和个人卡片，按理解组织关系 '+ref('heptawork','hepta'),'与“先有自己关心的问题”高度相邻；不能归类为仅整理材料','官方明确原生 EPUB 尚不支持，需先转 PDF 或文本。AuraReader 在 EPUB 阅读入口上有可验证优势 '+ref('heptaepub')],
+['Canto（外围参照）','官方描述：登记书籍及选择理由 → 回答读后问题 → AI 生成反思、画像和推荐；未实测 '+ref('cantohome','cantoprivacy'),'可满足部分读后表达与自我理解需求，但满足程度尚未实证','书目 CSV 导入不等于 EPUB 阅读；深入问答不等于子 Goal；生成跨书洞见不等于用户组织跨书材料。详见专项核查']])}
+<h3>非研究型阅读：同一结构，另一种价值</h3><p>例如“重新感受诗歌”可以关联诗集与散文集，把喜欢的语言和当时的心情放在一起，再生出“声音与节奏”这一子意图。这里没有待完成的研究任务，甚至不需要导出。Canto 的反思、普通阅读日记、手写笔记可能满足其中部分需求，实际替代程度待验；AuraReader 的价值假设是让意图、原文和感受持续相连，而风险是结构化操作打断审美体验。是否愿意付费，需要与问题型阅读分开验证。</p><h3>替代成本，才是差异能否变成购买的关键</h3><p>老 Zotero/Obsidian 用户已有结构、快捷键与资料库，新工具的“少搭建”收益可能抵不过迁移成本。对只想读小说的用户，Goal 可能反而增加操作。围绕问题读多本 EPUB 的人可以作为一个待验证样本，但不能由这一情境推导“最适配用户”或全部市场。用户的意图内容未知，应观察他们如何自行使用 Goal；本轮没有访谈或付费数据足以确定核心人群。</p>`);
+
+section('matrix','06 / 能力矩阵','区分原生支持、组合实现与证据不足',`
+<p class="caption">● = 官方/源码明确支持；△ = 可用通用结构配置或多工具组合；? = 本次未确认；— = 明确不支持或本项目尚未实现。矩阵比较的是所定义的具体能力，不是整体优劣评分。</p>
+${table(['具体能力','AuraReader','Readwise','MarginNote','Zotero + BN','Heptabase'],[
+['无书也存在、可递归展开的自由意图对象','● Goal','△ 外部笔记；原生 ?','△ 脑图节点','△ 集合+独立笔记','△ 卡片/白板'],
+['由同一组织结构访问多书材料并回原文','●','● 标签视图','● 学习集/脑图','● 跨资料笔记','● PDF 高亮/卡片'],
+['原生 EPUB 阅读','●','●','●','●','— 官方明确'],
+['阅读中页边呈现笔记','● 当前屏幕关联','● 足够宽时','● 标注/笔记界面；等同布局 ?','● 侧栏；同等页边布局 ?','● PDF/卡片；同等布局 ?'],
+['按章节把完整正文+行内高亮+段后笔记合为 Markdown','●','? 有全文/标注导出，精确形态未确认','? 不作缺失断言','△ 需额外转换；BN 主要是笔记导出','△ 先转换文本；精确标注形态 ?'],
+['按跨书主题一次导出材料成果','— Goal 导出未实现','● 标签摘录导出','? 需核验输出格式与范围','● BN 笔记导出','? 可组织；具体跨书导出未核验'],
+['全文阅读材料为 PDF','—','●','●','●','●'],
+['纯本地、无需云账号的基础工作','● 桌面','— 需 Readwise 账号；支持离线','? 本轮未核验免账号边界','● 本地核心','? 有离线，不等于免账号'],
+['同步现成阅读积累到其他设备','—','●','● iCloud','● 可选同步','●']])}
+<p>矩阵来源：AuraReader 本地基线；${ref('rwbase','rwtag','rwexport','rwobs','mn','mnprice','zcoll','zreader','bn','hepta','heptaepub')}。其中“配置可替代”是根据公开能力做的推断，未经统一实测。尤其不要把问号当作竞品缺点。</p>`);
+
+section('difference','07 / 差异与反证','我们能做什么他们做不了的？必须限定对象',`
+${table(['可以提出的差异','证据与限定','不能延伸成的说法'],[
+['直接在可重排 EPUB 中继续自己的跨书问题','AuraReader 原生支持；Heptabase 明确要求转换 EPUB '+ref('heptaepub'),'不是所有竞品都不支持 EPUB；Readwise、Zotero、MarginNote、Readest 都支持'],
+['意图独立于书籍，且有子意图与主动书单','这是 AuraReader 源码已实现的能力；与成熟替代工具的优势需要同任务实测','不能通过对比只有单书 Purpose 字段、可用性未确认的项目来证明商业差异或竞品无法做到'],
+['Windows 本地、无需自建标签/集合与问题笔记的配对','相对 MarginNote 的 Apple 平台边界有确定平台差异；相对组合工具属于操作整合 '+ref('mnprice','zcoll','bn'),'不是“Windows 没有深度阅读工具”；LiquidText、Zotero、BookxNote 均是反例'],
+['把标注放回完整章节上下文，直接生成普通 Markdown','源码已实现这一具体输出形态；适合外部编辑','不是“只有我们能导出全文+笔记”；Readwise 已有全文路径，其他工具可组合转换 '+ref('rwfull','rwobs')],
+['在一个轻量界面里使问题、原文和个人思考保持联系','是组合体验与默认流程差异，需统一任务测量中断次数/返回成功率','不是“竞品不能深度思考”，也不是可证明的学习效果提升']])}
+<div class="callout"><b>最重要的反证：</b>Readwise 原生就有页边笔记和跨文档标签摘录；Zotero 原生就有独立笔记与同资料多集合；Heptabase 明确围绕用户关心的问题建立理解。因而 AuraReader 的独特性不能靠把这些产品描述得更弱来成立。${ref('rwtag','znotes','zcoll','heptawork')}</div>
+<p><strong>可防守程度判断：</strong>数据模型与界面组织容易被复制。更可能长期成立的是持续打磨的键鼠阅读体验、可靠的位置关联、低摩擦的意图维护，以及数据可携带性；这些是执行质量，不是已经建立的技术壁垒。只增加 Goal 名词，不能自动产生护城河。</p>`);
+
+section('purchase','08 / 付费逻辑','先验证用户是否需要自主表达和展开意图',`
+${table(['用户/场景','可能购买的结果','现有支撑','反向条件与证据强度'],[
+['围绕个人问题读多本书的终身学习者','隔一周回来仍知道自己在追问什么，并能找到相关段落','独立 Goal、跨书材料、来源跳转','最贴合方向；但尚未验证他们会持续维护 Goal，而非仅创建一次'],
+['已有 Markdown 工作流的写作者/知识工作者','不再反复复制正文、摘录与笔记，减少二次整理','按章节导出完整上下文','功能已交付；用户可能更需要按 Goal 导出，目前缺口明显'],
+['主要用 Windows 键鼠的深度 EPUB 读者','在同一阅读界面里表达想法，少切到笔记工具','页边笔记、Goal 侧栏、字体和版式','应对比 Readwise/BookxNote/Readest 实测；窄窗及非单页是转化风险'],
+['对长期访问和数据控制敏感的读者','不用依赖持续在线服务也能保有阅读积累','本地数据库、备份、Markdown','有外部用户担忧证据，但不是 AuraReader 支付意愿证据；免费开源替代同样强 '+ref('lifetime')],
+['以 PDF、手写、论文引用为主的学生/研究者','批注、图示、引用、同步与检索','AuraReader 当前匹配度低','现在不宜重点争取；成熟竞品更完整'],
+['只想顺畅看小说或移动阅读的人','快速打开、跨设备接续、丰富书源','Goal 价值可能很低','不应为扩大用户量而把这些人算入目标市场']])}
+<h3>公开用户声音说明了什么</h3>
+<div class="two-col"><article><h4>正向信号</h4><p>Readwise 续费讨论中，有用户自述愿意为多格式解析、快速开读、跨设备与笔记输出付费；另一帖的用户认为跨设备接续非常有用，同时关心长期访问。这支持“连续流程”和“积累可用”的价值，但也提醒 AuraReader：云同步与格式广度是对方的购买理由。</p>${ref('paid','lifetime')}</article><article><h4>反向信号</h4><p>同一续费帖中，主要读文章、不会复用高亮的用户认为年费偏高。付费元数据投诉说明基础组织质量很重要；LiquidText 的历史可靠性讨论提示，笔记工具信任成本高。没有据此认定其当前版本不可靠。</p>${ref('paid','metadata','reliable')}</article></div>
+<p class="caption">这些是少量、自选择的公开帖子，无法验证身份或账单；不代表总体比例，也没有用户明确承诺购买 AuraReader。本次未联系用户、未开展访谈、未收取预付款。</p>
+<h3>可采用的卖点措辞</h3><ul><li><b>主卖点：</b>让你的阅读意图，贯穿阅读。</li><li><b>具体承诺：</b>围绕自己的问题组织书籍，把不同书中的摘录和想法放在一起，随时回到原文。</li><li><b>辅助承诺：</b>在正文旁记下思考，把带高亮和笔记的章节保存成 Markdown。</li><li><b>当前不宜宣传：</b>独家深度阅读、自动形成研究成果、提升理解力若干倍、完整记录思想演化、所有设备随时继续。</li></ul>`);
+
+section('pricing','09 / 商业判断','有付费相邻市场，但不能由竞品价格推导我们的售价',`
+${table(['产品','本轮核验价格 / 模式','这说明什么'],[
+['Readwise Full','年付折合 $9.99/月；月付 $12.99/月 '+ref('rwbase','rwprice'),'读者可能为多来源、同步、复习与输出整体付费，不等于单一 EPUB 功能值同价'],
+['MarginNote 4','Pro $12.99 买断（iPhone/iPad）；Max $16.99/年或 $51.99 买断（含 Mac）；AI 配额另有期限 '+ref('mnprice'),'成熟工具已有低价格入口；“比订阅便宜”并非自动形成优势'],
+['Heptabase Pro','常规 $11.99/月或 $107.88/年；旧用户价格另列 '+ref('heptaprice'),'综合思考环境可收费，但其输出、白板、AI 与跨端覆盖更宽'],
+['Canto+','美区 $6.99/月或 $39.99/年；反思、摘录、书库与导入免费。30 天赠送权限结束不会自动收费 '+ref('cantoterms'),'付费偏向深入反思、画像、推荐和跨书洞见；有价格不等于有付费验证。撤回旧缓存中摘录付费的说法'],
+['Marginalia / 开源阅读器','Marginalia 的基础阅读和 Markdown 导出免费；Readest 等提供开源基础 '+ref('marginalia','readestrepo'),'单独的“能标注、能导出”面临免费替代'],
+['LiquidText / Flexcil / BookxNote','有免费/商业产品路径；本轮未核验同地区实时结算价','不采用相互矛盾的第三方报价，不将商店其他产品的金额误读为其价格']])}
+<p>以上美元价格为研究时网页公开值，地区、税与促销可能不同。<strong>本报告不建议现在直接照抄某个价格。</strong>当前更合理的商业假设是为经过验证的桌面体验、稳定交付和持续维护收费；是否采用版本买断、付费升级或订阅，需要行为证据与支持成本一起决定。项目当前 Apache-2.0 源码与免费替代也意味着，商业价值不能只来自“独占这些代码”。</p>
+<h3>下一步最小验证，而非直接扩功能</h3>${table(['待证假设','可执行验证建议（未执行）','失败信号'],[
+['Goal 会持续改变阅读方式','找 8–12 位真实多书 EPUB 读者，用自己的书连续使用两周；允许不用 Goal','只在第一天创建；后续不返回、不修改、不归入材料'],
+['整合流程比已有工具更省心','同一任务对比现有工具与 AuraReader，记录第一次归入、跨书回源和一周后找材料的成功率及中断','喜欢界面但实际仍依赖原工具完成任务'],
+['用户愿为这个过程付费','在可交付候选版和明确更新范围下测试真实购买选择；先问现有付费/替代成本，再问报价','只表示“不错”，没有持续使用或真实付款行为'],
+['上下文导出会被继续使用','观察导出文件是否被打开、编辑、引用；单独询问章节导出还是 Goal 导出更有用','文件只是生成，从未复用；真正需要的是尚未实现的 Goal 汇编']])}
+<p class="caption">样本量是可操作的定性验证建议，不用于统计推断市场规模。隐私敏感资料可由用户自主选取；本轮没有实际收集。</p>`);
+
+section('opensource','10 / 开源生态','七个仓库：区分产品替代与未验收概念项目',`
+<p>通过 GitHub 连接器核对仓库元数据、README、关键类型或许可证。下表日期来自仓库 <code>pushed_at</code> 或发布页；推送可含文档/分支变化，不能等同于稳定版质量或活跃用户。全部七个仓库在查询时未归档。这里的“核验”仅指仓库身份、许可与活动记录，绝不代表七个项目都安装成功或能完成所述流程；Deepread 只保留为概念参照。</p>
+${table(['项目 / 许可','维护证据（UTC）','与本项目的关系','需要留意'],[
+['<a href="https://github.com/AyingAI/deepread">AyingAI/deepread</a><br>MIT','最近推送 2026-07-18','概念参照，已排除出核心竞品比较。源码有单书 Purpose 编辑、导出/回顾引用；未证明可用的意图组织工作流 '+ref('deepui')+'','用户反馈安装后运行失败；本次未独立复现。没有稳定可用性证据；MIT/推送日期不等于功能验收'],
+['<a href="https://github.com/readest/readest">readest/readest</a><br>AGPL-3.0-or-later','推送 2026-10-26；v0.12.16 / 2026-10-13','跨平台 EPUB 阅读、标注、并行阅读、深链接与导出 '+ref('readest','readestrepo'),'对阅读体验、格式覆盖和免费价格形成直接压力'],
+['<a href="https://github.com/koodo-reader/koodo-reader">koodo-reader/koodo-reader</a><br>AGPL-3.0','推送 2026-10-26；v2.4.6 / 2026-10-07','多平台、多格式，笔记/高亮导出 Markdown 等 '+ref('koodo'),'不能把它概括成只能读书；需区分源码功能与商业服务'],
+['<a href="https://github.com/zotero/zotero">zotero/zotero</a><br>AGPL-3.0','推送 2026-10-26；该 API 未取得 latest release','已有本地库、EPUB、集合、笔记和来源关系 '+ref('zlicense','zepub'),'API license 显示 NOASSERTION；已用 COPYING 与官方许可页核实，未误报为无许可证'],
+['<a href="https://github.com/windingwind/zotero-better-notes">windingwind/zotero-better-notes</a><br>AGPL-3.0','v3.3.3 / 2026-08-24','增强笔记结构、跨文献模板、双向 Markdown 同步 '+ref('bn'),'是插件，需匹配 Zotero 版本；它使“Zotero 不会组织思考”这一比较更站不住'],
+['<a href="https://github.com/johnfactotum/foliate">johnfactotum/foliate</a><br>GPL-3.0-or-later','推送 2026-04-08；3.3.0 / 2025-04-01','阅读与标注体验参照，尤其 Linux 生态 '+ref('foliate'),'稳定版距今较久，但不能由此判定项目停止；与 Windows 定位不完全重叠'],
+['<a href="https://github.com/edrlab/thorium-reader">edrlab/thorium-reader</a><br>BSD-3-Clause','推送 2026-10-26；v3.5.1 / 2026-09-02','桌面 EPUB、Readium、可访问性基准 '+ref('thorium'),'正式 LCP 组件不全在开源仓库内；不要把整套分发能力当作直接可复制源码']])}
+<p>机器可读核验记录：<a href="market-research-2026-10-27-repositories.json">repositories.json</a>。许可仅用于标识项目，不能据此把不同许可代码直接混入当前仓库；本轮没有复制或引入任何竞品代码。</p>
+<p class="caption">扩展检索中，思源主仓库与 Docear 的候选路径在当前连接器返回 404，未用猜测补全其状态或许可证，也未列入“已核验七个”。BookxNote 商店可下载不等于已开源。阅读底座本身丰富，进一步强调了 AuraReader 应靠具体流程和交付质量竞争。</p>`);
+
+section('priorities','11 / 产品含义','先把“意图贯穿阅读”做实，再扩大市场承诺',`
+<div class="two-col"><article><h3>最值得保持的方向</h3><p>保持意图的定义权在读者手中。自由文字、改写、子 Goal 与主动关联服务于读者自行表达和展开意图；系统不从材料推断其含义，不预设用途或要求产出。意图可在阅读前或阅读中产生。</p></article><article><h3>最需要补齐的闭环</h3><p>若用户在 Goal 下积累多书材料，却不能整理、移动、放下或带出整个意图及其积累，意图系统长期使用会受阻。Goal 生命周期和按 Goal 输出的验证优先级，应高于装饰性统计或自动生成答案。</p></article></div>
+${table(['优先问题','为什么影响市场判断','本轮结论'],[
+['阅读位置恢复、可靠保存、来源定位','损失一次笔记就可能抵消所有新颖概念价值','已有保存/备份建设；重载续读与发布验收仍应重视，不能声称全面成熟'],
+['所有主要阅读模式下 Goal 的可达性','双页/滚动用户可能看不见或不能执行最核心操作','这是当前源码可见的限制；需要体验验证，不应由报告擅自改实现'],
+['Goal 整理与输出','决定长期积累能否继续使用','缺少移动/删除及 Goal 成果导出，当前卖点必须收窄'],
+['中文 Windows EPUB 首批用户','与实际平台、输入方式和格式最贴合','先验证小而明确的场景，再决定 PDF、同步或其他扩展'],
+['不对竞品制造虚假缺口','市场上已经有意图、页边笔记、跨书组织和全文输出','对外描述应突出组合体验及适配用户，而非无法证明的唯一性']])}
+<div class="closing"><small>建议定位</small><p>AuraReader 是以读者自主定义的意图为核心的本地阅读工作台，让读者在阅读中表达、改写和展开自己的意图，并自行建立意图与书籍、摘录及笔记的联系。</p><span>“让你的阅读意图，贯穿阅读。”</span></div>
+<p>这是一项由当前实现支持的产品定位。它的商业成立条件仍是：有一群人反复使用这条路径，并认为省下的搭建、切换和回找成本足以支付价格。当前证据支持继续验证，不支持宣布品类垄断、需求已成立或给出收入预测。</p>`);
+
+section('method','12 / 方法与局限','新证据独立采集；明确源码、声明与实测的差别',`
+<p>本次重新检索中英文 reading intention、purpose reading、跨书材料、EPUB 注释导出、用户规模、官方定价与开源仓库；从意图近似扩展到完整工作流，再查规模和反证。旧报告只作归档，没有继承其竞争结论。共整理 ${sources.length} 项来源与七个仓库核验记录。</p>
+<ul><li><b>A：源码证据。</b>只能证明所查提交中的结构与代码路径；未经安装、交互和持久化核验，不能直接称为已交付流程。官方文档只证明厂商声明。</li><li><b>B：主体披露。</b>厂商/项目负责人用户数字、价格、营销说明；保留口径和时间，不视作独立审计。</li><li><b>C：用户/渠道信号。</b>论坛自述及经销商内容；只用于发现痛点和候选，不能外推比例或保证功能现状。</li><li><b>分析推断。</b>替代路径、目标用户、竞争优先级与购买动机；均需实际使用或付费行为验证。</li></ul>
+<p>限制：没有统一安装实测、没有当前竞品内部分析数据、没有同口径 MAU/付费人数、没有完整市场穷举、没有真实购买实验。BookxNote 官网抓取超时；部分论坛页读取有限；Zotero 2025 年报原始 PDF 披露 1730 万用户，当前规模采用已打开的 2026-10-05 原始文章，两者都未提供可直接比较的 MAU 定义。源码核查覆盖关键模型，未做竞品全代码审计。</p>
+<p>归档：<a href="archive/market-research/2026-10-27/README.md">历史调研索引与链接对照</a>；<a href="archive/market-research/2026-10-27/manifest.json">原文字节哈希</a>。归档原文中的旧相对链接保持原样，索引提供正确目标；未改业务代码。</p>`);
+
+const css=`:root{--ink:#162b2c;--muted:#5d6b6a;--line:#d9e1dc;--paper:#f5f6f0;--green:#23594d;--gold:#d9ae60}*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.85 'Segoe UI','Microsoft YaHei',sans-serif}a{color:#22695c;text-decoration-thickness:1px;text-underline-offset:3px;overflow-wrap:anywhere}a:focus-visible,button:focus-visible{outline:3px solid #b16d1c;outline-offset:3px}header{background:#173b35;color:#fff;padding:72px max(6vw,24px) 60px}header .wrap{max-width:1260px;margin:auto}.eyebrow{font-size:12px;letter-spacing:.12em;font-weight:700;color:#637b71;text-transform:uppercase}header .eyebrow{color:#d9b67b}h1{font-size:clamp(34px,4.5vw,64px);line-height:1.25;margin:20px 0 24px;font-weight:650;letter-spacing:-.03em}header p{max-width:820px;font-size:19px;color:#d8e2dd}header .meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:32px;font-size:13px;color:#bed0c6}.meta span{border:1px solid #5d7c70;padding:5px 12px;border-radius:20px}.layout{max-width:1510px;margin:auto;display:grid;grid-template-columns:225px minmax(0,1fr);gap:42px;padding:48px 36px 80px}aside{align-self:start;position:sticky;top:24px;font-size:13px;border-right:1px solid var(--line);padding-right:20px}aside strong{display:block;margin-bottom:16px;color:var(--green)}aside a{display:block;padding:7px 0;color:var(--muted);text-decoration:none;line-height:1.6}aside a:hover{color:var(--green)}main{min-width:0}section{background:#fff;border:1px solid var(--line);border-radius:12px;padding:36px;margin-bottom:26px;overflow:hidden}h2{font-size:28px;line-height:1.4;margin:12px 0 24px;letter-spacing:-.02em}h3{font-size:20px;line-height:1.6;margin:28px 0 12px}h4{margin:0 0 10px;font-size:18px}p{margin:12px 0 18px}.lead{font-size:19px;line-height:1.9}.refs{white-space:normal;font-size:11px;vertical-align:super;margin-left:4px}.refs a{text-decoration:none;margin-right:3px}.verdict-grid,.scale-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:24px 0}.verdict-grid article,.two-col article{background:#f1f5f0;padding:23px;border-radius:8px;min-width:0}.verdict-grid h3{font-size:18px;margin:14px 0 8px}.verdict-grid p{font-size:14px;line-height:1.8}.tag{display:inline-block;background:#d8e9dc;color:#24503a;padding:1px 9px;border-radius:4px;font-size:11px}.tag.amber{background:#f6e8c9;color:#775620}.callout{background:#fff6e2;border-left:4px solid #c5a25b;padding:20px 24px;margin:24px 0}.callout.muted{background:#edf3f0;border-color:#618b79}.table-wrap{overflow-x:auto;margin:24px 0;max-width:100%;border:1px solid var(--line);border-radius:7px}table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.75;min-width:720px}th{text-align:left;background:#e8efea;color:#254d40;font-size:13px;white-space:normal}td,th{padding:15px 16px;border-bottom:1px solid var(--line);vertical-align:top}td:first-child{font-weight:600;min-width:145px}tbody tr:last-child td{border-bottom:0}tbody tr:nth-child(even){background:#fafbf8}#matrix table{min-width:1100px}#matrix td:first-child{min-width:220px}#matrix td{min-width:128px}.caption{font-size:13px;color:var(--muted)}code{font-size:12px;background:#edf0ed;padding:3px 5px;overflow-wrap:anywhere}.flow{display:flex;align-items:center;gap:12px;margin:28px 0}.flow div{background:#edf3ef;flex:1;text-align:center;padding:20px 10px;min-width:0;border-top:3px solid #4d806b}.flow small{display:block;font-size:11px;color:var(--muted);margin-top:6px}.flow span{color:#789786}.scale-grid article{padding:24px 20px;border:1px solid #d5e3d8;background:#f1f6ef;border-radius:8px}.scale-grid strong{display:block;font-size:35px;line-height:1.5;color:#285640;margin-top:14px}.scale-grid small,.scale-grid span{display:block;font-size:12px;color:var(--muted)}.scale-grid p{font-size:14px;margin:3px 0 12px}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:24px 0}.two-col h3{margin-top:0}.closing{background:#183c34;color:#fff;padding:28px 32px;margin:28px 0;border-radius:8px}.closing small{color:#d9b67b;font-size:13px}.closing p{font-size:23px;line-height:1.8}.closing span{color:#c5d8cb}li{margin:10px 0}#sources ol{padding-left:26px}#sources li{padding:13px 0;border-bottom:1px solid var(--line);font-size:14px}#sources small{display:block;color:var(--muted);font-size:12px;line-height:1.6;margin-top:5px}button{background:#23594d;color:#fff;border:0;border-radius:4px;padding:10px 16px;cursor:pointer}footer{text-align:center;padding:20px;color:var(--muted);font-size:12px}@media(max-width:1100px){.layout{grid-template-columns:170px minmax(0,1fr);gap:22px;padding:28px 20px}section{padding:24px}.verdict-grid,.scale-grid{grid-template-columns:1fr}.scale-grid strong{font-size:30px}}@media(max-width:760px){header{padding:45px 22px}.layout{display:block;padding:22px 14px}aside{position:static;border:0;border-bottom:1px solid var(--line);margin-bottom:24px;padding-bottom:20px;display:flex;flex-wrap:wrap;gap:8px 18px}aside strong{width:100%;margin:0}aside a{font-size:12px;padding:2px 0}section{padding:22px 18px}h2{font-size:24px}.two-col{grid-template-columns:1fr}.flow{flex-direction:column}.flow div{width:100%}.flow span{transform:rotate(90deg)}.lead{font-size:17px}.closing p{font-size:19px}}@media print{body{background:#fff;font-size:11pt}header{padding:25px;background:#fff;color:#173b35}header p,header .meta{color:#4b6259}h1{font-size:32px}.layout{display:block;padding:0}aside,button{display:none}section{border:0;padding:20px 0;break-inside:auto}h2,h3{break-after:avoid}table{min-width:0!important;font-size:9pt}#matrix table{font-size:7pt}#matrix td,#matrix td:first-child{min-width:0}.table-wrap{overflow:visible}td,th{padding:8px}tr{break-inside:avoid}.refs{font-size:8pt}a{color:inherit}.verdict-grid,.scale-grid{grid-template-columns:repeat(3,1fr)}.closing{background:#eee;color:#111}}`;
+const html=`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>AuraReader｜意图驱动阅读市场研究 · 2026-10-27</title><style>${css}</style></head><body><header><div class="wrap"><div class="eyebrow">AURAREADER / INDEPENDENT MARKET RESEARCH</div><h1>从“读一本书”<br>到“带着自己的意图阅读”</h1><p>以当前 Goal 系统与真实产品流程为起点，重新审视同类产品、竞争规模、差异化、购买动机与开源生态。</p><div class="meta"><span>2026 年 10 月 27 日 · 北京时间</span><span>${sources.length} 项来源 / 7 个核验仓库</span><span>公开资料研究 · 非购买意愿实证</span></div></div></header><div class="layout"><aside aria-label="报告目录"><strong>报告导航</strong>${sections.map((s,i)=>`<a href="#${s.id}">${String(i+1).padStart(2,'0')} ${s.title.split('，')[0].split('；')[0]}</a>`).join('')}<a href="#sources">13 来源与证据</a><button type="button" onclick="window.print()">打印 / 保存 PDF</button></aside><main>${sections.map(s=>s.html).join('')}<section id="sources"><div class="eyebrow">13 / SOURCES</div><h2>来源与证据索引</h2><p>除单独标明外，来源访问日期均为 2026-10-27（Asia/Shanghai）。官方事实、厂商规模声明、渠道信息与用户自述的证明力不同；访问日期不是数据统计日期。正文中的编号可跳到这里，标题链接直达原始页面。</p><ol>${sources.map(s=>`<li id="source-${s.id}"><a href="${s.url}" target="_blank" rel="noopener noreferrer">${s.title}</a><small>${s.note} · 访问：${s.accessed}</small></li>`).join('')}</ol><p><a href="market-research-2026-10-27-sources.json">来源索引 JSON</a> · <a href="market-research-2026-10-27-repositories.json">仓库核验 JSON</a> · <a href="archive/market-research/2026-10-27/README.md">旧调研归档索引</a></p></section></main></div><footer>AuraReader · 以 2026-10-27 核验状态为准 · 自包含 HTML，无外部字体、脚本或统计追踪</footer></body></html>`;
+fs.writeFileSync(path.join(root,'market-research-2026-10-27.html'),html,'utf8');
+fs.writeFileSync(path.join(root,'market-research-2026-10-27-sources.json'),JSON.stringify(sources,null,2),'utf8');
+console.log(JSON.stringify({sections:sections.length,sources:sources.length,bytes:Buffer.byteLength(html),output:'docs/market-research-2026-10-27.html'}));

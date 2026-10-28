@@ -1,0 +1,121 @@
+{
+  "initialGoal": "Stop checking my phone while reading.",
+  "evolvedGoal": "Put my phone away. Read for 20 minutes.",
+  "goalId": "remotion-focused-reading-goal",
+  "durationSeconds": 39,
+  "notesAre": "Original fictional reader notes written for this product demonstration, not quotations from the books or evidence of a real user outcome.",
+  "durationIs": "20 minutes is the fictional reader’s own choice. Neither book prescribes this exact phone-reading routine.",
+  "materials": [
+    {
+      "bookId": "remotion-focus-bennett",
+      "title": "How to Live on 24 Hours a Day",
+      "fullTitle": "How to Live on 24 Hours a Day",
+      "author": "Arnold Bennett",
+      "chapter": "VII · Controlling the Mind",
+      "sourcePage": 2,
+      "chapterAnchor": "pgepubid00010",
+      "sourceUrl": "https://www.gutenberg.org/cache/epub/2274/pg2274-images.html",
+      "highlight": {
+        "annotationId": "remotion-focus-bennett-highlight",
+        "exactText": "Bring it back by the scruff of the neck.",
+        "linkToGoal": false
+      },
+      "note": {
+        "annotationId": "remotion-focus-bennett-note",
+        "exactAnchor": "Do not despair. Continue. Keep it up.",
+        "text": "When I drift, return to the next sentence.",
+        "textZh": "走神时，就回到下一句。",
+        "linkToGoal": true
+      },
+      "contextParagraph": "Bring it back by the scruff of the neck. Ere you have reached the station you will have brought it back about forty times. Do not despair. Continue. Keep it up. You will succeed. You cannot by any chance fail if you persevere. It is idle to pretend that your mind is incapable of concentration. Do you not remember that morning when you received a disquieting letter which demanded a very carefully-worded answer? How you kept your mind steadily on the subject of the answer, without a second's intermission, until you reached your office; whereupon you instantly sat down and wrote the answer? That was a case in which you were roused by circumstances to such a degree of vitality that you were able to dominate your mind like a tyrant. You would have no trifling. You insisted that its work should be done, and its work was done.",
+      "takeawayZh": "第一本书给出阅读中的应对动作：注意力跑开后，重新回到眼前这一句。",
+      "location": {
+        "sectionId": "chapter-2",
+        "page": 2,
+        "offset": 43335,
+        "start": 43335,
+        "end": 43373
+      }
+    },
+    {
+      "bookId": "remotion-focus-james",
+      "title": "Talks to Teachers on Psychology",
+      "fullTitle": "Talks To Teachers On Psychology; And To Students On Some Of Life's Ideals",
+      "author": "William James",
+      "chapter": "VIII · The Laws of Habit",
+      "sourcePage": 2,
+      "chapterAnchor": "pgepubid00013",
+      "sourceUrl": "https://www.gutenberg.org/cache/epub/16287/pg16287-images.html",
+      "highlight": {
+        "annotationId": "remotion-focus-james-highlight",
+        "exactText": "put yourself assiduously in conditions that encourage the new way",
+        "linkToGoal": false
+      },
+      "note": {
+        "annotationId": "remotion-focus-james-note",
+        "exactAnchor": "make engagements incompatible with the old",
+        "text": "Phone in another room before I start.",
+        "textZh": "开始前，把手机放到另一个房间。",
+        "linkToGoal": true
+      },
+      "contextParagraph": "In Professor Bain's chapter on 'The Moral Habits' there are some admirable practical remarks laid down. Two great maxims emerge from the treatment. The first is that in the acquisition of a new habit, or the leaving off of an old one, we must take care to launch ourselves with as strong and decided an initiative as possible. Accumulate all the possible circumstances which shall reinforce the right motives; put yourself assiduously in conditions that encourage the new way; make engagements incompatible with the old; take a public pledge, if the case allows; in short, envelope your resolution with every aid you know. This will give your new beginning such a momentum that the temptation to break down will not occur as soon as it otherwise might; and every day during which a breakdown is postponed adds to the chances of its not occurring at all.",
+      "takeawayZh": "第二本书带来另一个角度：我可以先改变阅读条件，再开始这一次阅读。",
+      "location": {
+        "sectionId": "chapter-2",
+        "page": 2,
+        "offset": 85742,
+        "start": 85742,
+        "end": 85784
+      }
+    }
+  ],
+  "goalMaterials": [
+    {
+      "goalId": "remotion-focused-reading-goal",
+      "annotationId": "remotion-focus-bennett-note",
+      "bookId": "remotion-focus-bennett"
+    },
+    {
+      "goalId": "remotion-focused-reading-goal",
+      "annotationId": "remotion-focus-james-note",
+      "bookId": "remotion-focus-james"
+    }
+  ],
+  "timeline": [
+    {
+      "from": 0,
+      "to": 3,
+      "action": "Idea appears"
+    },
+    {
+      "from": 3,
+      "to": 7,
+      "action": "Create the initial Goal; enter it explicitly"
+    },
+    {
+      "from": 7,
+      "to": 12,
+      "action": "Add Book A; explicitly open its card; move to the verified passage"
+    },
+    {
+      "from": 12,
+      "to": 18,
+      "action": "Highlight A; create the separate margin note; finish editing; explicitly link the note to the Goal"
+    },
+    {
+      "from": 18,
+      "to": 29,
+      "action": "Read Book B under the same Goal; highlight and add its note; explicitly link the note; rewrite the same Goal as evolvedGoal"
+    },
+    {
+      "from": 29,
+      "to": 35,
+      "action": "Present Achieve / Archive / Delete as three alternatives from the same unchanged starting state"
+    },
+    {
+      "from": 35,
+      "to": 39,
+      "action": "AuraReader / Your reading. Your direction."
+    }
+  ]
+}

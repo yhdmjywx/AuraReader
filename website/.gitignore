@@ -1,0 +1,4 @@
+# Keep the standalone static website despite the parent project's dist/ ignore.
+!dist/
+!dist/**
+*.zip

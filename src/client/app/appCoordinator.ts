@@ -1,3 +1,8 @@
+import type { GoalController } from '../features/goals/goalController.js';
+import type { GoalSourceLink } from '../domain/goal.js';
+import type { StoredAnnotation } from '../../shared/storage.js';
+import { bookVersion, readBooks } from '../infrastructure/storageClient.js';
+import { stageBookIntent } from '../infrastructure/goalLibraryRepository.js';
 import type { Session } from './session.js';
 import type { ReaderController } from '../features/reader/readerController.js';
 import type { AnnotationController } from '../features/annotations/annotationController.js';
@@ -10,6 +15,7 @@ import type { ReaderMode } from '../domain/book.js';
 import type { NoteDraft } from './contracts.js';
 import { errorMessage } from '../infrastructure/storageError.js';
 interface CoordinatorDependencies {
+    goalController?: GoalController;
     session: Session;
     readerController: ReaderController;
     annotationController: AnnotationController;
@@ -30,11 +36,12 @@ import {
     loadBookFromDB,
     saveBookToDB,
     deleteBookFromDB,
-    demoBooks
+    demoBooks,
+    getSeedNotes
 } from '../infrastructure/bookRepository.js';
 
 import { parseEpub, parseTxt } from '../infrastructure/epubParser.js';
-import { loadNotesForBook } from '../infrastructure/annotationRepository.js';
+import { loadNotesForBook, saveNoteToDB } from '../infrastructure/annotationRepository.js';
 import { isNote } from '../domain/annotationEngine.js';
 
 const demos: Record<string, (typeof demoBooks)[keyof typeof demoBooks]> = demoBooks;
@@ -48,7 +55,9 @@ export class AppCoordinator {
     selection?: SelectionController;
     backup?: BackupController;
     shell?: AppShell;
+    goals?: GoalController;
     private openBookRequestId: number;
+    onBookOpened?: () => void;
     constructor({
         session,
         readerController,
@@ -57,7 +66,8 @@ export class AppCoordinator {
         layoutController,
         selectionController,
         backupController,
-        appShell
+        appShell,
+        goalController
     }: CoordinatorDependencies) {
         this.session = session;
         this.reader = readerController;
@@ -67,17 +77,21 @@ export class AppCoordinator {
         this.selection = selectionController;
         this.backup = backupController;
         this.shell = appShell;
+        this.goals = goalController;
         this.openBookRequestId = 0;
     }
 
-    async openBook(bookId: string) {
+    async openBook(bookId: string, sourceRequestId?: number) {
         if (!bookId) return;
+        if (sourceRequestId === undefined) this.sourceRequest++;
+        else if (sourceRequestId !== this.sourceRequest) return;
         const requestId = ++this.openBookRequestId;
         this.shell?.setBookLoading?.(true);
 
         try {
             // Finish the old book's editor before reading, while it still owns
             // the session. Reads below must not replace any current UI state.
+            await this.goals?.finishInlineEdit();
             await this.annotations.finishInlineEdit();
             if (requestId !== this.openBookRequestId) return;
 
@@ -86,6 +100,9 @@ export class AppCoordinator {
             if (!book && demos[bookId]) {
                 book = { id: bookId, ...demos[bookId] };
                 await saveBookToDB(book);
+                if (requestId !== this.openBookRequestId) return;
+                // Factory examples are installed only when explicitly opened.
+                for (const note of (getSeedNotes() as StoredAnnotation[]).filter(note => note.bookId === bookId)) await saveNoteToDB(note);
                 if (requestId !== this.openBookRequestId) return;
             }
             if (!book) {
@@ -100,9 +117,12 @@ export class AppCoordinator {
             // Session subscribers see the matching reader and annotations.
             this.annotations.setNotesForBook(notes);
             this.reader.setBook(bookId, book);
+            this.onBookOpened?.();
+            this.goals?.useReadingSurface();
             this.session.setCurrentBookId(bookId);
             this.reader.renderPage(1, false, this.annotations.getNotes());
             this.annotations.refreshVisibleNotes();
+            this.goals?.bookChanged();
 
             if (this.shelf) await this.shelf.refreshShelf();
             if (requestId === this.openBookRequestId) {
@@ -119,7 +139,7 @@ export class AppCoordinator {
         }
     }
 
-    async importBook(file: File) {
+    async importBook(file: File, targetGoalId?: string): Promise<string | undefined> {
         if (!file) return;
 
         if (this.shell) {
@@ -145,17 +165,28 @@ export class AppCoordinator {
 
             if (!bookObj) throw new Error("无法解析该文件格式");
 
-            await saveBookToDB(bookObj);
+            const saved = await saveBookToDB(bookObj);
+            if (targetGoalId) {
+                try {
+                    if (!saved?.generation) throw new Error('The saved book version is unavailable');
+                    stageBookIntent({ goalId: targetGoalId, bookId: bookObj.id, generation: saved.generation });
+                    await this.goals?.addBook(targetGoalId, bookObj.id, saved.generation);
+                }
+                catch (error) { throw new Error(`Book saved in the library. Goal association is pending: ${errorMessage(error, 'Please retry adding the book')}`); }
+                await this.shelf?.refreshShelf(); return bookObj.id;
+            }
             await this.openBook(bookObj.id);
 
             if (this.shell) {
                 this.shell.showToast(`成功解析并入库《${bookObj.title}》！`);
             }
+            return bookObj.id;
         } catch (err) {
             console.error("书籍导入失败:", err);
             if (this.shell) {
                 this.shell.showToast(`图书导入失败: ${errorMessage(err, '无法解析该文件格式')}`);
             }
+            if (targetGoalId) throw err;
         }
     }
 
@@ -197,6 +228,20 @@ export class AppCoordinator {
         }
     }
 
+    async jumpToGoalSource(source: GoalSourceLink) {
+        const request = ++this.sourceRequest;
+        await this.goals?.finishInlineEdit();
+        await readBooks();
+        const book = await bookVersion(source.bookId);
+        if (request !== this.sourceRequest) return;
+        if (book.generation !== source.generation) { this.shell?.showToast('原文来源已删除或变化'); return; }
+        if (this.session.getCurrentBookId() !== source.bookId) await this.openBook(source.bookId, request);
+        if (request !== this.sourceRequest || this.session.getCurrentBookId() !== source.bookId) return;
+        if ((await bookVersion(source.bookId)).generation !== source.generation || request !== this.sourceRequest) { this.shell?.showToast('原文来源已变化'); return; }
+        if (!this.annotations.getNotes().some(n => n.id === source.annotationId)) { this.shell?.showToast('原文标注已不存在'); return; }
+        this.goals?.useReadingSurface(); this.jumpToAnnotation(source.annotationId);
+    }
+    private sourceRequest = 0;
     jumpToAnnotation(annotationId: string, options: { showMenu?: boolean } = {}) {
         if (!this.annotations) return;
         const notes = this.annotations.getNotes();
@@ -260,6 +305,7 @@ export class AppCoordinator {
     async deleteBook(bookId: string) {
         if (!bookId) return;
         if (this.session.getCurrentBookId() === bookId) await this.annotations.finishInlineEdit?.();
+        if (this.session.getCurrentBookId() === bookId) await this.goals?.finishInlineEdit();
         await deleteBookFromDB(bookId);
         if (this.shelf) {
             await this.shelf.refreshShelf();

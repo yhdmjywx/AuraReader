@@ -46,6 +46,7 @@ function submit(entry: PendingNoteWrite, retry = false) {
         } catch (cause) {
             const error = new StorageClientError(errorMessage(cause, '笔记保存失败'), { cause });
             error.status = cause instanceof StorageClientError ? cause.status : undefined; error.recoveryAvailable = entry.durable !== false;
+            error.details = cause instanceof StorageClientError ? cause.details : undefined;
             throw error;
         }
     });

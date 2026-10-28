@@ -238,6 +238,28 @@ export class ReaderController {
         return loc;
     }
 
+    refreshAnnotations(notes: Annotation[] = []) {
+        const elements = this.elements;
+        if (!elements) return;
+        const viewport = elements.bookPaper?.ownerDocument.getElementById('reader-viewport');
+        const surfaces = [viewport, elements.bookPaper, elements.bookPaperRight].filter((node): node is HTMLElement => !!node);
+        const positions = surfaces.map(node => ({ node, left: node.scrollLeft, top: node.scrollTop }));
+        if (elements.bookPaper) {
+            applyHighlightsToPaper(elements.bookPaper, this.currentLeftPage, notes);
+            for (const title of elements.bookPaper.querySelectorAll<HTMLElement>('[data-volume-title-page]')) {
+                applyHighlightsToPaper(title, Number(title.dataset.volumeTitlePage), notes);
+            }
+        }
+        if (!this.isChapterFlow() && elements.bookPaperRight && this.currentRightPage) {
+            applyHighlightsToPaper(elements.bookPaperRight, this.currentRightPage, notes);
+        }
+        for (const { node, left, top } of positions) {
+            node.scrollLeft = left;
+            node.scrollTop = top;
+        }
+        this.callbacks.onPageRendered?.();
+    }
+
     nextPage(notes: Annotation[] = []): ReadingLocation {
         if (this.isChapterFlow()) return this.stepChapter(1, notes);
         const isDouble = this.layoutController ? this.layoutController.isDoublePageEffective() : false;

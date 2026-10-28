@@ -1,0 +1,24 @@
+const assert = require('node:assert/strict');
+const { validateGoalState } = require('../../src/server/goalValidation');
+(async () => {
+    const { emptyGoals, addGoal, changeGoal, linkGoal, unlinkGoal, goalChildren } = await import('../../dist/client/domain/goalEngine.js');
+    const draft = (id, parentId = null) => ({ id, parentId, text: '<own words>\n第二行', origin: null });
+    let state = emptyGoals('book'); state = addGoal(state, draft('root'));
+    state = addGoal(state, { ...draft('child', 'root'), origin: { sourcePage: 2, sectionId: 'chapter-2', chapter: 'Two' } });
+    assert.equal(goalChildren(state, 'root', 1).length, 0);
+    assert.equal(goalChildren(state, 'root', 2).length, 1);
+    state = changeGoal(state, 'root', 'What am I looking for?\n');
+    assert.equal(changeGoal(state, 'root', '  '), state);
+    assert.throws(() => addGoal(state, draft('root')));
+    state = linkGoal(state, 'child', 'note'); assert.equal(linkGoal(state, 'child', 'note'), state);
+    state = linkGoal(state, 'root', 'note'); assert.equal(state.links.length, 2);
+    assert.equal(unlinkGoal(state, 'child', 'note').links.length, 1);
+    assert.throws(() => validateGoalState(state, () => false));
+    assert.throws(() => validateGoalState({ ...state, goals: [{ ...state.goals[0], parentId: 'child' }, state.goals[1]] }));
+    assert.throws(() => validateGoalState({ ...state, goals: [{ ...state.goals[0], parentId: 'missing' }, state.goals[1]] }));
+    assert.throws(() => validateGoalState({ ...state, links: [...state.links, state.links[0]] }));
+    const now = new Date().toISOString();
+    const deep = { bookId: 'deep', links: [], goals: Array.from({ length: 12000 }, (_, i) => ({ id: String(i), parentId: i ? String(i - 1) : null, text: 'Question', origin: null, createdAt: now, updatedAt: now })) };
+    assert.equal(validateGoalState(deep), deep, 'deep trees validate without recursion');
+    console.log('Goal model: independent intentions, exact text, chapter children, relationships and deep-tree validation passed.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

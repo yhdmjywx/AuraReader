@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AuraReader · Goals</title>
+<link rel="stylesheet" href="../../src/client/styles.css">
+<link rel="stylesheet" href="../../src/client/assets/fonts/fonts.css">
+<link rel="stylesheet" href="../../node_modules/remixicon/fonts/remixicon.css">
+<style>
+body { height:auto; min-height:100vh; overflow:auto; background:var(--bg-paper); }
+[hidden] { display:none !important; }
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+#stage-shell { position:relative; overflow:hidden; }
+#stage { width:1613px; height:928px; transform-origin:top left; position:relative; background:var(--bg-paper); }
+#stage .app-header { position:absolute; inset:0 0 auto; }
+#stage .workspace-container { position:absolute; inset:52px 0 0; height:auto; --reading-left:526.5px; --reading-right:526.5px; }
+#stage .reader-panel { position:relative; }
+#stage .reader-viewport { position:absolute; inset:0 0 44px; }
+#stage .paper-container { height:100%; overflow:hidden; }
+#stage .book-paper { padding:28px 0 32px; font-family:Literata,Georgia,serif; font-size:18px; line-height:1.85; }
+#stage .book-paper h1 { font-size:25px; font-weight:500; margin-bottom:30px; }
+#stage .book-paper p { text-indent:0; }
+#stage .reader-pagination { position:absolute; inset:auto 0 0; height:44px; }
+#stage .notes-panel { z-index:2; }
+#stage .margin-notes-lane { top:245px; left:1134.5px; width:260px; height:480px; }
+#stage .note-card { top:0; cursor:text; }
+#stage .note-card-actions { display:flex; justify-content:flex-start; gap:6px; }
+#note-editor { font-size:14px; line-height:1.8; }
+.source-mark { cursor:pointer; }
+.source-mark:focus-visible,.source-mark.is-located { outline:2px solid var(--primary); outline-offset:3px; }
+.goal-panel { position:absolute; top:58px; bottom:70px; left:226.5px; width:260px; padding:0 5px; overflow:auto; scrollbar-width:thin; z-index:3; color:var(--bg-paper-text); font-size:14px; line-height:1.8; }
+.goal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.goal-header .btn { color:var(--text-secondary); }
+#tree-toggle { padding-left:0; font-size:12px; gap:5px; }
+.goal-icon { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border:0; background:transparent; color:var(--text-secondary); border-radius:4px; cursor:pointer; flex:none; }
+.goal-icon:hover { background:var(--nav-pill-bg); color:var(--primary); }
+.goal-parent { display:flex; gap:5px; align-items:center; width:100%; border:0; background:none; color:var(--text-secondary); text-align:left; font-size:12px; line-height:1.6; padding:0 0 12px; cursor:pointer; }
+.goal-parent span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.goal-current { display:flex; align-items:flex-start; gap:8px; }
+.goal-title { flex:1; width:0; padding:0; border:0; background:none; color:inherit; text-align:left; font-size:16px; font-weight:500; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; cursor:text; }
+.goal-children { margin:14px 0 0 14px; }
+.goal-child { display:block; width:100%; padding:8px 0; border:0; background:none; color:var(--text-secondary); text-align:left; font-size:14px; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere; cursor:pointer; }
+.goal-child:hover { color:var(--primary); }
+.goal-items-toggle { display:inline-flex; align-items:center; gap:6px; padding:0; margin-top:20px; border:0; background:none; color:var(--text-secondary); font-size:12px; cursor:pointer; }
+.goal-items { margin-top:12px; }
+.goal-item { display:flex; align-items:flex-start; gap:8px; margin:14px 0; }
+.goal-item > i { margin-top:3px; font-size:13px; color:var(--text-secondary); }
+.goal-item-text { flex:1; min-width:0; border:0; padding:0; background:none; color:var(--text-secondary); text-align:left; font-size:13px; line-height:1.8; cursor:pointer; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
+.goal-item-text:hover { color:var(--primary); }
+.goal-item .goal-icon { width:24px; height:24px; }
+.goal-tree { list-style:none; padding:0; margin:0; }
+.goal-tree-row { display:flex; align-items:flex-start; gap:4px; padding:5px 0; }
+.goal-tree-label { flex:1; min-width:0; padding:2px 0; background:none; border:0; text-align:left; color:var(--text-secondary); line-height:1.8; cursor:pointer; white-space:pre-wrap; overflow-wrap:anywhere; }
+.goal-tree-label[aria-current="true"] { color:var(--primary); }
+.tree-spacer { width:28px; flex:none; }
+.goal-editor { margin:0; width:100%; }
+.goal-editor textarea { width:100%; min-height:32px; margin:0; padding:0; border:0; border-bottom:1px solid var(--border-color); border-radius:0; resize:none; overflow:hidden; background:none; color:inherit; font:inherit; font-size:16px; line-height:1.75; white-space:pre-wrap; }
+.goal-editor textarea:focus-visible { outline:2px solid var(--primary); outline-offset:4px; }
+.goal-editor.is-new { margin-top:14px; }
+.note-card-actions .btn:disabled,.tooltip-btn:disabled { opacity:.65; cursor:default; }
+.goal-current > .goal-icon,.goal-item > .goal-icon { opacity:0; }
+.goal-current:hover > .goal-icon,.goal-current:focus-within > .goal-icon,
+.goal-item:hover > .goal-icon,.goal-item:focus-within > .goal-icon { opacity:1; }
+@media (hover:none) { .goal-current > .goal-icon,.goal-item > .goal-icon { opacity:1; } }
+</style>
+</head>
+<body class="theme-light">
+<!-- Local interaction prototype. In-memory data only. Sample prose is original. -->
+<div id="stage-shell"><div id="stage">
+<header class="app-header">
+  <div class="header-side header-brand"><div class="brand"><i class="ri-book-open-fill brand-icon" aria-hidden="true"></i><span class="brand-name">AuraReader</span></div></div>
+  <div class="header-center"><button class="book-nav-btn" id="chapter" type="button" aria-label="Switch sample chapter"><i class="ri-list-unordered" aria-hidden="true"></i><span class="book-nav-title">On Time</span><i class="ri-arrow-down-s-line" aria-hidden="true"></i></button></div>
+  <div class="header-side header-actions"></div>
+</header>
+<main class="workspace-container immersive-notes layout-single">
+  <section class="reader-panel">
+    <div class="reader-viewport"><div class="paper-container"><article class="book-paper">
+      <h1 id="chapter-title">Time and observation</h1>
+      <p>We notice time most clearly when something changes. A shadow crosses a room, a train reaches a platform, a familiar voice becomes a memory. Yet none of these experiences tells us quite what has passed.</p>
+      <p>A clock offers a useful answer to a practical question. It compares one change with another: the movement of a hand, the swing of a pendulum, the vibration of an atom. <span id="source-h1" class="annotation-token has-highlight source-mark" data-annotation-id="h1" role="button" tabindex="0" aria-label="Highlight actions">To describe time, we begin by comparing changes.</span> Agreement between clocks makes the comparison dependable, but it does not settle every question about what they measure.</p>
+      <p><span id="source-n1" class="annotation-token has-note source-mark" data-annotation-id="n1" role="button" tabindex="0" aria-label="Note actions">Measuring time and understanding time may be different questions.</span> We can count the hours of a journey with great accuracy and still wonder why a short wait feels longer than a busy afternoon.</p>
+      <p>The observer belongs to this story too. An observation takes place somewhere, with an instrument, under particular conditions. When two observers disagree, it helps to ask what each could see and how each made a measurement.</p>
+      <p>Perhaps the first step is to leave the question open long enough to notice its parts. Duration, order, memory, and change are close companions. They need not be identical to be worth considering together.</p>
+    </article></div></div>
+    <nav class="reader-pagination" aria-label="Sample chapter navigation"><button id="prev" class="page-turn-btn" type="button" aria-label="Previous chapter">‹</button><span class="page-indicator" id="page-label">2 / 3</span><button id="next" class="page-turn-btn" type="button" aria-label="Next chapter">›</button></nav>
+    <!-- Existing annotation toolbar; Goal is the only additional action. -->
+    <div class="selection-tooltip" id="highlight-action-tooltip">
+      <button class="tooltip-btn" id="btn-hl-remove" type="button" style="color:#fca5a5" aria-label="Delete highlight"><i class="ri-delete-bin-line" aria-hidden="true"></i>Delete</button>
+      <button class="tooltip-btn" id="btn-note-remove" type="button" style="color:#fca5a5" aria-label="Delete note"><i class="ri-delete-bin-line" aria-hidden="true"></i>Delete</button>
+      <button class="tooltip-btn" id="btn-annotation-goal" type="button"><i class="ri-links-line" aria-hidden="true"></i><span>Goal</span></button>
+    </div>
+  </section>
+  <aside class="goal-panel" aria-label="Reading goals">
+    <div class="goal-header">
+      <button id="tree-toggle" class="btn btn-ghost-sm" type="button" aria-expanded="false" aria-controls="goal-content" title="All goals"><span>Goals</span><i class="ri-arrow-down-s-line" aria-hidden="true"></i></button>
+      <button id="add-root" class="goal-icon" type="button" aria-label="New goal" title="New goal"><i class="ri-add-line" aria-hidden="true"></i></button>
+    </div>
+    <div id="goal-content"></div>
+    <div id="goal-form" class="goal-editor" hidden><textarea id="goal-text" rows="1" aria-label="Goal" aria-keyshortcuts="Escape Control+Enter Meta+Enter"></textarea></div>
+  </aside>
+  <section class="notes-panel" aria-label="Margin notes"><div class="notes-list"><div class="margin-notes-lane">
+    <div class="note-card" id="note-card" data-annotation-id="n1" role="group" aria-label="Note" tabindex="0">
+      <div class="note-comment-text" id="note-text">A clock measures change. Does that explain time itself?</div>
+      <textarea id="note-editor" class="note-editor" aria-label="Note" aria-keyshortcuts="Escape Control+Enter Meta+Enter" rows="1" hidden></textarea>
+      <div class="note-card-actions" id="note-actions">
+        <button id="delete-note" class="btn btn-ghost-sm btn-delete-note" type="button" title="Delete note" aria-label="Delete note"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
+        <button id="link-note" class="btn btn-ghost-sm" type="button"><i class="ri-links-line" aria-hidden="true"></i><span>Goal</span></button>
+      </div>
+    </div>
+  </div></div></section>
+</main>
+<p id="message" class="sr-only" role="status" aria-live="polite"></p>
+</div></div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const form = $('goal-form'), field = $('goal-text');
+  const goals = [
+    {id:'g1',parentId:null,text:'What is time?',chapter:null},
+    {id:'g2',parentId:'g1',text:'How does time relate to change?',chapter:2},
+    {id:'g3',parentId:'g1',text:'Does the observer matter?',chapter:3}
+  ];
+  const annotations = {
+    h1:{kind:'highlight',text:$('source-h1').textContent,chapter:2},
+    n1:{kind:'note',text:$('note-text').textContent,chapter:2}
+  };
+  const links = [{goalId:'g2',annotationId:'h1'}];
+  const expanded = new Set(['g1']);
+  let selected='g1',chapter=2,allGoals=false,itemsOpen=false,goalEdit=null,finishingGoal=false;
+  let activeAnnotation=null,noteComposing=false,goalComposing=false;
+  const getGoal = id => goals.find(goal => goal.id===id);
+  const children = id => goals.filter(goal => goal.parentId===id);
+  const element = (tag,className='',text) => {
+    const node=document.createElement(tag); node.className=className;
+    if (text!==undefined) node.textContent=text;
+    return node;
+  };
+  const icon = name => { const node=element('i',`ri-${name}`);node.setAttribute('aria-hidden','true');return node; };
+  const button = (label,action,className='goal-icon',iconName=null) => {
+    const node=element('button',className);node.type='button';
+    if (iconName) {node.append(icon(iconName));node.setAttribute('aria-label',label);node.title=label;}
+    else node.textContent=label;
+    node.addEventListener('click',action);return node;
+  };
+  const announce = text => { $('message').textContent=text; };
+  function choose(id) {
+    finishGoalEdit();finishNoteEdit();hideAnnotationActions();
+    selected=id;allGoals=false;itemsOpen=true;renderGoals();
+  }
+  function renderGoals() {
+    updateAssociationActions();
+    const content=$('goal-content');
+    // Rendering notes never invokes this while a Goal textarea owns focus.
+    form.remove();content.replaceChildren();
+    $('tree-toggle').setAttribute('aria-expanded',String(allGoals));
+    if (allGoals) {
+      const list=element('ul','goal-tree');
+      const stack=children(null).reverse().map(goal=>({goal,depth:0}));
+      while (stack.length) {
+        const {goal,depth}=stack.pop(),row=element('li','goal-tree-row');
+        row.style.paddingLeft=`${Math.min(depth,3)*14}px`;
+        const nested=children(goal.id);
+        if (nested.length) {
+          const toggle=button(`${expanded.has(goal.id)?'Collapse':'Expand'} ${goal.text}`,()=>{
+            if (expanded.has(goal.id)) expanded.delete(goal.id);else expanded.add(goal.id);
+            renderGoals();
+          },'goal-icon',expanded.has(goal.id)?'arrow-down-s-line':'arrow-right-s-line');
+          toggle.setAttribute('aria-expanded',String(expanded.has(goal.id)));row.append(toggle);
+        } else row.append(element('span','tree-spacer'));
+        const label=button(goal.text,()=>choose(goal.id),'goal-tree-label');
+        label.setAttribute('aria-current',String(goal.id===selected));row.append(label);list.append(row);
+        if (expanded.has(goal.id)) stack.push(...nested.reverse().map(child=>({goal:child,depth:depth+1})));
+      }
+      content.append(list);
+    } else {
+      const goal=getGoal(selected);
+      if (goal) {
+        const parent=getGoal(goal.parentId);
+        if (parent) {
+          const back=button('',()=>choose(parent.id),'goal-parent');back.append(icon('arrow-left-s-line'),element('span','',parent.text));
+          back.title=parent.text;content.append(back);
+        }
+        const current=element('div','goal-current');
+        if (goalEdit?.mode==='edit') {form.hidden=false;current.append(form);}
+        else current.append(button(goal.text,()=>startGoalEdit('edit',goal.id),'goal-title'));
+        current.append(button('Add subgoal',()=>startGoalEdit('child',selected),'goal-icon','add-line'));content.append(current);
+        const group=element('div','goal-children');
+        children(selected).filter(child=>!child.chapter||child.chapter===chapter).forEach(child=>group.append(button(child.text,()=>choose(child.id),'goal-child')));
+        if (group.childElementCount) content.append(group);
+        const related=links.filter(link=>link.goalId===selected&&annotations[link.annotationId]);
+        if (related.length) {
+          const toggle=button('',()=>{itemsOpen=!itemsOpen;renderGoals();},'goal-items-toggle');
+          toggle.append(icon('attachment-2'),element('span','',String(related.length)));
+          toggle.setAttribute('aria-label',`${related.length} linked ${related.length===1?'item':'items'}`);
+          toggle.setAttribute('aria-expanded',String(itemsOpen));toggle.title='Linked notes and highlights';content.append(toggle);
+          if (itemsOpen) {
+            const list=element('div','goal-items');
+            related.forEach(link=>{
+              const annotation=annotations[link.annotationId],row=element('div','goal-item');
+              const kindIcon=icon(annotation.kind==='note'?'sticky-note-line':'mark-pen-line');kindIcon.title=annotation.kind;row.append(kindIcon);
+              const excerpt=button(annotation.text,()=>locate(link.annotationId),'goal-item-text');
+              excerpt.dataset.annotationId=link.annotationId;excerpt.title=annotation.text;
+              excerpt.setAttribute('aria-label',`${annotation.kind}: ${annotation.text}`);row.append(excerpt);
+              row.append(button('Unlink',()=>{links.splice(links.indexOf(link),1);renderGoals();announce('Unlinked');},'goal-icon','close-line'));
+              list.append(row);
+            });content.append(list);
+          }
+        }
+      }
+    }
+    if (goalEdit&&goalEdit.mode!=='edit') {form.hidden=false;content.append(form);}
+    else if (!goalEdit) {form.hidden=true;content.append(form);}
+  }
+  function startGoalEdit(mode,id=null) {
+    finishGoalEdit();finishNoteEdit();hideAnnotationActions();
+    const previousAllGoals=allGoals;
+    if (mode==='root') allGoals=true;
+    goalEdit={mode,id,previousAllGoals};field.value=mode==='edit'?getGoal(id).text:'';
+    field.setAttribute('aria-label',mode==='edit'?'Edit goal':mode==='child'?'New subgoal':'New goal');
+    field.placeholder=mode==='child'?'Subgoal':'Goal';form.classList.toggle('is-new',mode!=='edit');
+    renderGoals();resizeGoalField();field.focus();field.setSelectionRange(field.value.length,field.value.length);
+  }
+  function resizeGoalField() {field.style.height='0px';field.style.height=`${Math.max(32,field.scrollHeight)}px`;}
+  function finishGoalEdit() {
+    if (!goalEdit||finishingGoal) return;
+    finishingGoal=true;
+    const edit=goalEdit,text=field.value;goalEdit=null;
+    if (text.trim()) {
+      if (edit.mode==='edit') getGoal(edit.id).text=text;
+      else {
+        const id=crypto.randomUUID();goals.push({id,parentId:edit.mode==='child'?edit.id:null,text,chapter:edit.mode==='child'?chapter:null});
+        if (edit.id) expanded.add(edit.id);
+        selected=id;allGoals=false;itemsOpen=false;
+      }
+    } else allGoals=edit.previousAllGoals;
+    form.hidden=true;renderGoals();finishingGoal=false;
+  }
+  function linkCurrent(id) {
+    if (!annotations[id]||!getGoal(selected)) return;
+    if (!links.some(link=>link.goalId===selected&&link.annotationId===id)) links.push({goalId:selected,annotationId:id});
+    allGoals=false;itemsOpen=true;
+    hideAnnotationActions();renderGoals();announce('Added to goal');
+  }
+  function updateAssociationActions() {
+    for (const [buttonId,id] of [['link-note','n1'],['btn-annotation-goal',activeAnnotation]]) {
+      const control=$(buttonId),exists=links.some(link=>link.goalId===selected&&link.annotationId===id);
+      control.querySelector('i').className=exists?'ri-check-line':'ri-links-line';
+      control.querySelector('span').textContent='Goal';
+      control.disabled=!getGoal(selected)||!annotations[id]||exists;
+      control.setAttribute('aria-label',exists?'Added to goal':'Add to goal');
+      control.title=getGoal(selected)?`${exists?'Added to':'Add to'}: ${getGoal(selected).text}`:'Select a goal';
+    }
+  }
+  function hideAnnotationActions() {
+    activeAnnotation=null;$('highlight-action-tooltip').style.display='none';
+    document.querySelectorAll('.source-mark.is-active').forEach(node=>node.classList.remove('is-active'));
+  }
+  function showAnnotationActions(id,target) {
+    if (!annotations[id]||activeAnnotation===id) return;
+    hideAnnotationActions();activeAnnotation=id;target.classList.add('is-active');
+    $('btn-hl-remove').hidden=id!=='h1';$('btn-note-remove').hidden=id!=='n1';updateAssociationActions();
+    const readerRect=document.querySelector('.reader-panel').getBoundingClientRect();
+    const scale=$('stage').getBoundingClientRect().width/1613||1,rect=target.getBoundingClientRect(),bar=$('highlight-action-tooltip');
+    bar.style.left=`${(rect.left+rect.width/2-readerRect.left)/scale}px`;bar.style.top=`${(rect.top-readerRect.top)/scale}px`;bar.style.display='flex';
+  }
+  function removeAnnotation(id) {
+    if (!annotations[id]) return;
+    delete annotations[id];
+    for (let index=links.length-1;index>=0;index--) if (links[index].annotationId===id) links.splice(index,1);
+    const source=$('source-'+id);source.classList.remove('has-highlight','has-note','source-mark','is-located');
+    for (const attr of ['role','tabindex','aria-label']) source.removeAttribute(attr);
+    if (id==='n1') document.querySelector('.margin-notes-lane').hidden=true;
+    hideAnnotationActions();renderGoals();
+  }
+  function resizeNoteEditor() {const editor=$('note-editor');editor.style.height='0px';editor.style.height=`${Math.max(editor.scrollHeight,25.2)}px`;}
+  function beginNoteEdit() {
+    if (!annotations.n1||!$('note-editor').hidden) return;
+    finishGoalEdit();hideAnnotationActions();$('note-editor').value=annotations.n1.text;
+    $('note-text').hidden=true;$('note-editor').hidden=false;$('note-actions').hidden=true;
+    resizeNoteEditor();$('note-editor').focus();$('note-editor').setSelectionRange($('note-editor').value.length,$('note-editor').value.length);
+  }
+  function updateNoteText() {
+    if (!annotations.n1) return;
+    annotations.n1.text=$('note-editor').value;$('note-text').textContent=annotations.n1.text;resizeNoteEditor();
+    document.querySelectorAll('.goal-item-text[data-annotation-id="n1"]').forEach(node=>{
+      node.textContent=annotations.n1.text;node.title=annotations.n1.text;node.setAttribute('aria-label',`note: ${annotations.n1.text}`);
+    });
+  }
+  function finishNoteEdit() {
+    if ($('note-editor').hidden) return;
+    updateNoteText();$('note-editor').hidden=true;$('note-text').hidden=false;$('note-actions').hidden=false;
+    if (!annotations.n1.text.trim()) removeAnnotation('n1');
+  }
+  function setChapter(value) {
+    chapter=value;$('chapter-title').textContent=chapter===2?'Time and observation':'The observer';$('page-label').textContent=`${chapter} / 3`;
+    // Keep the sample text intact; only annotation visibility follows its chapter.
+    for (const id of ['h1','n1']) {
+      const source=$('source-'+id),visible=chapter===2&&!!annotations[id];
+      source.classList.toggle('has-highlight',visible&&id==='h1');source.classList.toggle('has-note',visible&&id==='n1');
+      source.setAttribute('aria-disabled',String(!visible));
+    }
+    document.querySelector('.margin-notes-lane').hidden=chapter!==2||!annotations.n1;renderGoals();
+  }
+  function locate(id) {
+    if (!annotations[id]) return;
+    finishGoalEdit();finishNoteEdit();hideAnnotationActions();setChapter(annotations[id].chapter);
+    document.querySelectorAll('.is-located').forEach(node=>node.classList.remove('is-located'));
+    $('source-'+id).classList.add('is-located');announce('Source located');
+  }
+  field.addEventListener('input',resizeGoalField);
+  field.addEventListener('compositionstart',()=>{goalComposing=true;});
+  field.addEventListener('compositionend',()=>{goalComposing=false;resizeGoalField();});
+  field.addEventListener('blur',finishGoalEdit);
+  field.addEventListener('keydown',event=>{
+    event.stopPropagation();if (goalComposing||event.isComposing||event.keyCode===229) return;
+    if (event.key==='Escape'||(event.key==='Enter'&&(event.ctrlKey||event.metaKey))) {event.preventDefault();finishGoalEdit();}
+  });
+  $('add-root').addEventListener('click',()=>startGoalEdit('root'));
+  $('tree-toggle').addEventListener('click',()=>{finishGoalEdit();hideAnnotationActions();allGoals=!allGoals;renderGoals();});
+  $('link-note').addEventListener('click',event=>{event.stopPropagation();linkCurrent('n1');});
+  $('delete-note').addEventListener('click',event=>{event.stopPropagation();removeAnnotation('n1');});
+  $('note-card').addEventListener('click',event=>{if(!event.target.closest('button,textarea'))beginNoteEdit();});
+  $('note-card').addEventListener('keydown',event=>{if(event.target===$('note-card')&&(event.key==='Enter'||event.key===' ')){event.preventDefault();beginNoteEdit();}});
+  $('note-editor').addEventListener('input',updateNoteText);
+  $('note-editor').addEventListener('compositionstart',()=>{noteComposing=true;});
+  $('note-editor').addEventListener('compositionend',()=>{noteComposing=false;updateNoteText();});
+  $('note-editor').addEventListener('blur',finishNoteEdit);
+  $('note-editor').addEventListener('keydown',event=>{
+    event.stopPropagation();if(noteComposing||event.isComposing||event.keyCode===229)return;
+    if(event.key==='Escape'||(event.key==='Enter'&&(event.ctrlKey||event.metaKey))){event.preventDefault();finishNoteEdit();}
+  });
+  $('btn-hl-remove').addEventListener('click',()=>removeAnnotation('h1'));
+  $('btn-note-remove').addEventListener('click',()=>removeAnnotation('n1'));
+  $('btn-annotation-goal').addEventListener('click',()=>linkCurrent(activeAnnotation));
+  document.querySelectorAll('.source-mark').forEach(mark=>{
+    let start=null,moved=false;
+    mark.addEventListener('pointerdown',event=>{start=[event.clientX,event.clientY];moved=false;});
+    mark.addEventListener('pointermove',event=>{if(start&&Math.hypot(event.clientX-start[0],event.clientY-start[1])>5)moved=true;});
+    mark.addEventListener('click',()=>{const selection=window.getSelection();if(chapter!==2||moved||(selection&&!selection.isCollapsed))return;showAnnotationActions(mark.dataset.annotationId,mark);});
+    mark.addEventListener('keydown',event=>{if(chapter===2&&(event.key==='Enter'||event.key===' ')){event.preventDefault();showAnnotationActions(mark.dataset.annotationId,mark);}});
+  });
+  for(const id of ['chapter','prev','next'])$(id).addEventListener('click',()=>{finishGoalEdit();finishNoteEdit();hideAnnotationActions();setChapter(chapter===2?3:2);});
+  document.addEventListener('click',event=>{if(!event.target.closest('#highlight-action-tooltip,.source-mark,#note-card'))hideAnnotationActions();});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape')hideAnnotationActions();});
+  function resize(){const scale=Math.min(1,$('stage-shell').clientWidth/1613);$('stage').style.transform=`scale(${scale})`;$('stage-shell').style.height=`${928*scale}px`;}
+  new ResizeObserver(resize).observe($('stage-shell'));renderGoals();resize();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+[
+  {
+    "bookId": "remotion-friendship-anne",
+    "sourceUrl": "https://www.gutenberg.org/cache/epub/45/pg45-images.html",
+    "sourcePage": 10,
+    "paragraphs": [
+      "Anne tipped the vase of apple blossoms near enough to bestow a soft kiss on a pink-cupped bud, and then studied diligently for some moments longer.",
+      "“Marilla,” she demanded presently, “do you think that I shall ever have a bosom friend in Avonlea?”",
+      "“A—a what kind of friend?”",
+      "“A bosom friend—an intimate friend, you know—a really kindred spirit to whom I can confide my inmost soul. I’ve dreamed of meeting her all my life. I never really supposed I would, but so many of my loveliest dreams have come true all at once that perhaps this one will, too. Do you think it’s possible?”",
+      "“Diana Barry lives over at Orchard Slope and she’s about your age. She’s a very nice little girl, and perhaps she will be a playmate for you when she comes home."
+    ],
+    "quoteParagraph": 1,
+    "quoteLine": 3,
+    "quoteTop": 415,
+    "lineCount": 15,
+    "width": 640,
+    "fontSize": 25,
+    "lineHeight": 40,
+    "paragraphGap": 14
+  },
+  {
+    "bookId": "remotion-friendship-conversation",
+    "sourceUrl": "https://www.gutenberg.org/cache/epub/63995/pg63995-images.html",
+    "sourcePage": 2,
+    "paragraphs": [
+      "Choose subject of mutual interest.",
+      "He.—And here we are again at one of your charming \"at homes,\" and I, as usual, am the only guest.",
+      "It is delightful of you to select for my visits those evenings where there is no possibility of our being interrupted while discussing our favorite topic.",
+      "She.—If I were \"not at home\" on these occasions, we should have very little opportunity to talk about the subjects in which we are mutually interested. It is decidedly paradoxical, is it not, to be at home under the circumstances?",
+      "He.—It is, to say the least, decidedly pleasant; for, otherwise, how should you be able to teach me that delightful art—the Art of Conversation? I am just selfish enough to exult in my being the only diplomat"
+    ],
+    "quoteParagraph": 0,
+    "quoteLine": 0,
+    "quoteTop": 281,
+    "lineCount": 15,
+    "width": 640,
+    "fontSize": 25,
+    "lineHeight": 40,
+    "paragraphGap": 14
+  }
+]

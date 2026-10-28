@@ -1,5 +1,15 @@
 /** Known application elements; optional for headless and partial test mounts. */
 export interface AppElements {
+    goalPanel?: HTMLElement | null;
+    goalSidebar?: HTMLElement | null;
+    goalResizer?: HTMLElement | null;
+    btnGoals?: HTMLButtonElement | null;
+    btnGoalSidebar?: HTMLButtonElement | null;
+    btnGoalBack?: HTMLButtonElement | null;
+    goalPage?: HTMLElement | null;
+    goalPageContent?: HTMLElement | null;
+    readingWorkspace?: HTMLElement | null;
+    btnAnnotationGoal?: HTMLButtonElement | null;
     appHeader?: HTMLElement | null;
     workspaceContainer?: HTMLElement | null;
     readerPanel?: HTMLElement | null;
@@ -64,8 +74,17 @@ export interface AppElements {
     btnToggleShowHighlights?: HTMLButtonElement | null;
     countPureHighlights?: HTMLElement | null;
     btnExportMarkdown?: HTMLButtonElement | null;
-    btnExportChapterZip?: HTMLButtonElement | null;
-    btnExportStandaloneHtml?: HTMLButtonElement | null;
+    btnExportChapters?: HTMLButtonElement | null;
+    chapterExportEntry?: HTMLElement | null;
+    chapterExportOptions?: HTMLElement | null;
+    chapterExportCustom?: HTMLElement | null;
+    chapterExportList?: HTMLElement | null;
+    btnCollapseChapterExport?: HTMLButtonElement | null;
+    btnExportCurrentChapter?: HTMLButtonElement | null;
+    btnExportAllChapters?: HTMLButtonElement | null;
+    btnSelectChapters?: HTMLButtonElement | null;
+    btnCancelChapterExport?: HTMLButtonElement | null;
+    btnConfirmChapterExport?: HTMLButtonElement | null;
     btnExportFullBackup?: HTMLButtonElement | null;
     btnImportFullBackup?: HTMLButtonElement | null;
     backupFileInput?: HTMLInputElement | null;

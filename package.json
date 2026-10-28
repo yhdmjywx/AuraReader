@@ -2,7 +2,7 @@
   "name": "aurareader-workstation",
   "version": "1.0.0",
   "description": "AuraReader Workstation - Smart Reading & Notes Workstation",
-  "main": "src/server/server.js",
+  "main": "src/desktop/main.cjs",
   "engines": {
     "node": ">=24.15.0"
   },
@@ -10,6 +10,14 @@
     "start": "node src/server/server.js",
     "prestart": "npm run build",
     "dev": "npm run build && node src/server/server.js",
+    "desktop": "npm run build && node scripts/desktop.cjs",
+    "dist:win": "npm run build && node scripts/package-resources.cjs && electron-builder --config electron-builder.cjs --win nsis --x64 --publish never && node scripts/verify-package.cjs",
+    "verify:package": "node scripts/verify-package.cjs",
+    "test:install": "npm run dist:win && node scripts/package-upgrade-fixture.cjs && node scripts/test-install.cjs",
+    "test:desktop": "npm run build && node scripts/test-desktop.cjs",
+    "test:stability": "npm run build && node scripts/test-stability.cjs",
+    "test:packaged:stability": "node tests/desktop/packaged-stability.cjs",
+    "test:desktop:native": "npm run build && node scripts/test-native-dialogs.cjs",
     "build": "node scripts/build.cjs",
     "typecheck": "node scripts/build.cjs --check",
     "test": "node scripts/test.cjs all",
@@ -20,8 +28,9 @@
   },
   "devDependencies": {
     "@types/node": "24.19.2",
+    "electron": "45.0.0",
+    "electron-builder": "26.15.3",
     "jsdom": "^30.1.2",
-    "jszip": "^3.10.1",
     "typescript": "5.9.3"
   },
   "keywords": [
@@ -32,6 +41,8 @@
   "author": "Antigravity",
   "license": "Apache-2.0",
   "dependencies": {
-    "fontkit": "^2.0.4"
+    "fontkit": "^2.0.4",
+    "jszip": "3.10.1",
+    "remixicon": "4.6.0"
   }
 }

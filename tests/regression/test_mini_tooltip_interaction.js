@@ -22,7 +22,8 @@ const { JSDOM } = require('jsdom');
             notesList: byId('notes-list'), emptyNotesState: byId('empty-notes-state'), workspaceContainer: byId('workspace-container')
         };
         const tooltip = elements.highlightActionTooltip;
-        assert.equal(tooltip.querySelectorAll('button').length, 2, '已存在标注的菜单只保留删除高亮和删除笔记');
+        assert.equal(tooltip.querySelectorAll('button').length, 3, '保留两个独立删除动作，并补一个 Goal 动作');
+        assert.equal(byId('btn-annotation-goal').hidden, true, '未接入 Goal 时不展示不可用归入动作');
         assert.equal(tooltip.querySelector('.tooltip-divider'), null);
         for (const id of ['btn-hl-view-notes', 'btn-hl-operate', 'btn-hl-add-thought']) assert.equal(byId(id), null);
         const annotations = new AnnotationController({ callbacks: {

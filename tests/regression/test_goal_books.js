@@ -1,0 +1,51 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { randomUUID } = require('node:crypto');
+const { DatabaseSync } = require('node:sqlite');
+const { createDataStore } = require('../../src/server/dataStore');
+const { backupDatabase, verifyDatabase } = require('../../src/server/storageMaintenance');
+(async () => {
+    const dir = fs.mkdtempSync(path.resolve('.commandcode/goal-books-'));
+    let s = createDataStore(dir);
+    const now = new Date().toISOString();
+    const goal = (id, parentId = null) => ({ id, parentId, text: id, origin: null, createdAt: now, updatedAt: now });
+    const books = ['a', 'b'].map(id => ({ id, title: id, pages: ['<p>Source</p>'] }));
+    const versions = books.map(book => s.saveBook({ opId: randomUUID(), expected: 0, book }));
+    const state = { goals: [goal('parent'), goal('child', 'parent'), goal('other')], links: [] };
+    s.saveGoalLibrary({ opId: randomUUID(), expected: 0, state });
+    const old = s.goalLibrary(); const oldBooks = s.books(); s.close();
+    const raw = new DatabaseSync(path.join(dir, 'aurareader.sqlite'));
+    raw.exec('PRAGMA user_version=3'); raw.close(); s = createDataStore(dir);
+    assert.equal(s.one('PRAGMA user_version').user_version, 4); assert.deepEqual(s.goalLibrary(), old); assert.deepEqual(s.books(), oldBooks);
+    const links = [{ goalId: 'parent', bookId: 'a', generation: versions[0].generation }, { goalId: 'parent', bookId: 'b', generation: versions[1].generation }, { goalId: 'other', bookId: 'a', generation: versions[0].generation }];
+    s.saveGoalLibrary({ opId: randomUUID(), expected: old.revision, state: { ...state, bookLinks: links } });
+    let current = s.goalLibrary();
+    for (const bad of [[...links, links[0]], [{ ...links[0], generation: 'stale' }], [{ ...links[0], goalId: 'missing' }], [{ ...links[0], bookId: 'missing' }]]) {
+        assert.throws(() => s.saveGoalLibrary({ opId: randomUUID(), expected: current.revision, state: { ...state, bookLinks: bad } }));
+        assert.deepEqual(s.goalLibrary(), current);
+    }
+    // Exact replay of an old global command must not clear the new field.
+    const oldCommand = { opId: randomUUID(), expected: current.revision, state };
+    const ack = s.saveGoalLibrary(oldCommand); assert.deepEqual(s.saveGoalLibrary(oldCommand), ack);
+    assert.deepEqual(s.goalLibrary().value.bookLinks, links);
+    assert.throws(() => s.saveGoalLibrary({ ...oldCommand, opId: randomUUID() }), { status: 409 });
+    const graph = { goals: state.goals, bookLinks: links.filter(l => l.bookId === 'a') };
+    s.restore({ opId: randomUUID(), books: [books[0]], notes: [], goalGraph: graph });
+    assert.equal(s.goalLibrary().value.bookLinks.length, 3, 'partial book restore preserves other book relations');
+    s.restore({ opId: randomUUID(), books: [books[0]], notes: [], goalGraph: { goals: state.goals, links: [] } });
+    assert.equal(s.goalLibrary().value.bookLinks.length, 3, 'old graph omission preserves explicit books');
+    const before = s.goalLibrary();
+    assert.throws(() => s.restore({ opId: randomUUID(), books: [{ ...books[0], title: 'Rollback' }], notes: [], goalGraph: { goals: state.goals, bookLinks: [links[1]] } }));
+    assert.deepEqual(s.goalLibrary(), before); assert.equal(s.books().find(b => b.id === 'a').value.title, 'a');
+    s.saveNote({ opId: randomUUID(), expected: 0, generation: versions[0].generation, note: { id: 'n', bookId: 'a', kind: 'note', comment: 'kept', quote: 'Source', page: 1 } });
+    s.deleteNote({ opId: randomUUID(), expected: 1, generation: versions[0].generation, id: 'n', bookId: 'a' });
+    assert.equal(s.goalLibrary().value.bookLinks.length, 3, 'deleting an annotation never removes selected books');
+    const deletion = s.deleteBook({ opId: randomUUID(), expected: s.books().find(b => b.id === 'a').revision, id: 'a' });
+    assert.ok(deletion.goalLibrary); assert.equal(s.goalLibrary().value.goals.length, 3); assert.equal(s.goalLibrary().value.bookLinks.length, 1);
+    const tombstone = s.books().find(b => b.id === 'a'); s.saveBook({ opId: randomUUID(), expected: tombstone.revision, book: books[0] });
+    current = s.goalLibrary(); assert.throws(() => s.saveGoalLibrary({ opId: randomUUID(), expected: current.revision, state: { ...current.value, bookLinks: [links[0]] } }));
+    const backup = await backupDatabase(dir); assert.equal(verifyDatabase(backup.filename).integrity, 'ok');
+    s.close(); s = createDataStore(dir); assert.deepEqual(s.goalLibrary(), current); s.close();
+    console.log('Goal books: v3 upgrade, many-to-many, validation/CAS, exact old command replay, partial backup restore/rollback, note deletion, book generations and SQLite backup passed.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

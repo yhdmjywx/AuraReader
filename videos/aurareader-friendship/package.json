@@ -1,0 +1,41 @@
+{
+  "name": "aurareader-friendship",
+  "version": "1.0.0",
+  "description": "AuraReader · Friendship · 39-second product film",
+  "repository": {},
+  "license": "UNLICENSED",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.539",
+    "@remotion/fonts": "4.0.539",
+    "@remotion/transitions": "4.0.539",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.539"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.539",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "10.12.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "start": "remotion studio --no-open",
+    "review": "node scripts/check-frames.cjs",
+    "prepare:pages": "node scripts/prepare-reading-pages.cjs",
+    "prepare:covers": "node scripts/prepare-covers.cjs",
+    "export:media": "node scripts/export-media.cjs",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc"
+  },
+  "allowScripts": {
+    "esbuild": false
+  }
+}

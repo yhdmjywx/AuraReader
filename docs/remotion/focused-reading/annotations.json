@@ -1,0 +1,74 @@
+[
+  {
+    "id": "remotion-focus-bennett-highlight",
+    "bookId": "remotion-focus-bennett",
+    "kind": "highlight",
+    "quote": "Bring it back by the scruff of the neck.",
+    "comment": "",
+    "color": "yellow",
+    "page": 2,
+    "chapter": "VII · Controlling the Mind",
+    "timestamp": "2026-10-27T04:00:00.000Z",
+    "location": {
+      "sectionId": "chapter-2",
+      "page": 2,
+      "offset": 43210,
+      "start": 43210,
+      "end": 43250
+    }
+  },
+  {
+    "id": "remotion-focus-bennett-note",
+    "bookId": "remotion-focus-bennett",
+    "kind": "note",
+    "quote": "Do not\ndespair.  Continue. Keep it up.",
+    "comment": "When I drift, return to the next sentence.",
+    "color": "green",
+    "page": 2,
+    "chapter": "VII · Controlling the Mind",
+    "timestamp": "2026-10-27T04:00:00.000Z",
+    "location": {
+      "sectionId": "chapter-2",
+      "page": 2,
+      "offset": 43335,
+      "start": 43335,
+      "end": 43373
+    }
+  },
+  {
+    "id": "remotion-focus-james-highlight",
+    "bookId": "remotion-focus-james",
+    "kind": "highlight",
+    "quote": "put yourself assiduously in conditions that\nencourage the new way",
+    "comment": "",
+    "color": "yellow",
+    "page": 2,
+    "chapter": "VIII · The Laws of Habit",
+    "timestamp": "2026-10-27T04:00:00.000Z",
+    "location": {
+      "sectionId": "chapter-2",
+      "page": 2,
+      "offset": 85675,
+      "start": 85675,
+      "end": 85740
+    }
+  },
+  {
+    "id": "remotion-focus-james-note",
+    "bookId": "remotion-focus-james",
+    "kind": "note",
+    "quote": "make engagements incompatible with the old",
+    "comment": "Phone in another room before I start.",
+    "color": "green",
+    "page": 2,
+    "chapter": "VIII · The Laws of Habit",
+    "timestamp": "2026-10-27T04:00:00.000Z",
+    "location": {
+      "sectionId": "chapter-2",
+      "page": 2,
+      "offset": 85742,
+      "start": 85742,
+      "end": 85784
+    }
+  }
+]

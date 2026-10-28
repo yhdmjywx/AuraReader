@@ -1,4 +1,5 @@
 import { eventElement } from './dom.js';
+import { unwrapDesktop } from '../infrastructure/storageClient.js';
 import type { AppElements } from './elements.js';
 import type { ShellCallbacks } from './contracts.js';
 /* ==========================================================================
@@ -33,7 +34,7 @@ export class AppShell {
 
     setBookLoading(loading: boolean) {
         // Leave header and shelf controls available for a newer book request.
-        for (const panel of [this.elements?.readerPanel, this.elements?.notesPanel]) {
+        for (const panel of [this.elements?.readerPanel, this.elements?.notesPanel, this.elements?.goalPanel]) {
             if (!panel) continue;
             panel.inert = loading;
             panel.setAttribute('aria-busy', String(loading));
@@ -54,6 +55,7 @@ export class AppShell {
                 this.elements.btnThemeToggle.innerHTML = '<i class="ri-sun-line"></i>';
             }
         }
+        this.callbacks.onThemeChanged?.();
     }
 
     toggleAppearance(forceOpen?: boolean) {
@@ -90,6 +92,8 @@ export class AppShell {
         panel.classList.toggle('open', open);
         panel.setAttribute('aria-hidden', open ? 'false' : 'true');
         if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        const PanelEvent = panel.ownerDocument?.defaultView?.Event || Event;
+        if (!open) panel.dispatchEvent?.(new PanelEvent('exportpanelclose'));
     }
 
     closeExportPanel() {
@@ -97,6 +101,14 @@ export class AppShell {
     }
 
     toggleFullscreen() {
+        if (window.auraDesktop) {
+            window.auraDesktop.window.toggleFullscreen().then(result => {
+                const { fullscreen } = unwrapDesktop(result);
+                const icon = this.elements?.btnFullscreen?.querySelector('i');
+                if (icon) icon.className = fullscreen ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
+            }).catch(error => this.showToast(error instanceof Error ? error.message : '全屏切换失败'));
+            return;
+        }
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => {
                 console.warn("全屏模式不可用:", err);
@@ -205,11 +217,12 @@ export class AppShell {
                 return;
             }
             const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-            if (tag === 'input' || tag === 'textarea' || (document.activeElement as HTMLElement | null)?.isContentEditable) {
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || (document.activeElement as HTMLElement | null)?.isContentEditable) {
                 return;
             }
 
             if (elements.backupSelectModal && elements.backupSelectModal.classList.contains('active')) return;
+            if (elements.exportPanel?.classList.contains('open')) return;
             if (elements.shelfPanel?.classList.contains('open')) return;
 
             if (e.key === 'Escape' && elements.appearancePanel && elements.appearancePanel.classList.contains('open')) {
