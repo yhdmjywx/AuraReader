@@ -1,0 +1,386 @@
+[
+  {
+    "id": "canto",
+    "index": 1,
+    "title": "Canto · 当前美区 App Store",
+    "url": "https://apps.apple.com/us/app/canto-book-tracker-journal/id6771089037",
+    "note": "2026-10-27 经只读抓取核查：1.6.0、5.0/3 Ratings；版本历史与功能为厂商声明，未安装实测",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "cantohome",
+    "index": 2,
+    "title": "Canto · 官网",
+    "url": "https://readcanto.com/",
+    "note": "读后问答、AI 反思和画像；页面样本来自开发者本人，非独立用户案例",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "cantoprivacy",
+    "index": 3,
+    "title": "Canto · 隐私说明",
+    "url": "https://readcanto.com/privacy",
+    "note": "2026-09 版本；Apple 登录、单书选择理由、Supabase 存储、Claude 生成及图片分享",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "cantoterms",
+    "index": 4,
+    "title": "Canto · 服务条款",
+    "url": "https://readcanto.com/terms",
+    "note": "2026-10 版本，经只读抓取；年/月付价格、免费边界和不会自动收费的 30 天权限",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "cantoold",
+    "index": 5,
+    "title": "Canto · 旧标题商店缓存（仅历史对照）",
+    "url": "https://apps.apple.com/us/app/canto-reading-journal/id6771089037",
+    "note": "检索缓存仍为 1.1.0；不能作为当前摘录收费边界、评分或版本依据",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "deep",
+    "index": 6,
+    "title": "Deepread · README",
+    "url": "https://github.com/AyingAI/deepread",
+    "note": "作者自述的功能设计；未通过安装运行与端到端交互核验，不作已交付能力证据",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "deepui",
+    "index": 7,
+    "title": "Deepread · ReadingView.tsx（固定提交）",
+    "url": "https://github.com/AyingAI/deepread/blob/5c1e46c9a5cb8eaa2b88a561febf693267378e19/components/ReadingView.tsx",
+    "note": "2026-10-27 纠错复核：621–631 行编辑保存，930–940 行 Purpose 文本控件；无层级 Goal 交互证明，未运行验收",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "deepmodel",
+    "index": 8,
+    "title": "Deepread · types.ts",
+    "url": "https://github.com/AyingAI/deepread/blob/main/types.ts",
+    "note": "静态模型：Book.intention 字段、ThoughtCard.bookId；仅能证明结构，不能证明可用产品流程",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "rwbase",
+    "index": 9,
+    "title": "Readwise Reader · Basics",
+    "url": "https://docs.readwise.io/reader/docs/faqs",
+    "note": "官方文档；平台、离线、账号、订阅",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "rwtag",
+    "index": 10,
+    "title": "Readwise · Highlights, Tags, and Notes",
+    "url": "https://docs.readwise.io/reader/docs/faqs/highlights-tags-notes",
+    "note": "官方文档；页边笔记、跨文档标签、原文跳转",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "rworg",
+    "index": 11,
+    "title": "Readwise · Organizing Content",
+    "url": "https://docs.readwise.io/reader/docs/organizing-content",
+    "note": "官方文档；文档标签、摘录标签、过滤视图",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "rwexport",
+    "index": 12,
+    "title": "Readwise · Exporting",
+    "url": "https://docs.readwise.io/reader/docs/faqs/exporting",
+    "note": "官方文档；Markdown、标签集合导出、全文备份、带标注打印",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "rwfull",
+    "index": 13,
+    "title": "Readwise · January 2025 update",
+    "url": "https://blog.readwise.io/update-jan2025/",
+    "note": "2025-01-30；文章全文导出与高亮问答发布记录",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "rwobs",
+    "index": 14,
+    "title": "Readwise · Obsidian integration",
+    "url": "https://docs.readwise.io/readwise/docs/exporting-highlights/obsidian",
+    "note": "官方文档；全文和高亮分文件、模板与同步边界",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "rwprice",
+    "index": 15,
+    "title": "Readwise · Pricing",
+    "url": "https://readwise.io/pricing/reader",
+    "note": "官方定价，结合 Basics 核对 Full 计划",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "mn",
+    "index": 16,
+    "title": "MarginNote · Product",
+    "url": "https://www.marginnote.com/en/index.html",
+    "note": "官方产品说明；学习集、卡片、脑图、复习",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "mncn",
+    "index": 17,
+    "title": "MarginNote · 中文首页",
+    "url": "https://www.marginnote.com/index.html",
+    "note": "厂商自报 MN3+MN4 评分数；地区与去重口径不明",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "mnprice",
+    "index": 18,
+    "title": "MarginNote · Pricing",
+    "url": "https://www.marginnote.com/en/pricing/index.html",
+    "note": "官方价格与 Apple 平台授权边界",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "lt",
+    "index": 19,
+    "title": "LiquidText · Product",
+    "url": "https://www.liquidtext.net/",
+    "note": "官方产品说明；跨文档联系、来源、Windows、导出",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "ltscale",
+    "index": 20,
+    "title": "LiquidText · Company",
+    "url": "https://law.liquidtext.net/company/",
+    "note": "厂商自报 600 万下载、2 万以上法律月用户；页面未注明统计时点",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "zscale",
+    "index": 21,
+    "title": "Sean Takats · Zotero at Twenty",
+    "url": "https://quintessenceofham.org/zotero-at-twenty/",
+    "note": "2026-10-05；项目创始成员自报超过 2000 万用户，非 MAU 披露",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "zannual",
+    "index": 22,
+    "title": "Digital Scholar · 2025 Annual Report",
+    "url": "https://digitalscholar.org/assets/downloads/2025%20Digital%20Scholar%20Annual%20Report.pdf",
+    "note": "已打开原始 PDF，第 16–17 页：2025 年 1730 万 Users；历史时点，非 MAU",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "zcoll",
+    "index": 23,
+    "title": "Zotero · Collections and Tags",
+    "url": "https://www.zotero.org/support/collections_and_tags",
+    "note": "官方文档；层级集合、同资料多集合、不复制",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "znotes",
+    "index": 24,
+    "title": "Zotero · Notes",
+    "url": "https://www.zotero.org/support/notes",
+    "note": "官方文档；独立笔记及关联",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "zreader",
+    "index": 25,
+    "title": "Zotero · Reader and Note Editor",
+    "url": "https://www.zotero.org/support/pdf_reader",
+    "note": "官方文档；跨资料注释入笔记、返回来源、引文",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "zepub",
+    "index": 26,
+    "title": "Zotero · EPUB reader announcement",
+    "url": "https://forums.zotero.org/discussion/106716/available-for-beta-testing-updated-reader-with-epub-snapshot-support-and-new-annotation-types",
+    "note": "官方开发者公告，2023-08-07；EPUB 支持起点",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "zlicense",
+    "index": 27,
+    "title": "Zotero · Licensing",
+    "url": "https://www.zotero.org/support/licensing",
+    "note": "官方许可页，并核对当前仓库 COPYING 为 AGPLv3",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "flex",
+    "index": 28,
+    "title": "Flexcil · Product",
+    "url": "https://www.flexcil.com/",
+    "note": "官方；PDF、笔记、参考链接，首页已展示 Web 版",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "flexscale",
+    "index": 29,
+    "title": "Flexcil · Board info",
+    "url": "https://www.flexcil.com/flexcilboardinfo/",
+    "note": "厂商自报 950 万以上 Global users；总产品口径，非活跃度，非 Board 用户数",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "flexlink",
+    "index": 30,
+    "title": "Flexcil · Reference Link",
+    "url": "https://support.flexcil.com/hc/en-us/articles/8427582550553-What-is-a-Reference-Link",
+    "note": "官方帮助；2023-07-17；多文档摘要和双向来源导航",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "good",
+    "index": 31,
+    "title": "Goodnotes · Press kit",
+    "url": "https://www.goodnotes.com/press",
+    "note": "厂商自报超过 2500 万月活；页面统计时点未注明",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "hepta",
+    "index": 32,
+    "title": "Heptabase · Product",
+    "url": "https://heptabase.com/",
+    "note": "官方；白板、卡片、PDF、双链、离线、AI",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "heptawork",
+    "index": 33,
+    "title": "Heptabase · Getting started",
+    "url": "https://wiki.heptabase.com/getting-started-with-heptabase",
+    "note": "官方；关心的问题、复杂主题、生活反思等使用目的",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "heptaepub",
+    "index": 34,
+    "title": "Heptabase · Whole book / long PDF",
+    "url": "https://support.heptabase.com/en/articles/16762580-how-do-i-use-a-whole-book-or-long-pdf-with-heptabase-ai",
+    "note": "官方明确当前不支持原生 EPUB，建议转 PDF 或文本",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "heptaprice",
+    "index": 35,
+    "title": "Heptabase · Plans and pricing",
+    "url": "https://support.heptabase.com/en/articles/12990121-plans-and-pricing",
+    "note": "官方当前定价；Pro、Premium、Premium+",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "marginalia",
+    "index": 36,
+    "title": "Marginalia · Product",
+    "url": "https://usemarginalia.app/",
+    "note": "官方，版本 1.1.2 / 2026-10；本地 Markdown、免费导出、量化阅读目标",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "readest",
+    "index": 37,
+    "title": "Readest · Reading",
+    "url": "https://www.readest.com/docs/reading",
+    "note": "官方文档；标注导出、深链接与原文上下文",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "bookx",
+    "index": 38,
+    "title": "BookxNote · 荔枝软件商店",
+    "url": "https://lizhi.shop/products/bookxnote-pro",
+    "note": "经销商二级证据；功能可作线索。页面已下架，不能据此判定产品停止",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "paid",
+    "index": 39,
+    "title": "Readwise 用户：续费还是返回免费工具",
+    "url": "https://www.reddit.com/r/readwise/comments/1oblyn1/convince_me_to_stay_with_paid_readwise_reader/",
+    "note": "约 2025 年帖；用户自述及正反回复，非代表性样本",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "lifetime",
+    "index": 40,
+    "title": "Readwise 用户：永久许可诉求",
+    "url": "https://www.reddit.com/r/readwise/comments/1npydnt/any_possibility_of_a_lifetime_subscription/",
+    "note": "约 2025 年帖；跨端价值、长期访问担忧、订阅疲劳",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "metadata",
+    "index": 41,
+    "title": "Readwise 付费用户：元数据问题",
+    "url": "https://www.reddit.com/r/readwise/comments/1r72fc4/paying_user_frustrated_by_lack_of_basic_metadata/",
+    "note": "约 2026-02；付费用户自述，不代表全部用户",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "reliable",
+    "index": 42,
+    "title": "LiquidText 用户：可靠性讨论",
+    "url": "https://www.reddit.com/r/LiquidText/comments/17p8veb/reliability_and_daily_use_issues/",
+    "note": "约 2023-11；历史风险信号，不能证明当前版本仍有同一问题",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "bn",
+    "index": 43,
+    "title": "Better Notes · README",
+    "url": "https://github.com/windingwind/zotero-better-notes",
+    "note": "当前官方仓库；跨资料模板、笔记链接、Markdown 双向同步",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "koodo",
+    "index": 44,
+    "title": "Koodo Reader · README",
+    "url": "https://github.com/koodo-reader/koodo-reader",
+    "note": "当前官方仓库；多格式、多平台、笔记导出",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "foliate",
+    "index": 45,
+    "title": "Foliate · Repository",
+    "url": "https://github.com/johnfactotum/foliate",
+    "note": "官方仓库；GPLv3+、阅读与标注",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "thorium",
+    "index": 46,
+    "title": "Thorium Reader · Repository",
+    "url": "https://github.com/edrlab/thorium-reader",
+    "note": "官方仓库；BSD-3-Clause、可访问性、EPUB、LCP 组件边界",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "readestrepo",
+    "index": 47,
+    "title": "Readest · Repository",
+    "url": "https://github.com/readest/readest",
+    "note": "官方仓库；AGPLv3+，多平台、并行阅读",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  },
+  {
+    "id": "leaf",
+    "index": 48,
+    "title": "Leaf · Reading goals",
+    "url": "https://readwithleaf.app/features/reading-goals/",
+    "note": "厂商说明；页数/日期目标，用于辨别关键词伪同类",
+    "accessed": "2026-10-27 (Asia/Shanghai)"
+  }
+]
