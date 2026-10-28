@@ -14,6 +14,7 @@ import type { AppShell } from './appShell.js';
 import type { ReaderMode } from '../domain/book.js';
 import type { NoteDraft } from './contracts.js';
 import { errorMessage } from '../infrastructure/storageError.js';
+import JSZip from 'jszip';
 import { AppNavigation } from './navigation.js';
 interface CoordinatorDependencies {
     goalController?: GoalController;
@@ -177,12 +178,12 @@ export class AppCoordinator {
 
             if (ext === 'epub' || ext === 'equb' || ext === 'zip') {
                 const arrayBuffer = await file.arrayBuffer();
-                bookObj = await parseEpub(arrayBuffer, file.name, window.JSZip);
+                bookObj = await parseEpub(arrayBuffer, file.name, JSZip);
             } else {
                 const text = await file.text();
                 if (text.startsWith('PK')) {
                     const arrayBuffer = await file.arrayBuffer();
-                    bookObj = await parseEpub(arrayBuffer, file.name, window.JSZip);
+                    bookObj = await parseEpub(arrayBuffer, file.name, JSZip);
                 } else {
                     bookObj = parseTxt(text, file.name);
                 }

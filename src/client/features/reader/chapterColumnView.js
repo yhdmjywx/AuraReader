@@ -1,3 +1,4 @@
+import { readerViewport } from './readerDom.js';
 /* ==========================================================================
    Chapter column view - DOM layout for one EPUB chapter strip.
    scroll: vertical strip. single: one column per screen.
@@ -16,7 +17,7 @@ const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, figcapti
 
 export function clearChapterFlow(elements) {
     if (!elements) return;
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     if (viewport) viewport.classList.remove('chapter-paged', 'chapter-scroll');
     if (elements.paperContainer) elements.paperContainer.classList.remove('chapter-flow');
     if (elements.bookPaper) {
@@ -32,7 +33,7 @@ export function clearChapterFlow(elements) {
 }
 
 export function layoutChapterStrip(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     const container = elements && elements.paperContainer;
     if (!viewport || !paper || !container) return null;
@@ -85,7 +86,7 @@ export function readTopLeftSentence(root, viewport) {
     for (const [dx, dy] of probes) {
         const x = Math.min(view.right - 4, view.left + dx);
         const y = Math.min(view.bottom - 4, view.top + dy);
-        const hit = caretAt(x, y);
+        const hit = caretAt(x, y, root.ownerDocument);
         if (!hit || !root.contains(hit.node)) continue;
         const sentence = sentenceFromHit(root, hit.node, hit.offset);
         if (sentence) return sentence;
@@ -134,7 +135,7 @@ export function placeAnchorIdAtTopLeft(root, viewport, anchor, mode, sourcePage 
 }
 
 export function shiftStrip(elements, mode, direction) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (!viewport || !paper) return 'edge';
     if (mode === 'scroll') {
@@ -162,7 +163,7 @@ export function shiftStrip(elements, mode, direction) {
 }
 
 export function scrollStripToStart(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (mode === 'scroll') {
         if (viewport) viewport.scrollTop = 0;
@@ -172,7 +173,7 @@ export function scrollStripToStart(elements, mode) {
 }
 
 export function scrollStripToEnd(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (mode === 'scroll') {
         if (!viewport) return;
@@ -184,14 +185,14 @@ export function scrollStripToEnd(elements, mode) {
 }
 
 export function atStripStart(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (mode === 'scroll') return !viewport || viewport.scrollTop <= 2;
     return !paper || paper.scrollLeft <= 2;
 }
 
 export function atStripEnd(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (mode === 'scroll') {
         if (!viewport) return true;
@@ -203,7 +204,7 @@ export function atStripEnd(elements, mode) {
 }
 
 export function writeChapterIndicator(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (!elements || !elements.currentPageSpan || !elements.totalPagesSpan) return { current: 1, total: 1 };
     let current = 1;
@@ -231,7 +232,7 @@ export function writeChapterIndicator(elements, mode) {
     return { current, total };
 }
 
-function caretAt(x, y) {
+function caretAt(x, y, document) {
     if (document.caretPositionFromPoint) {
         const pos = document.caretPositionFromPoint(x, y);
         if (pos && pos.offsetNode) return { node: pos.offsetNode, offset: pos.offset };
@@ -257,7 +258,7 @@ function sentenceFromHit(root, node, offset) {
 }
 
 function firstText(element) {
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     const node = walker.nextNode();
     if (!node) return null;
     return { node, offset: 0 };
@@ -265,7 +266,7 @@ function firstText(element) {
 
 function offsetInside(block, node, offset) {
     if (!block || !node) return 0;
-    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+    const walker = block.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT);
     let count = 0;
     let current = walker.nextNode();
     while (current) {
@@ -279,7 +280,7 @@ function offsetInside(block, node, offset) {
 function locateSnippet(root, snippet) {
     const needle = String(snippet || '').replace(/\s+/g, '').slice(0, 40);
     if (!needle) return null;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const parts = [];
     let raw = '';
     let compact = '';
@@ -307,7 +308,7 @@ function locateSnippet(root, snippet) {
 }
 
 function rangeAt(node, offset) {
-    const range = document.createRange();
+    const range = node.ownerDocument.createRange();
     const safe = Math.max(0, Math.min(node.textContent.length, offset));
     range.setStart(node, safe);
     range.setEnd(node, safe);
@@ -319,7 +320,7 @@ function isDocumentStart(root, node, offset) {
         const head = node.textContent.slice(0, offset);
         if (head.replace(/\s+/g, '') !== '') return false;
     }
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     let current = walker.nextNode();
     while (current) {
         if (current === node) return true;
@@ -379,7 +380,7 @@ function liftToColumnChild(paper, textNode) {
     }
     if (!node.parentNode) return null;
     if (node.nodeType === Node.TEXT_NODE) {
-        const wrap = document.createElement('div');
+        const wrap = paper.ownerDocument.createElement('div');
         node.parentNode.insertBefore(wrap, node);
         wrap.appendChild(node);
         node = wrap;

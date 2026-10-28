@@ -7,12 +7,16 @@ const { getCurrentFuseWire, FuseV1Options } = require('@electron/fuses');
 async function verifyPackage(directory) {
     const archive = path.join(directory, 'resources/app.asar');
     const entries = asar.listPackage(archive).map(file => file.replaceAll('\\', '/').replace(/^\//, ''));
-    const required = ['src/desktop/main.cjs', 'src/desktop/preload.cjs', 'dist/client/desktop.js', 'dist/client/main.js',
-        'src/client/index.html', 'src/client/styles.css', 'src/client/assets/fonts/literata.woff2',
-        'src/client/assets/fonts/sarasa-regular.woff2', 'src/client/assets/fonts/licenses/Literata-OFL.txt',
+    const required = ['src/desktop/main.cjs', 'src/desktop/preload.cjs',
+        'dist/renderer/index.html', 'dist/renderer/fonts/literata.woff2',
+        'dist/renderer/fonts/sarasa-regular.woff2', 'dist/renderer/fonts/licenses/Literata-OFL.txt',
         'src/server/dataStore.js', 'src/server/migration.js', 'src/server/storageMaintenance.js', 'src/server/fontStore.js',
-        'node_modules/jszip/dist/jszip.min.js', 'node_modules/remixicon/fonts/remixicon.woff2', 'node_modules/fontkit/dist/main.cjs'];
+        'node_modules/fontkit/dist/main.cjs'];
     required.forEach(file => assert.ok(entries.includes(file), 'Missing package resource: ' + file));
+    const html = asar.extractFile(archive, path.join('dist', 'renderer', 'index.html')).toString('utf8');
+    const resources = [...html.matchAll(/(?:src|href)="\.\/([^"?#]+)"/g)].map(match => 'dist/renderer/' + match[1]);
+    assert.ok(resources.some(file => file.endsWith('.js')), 'Missing renderer entry');
+    resources.forEach(file => assert.ok(entries.includes(file), 'Missing built resource: ' + file));
     for (const entry of entries) {
         assert.ok(!/^(data|tests|docs|\.git|\.commandcode)\//.test(entry), 'Private/development file: ' + entry);
         assert.ok(!/^node_modules\/(electron|electron-builder|typescript|jsdom)\//.test(entry), 'Development dependency: ' + entry);

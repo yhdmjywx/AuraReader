@@ -13,6 +13,7 @@ export interface AppElements {
     appHeader?: HTMLElement | null;
     workspaceContainer?: HTMLElement | null;
     readerPanel?: HTMLElement | null;
+    readerViewport?: HTMLElement | null;
     notesPanel?: HTMLElement | null;
     bookPaper?: HTMLElement | null;
     paperContainer?: HTMLElement | null;

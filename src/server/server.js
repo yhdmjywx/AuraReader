@@ -62,10 +62,7 @@ const server = http.createServer((req, res) => {
     // --------------------------------------------------------------------------
     // Static Files Handler
     // --------------------------------------------------------------------------
-    // JavaScript is emitted from the mixed TS/JS graph; assets stay in source.
-    const CLIENT_DIR = pathname.endsWith('.js')
-        ? path.resolve(__dirname, '../../dist/client')
-        : path.resolve(__dirname, '../client');
+    const CLIENT_DIR = path.resolve(__dirname, '../../dist/renderer');
     let decodedPath;
     try {
         decodedPath = decodeURIComponent(pathname);

@@ -1,3 +1,4 @@
+import { readerAbortController } from '../reader/readerDom.js';
 import { eventElement } from '../../app/dom.js';
 import type { Annotation, AnnotationLocation } from '../../domain/annotation.js';
 import type { ActiveAnnotationContext, SelectionCallbacks, PendingSelection } from '../../app/contracts.js';
@@ -23,6 +24,23 @@ import {
 const DRAG_THRESHOLD = 5;
 
 export class SelectionController {
+    private bindings?: AbortController;
+    private selectionTimer?: ReturnType<typeof setTimeout>;
+    private listeners = new Set<() => void>();
+    subscribe(listener: () => void) {
+        this.listeners.add(listener);
+        return () => { this.listeners.delete(listener); };
+    }
+    private changed() { for (const listener of this.listeners) listener(); }
+    destroy() {
+        this.bindings?.abort(); this.bindings = undefined;
+        clearTimeout(this.selectionTimer);
+        this.hideSelectionTooltip(); this.clearAnnotationContext();
+        this.pendingSelection = null;
+        this.pointerOrigin = null; this.pointerMoved = false;
+        this.elements = null;
+        this.changed();
+    }
     callbacks: SelectionCallbacks;
     pendingSelection: PendingSelection | null;
     activeAnnotationContext: ActiveAnnotationContext | null;
@@ -61,9 +79,8 @@ export class SelectionController {
 
     clearSelection() {
         this.pendingSelection = null;
-        if (window.getSelection) {
-            window.getSelection()?.removeAllRanges();
-        }
+        this.changed();
+        this.elements?.bookPaper?.ownerDocument.getSelection()?.removeAllRanges();
     }
 
     showHighlightAction(targetEl: HTMLElement, note: Annotation) {
@@ -109,9 +126,10 @@ export class SelectionController {
         const hadContext = !!this.activeAnnotationContext || this.menuOpen;
         this.activeAnnotationContext = null;
         this.menuOpen = false;
-        clearActiveTokens();
+        clearActiveTokens(this.elements?.bookPaper);
         if (this.elements) hideHighlightActionTooltip(this.elements);
         if (hadContext && this.callbacks.onClearFocus) this.callbacks.onClearFocus();
+        if (hadContext) this.changed();
     }
 
     activateToken(token: HTMLElement, page: number, { force = false, notify = true, showMenu = true } = {}) {
@@ -150,12 +168,13 @@ export class SelectionController {
         if (notify && this.callbacks.onAnnotationActivated) {
             this.callbacks.onAnnotationActivated(this.activeAnnotationContext);
         }
+        this.changed();
         return true;
     }
 
     activateAnnotationId(annotationId: string, { notify = false, showMenu = false } = {}) {
-        if (!annotationId || typeof document === 'undefined') return false;
-        const token = findTokenByAnnotationId(annotationId);
+        if (!annotationId || typeof globalThis.document === 'undefined') return false;
+        const token = findTokenByAnnotationId(annotationId, this.elements?.bookPaper);
         if (!token) return false;
         const page = Number(token.dataset.page) || (this.activeAnnotationContext && this.activeAnnotationContext.page) || 1;
         return this.activateToken(token, page, { force: true, notify, showMenu });
@@ -163,7 +182,7 @@ export class SelectionController {
 
     restoreActiveTokens() {
         if (!this.activeAnnotationContext) return;
-        const tokens = findTokensByKey(this.activeAnnotationContext.key);
+        const tokens = findTokensByKey(this.activeAnnotationContext.key, this.elements?.bookPaper);
         if (tokens.length === 0) {
             this.clearAnnotationContext();
             return;
@@ -174,9 +193,9 @@ export class SelectionController {
     }
 
     applyActiveClasses() {
-        clearActiveTokens();
+        clearActiveTokens(this.elements?.bookPaper);
         if (!this.activeAnnotationContext) return;
-        findTokensByKey(this.activeAnnotationContext.key).forEach(token => token.classList.add('is-active'));
+        findTokensByKey(this.activeAnnotationContext.key, this.elements?.bookPaper).forEach(token => token.classList.add('is-active'));
     }
 
     showMenuForContext() {
@@ -185,7 +204,7 @@ export class SelectionController {
             this.hideMenu();
             return;
         }
-        const target = this.activeAnnotationContext.targetElement || findTokensByKey(this.activeAnnotationContext.key)[0];
+        const target = this.activeAnnotationContext.targetElement || findTokensByKey(this.activeAnnotationContext.key, this.elements?.bookPaper)[0];
         if (!target) return;
         this.activeAnnotationContext.targetElement = target;
         this.refreshGoalAction();
@@ -196,7 +215,7 @@ export class SelectionController {
 
     handleAnnotationClick(event: MouseEvent, paper: HTMLElement) {
         if (!paper || !event) return;
-        if (this.pointerMoved || hasTextSelection()) return;
+        if (this.pointerMoved || hasTextSelection(this.elements?.bookPaper?.ownerDocument.getSelection())) return;
 
         const eventTarget = eventElement(event);
         const token = eventTarget?.closest<HTMLElement>('.annotation-token');
@@ -213,7 +232,7 @@ export class SelectionController {
 
     handleSelection() {
         if (!this.elements) return;
-        const selection = window.getSelection();
+        const selection = this.elements.bookPaper?.ownerDocument.getSelection();
         if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
             this.hideSelectionTooltip();
             return;
@@ -262,6 +281,7 @@ export class SelectionController {
         if (this.elements) {
             showSelectionTooltip(this.elements, rect);
         }
+        this.changed();
     }
 
     refreshGoalAction() {
@@ -279,36 +299,44 @@ export class SelectionController {
     }
 
     initUI(elements: AppElements) {
+        this.destroy();
         this.elements = elements;
-        if (!elements || typeof document === 'undefined') return;
+        if (!elements || typeof globalThis.document === 'undefined') return;
+        const document = elements.bookPaper?.ownerDocument || globalThis.document;
+        this.bindings = readerAbortController(document);
+        const signal = this.bindings.signal;
+        const scheduleSelection = () => {
+            clearTimeout(this.selectionTimer);
+            this.selectionTimer = setTimeout(() => this.handleSelection(), 30);
+        };
 
         document.addEventListener('selectionchange', () => {
-            const selection = window.getSelection();
+            const selection = document.getSelection();
             if (!selection || selection.rangeCount === 0 || selection.isCollapsed || !selection.toString().trim()) {
                 this.hideSelectionTooltip();
             }
-        });
+        }, { signal });
 
         const bindPaper = (paper: HTMLElement | null | undefined) => {
             if (!paper) return;
             paper.addEventListener('pointerdown', (event) => {
                 this.pointerOrigin = { x: event.clientX, y: event.clientY };
                 this.pointerMoved = false;
-            });
+            }, { signal });
             paper.addEventListener('pointermove', (event) => {
                 if (!this.pointerOrigin) return;
                 const dx = Math.abs(event.clientX - this.pointerOrigin.x);
                 const dy = Math.abs(event.clientY - this.pointerOrigin.y);
                 if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) this.pointerMoved = true;
-            });
-            paper.addEventListener('click', (event) => this.handleAnnotationClick(event, paper));
-            paper.addEventListener('mouseup', () => setTimeout(() => this.handleSelection(), 30));
-            paper.addEventListener('touchend', () => setTimeout(() => this.handleSelection(), 30));
+            }, { signal });
+            paper.addEventListener('click', (event) => this.handleAnnotationClick(event, paper), { signal });
+            paper.addEventListener('mouseup', scheduleSelection, { signal });
+            paper.addEventListener('touchend', scheduleSelection, { signal });
         };
 
         bindPaper(elements.bookPaper);
 
-        document.querySelectorAll('.tooltip-btn[data-color]').forEach(btn => {
+        (elements.selectionTooltip || elements.readerPanel || document).querySelectorAll('.tooltip-btn[data-color]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const color = btn.getAttribute('data-color') || 'yellow';
@@ -317,7 +345,7 @@ export class SelectionController {
                 }
                 this.hideSelectionTooltip();
                 this.clearSelection();
-            });
+            }, { signal });
         });
 
         if (elements.btnAddNote) {
@@ -336,7 +364,7 @@ export class SelectionController {
                 } else if (this.callbacks.onOpenNoteModal) {
                     this.callbacks.onOpenNoteModal(text, null, page);
                 }
-            });
+            }, { signal });
         }
 
         elements.btnAnnotationGoal?.addEventListener('click', event => {
@@ -347,7 +375,7 @@ export class SelectionController {
             const result = this.callbacks.onLinkGoal?.(ids[0]!);
             this.clearAnnotationContext();
             Promise.resolve(result).catch(error => console.error('Goal 归入失败', error));
-        });
+        }, { signal });
         if (elements.btnHlRemove) {
             elements.btnHlRemove.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -356,7 +384,7 @@ export class SelectionController {
                 const ids = ctx.highlightIds.slice();
                 this.clearAnnotationContext();
                 if (this.callbacks.onDeleteHighlight) this.callbacks.onDeleteHighlight(ids);
-            });
+            }, { signal });
         }
 
         if (elements.btnNoteRemove) {
@@ -367,11 +395,11 @@ export class SelectionController {
                 const ids = ctx.noteIds.slice();
                 this.clearAnnotationContext();
                 this.callbacks.onDeleteNotes?.(ids);
-            });
+            }, { signal });
         }
 
         document.addEventListener('click', (e) => {
-            const selection = window.getSelection();
+            const selection = document.getSelection();
             const hasActiveSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
 
             if (!eventElement(e)?.closest('#selection-tooltip') && !hasActiveSelection) {
@@ -382,7 +410,7 @@ export class SelectionController {
             if (eventElement(e)?.closest('#highlight-action-tooltip') || eventElement(e)?.closest('.annotation-token')) return;
             if (eventElement(e)?.closest('#notes-panel')) return;
             this.hideHighlightAction();
-        });
+        }, { signal });
     }
 }
 
@@ -391,31 +419,24 @@ function splitIds(value: string | null) {
     return String(value).split(/\s+/).filter(Boolean);
 }
 
-function hasTextSelection() {
-    if (typeof window === 'undefined' || !window.getSelection) return false;
-    const selection = window.getSelection();
+function hasTextSelection(selection: Selection | null | undefined) {
     return !!(selection && selection.rangeCount > 0 && !selection.isCollapsed && selection.toString().trim());
 }
 
-function clearActiveTokens() {
-    if (typeof document === 'undefined') return;
-    document.querySelectorAll('.annotation-token.is-active').forEach(token => token.classList.remove('is-active'));
+function clearActiveTokens(root?: HTMLElement | null) {
+    if (!root) return;
+    root.querySelectorAll('.annotation-token.is-active').forEach(token => token.classList.remove('is-active'));
 }
 
-function findTokensByKey(key: string) {
-    if (typeof document === 'undefined' || !key) return [];
-    return Array.from(document.querySelectorAll<HTMLElement>('.annotation-token')).filter(token => tokenKey(token) === key);
+function findTokensByKey(key: string, root?: HTMLElement | null) {
+    if (!root || !key) return [];
+    return Array.from(root.querySelectorAll<HTMLElement>('.annotation-token')).filter(token => tokenKey(token) === key);
 }
 
-function findTokenByAnnotationId(annotationId: string): HTMLElement | null {
-    if (typeof document === 'undefined' || !annotationId) return null;
-    if (typeof CSS === 'undefined' || !CSS.escape) {
-        return document && annotationId
-            ? document.querySelector<HTMLElement>(`[data-highlight-ids~="${annotationId}"], [data-note-ids~="${annotationId}"]`)
-            : null;
-    }
-    const escaped = CSS.escape(annotationId);
-    return document.querySelector<HTMLElement>(`[data-highlight-ids~="${escaped}"], [data-note-ids~="${escaped}"]`);
+function findTokenByAnnotationId(annotationId: string, root?: HTMLElement | null): HTMLElement | null {
+    if (!root || !annotationId) return null;
+    return [...root.querySelectorAll<HTMLElement>('.annotation-token')].find(token =>
+        [...splitIds(token.dataset.highlightIds || ''), ...splitIds(token.dataset.noteIds || '')].includes(annotationId)) || null;
 }
 
 function tokenKey(token: Element) {

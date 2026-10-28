@@ -34,11 +34,15 @@ Electron Windows 桌面迁移已进入阶段 6 的本地验证，保留 Windows 
 
 首次创建书库需明确点击；桌面 SQLite 和导入字体位于 `%APPDATA%\AuraReader\data`，不在安装目录内。按当前范围只保证现用 SQLite 的读写、版本/幂等、备份与恢复，不提供旧数据库或 IndexedDB 的桌面迁移；未知或缺失数据库仍阻断启动，不静默清库。浏览器模式继续独立运行，[旧版迁移说明](data-and-backup.md#从旧版本迁移)仅适用于现有浏览器模式。阶段 6 增加实际 SQLite 容量、只读和锁竞争故障、Renderer/主进程终止恢复、大书与持续读写、打包程序及安装生命周期验证，并修复容量错误掩盖与页面关闭漏保存。发布验收仍有未验证项；最新证据与限制见 [阶段 6 记录](electron-desktop-stage6.md)，安装设计见 [阶段 5](electron-desktop-stage5.md)，文件功能见 [阶段 4](electron-desktop-stage4.md)，历史记录见 [阶段 3](electron-desktop-stage3.md)、[审计](electron-desktop-audit.md)和[外壳记录](electron-desktop-stage2.md)。
 
-源码位于 `src/client/` 和 `src/server/`；前端采用渐进式 TypeScript 迁移，`npm start` 会先检查类型并构建到 `dist/client/`，再启动服务。依赖安装后，可以运行：
+源码位于 `src/client/` 和 `src/server/`。前端已接入 React + Vite：`entry.tsx` 挂载 React 启动组件，再按运行环境载入现有浏览器／桌面应用。阅读器、Goal 和笔记界面暂沿用现有实现，后续逐步组件化。
+
+`npm start` 会先检查类型并构建，再启动服务。`dist/renderer/` 是浏览器与 Electron 共用的 Vite 产物，包含带 hash 的 JS/CSS、本地图标和字体；`dist/client/` 保留逐模块编译输出，供现有测试导入，不随桌面版发布。依赖安装后，可以运行：
 
 ```powershell
 npm test                 # 语法、单元和回归检查
-npm run build            # 严格类型检查并生成浏览器使用的 JavaScript
+npm run dev              # 启动 API (8095) 和 Vite 开发页面 (5173)，支持 React 热更新
+npm run build            # 严格类型检查、测试模块输出和 Vite 生产构建
+npm run build:modules    # 只编译现有测试使用的模块
 npm run typecheck        # 只检查类型
 npm run test:unit        # 单元测试
 npm run test:regression  # 回归检查
@@ -53,7 +57,11 @@ npm run verify:package    # 核对已有 win-unpacked，并生成安装包 SHA25
 npm run test:install      # 构建候选/升级测试包，真实安装、升级、卸载和重装（需无现有 AuraReader 安装）
 ```
 
-修改源码后重新运行 `npm run build` 并刷新浏览器；直接运行 `node src/server/server.js` 前也需先构建。迁移边界及运行方式见 [TypeScript 迁移说明](typescript-migration.md)。
+阅读器现在通过 `features/reader/readerRuntime.ts` 提供 `mount`、`setBook`、`setAnnotations`、`setLayout`、翻页、`subscribe/getSnapshot` 和 `destroy`；当前应用也使用这个入口挂载。React 界面可直接使用 `readerReact.tsx` 中的 `ReaderSurface` 与 `useReaderSnapshot`。React 管理容器和周边界面，阅读器独占正文子节点；快照只包含普通数据，不传出 DOM 或 Range。卸载会移除阅读与选区监听、排版任务和尺寸观察；重新挂载保留书籍与源文档位置。业务数据保存仍由原有 repository/controller 负责。
+
+日常前端开发访问 `npm run dev` 输出的 `http://127.0.0.1:5173/`，API 请求由 Vite 转发至本地服务。生产预览仍使用 `npm start` 的 8095 端口；直接运行 `node src/server/server.js` 前需先构建。浏览器偏好按页面访问地址隔离。
+
+Electron 此阶段继续通过 `aurareader://app/index.html` 加载 Vite 构建资源，不启用桌面 HMR，也不改 IPC 来源校验。桌面改动后重新执行 `npm run desktop`。原有通过固定 `main.js` URL 导入应用的 Electron 交互测试，需要在测试迁移阶段适配构建后的模块入口；现有 Node/JSDOM 模块测试继续使用 `dist/client/`。
 
 测试素材 `tests/fixtures/test.epub` 是 Project Gutenberg 的英文版《爱丽丝梦游仙境》，保留书内原始声明与许可。素材来源见 [测试素材说明](../tests/fixtures/README.md)。嵌套目录另由自写测试样例验证。
 

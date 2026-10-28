@@ -1,3 +1,4 @@
+import { readerViewport } from './readerDom.js';
 /* ==========================================================================
    PaperRenderer - Canvas DOM Renderer for Reader (Feature Layer)
    Handles the reading page, highlight mounting,
@@ -20,7 +21,7 @@ export function renderPaper({
 
     clearChapterFlow(elements);
 
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const savedScrollTop = (viewport && preserveScroll) ? viewport.scrollTop : 0;
 
     const currentPage = readerEngine.getCurrentPage();
@@ -83,7 +84,7 @@ export function hideHighlightActionTooltip(elements) {
  * @param {import('../../domain/book.js').Book | null} currentBookObj
  * @param {((href: string) => void) | null} onLinkClick */
 export function interceptInTextLinks(elements, currentBookObj, onLinkClick) {
-    document.querySelectorAll('#book-paper a[href]').forEach(a => {
+    elements.bookPaper?.querySelectorAll('a[href]').forEach(a => {
         const href = a.getAttribute('href');
         if (!href) return;
 
@@ -103,7 +104,7 @@ export function interceptInTextLinks(elements, currentBookObj, onLinkClick) {
 export function scrollToAnchor(anchor, elements) {
     if (!anchor || !elements) return;
 
-    setTimeout(() => {
+    const timer = setTimeout(() => {
         let targetEl = elements.bookPaper ? (
             elements.bookPaper.querySelector(`#${CSS.escape(anchor)}`)
             || elements.bookPaper.querySelector(`[name="${anchor}"]`)
@@ -115,4 +116,5 @@ export function scrollToAnchor(anchor, elements) {
             targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }, 120);
+    return () => clearTimeout(timer);
 }

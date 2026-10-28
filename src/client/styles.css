@@ -104,7 +104,7 @@ body.theme-dark {
 }
 
 body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
     background-color: var(--bg-app);
     color: var(--text-primary);
     height: 100vh;

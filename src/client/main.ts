@@ -17,6 +17,7 @@ import { positionMarginNotes } from './features/layout/marginNotesLayout.js';
 import { ReaderEngine, readerEngine } from './domain/readerEngine.js';
 import { findChapterForPage } from './domain/readingLocation.js';
 import { ReaderController } from './features/reader/readerController.js';
+import { ReaderRuntime } from './features/reader/readerRuntime.js';
 import { AnnotationController } from './features/annotations/annotationController.js';
 import { SelectionController } from './features/annotations/selectionController.js';
 import { ShelfController } from './features/shelf/shelfController.js';
@@ -31,6 +32,7 @@ export function queryElements(): AppElements {
         appHeader: document.querySelector<HTMLElement>('.app-header'),
         workspaceContainer: document.getElementById('workspace-container'),
         readerPanel: document.getElementById('reader-panel'),
+        readerViewport: document.getElementById('reader-viewport'),
         notesPanel: document.getElementById('notes-panel'),
         goalPanel: document.getElementById('goal-panel'),
         goalSidebar: document.getElementById('goal-sidebar'),
@@ -183,6 +185,8 @@ export function bootstrapApp() {
             showToast: (msg) => appShell.showToast(msg)
         }
     });
+
+    const readerRuntime = new ReaderRuntime(reader, selection);
 
     const backup = new BackupController({
         callbacks: {
@@ -348,9 +352,7 @@ export function bootstrapApp() {
     const syncReaderLayout = () => {
         if (goals.page || home?.active) return;
         layout.updateLayoutClasses(elements);
-        const notes = annotations.getNotes();
-        if (reader.isChapterFlow()) reader.refitChapter(notes);
-        else reader.renderPage(reader.getCurrentPage(), true, notes);
+        readerRuntime.relayout();
     };
     layout.callbacks.beforeGeometryChange = () => { goals.finishInlineEdit().catch(() => {}); reader.rememberAnchor(); };
     layout.callbacks.onLayoutChange = (res) => {
@@ -359,9 +361,8 @@ export function bootstrapApp() {
     };
     // 4. Initialize UI Listeners (Browser DOM only)
     if (typeof document !== 'undefined') {
-        reader.initUI(elements);
+        if (elements.readerPanel) readerRuntime.mount(elements.readerPanel, elements);
         annotations.initUI(elements);
-        selection.initUI(elements);
         shelf.initUI(elements);
         backup.initUI(elements);
         layout.initUI(elements);
@@ -385,21 +386,6 @@ export function bootstrapApp() {
             }
         });
 
-        // Sidebar sizing changes only the available reading viewport. Reuse
-        // the same responsive layout/refit path as a normal window resize.
-        if (elements.workspaceContainer && typeof ResizeObserver !== 'undefined') {
-            let width = elements.workspaceContainer.clientWidth;
-            let resizeTimer: ReturnType<typeof setTimeout>;
-            new ResizeObserver(() => {
-                const next = elements.workspaceContainer!.clientWidth;
-                if (goals.page || home?.active || next === 0) return;
-                if (next === width) return;
-                width = next;
-                clearTimeout(resizeTimer);
-                resizeTimer = setTimeout(() => appShell.callbacks.onWindowResize?.(false), 60);
-            }).observe(elements.workspaceContainer);
-        }
-
         // 5. Initial Execution & Mounting
         layout.updateLayoutClasses(elements);
 
@@ -409,6 +395,7 @@ export function bootstrapApp() {
         session,
         coordinator,
         reader,
+        readerRuntime,
         annotations,
         selection,
         shelf,
@@ -427,6 +414,7 @@ export const {
     session,
     coordinator,
     reader,
+    readerRuntime,
     annotations,
     selection,
     shelf,

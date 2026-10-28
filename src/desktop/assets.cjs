@@ -9,19 +9,6 @@ const CSP = [
     "base-uri 'none'", "form-action 'none'", "worker-src 'none'"
 ].join('; ');
 
-/** @param {string} html */
-function desktopHtml(html) {
-    // Keep the browser source intact. No remote resources execute in desktop.
-    const entry = /<script type="module" src="main\.js(?:\?[^\"]*)?"><\/script>/;
-    if (!entry.test(html) || !html.includes('</head>')) throw new Error('Browser entry changed; desktop mapping must be reviewed');
-    return html.replace(/<link\b[^>]*\bhref="https?:\/\/[^>]*>/gi, '')
-        .replace(/<script\b[^>]*\bsrc="https?:\/\/[^>]*><\/script>/gi, '')
-        .replace('</head>', '<link rel="stylesheet" href="vendor/remixicon.css">\n' +
-            '<link rel="stylesheet" href="desktop-shell.css">\n<script src="vendor/jszip.min.js"></script>\n</head>')
-        .replace(entry,
-            '<script type="module" src="desktop-shell.js"></script>');
-}
-
 /** @param {string} raw */
 function resourcePath(raw) {
     const url = new URL(raw);
@@ -42,38 +29,23 @@ async function createAssetHandler(root, fontResource) {
     /** @param {string} url @param {string} directory @param {string} filename @param {string} type */
     const add = (url, directory, filename, type) => files.set(url,
         { filename: path.join(directory, filename), root: directory, type });
-    const client = path.join(root, 'src/client');
-    const emitted = path.join(root, 'dist/client');
-    const renderer = path.join(root, 'src/desktop/renderer');
-    const icons = path.join(root, 'node_modules/remixicon/fonts');
-    add('/index.html', client, 'index.html', 'text/html; charset=utf-8');
-    add('/styles.css', client, 'styles.css', 'text/css; charset=utf-8');
-    add('/desktop-shell.js', renderer, 'shell.js', 'application/javascript; charset=utf-8');
-    add('/desktop-shell.css', renderer, 'shell.css', 'text/css; charset=utf-8');
-    add('/vendor/remixicon.css', icons, 'remixicon.css', 'text/css; charset=utf-8');
-    add('/vendor/jszip.min.js', path.join(root, 'node_modules/jszip/dist'), 'jszip.min.js', 'application/javascript; charset=utf-8');
-    for (const ext of ['woff2', 'woff', 'ttf', 'eot', 'svg']) {
-        const type = ({ woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf',
-            eot: 'application/vnd.ms-fontobject', svg: 'image/svg+xml' })[ext];
-        add(`/vendor/remixicon.${ext}`, icons, `remixicon.${ext}`, type || 'application/octet-stream');
-    }
-    const fonts = path.join(client, 'assets/fonts');
-    for (const entry of await fs.readdir(fonts, { withFileTypes: true })) {
-        if (!entry.isFile()) continue;
-        const type = entry.name.endsWith('.woff2') ? 'font/woff2'
-            : entry.name === 'fonts.css' ? 'text/css; charset=utf-8'
-            : entry.name === 'inventory.json' ? 'application/json; charset=utf-8' : null;
-        if (type) add('/assets/fonts/' + entry.name, fonts, entry.name, type);
-    }
-    // Only emitted JS is exposed, never TS source, package files, data or server modules.
+    const emitted = path.join(root, 'dist/renderer');
+    const types = new Map([
+        ['.html', 'text/html; charset=utf-8'], ['.js', 'application/javascript; charset=utf-8'],
+        ['.css', 'text/css; charset=utf-8'], ['.json', 'application/json; charset=utf-8'],
+        ['.woff2', 'font/woff2'], ['.woff', 'font/woff'], ['.ttf', 'font/ttf'], ['.otf', 'font/otf'],
+        ['.eot', 'application/vnd.ms-fontobject'], ['.svg', 'image/svg+xml'],
+        ['.png', 'image/png'], ['.jpg', 'image/jpeg'], ['.ico', 'image/x-icon']
+    ]);
+    // Browser and desktop consume the same Vite output, including hashed chunks.
     /** @param {string} directory */
     async function emittedFiles(directory) {
         for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
             const filename = path.join(directory, entry.name);
             if (entry.isDirectory()) await emittedFiles(filename);
-            else if (entry.isFile() && entry.name.endsWith('.js')) {
+            else if (entry.isFile() && types.has(path.extname(entry.name))) {
                 const relative = path.relative(emitted, filename);
-                add('/' + relative.split(path.sep).join('/'), emitted, relative, 'application/javascript; charset=utf-8');
+                add('/' + relative.split(path.sep).join('/'), emitted, relative, types.get(path.extname(entry.name)) || 'application/octet-stream');
             }
         }
     }
@@ -101,8 +73,7 @@ async function createAssetHandler(root, fontResource) {
             const relative = path.relative(directory, filename);
             if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Resource outside root');
             const bytes = await fs.readFile(filename);
-            const body = name === '/index.html' ? desktopHtml(bytes.toString('utf8')) : bytes;
-            return new Response(request.method === 'HEAD' ? null : body,
+            return new Response(request.method === 'HEAD' ? null : bytes,
                 { headers: { ...headers, 'Content-Type': resource.type } });
         } catch (error) {
             if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'ENOENT') console.error('Desktop resource read failed:', error);
@@ -111,4 +82,4 @@ async function createAssetHandler(root, fontResource) {
     };
 }
 
-module.exports = { APP_URL, CSP, desktopHtml, resourcePath, createAssetHandler };
+module.exports = { APP_URL, CSP, resourcePath, createAssetHandler };

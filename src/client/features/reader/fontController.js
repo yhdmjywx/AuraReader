@@ -114,9 +114,11 @@ export class FontController {
         if (revision === this.revision) this.callbacks.onChange?.();
     }
 
-    initUI(elements) {
+    /** @param {import('../../app/elements.js').AppElements} elements @param {AbortSignal} [signal] */
+    initUI(elements, signal) {
         const trigger = elements.fontFamilySelect;
         if (!trigger || !elements.fontMenu) return;
+        const document = trigger.ownerDocument;
         this.elements = elements;
         const menu = elements.fontMenu;
         trigger.addEventListener('click', () => {
@@ -128,7 +130,7 @@ export class FontController {
                 const selected = menu.querySelector('[aria-checked="true"]');
                 (selected || menu.querySelector('[data-font-choice]'))?.focus();
             }
-        });
+        }, { signal });
         menu.addEventListener('click', event => {
             const option = event.target.closest('[data-font-choice]');
             if (option) {
@@ -142,30 +144,30 @@ export class FontController {
                 const font = this.imported.find(font => font.id === imported.dataset.importedFont);
                 if (font) this.choose({ kind: 'imported', id: font.id, name: font.name });
             }
-        });
-        elements.btnMoreFonts.addEventListener('click', () => this.showMore());
-        elements.btnFontBack.addEventListener('click', () => this.showMain());
+        }, { signal });
+        elements.btnMoreFonts.addEventListener('click', () => this.showMore(), { signal });
+        elements.btnFontBack.addEventListener('click', () => this.showMain(), { signal });
         elements.fontSearch.value = String(readStored(SEARCH_KEY, '')).slice(0, 160);
         elements.fontSearch.addEventListener('input', () => {
             store(SEARCH_KEY, elements.fontSearch.value);
             this.renderBrowser();
-        });
-        elements.btnReadSystemFonts.addEventListener('click', () => this.readSystemFonts());
-        elements.btnImportFont.addEventListener('click', () => window.auraDesktop ? this.importFile() : elements.fontFileInput.click());
+        }, { signal });
+        elements.btnReadSystemFonts.addEventListener('click', () => this.readSystemFonts(), { signal });
+        elements.btnImportFont.addEventListener('click', () => window.auraDesktop ? this.importFile() : elements.fontFileInput.click(), { signal });
         elements.fontFileInput.addEventListener('change', async () => {
             const file = elements.fontFileInput.files[0];
             elements.fontFileInput.value = '';
             if (file) await this.importFile(file);
-        });
+        }, { signal });
         document.addEventListener('click', event => {
             if (!menu.hidden && !event.composedPath().includes(elements.fontPicker)) this.close(false);
-        }, true);
+        }, { capture: true, signal });
         document.addEventListener('keydown', event => {
             if (menu.hidden) return;
             if (event.key === 'Escape') {
                 event.preventDefault(); event.stopImmediatePropagation(); this.close();
             }
-        }, true);
+        }, { capture: true, signal });
         menu.addEventListener('keydown', event => {
             if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) || event.target === elements.fontSearch) return;
             const buttons = [...menu.querySelectorAll('button:not(:disabled)')].filter(button => !button.closest('[hidden]'));
@@ -173,12 +175,19 @@ export class FontController {
             const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
                 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
             event.preventDefault(); buttons[next]?.focus();
-        });
+        }, { signal });
         this.renderLabel();
         this.ready = this.loadImports().then(() => {
+            if (signal?.aborted) return;
             this.renderLabel();
             return this.prepareForBook();
         });
+    }
+
+    destroy() {
+        this.close(false);
+        this.revision++;
+        this.elements = null;
     }
 
     close(focus = true) {
@@ -267,7 +276,7 @@ export class FontController {
             this.renderBrowser();
         } catch (error) {
             this.status(error.name === 'NotAllowedError' ? '未获字体读取权限，可导入字体文件' : (error.message || '本机字体读取失败'));
-        } finally { this.elements.btnReadSystemFonts.disabled = false; }
+        } finally { if (this.elements) this.elements.btnReadSystemFonts.disabled = false; }
     }
 
     /** @param {File} [file] */
@@ -295,10 +304,11 @@ export class FontController {
             this.status(`已导入 ${data.font.name}`);
             await this.choose({ kind: 'imported', id: data.font.id, name: data.font.name });
         } catch (error) { this.status(error.message || '字体导入失败'); }
-        finally { this.elements.btnImportFont.disabled = false; }
+        finally { if (this.elements) this.elements.btnImportFont.disabled = false; }
     }
 
     renderBrowser() {
+        if (!this.elements) return;
         const list = this.elements.fontBrowserList;
         list.replaceChildren();
         const query = this.elements.fontSearch.value.trim().toLocaleLowerCase();

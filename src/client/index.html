@@ -4,19 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AuraReader Workstation | 智能阅读与笔记工作台</title>
-    <!-- Remix Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet">
     <!-- Offline reader fonts -->
-    <link rel="stylesheet" href="assets/fonts/fonts.css">
-    <!-- Retain the existing interface fonts; reading fonts above are local. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
-    <!-- JSZip & Stylesheet -->
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=18">
+    <link rel="stylesheet" href="/fonts/fonts.css">
 </head>
 <body class="theme-light">
+    <div id="react-root"></div>
     <section id="app-status" class="app-status" role="status" aria-live="polite"><p>正在打开书库…</p></section>
     <!-- Single navigation bar -->
     <header class="app-header">
@@ -316,6 +308,6 @@
     <!-- Notification Toast -->
     <div class="toast" id="toast-msg"></div>
 
-    <script type="module" src="main.js?v=15"></script>
+    <script type="module" src="/entry.tsx"></script>
 </body>
 </html>

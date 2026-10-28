@@ -1,4 +1,5 @@
 import { eventElement } from '../../app/dom.js';
+import { readerAbortController, readerViewport } from './readerDom.js';
 import type { Book, ReadingLocation, TocEntry } from '../../domain/book.js';
 import type { Annotation } from '../../domain/annotation.js';
 import type { BookStructure } from '../../domain/bookStructure.js';
@@ -44,6 +45,32 @@ import {
 } from './tocUI.js';
 
 export class ReaderController {
+    private bindings?: AbortController;
+    private listeners = new Set<(event: 'render' | 'viewport' | 'location') => void>();
+    private cancelViewport?: () => void;
+    private cancelLayout?: () => void;
+    private cancelAnchor?: () => void;
+
+    subscribe(listener: (event: 'render' | 'viewport' | 'location') => void) {
+        this.listeners.add(listener);
+        return () => { this.listeners.delete(listener); };
+    }
+    private emit(event: 'render' | 'viewport' | 'location') {
+        for (const listener of this.listeners) listener(event);
+    }
+    destroy() {
+        this.rememberAnchor();
+        this.bindings?.abort(); this.bindings = undefined;
+        clearTimeout(this._anchorTimer);
+        this.cancelViewport?.(); this.cancelLayout?.(); this.cancelAnchor?.();
+        this.cancelViewport = this.cancelLayout = undefined;
+        this._viewportUpdatePending = false;
+        this.fonts.destroy();
+        this.closeTOC();
+        this.elements?.bookPaper?.replaceChildren();
+        this.elements?.tocList?.replaceChildren();
+        this.elements = null;
+    }
     engine: ReaderEngine;
     layoutController: LayoutController | null;
     callbacks: ReaderCallbacks;
@@ -132,6 +159,7 @@ export class ReaderController {
         for (const paper of [this.elements?.bookPaper]) paper?.replaceChildren();
         if (this.elements?.currentBookTitle) this.elements.currentBookTitle.textContent = '未打开书籍';
         this.renderTOC([]);
+        this.emit('location');
     }
 
     closeTOC() { if (this.elements) domCloseTOC(this.elements); }
@@ -150,22 +178,30 @@ export class ReaderController {
 
     getVisibleAnnotationIds() {
         const elements = this.elements;
-        if (!elements || typeof document === 'undefined') return new Set<string>();
+        if (!elements || typeof globalThis.document === 'undefined') return new Set<string>();
         return collectVisibleAnnotationIds(
             [elements.bookPaper],
-            document.getElementById('reader-viewport')
+            readerViewport(elements)
         );
     }
 
     scheduleViewportChange() {
-        if (this._viewportUpdatePending || !this.callbacks.onViewportChange) return;
+        if (this._viewportUpdatePending || !this.elements) return;
         this._viewportUpdatePending = true;
         const update = () => {
             this._viewportUpdatePending = false;
+            this.cancelViewport = undefined;
             this.callbacks.onViewportChange?.();
+            this.emit('viewport');
         };
-        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(update);
-        else setTimeout(update, 0);
+        const view = this.elements.bookPaper?.ownerDocument.defaultView;
+        if (view?.requestAnimationFrame) {
+            const id = view.requestAnimationFrame(update);
+            this.cancelViewport = () => view.cancelAnimationFrame(id);
+        } else {
+            const id = setTimeout(update, 0);
+            this.cancelViewport = () => clearTimeout(id);
+        }
     }
 
     isChapterFlow() {
@@ -181,7 +217,7 @@ export class ReaderController {
 
     rememberAnchor() {
         if (!this.isChapterFlow() || !this.elements || !this.elements.bookPaper) return this.flowAnchorText;
-        const viewport = document.getElementById('reader-viewport');
+        const viewport = readerViewport(this.elements);
         const sentence = readTopLeftSentence(this.elements.bookPaper, viewport);
         if (sentence) this.flowAnchorText = sentence;
         return this.flowAnchorText;
@@ -217,9 +253,11 @@ export class ReaderController {
         if (this.callbacks.onPageChange) {
             this.callbacks.onPageChange(this.getLocation());
         }
+        this.emit('location');
         if (this.callbacks.onPageRendered) {
             this.callbacks.onPageRendered();
         }
+        this.emit('render');
         this.scheduleViewportChange();
 
         return loc;
@@ -228,7 +266,7 @@ export class ReaderController {
     refreshAnnotations(notes: Annotation[] = []) {
         const elements = this.elements;
         if (!elements) return;
-        const viewport = elements.bookPaper?.ownerDocument.getElementById('reader-viewport');
+        const viewport = readerViewport(elements);
         const surfaces = [viewport, elements.bookPaper].filter((node): node is HTMLElement => !!node);
         const positions = surfaces.map(node => ({ node, left: node.scrollLeft, top: node.scrollTop }));
         if (elements.bookPaper) {
@@ -242,6 +280,7 @@ export class ReaderController {
             node.scrollTop = top;
         }
         this.callbacks.onPageRendered?.();
+        this.emit('render');
     }
 
     nextPage(notes: Annotation[] = []): ReadingLocation {
@@ -288,7 +327,8 @@ export class ReaderController {
 
     scrollToAnchor(anchor: string) {
         if (this.elements) {
-            domScrollToAnchor(anchor, this.elements);
+            this.cancelAnchor?.();
+            this.cancelAnchor = domScrollToAnchor(anchor, this.elements);
         }
     }
 
@@ -331,25 +371,29 @@ export class ReaderController {
     }
 
     initUI(elements: AppElements) {
+        this.destroy();
         this.elements = elements;
-        if (!elements || typeof document === 'undefined') return;
+        if (!elements || typeof globalThis.document === 'undefined') return;
+        const document = elements.bookPaper?.ownerDocument || globalThis.document;
+        this.bindings = readerAbortController(document);
+        const signal = this.bindings.signal;
 
         // Navigation Buttons
         if (elements.btnPrevPage) {
             elements.btnPrevPage.addEventListener('click', () => {
                 const notes = this.callbacks.getNotes ? this.callbacks.getNotes() : [];
                 this.prevPage(notes);
-            });
+            }, { signal });
         }
         if (elements.btnNextPage) {
             elements.btnNextPage.addEventListener('click', () => {
                 const notes = this.callbacks.getNotes ? this.callbacks.getNotes() : [];
                 this.nextPage(notes);
-            });
+            }, { signal });
         }
 
         // Font Controls
-        this.fonts.initUI(elements);
+        this.fonts.initUI(elements, signal);
 
         if (elements.btnFontDec) {
             elements.btnFontDec.addEventListener('click', () => {
@@ -360,7 +404,7 @@ export class ReaderController {
                     this.applyTypography();
                     this.refitAfterTypography();
                 }
-            });
+            }, { signal });
         }
 
         if (elements.btnFontInc) {
@@ -372,7 +416,7 @@ export class ReaderController {
                     this.applyTypography();
                     this.refitAfterTypography();
                 }
-            });
+            }, { signal });
         }
 
         if (elements.indentSelect) {
@@ -389,21 +433,21 @@ export class ReaderController {
                 if (this.callbacks.showToast) {
                     this.callbacks.showToast(`已切换首行缩进：${input.options[input.selectedIndex].text}`);
                 }
-            });
+            }, { signal });
         }
 
-        const viewport = document.getElementById('reader-viewport');
+        const viewport = readerViewport(this.elements);
         if (viewport) {
             // Capture scrolls from both the vertical viewport and its paged
             // chapter strip (horizontal scroll events do not bubble).
-            viewport.addEventListener('scroll', () => this.scheduleViewportChange(), { capture: true, passive: true });
-            viewport.addEventListener('load', () => this.scheduleViewportChange(), { capture: true });
+            viewport.addEventListener('scroll', () => this.scheduleViewportChange(), { capture: true, passive: true, signal });
+            viewport.addEventListener('load', () => this.scheduleViewportChange(), { capture: true, signal });
             viewport.addEventListener('scroll', () => {
                 if (!this.isChapterFlow() || this.effectiveReaderMode() !== 'scroll') return;
                 this.syncChapterChrome();
                 clearTimeout(this._anchorTimer);
                 this._anchorTimer = setTimeout(() => this.rememberAnchor(), 120);
-            });
+            }, { signal });
         }
 
         // Paper Theme Buttons
@@ -417,7 +461,7 @@ export class ReaderController {
                         elements.readerPanel.className = `reader-panel paper-${this.paperTheme}`;
                     }
                     this.scheduleViewportChange();
-                });
+                }, { signal });
             });
         }
 
@@ -426,13 +470,13 @@ export class ReaderController {
             elements.btnToc.addEventListener('click', (e) => {
                 e.stopPropagation();
                 domToggleTOC(elements);
-            });
+            }, { signal });
         }
         if (elements.btnCloseToc) {
             elements.btnCloseToc.addEventListener('click', (e) => {
                 e.stopPropagation();
                 domCloseTOC(elements);
-            });
+            }, { signal });
         }
         document.addEventListener('click', (e) => {
             if (elements.tocDrawer && elements.tocDrawer.classList.contains('open')) {
@@ -440,7 +484,7 @@ export class ReaderController {
                     domCloseTOC(elements);
                 }
             }
-        });
+        }, { signal });
     }
 
     applyTypography() {
@@ -502,7 +546,9 @@ export class ReaderController {
             anchorPage: sourcePage
         });
         if (this.callbacks.onPageChange) this.callbacks.onPageChange(this.getLocation());
+        this.emit('location');
         if (this.callbacks.onPageRendered) this.callbacks.onPageRendered();
+        this.emit('render');
         return loc;
     }
 
@@ -535,10 +581,16 @@ export class ReaderController {
         const mode = this.effectiveReaderMode();
         const laid = layoutChapterStrip(elements, mode);
         if (laid && laid.mode !== 'scroll' && laid.hostHeight < 40 && !options.retried) {
-            requestAnimationFrame(() => this.layoutAndPlace(notes, { ...options, retried: true }));
+            const view = elements.bookPaper!.ownerDocument.defaultView!;
+            this.cancelLayout?.();
+            const id = view.requestAnimationFrame(() => {
+                this.cancelLayout = undefined;
+                this.layoutAndPlace(notes, { ...options, retried: true });
+            });
+            this.cancelLayout = () => view.cancelAnimationFrame(id);
             return;
         }
-        const viewport = document.getElementById('reader-viewport');
+        const viewport = readerViewport(this.elements);
         const paper = elements.bookPaper;
         if (options.anchorId && paper) {
             placeAnchorIdAtTopLeft(paper, viewport, options.anchorId, mode, options.anchorPage);

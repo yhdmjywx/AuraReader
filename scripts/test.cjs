@@ -5,6 +5,9 @@ require('./build.cjs');
 const root = path.resolve(__dirname, '..');
 const mode = process.argv[2] || 'all';
 if (!['all', 'unit', 'regression', 'syntax'].includes(mode)) throw new Error('Unknown test mode');
+if (mode === 'all' || mode === 'regression') {
+    execFileSync(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js'), 'build'], { cwd: root, stdio: 'inherit' });
+}
 let failed = 0, count = 0;
 function run(args) {
     count++;
