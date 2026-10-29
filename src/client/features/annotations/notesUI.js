@@ -260,6 +260,7 @@ function escapeHtml(str) {
 }
 
 export function updateNoteGoalActions(elements, getGoalAction) {
+    if (elements?.notesList?.dataset.renderer === 'react') return;
     for (const control of elements?.notesList?.querySelectorAll('.btn-goal-link') || []) {
         const state = getGoalAction?.(control.dataset.annotationId);
         control.hidden = !state?.visible; control.disabled = !state || state.disabled;

@@ -7,6 +7,8 @@ const bridge = window.auraDesktop;
 if (!bridge) throw new Error('桌面安全入口不可用');
 let application: typeof import('./main.js') | null = null;
 let boot: Promise<void> | null = null;
+let resolveApplication!: (value: typeof import('./main.js')) => void;
+export const applicationReady = new Promise<typeof import('./main.js')>(resolve => { resolveApplication = resolve; });
 const originalControls = new Map([...document.querySelectorAll<HTMLButtonElement>('button, input, select, textarea')]
     .map(control => [control, control.disabled]));
 // Chromium's native window.close() destroys WebContents without emitting the
@@ -52,6 +54,7 @@ async function start() {
         if (application) positionMarginNotes(application.elements);
     });
     document.documentElement.dataset.desktopReady = 'library';
+    resolveApplication(application);
 }
 
 async function load() {

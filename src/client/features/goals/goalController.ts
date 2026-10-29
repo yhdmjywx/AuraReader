@@ -20,6 +20,11 @@ export interface GoalCallbacks {
     openCollection?(area: GoalArea): void;
 }
 export class GoalController {
+    private listeners = new Set<() => void>();
+    subscribe(listener: () => void) {
+        this.listeners.add(listener);
+        return () => { this.listeners.delete(listener); };
+    }
     state: GoalLibraryState = { goals: [], links: [] };
     selected: string | null = null; allGoals = true; itemsOpen = true;
     edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft; lastNonempty: string; previousTree: boolean } | null = null;
@@ -194,7 +199,9 @@ export class GoalController {
             if (e.goalPage) e.goalPage.hidden = true;
             if (e.btnToc) e.btnToc.hidden = true;
             if (e.btnGoalSidebar) e.btnGoalSidebar.hidden = true;
-            this.visible = false; this.callbacks.onActionsChanged?.(); return;
+            this.visible = false; this.callbacks.onActionsChanged?.();
+            for (const listener of this.listeners) listener();
+            return;
         }
         if (e?.goalPage && e.goalSidebar && e.goalPanel) {
             e.readingWorkspace!.hidden = this.page; e.goalPage.hidden = !this.page;
@@ -249,5 +256,6 @@ export class GoalController {
         this.ui?.render({ state: this.state, selected: this.selected, allGoals: this.allGoals, itemsOpen: this.itemsOpen, edit: this.edit,
             sourcePage: this.callbacks.getLocation().page, sourceBook: this.callbacks.getLocation().bookId, annotations: [...annotations.values()], disabled: this.disabled || this.lifecycleBusy,
             fullPage: this.page, titles: this.titles, materialStatus: this.materialStatus }); this.callbacks.onActionsChanged?.();
+        for (const listener of this.listeners) listener();
     }
 }

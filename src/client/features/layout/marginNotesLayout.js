@@ -62,7 +62,7 @@ export function positionMarginNotes(elements) {
     const list = elements.notesList;
     const cards = [...list.querySelectorAll('.note-card')];
     if (!cards.length) {
-        list.querySelectorAll('.margin-notes-lane').forEach(lane => lane.remove());
+        if (list.dataset.renderer !== 'react') list.querySelectorAll('.margin-notes-lane').forEach(lane => lane.remove());
         return;
     }
     const bounds = workspace.getBoundingClientRect();
@@ -98,12 +98,12 @@ export function positionMarginNotes(elements) {
         const anchor = anchors.get(card.dataset.annotationId);
         const side = 'right';
         const target = lane(side);
-        if (card.parentElement !== target) moveNoteCard(card, target);
+        if (card.parentElement !== target && list.dataset.renderer !== 'react') moveNoteCard(card, target);
         if (!groups.has(target)) groups.set(target, []);
         groups.get(target).push({ card, y: anchor ? anchor.top - bounds.top - top : 0 });
     });
     list.querySelectorAll('.margin-notes-lane').forEach(node => {
-        if (!groups.has(node)) node.remove();
+        if (!groups.has(node) && list.dataset.renderer !== 'react') node.remove();
     });
     for (const [target, entries] of groups) {
         // Keep an overflowing lane scrollable and stable while its source text

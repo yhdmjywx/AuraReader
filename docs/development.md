@@ -34,7 +34,7 @@ Electron Windows 桌面迁移已进入阶段 6 的本地验证，保留 Windows 
 
 首次创建书库需明确点击；桌面 SQLite 和导入字体位于 `%APPDATA%\AuraReader\data`，不在安装目录内。按当前范围只保证现用 SQLite 的读写、版本/幂等、备份与恢复，不提供旧数据库或 IndexedDB 的桌面迁移；未知或缺失数据库仍阻断启动，不静默清库。浏览器模式继续独立运行，[旧版迁移说明](data-and-backup.md#从旧版本迁移)仅适用于现有浏览器模式。阶段 6 增加实际 SQLite 容量、只读和锁竞争故障、Renderer/主进程终止恢复、大书与持续读写、打包程序及安装生命周期验证，并修复容量错误掩盖与页面关闭漏保存。发布验收仍有未验证项；最新证据与限制见 [阶段 6 记录](electron-desktop-stage6.md)，安装设计见 [阶段 5](electron-desktop-stage5.md)，文件功能见 [阶段 4](electron-desktop-stage4.md)，历史记录见 [阶段 3](electron-desktop-stage3.md)、[审计](electron-desktop-audit.md)和[外壳记录](electron-desktop-stage2.md)。
 
-源码位于 `src/client/` 和 `src/server/`。前端已接入 React + Vite：`entry.tsx` 挂载 React 启动组件，再按运行环境载入现有浏览器／桌面应用。阅读器、Goal 和笔记界面暂沿用现有实现，后续逐步组件化。
+源码位于 `src/client/` 和 `src/server/`。前端已接入 React + Vite：`entry.tsx` 挂载 React 启动组件，再按运行环境载入现有浏览器／桌面应用。启动后，React 接管阅读中的书籍切换、选区操作、页边笔记和 Goal 侧栏；首页、完整 Goal 页面、设置及导出继续使用现有界面。
 
 `npm start` 会先检查类型并构建，再启动服务。`dist/renderer/` 是浏览器与 Electron 共用的 Vite 产物，包含带 hash 的 JS/CSS、本地图标和字体；`dist/client/` 保留逐模块编译输出，供现有测试导入，不随桌面版发布。依赖安装后，可以运行：
 
@@ -49,6 +49,7 @@ npm run test:regression  # 回归检查
 npm run test:syntax      # JavaScript 语法检查
 npm run desktop          # Windows x64 桌面预览，书库通过 IPC 访问，不启动 HTTP 服务
 npm run test:desktop     # 真实 Electron 窗口、SQLite 运行时与安全检查
+npm run test:reading-workflow # 单条 React 核心链路：选书、选区、IME 笔记、保存、关联 Goal、跨书回跳
 npm run test:stability   # 独立 profile 的故障、异常终止恢复、大书及默认 300 秒持续读写；可附 -- 600
 npm run test:packaged:stability # 复验已有 win-unpacked 的真实 exe；先运行 dist:win
 npm run test:desktop:native # 交互验收真实 Windows 文件对话框，按终端提示选项目测试素材
@@ -58,6 +59,8 @@ npm run test:install      # 构建候选/升级测试包，真实安装、升级
 ```
 
 阅读器现在通过 `features/reader/readerRuntime.ts` 提供 `mount`、`setBook`、`setAnnotations`、`setLayout`、翻页、`subscribe/getSnapshot` 和 `destroy`；当前应用也使用这个入口挂载。React 界面可直接使用 `readerReact.tsx` 中的 `ReaderSurface` 与 `useReaderSnapshot`。React 管理容器和周边界面，阅读器独占正文子节点；快照只包含普通数据，不传出 DOM 或 Range。卸载会移除阅读与选区监听、排版任务和尺寸观察；重新挂载保留书籍与源文档位置。业务数据保存仍由原有 repository/controller 负责。
+
+核心业务界面位于 `features/workbench/ReadingWorkbench.tsx`，通过 `WorkbenchStore` 订阅现有阅读、笔记、Goal 和导航状态。选书、创建/编辑笔记、关联 Goal 和回跳使用统一命令，继续调用原有 controller/coordinator 的保存与导航逻辑。页边笔记使用稳定的 React 节点，排版模块只测量和定位，不移动或重建这些节点。完整 Goal 页及其他外围视图留待后续迁移。
 
 日常前端开发访问 `npm run dev` 输出的 `http://127.0.0.1:5173/`，API 请求由 Vite 转发至本地服务。生产预览仍使用 `npm start` 的 8095 端口；直接运行 `node src/server/server.js` 前需先构建。浏览器偏好按页面访问地址隔离。
 

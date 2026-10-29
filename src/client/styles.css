@@ -1794,3 +1794,19 @@ html[data-app-surface="home"] .header-center,
 html[data-app-surface="goal"] .header-center { visibility: hidden; }
 html[data-app-surface="home"] #appearance-panel .appearance-row:not(:last-child),
 html[data-app-surface="goal"] #appearance-panel .appearance-row:not(:last-child) { display: none; }
+
+/* React core workflow; surrounding pages continue to use their existing views. */
+html[data-react-workbench="true"][data-app-surface="reader"] #goal-panel,
+html[data-react-workbench="true"] #selection-tooltip > .tooltip-btn { display:none; }
+#react-reading-goals:empty { display:none; }
+#react-notes,#react-selection-actions { display:contents; }
+.react-goal-title { flex:1; min-width:0; font-size:18px; line-height:1.6; font-weight:600; white-space:pre-wrap; overflow-wrap:anywhere; }
+#react-reading-goals .goal-heading { display:flex; align-items:flex-start; gap:8px; }
+.react-goal-create { display:flex; gap:6px; margin:16px 0; }
+.react-goal-create input { width:100%; min-width:0; border:0; border-bottom:1px solid var(--border-color); padding:6px 0; color:inherit; background:transparent; }
+.react-material-count { margin-top:24px; font-size:12px; color:var(--text-muted); }
+.reader-pagination { position:relative; }
+#react-reading-book { position:absolute; left:16px; display:flex; gap:12px; align-items:center; max-width:35%; }
+#react-reading-book select { min-width:0; max-width:180px; border:0; background:transparent; color:var(--text-secondary); font-size:12px; }
+.react-save-status { color:var(--text-muted); font-size:11px; white-space:nowrap; }
+.react-workbench-error { color:#b42318; font-size:12px; }

@@ -163,6 +163,7 @@
     <div class="reading-workspace" id="reading-workspace">
         <aside class="goal-sidebar" id="goal-sidebar" aria-label="Goals sidebar" hidden>
             <div class="goal-panel" id="goal-panel" aria-label="Reading goals" hidden></div>
+            <div id="react-reading-goals" class="goal-panel"></div>
             <div class="goal-resizer" id="goal-resizer" role="separator" tabindex="0" aria-label="Resize goals sidebar" aria-orientation="vertical" aria-controls="goal-sidebar"></div>
         </aside>
     <!-- Reading surface with always-visible margin notes. -->
@@ -193,6 +194,7 @@
             </div>
 
             <nav class="reader-pagination" aria-label="翻页">
+                <span id="react-reading-book"></span>
                 <button id="btn-prev-page" class="page-turn-btn" type="button" title="上一页 (←)">‹</button>
                 <span class="page-indicator">
                     <span id="current-page">1</span> / <span id="total-pages">1</span> <span id="page-unit">页</span>
@@ -202,6 +204,7 @@
 
             <!-- Floating Selection Toolbar (Highlight / Add Note) -->
             <div class="selection-tooltip" id="selection-tooltip">
+                <span id="react-selection-actions"></span>
                 <button class="tooltip-btn hl-yellow" data-color="yellow" title="高亮标记"><i class="ri-mark-pen-line"></i> 高亮</button>
                 <button class="tooltip-btn" id="btn-add-note" title="添加随笔"><i class="ri-sticky-note-line"></i> 笔记</button>
             </div>
@@ -238,6 +241,7 @@
 
                 <!-- Notes Feed List -->
                 <div class="notes-list" id="notes-list">
+                    <div id="react-notes"></div>
                     <div class="empty-state" id="empty-notes-state">
                         <i class="ri-draft-line"></i>
                         <p>暂无划线或笔记</p>

@@ -6,22 +6,25 @@ import '@fontsource/fira-code/500.css';
 import 'remixicon/fonts/remixicon.css';
 import './styles.css';
 import '../desktop/renderer/shell.css';
+import { ReadingWorkbench } from './features/workbench/ReadingWorkbench.js';
+import type { ReadingApplication } from './features/workbench/workbenchStore.js';
 
-// The existing workspace keeps its DOM until its features migrate to components.
-// React owns only this root; the reader continues to own the book/selection DOM.
-let startup: Promise<unknown> | undefined;
+// React mounts the core workflow into explicit portal hosts in the existing shell.
+// The reader continues to own the book/selection DOM.
+let startup: Promise<typeof import('./main.js')> | undefined;
 function startRuntime() {
     window.__AURA_BOOTSTRAPPED__ = true;
     return startup ??= window.auraDesktop
-        ? import('./desktop.js')
-        : import('./main.js').then(application => application.startApp());
+        ? import('./desktop.js').then(desktop => desktop.applicationReady)
+        : import('./main.js').then(async application => { await application.startApp(); return application; });
 }
 
 function App() {
     const [failure, setFailure] = useState<string | null>(null);
+    const [application, setApplication] = useState<ReadingApplication | null>(null);
     useEffect(() => {
         let active = true;
-        void startRuntime().catch(error => {
+        void startRuntime().then(app => { if (active) setApplication(app.appInstance); }).catch(error => {
             console.error('应用启动失败', error);
             if (active) setFailure(error instanceof Error ? error.message : '应用暂时无法启动');
         });
@@ -30,7 +33,7 @@ function App() {
     return failure ? <section className="app-status" role="alert">
         <p>{failure}</p>
         <button type="button" onClick={() => location.reload()}>重新加载</button>
-    </section> : null;
+    </section> : application ? <ReadingWorkbench application={application} /> : null;
 }
 
 document.documentElement.dataset.renderer = 'react';

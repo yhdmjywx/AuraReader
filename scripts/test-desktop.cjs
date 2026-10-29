@@ -27,7 +27,7 @@ async function run(entry, args = []) {
 (async () => {
     const selected = process.argv[2];
     if (selected) {
-        if (!['main.cjs','restart.cjs','note-interaction.cjs','goal-interaction.cjs','goal-home.cjs','goal-lifecycle.cjs'].includes(selected)) throw new Error('Unknown desktop test: ' + selected);
+        if (!['main.cjs','restart.cjs','note-interaction.cjs','goal-interaction.cjs','goal-home.cjs','goal-lifecycle.cjs','reading-workflow.cjs'].includes(selected)) throw new Error('Unknown desktop test: ' + selected);
         await run(selected, process.argv.slice(3));
         console.log('Desktop artifacts:', output);
         return;

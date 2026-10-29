@@ -29,6 +29,16 @@ import {
 } from './notesUI.js';
 
 export class AnnotationController {
+    private listeners = new Set<() => void>();
+    private reactView = false;
+    private pendingWrites = 0;
+    get saveState() { return this.inlineWriteErrors.size ? 'error' : this.pendingWrites ? 'saving' : 'saved'; }
+    subscribe(listener: () => void) {
+        this.listeners.add(listener);
+        return () => { this.listeners.delete(listener); };
+    }
+    private changed() { for (const listener of this.listeners) listener(); }
+    useReactView(enabled: boolean) { this.reactView = enabled; this.renderNotesUI(); }
     callbacks: AnnotationCallbacks;
     notes: Annotation[];
     editingNoteId: string | null;
@@ -225,6 +235,7 @@ export class AnnotationController {
         const note = this.inlineEdit?.note;
         if (!note || id !== note.id || note.comment === comment) return;
         note.comment = comment;
+        this.changed();
         this.callbacks.onAnnotationContentChanged?.(note);
         note.timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
         const exists = this.notes.some(item => item.id === id);
@@ -236,6 +247,8 @@ export class AnnotationController {
     }
 
     writeInlineNote(note: Annotation, remove = false) {
+        this.pendingWrites++;
+        this.changed();
         const snapshot: Annotation = JSON.parse(JSON.stringify(note));
         // Start transactions immediately, in input order. The repository must
         // not mirror an older completed transaction over newer local input.
@@ -251,7 +264,7 @@ export class AnnotationController {
                 ? '笔记尚未可靠保存，请暂勿关闭页面'
                 : error.status === 409 ? '笔记保存存在冲突，输入已保留在本机，请勿关闭页面'
                     : '笔记已保留在本机缓存，数据库暂时无法写入');
-        });
+        }).finally(() => { this.pendingWrites--; this.changed(); });
     }
 
     finishInlineEdit() {
@@ -499,6 +512,8 @@ export class AnnotationController {
         if (!this.elements) return;
         const sidebarNotes = this.getSidebarNotes();
         this._renderedSidebarIds = JSON.stringify(sidebarNotes.map(note => note.id));
+        this.changed();
+        if (this.reactView) return;
         renderNotesList({
             elements: this.elements,
             notes: sidebarNotes,
