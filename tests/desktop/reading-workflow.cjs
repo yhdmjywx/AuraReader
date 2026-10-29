@@ -23,6 +23,10 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
         const end = Date.now() + 15000;
         while (!(${expression})) { if (Date.now() > end) throw new Error(${JSON.stringify(expression)} + '\\nActive: ' + document.activeElement?.outerHTML); await new Promise(resolve => setTimeout(resolve, 20)); }
     })()`);
+    const capture = async name => {
+        await run(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 500))))`);
+        await fs.writeFile(path.join(output, name + '.png'), (await window.webContents.capturePage()).toPNG());
+    };
     await waitFor(`document.documentElement.dataset.desktopReady === 'setup'`);
     await run(`document.getElementById('desktop-create-library').click()`);
     await waitFor(`document.documentElement.dataset.reactWorkbench === 'true'`);
@@ -40,7 +44,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
         await a.coordinator.importBook(new File([bytes], 'React workflow A.epub'));
         await a.coordinator.importBook(new File(['Second book for the shared Goal.'], 'React workflow B.txt'));
     })()`);
-    await waitFor(`document.querySelector('[aria-label="阅读书籍"]')?.options.length === 3`);
+    await waitFor(`document.getElementById('shelf-book-count').textContent === '2'`);
     await run(`document.querySelector('.brand').click()`);
     await waitFor(`document.documentElement.dataset.appSurface === 'home' && document.querySelector('#home-books .home-book-title')`);
     await run(`document.getElementById('home-new-goal').click()`);
@@ -60,6 +64,27 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`!document.querySelector('.ui-dialog[data-open]') && document.querySelector('#home-books .goal-home-book')`);
     await run(`document.querySelector('#home-books .goal-home-book').click()`);
     await waitFor(`document.documentElement.dataset.appSurface === 'reader' && document.getElementById('book-paper').textContent.includes('Alpha evidence') && document.querySelector('#goal-panel .goal-title')`);
+    assert.equal(await run(`!!document.querySelector('#goal-panel select, #goal-panel .goal-collections, #react-reading-book select')`), false, 'reader omits redundant filters, collections and book picker');
+    assert.equal(await run(`document.getElementById('btn-fullscreen') === null && document.getElementById('goal-expand') !== null`), true, 'EPUB fullscreen is removed and Goal expansion remains');
+    assert.equal(await run(`['btn-toc', 'btn-shelf', 'btn-appearance', 'btn-export-menu'].every(id => !!document.getElementById(id).closest('.reader-toolbar'))`), true, 'book actions belong to the reading surface');
+    for (const theme of ['light', 'dark']) {
+        if (theme === 'dark') await run(`(async () => { const a = await import(${JSON.stringify(mainUrl)}); a.appShell.toggleAppTheme(); })()`);
+        assert.equal(await run(`getComputedStyle(document.querySelector('.app-header')).backgroundColor === getComputedStyle(document.getElementById('goal-sidebar')).backgroundColor`), true, `${theme} header shares the Goal background`);
+        await run(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 500))))`);
+        await fs.writeFile(path.join(output, `reader-ui-${theme}.png`), (await window.webContents.capturePage()).toPNG());
+    }
+    await run(`(async () => { const a = await import(${JSON.stringify(mainUrl)}); a.appShell.toggleAppTheme(); })()`);
+    await run(`document.querySelector('#goal-panel .goal-title').click()`);
+    await waitFor(`document.querySelector('#goal-panel textarea')`);
+    await run(`(() => {
+        window.goalCaretCheck = document.querySelector('#goal-panel textarea');
+        goalCaretCheck.setSelectionRange(4, 4);
+        document.getElementById('goal-resizer').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    })()`);
+    assert.equal(await run(`document.querySelector('#goal-panel textarea') === goalCaretCheck && goalCaretCheck.selectionStart === 4`), true, 'resizing retains the existing Goal editor and caret');
+    assert.equal(await run(`getComputedStyle(document.documentElement).getPropertyValue('--goal-sidebar-space').trim() === document.getElementById('goal-sidebar').style.width`), true, 'workspace controls follow the actual Goal width');
+    await run(`document.getElementById('goal-resizer').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); goalCaretCheck.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));`);
+    await waitFor(`!document.querySelector('#goal-panel textarea')`);
     await run(`(() => {
         const paper = document.getElementById('book-paper'), text = paper.querySelector('p').firstChild;
         const range = document.createRange(); range.setStart(text, 0); range.setEnd(text, 16);
@@ -94,10 +119,11 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     assert.equal(saved.notes[0].comment, noteText);
     assert.equal(saved.links.length, 1);
     assert.equal(saved.links[0].annotationId, saved.notes[0].id);
+    await run(`document.getElementById('btn-shelf').click()`);
+    await waitFor(`document.querySelectorAll('#shelf-list .shelf-entry').length === 2`);
     await run(`(() => {
-        const select = document.querySelector('[aria-label="阅读书籍"]');
-        select.value = [...select.options].find(option => option.text.includes('workflow B')).value;
-        select.dispatchEvent(new Event('change', { bubbles: true }));
+        const row = [...document.querySelectorAll('#shelf-list .shelf-entry')].find(row => row.textContent.includes('workflow B'));
+        row.querySelector('.shelf-book-title').click();
     })()`);
     await waitFor(`document.getElementById('book-paper').textContent.includes('Second book')`);
     await run(`document.querySelector('#goal-panel .goal-item-text').click()`);
@@ -112,6 +138,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`document.querySelectorAll('#shelf-list .shelf-entry').length === 1 && document.querySelector('#shelf-list .shelf-book-title').textContent.includes('workflow B')`);
     await run(`document.getElementById('btn-close-shelf').click(); document.getElementById('btn-appearance').click()`);
     await waitFor(`document.activeElement?.id === 'font-family-select'`);
+    await capture('reader-settings');
     await run(`document.getElementById('btn-font-inc').click()`);
     await waitFor(`document.getElementById('font-size-label').textContent === '19px'`);
     await run(`document.getElementById('btn-export-menu').click()`);
@@ -120,6 +147,9 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`document.querySelectorAll('#chapter-export-list input').length > 0`);
     await run(`document.querySelector('#chapter-export-list input').click()`);
     await waitFor(`document.getElementById('btn-confirm-chapter-export').disabled === false`);
+    await run(`document.getElementById('btn-workspace-settings').click()`);
+    await waitFor(`document.getElementById('workspace-settings-panel').getClientRects().length > 0 && !document.getElementById('export-panel').classList.contains('open')`);
+    await capture('workspace-settings');
     await run(`document.getElementById('btn-export-full-backup').click()`);
     await waitFor(`document.querySelector('#backup-select-modal[data-open] input.chk-backup-book')`);
     await run(`document.getElementById('btn-deselect-all-backup').click()`);
@@ -128,6 +158,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`!document.querySelector('#backup-select-modal[data-open]')`);
     await run(`document.getElementById('goal-expand').click()`);
     await waitFor(`document.documentElement.dataset.appSurface === 'goal' && document.querySelector('#goal-page-content #goal-panel .goal-title')`);
+    await capture('goal-workspace');
     await run(`document.querySelector('#goal-panel .goal-title').click()`);
     await waitFor(`document.activeElement === document.querySelector('#goal-panel textarea')`);
     await run(`(() => {
@@ -150,8 +181,24 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`document.querySelector('.ui-dialog[data-open]')?.textContent.includes('删除 Goal')`);
     window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
     await waitFor(`!document.querySelector('.ui-dialog[data-open]')`);
+    await run(`(async () => { const a = await import(${JSON.stringify(mainUrl)}); await a.goals.assertWritesSaved(); await a.annotations.assertInlineWritesSaved(); })()`);
+    window.webContents.reload();
+    await waitFor(`document.documentElement.dataset.reactWorkbench === 'true' && document.documentElement.dataset.appSurface === 'home'`);
+    await waitFor(`document.querySelector('#home-goal-folders [data-goal-id]')?.textContent.includes('A shared React workbench')`);
+    await run(`document.querySelector('#home-goal-folders .home-goal-folder').click()`);
+    await waitFor(`document.querySelector('#home-books .goal-home-book')`);
+    await run(`document.querySelector('#home-books .goal-home-book').click()`);
+    await waitFor(`document.documentElement.dataset.appSurface === 'reader' && document.getElementById('book-paper').textContent.includes('Alpha evidence')`);
+    await waitFor(`document.querySelector('#goal-panel .goal-item-text')?.textContent.includes('A React note')`);
+    const reloaded = await run(`(async () => {
+        const a = await import(${JSON.stringify(mainUrl)});
+        return { comment: a.annotations.getNotes().find(note => note.id === ${JSON.stringify(saved.notes[0].id)})?.comment,
+            goal: a.goals.state.goals.find(goal => goal.id === a.goals.selected)?.text };
+    })()`);
+    assert.equal(reloaded.comment, noteText);
+    assert.equal(reloaded.goal, 'A shared React workbench');
     assert.deepEqual(errors, []);
     clearTimeout(watchdog);
-    console.log('PASS: React Home → Goal/book picker → EPUB/IME note → SQLite/Goal link → cross-book source → shelf/search → preferences/export/backup → full Goal edit → keyboard menu/dialog');
+    console.log('PASS: React Home → Goal/book picker → EPUB/IME note → SQLite/Goal link → cross-book source → shelf/search → preferences/export/backup → full Goal edit → keyboard menu/dialog → reload/persisted data');
     app.exit(0);
 })().catch(error => { console.error(error, errors); app.exit(1); });

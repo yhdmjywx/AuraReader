@@ -16,6 +16,7 @@
     "test:install": "npm run dist:win && node scripts/package-upgrade-fixture.cjs && node scripts/test-install.cjs",
     "test:desktop": "npm run build && node scripts/test-desktop.cjs",
     "test:reading-workflow": "npm run build && node scripts/test-desktop.cjs reading-workflow.cjs",
+    "test:migration": "node scripts/test.cjs migration",
     "test:stability": "npm run build && node scripts/test-stability.cjs",
     "test:packaged:stability": "node tests/desktop/packaged-stability.cjs",
     "test:desktop:native": "npm run build && node scripts/test-native-dialogs.cjs",

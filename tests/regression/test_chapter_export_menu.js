@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const { JSDOM } = require('jsdom');
 
 (async () => {
-    const dom = new JSDOM(fs.readFileSync('src/client/index.html', 'utf8'), { url: 'https://reader.test' });
+    const dom = require('../helpers/react-workbench.cjs').createWorkbench({ url: 'https://reader.test' });
     const originals = new Map(['document', 'window', 'NodeFilter'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     try {
         for (const key of originals.keys()) globalThis[key] = dom.window[key];
@@ -36,7 +36,7 @@ const { JSDOM } = require('jsdom');
         assert.equal(elements.chapterExportOptions.hidden, false);
         assert.equal(elements.btnExportChapters.hidden, true);
         assert.equal(elements.chapterExportCustom.hidden, true);
-        assert.equal(document.querySelector('[aria-modal="true"]'), null);
+        assert.equal(document.querySelector('[aria-modal="true"]:not([data-closed])'), null);
         elements.btnExportCurrentChapter.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
         assert.equal(nextPage, 0);
         await menu.run('current');
@@ -50,13 +50,13 @@ const { JSDOM } = require('jsdom');
         await menu.run('current');
         const second = Buffer.from(singles[1].bytes).toString();
         assert.ok(second.includes('独立正文') && second.includes('本章笔记') && !second.includes('共享正文'), '当前章节按点击时位置确定');
-        open(); elements.btnSelectChapters.click();
+        await require('../helpers/react-workbench.cjs').ui(() => { open(); elements.btnSelectChapters.click(); });
         assert.equal(elements.chapterExportList.querySelectorAll('input').length, 3, '卷标题和同篇锚点沿用共享内容单元');
         assert.equal(elements.btnConfirmChapterExport.disabled, true);
         const checkboxes = elements.chapterExportList.querySelectorAll('input');
         for (const checkbox of [checkboxes[0], checkboxes[1]]) { checkbox.checked = true; checkbox.dispatchEvent(new window.Event('change', { bubbles: true })); }
         const pending = menu.run('custom');
-        await menu.run('custom');
+        await require('../helpers/react-workbench.cjs').ui(() => menu.run('custom'));
         assert.equal(folders.length, 1);
         assert.equal(elements.btnConfirmChapterExport.disabled, true);
         assert.equal(elements.btnExportAllChapters.disabled, true);
@@ -78,7 +78,7 @@ const { JSDOM } = require('jsdom');
         await menu.run('custom');
         assert.match(messages.at(-1), /已保存章节文件夹.*\(2\)/);
         assert.ok(!elements.exportPanel.classList.contains('open'));
-        open(); elements.btnSelectChapters.click();
+        await require('../helpers/react-workbench.cjs').ui(() => { open(); elements.btnSelectChapters.click(); });
         assert.equal(elements.chapterExportList.querySelectorAll('input:checked').length, 0);
         book = { ...book, id: 'other', title: '另一本' };
         await menu.run('custom');

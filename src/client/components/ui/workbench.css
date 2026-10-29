@@ -112,8 +112,73 @@ body.theme-dark {
 .goal-page-content > .goal-panel { width: 100%; }
 .appearance-panel, .export-panel { border-color: var(--border-color); box-shadow: 0 8px 30px #0002; border-radius: 10px; }
 .app-header .brand-icon { color: var(--primary); }
+.app-header :is(.btn, .book-nav-btn), .goal-panel .goal-icon { border-radius: var(--ui-radius); }
+.app-header .book-nav-btn { background: transparent; }
+.app-header :is(.btn, .book-nav-btn):hover, .app-header .book-nav-btn.is-open { background: var(--goal-hover-bg); color: var(--text-primary); }
 .goal-home .home-path { overflow: hidden; }
 .goal-home .home-path .ui-button { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Application controls and book controls occupy their own surfaces. */
+.app-header {
+    display: flex; justify-content: space-between; flex: none; min-height: var(--header-height);
+    padding: 0 20px; gap: 12px; border-bottom: 0; background: var(--bg-app);
+}
+.workspace-settings {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-width: 32px; min-height: 34px; padding: 5px 8px; color: var(--text-secondary); font-size: 12px;
+}
+.workspace-settings i { font-size: 17px; }
+.workspace-settings-panel {
+    width: min(300px, calc(100vw - 24px)); padding: 10px; border: 1px solid var(--border-color);
+    border-radius: 10px; background: var(--bg-panel); color: var(--text-primary); box-shadow: 0 8px 30px #0002;
+}
+.workspace-settings-panel[data-closed] { display: none; }
+.workspace-settings-panel > h2 { padding: 6px 8px 10px; margin: 0; font-size: 13px; font-weight: 600; }
+.workspace-theme-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; font-size: 13px; color: var(--text-secondary); }
+.workspace-settings-panel hr { border: 0; border-top: 1px solid var(--border-color); margin: 9px 0; }
+html[data-app-surface="reader"] .app-header {
+    position: absolute; top: var(--content-gutter); left: 16px; width: auto; height: 52px; padding: 0; z-index: 25;
+}
+html[data-app-surface="reader"]:has(#goal-sidebar:not([hidden])) .app-header { width: calc(var(--goal-sidebar-space, 280px) - 32px); }
+html[data-app-surface="reader"]:has(#goal-sidebar:not([hidden])) .workspace-settings {
+    position: fixed; bottom: 16px; left: 16px; width: calc(var(--goal-sidebar-space, 280px) - 32px);
+    justify-content: flex-start; font-size: 11px;
+}
+html[data-app-surface="reader"]:has(#goal-sidebar[hidden]) .workspace-settings > span { display: none; }
+.goal-sidebar .goal-panel { height: calc(100% - 56px); padding: 80px 20px 24px; }
+.goal-sidebar .goal-title, .goal-sidebar .goal-editor textarea { font-size: 16px; font-weight: 500; line-height: 1.85; }
+.goal-sidebar .goal-header { margin-bottom: 24px; }
+.goal-sidebar .goal-child { font-size: 14px; line-height: 1.85; }
+.goal-sidebar .goal-item-text { font-size: 13px; line-height: 1.85; }
+.goal-sidebar .goal-item-source { font-size: 11px; }
+.workspace-container.immersive-notes { display: flex; flex-direction: column; }
+.immersive-notes .reader-panel { flex: 1; min-height: 0; height: auto !important; border-radius: 0 0 var(--content-radius) var(--content-radius); }
+.reader-toolbar {
+    position: relative; z-index: 11; display: flex; flex: none; align-items: center; gap: 6px;
+    height: 52px; min-width: 0; padding: 0 18px; border-bottom: 1px solid var(--border-color);
+    background: var(--bg-panel); color: var(--text-secondary); border-radius: var(--content-radius) var(--content-radius) 0 0;
+}
+.reader-toolbar .header-center { flex: 1; max-width: none; min-width: 0; }
+.reader-toolbar .header-actions { display: flex; flex: none; align-items: center; gap: 4px; }
+.reader-toolbar .book-nav-btn { padding: 0 6px; background: transparent; border-radius: var(--ui-radius); }
+.reader-toolbar :is(.btn, .book-nav-btn):hover, .reader-toolbar .book-nav-btn.is-open { background: var(--goal-hover-bg); color: var(--text-primary); }
+.reader-toolbar .reader-appearance-trigger { font-size: 12px; }
+.reader-appearance-trigger > span:first-child { font-family: Georgia, serif; font-size: 18px; }
+.paper-themes .paper-btn { width: 32px; height: 28px; min-height: 28px; padding: 0; border-radius: 6px; font-size: 11px; }
+.paper-themes .paper-btn.paper-white { background: #fff; color: #373741; border: 1px solid #d1d1db; }
+.paper-themes .paper-btn.paper-sepia { background: #fbf0d9; color: #635641; border: 1px solid #e5d3b3; }
+.paper-themes .paper-btn.paper-dark { background: #121827; color: #e2e8f0; border: 1px solid #374151; }
+.paper-themes .paper-btn.active { border-color: var(--primary); outline: 1px solid var(--primary); transform: none; }
+html[data-app-surface="reader"]:has(#goal-sidebar[hidden]) .reader-toolbar { padding-left: 220px; }
+@media (max-width: 650px) {
+    html[data-app-surface="reader"] .brand-name { display: none; }
+    html[data-app-surface="reader"]:has(#goal-sidebar[hidden]) .reader-toolbar { padding-left: 94px; padding-right: 8px; gap: 2px; }
+    .reader-toolbar .header-actions { gap: 1px; }
+    .reader-toolbar .btn-icon { width: 30px; }
+    .reader-toolbar .book-nav-btn { gap: 5px; font-size: 12px; }
+    .reader-action-label { display: none; }
+    .workspace-settings > span { display: none; }
+}
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0s !important; transition-duration: 0s !important; }
 }

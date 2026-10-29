@@ -17,8 +17,10 @@ const { APP_URL, createAssetHandler, resourcePath } = require('../../src/desktop
         assert.ok(document.querySelector('script[type="module"][src^="./assets/"]'));
         assert.ok(document.getElementById('react-root'));
         assert.equal(document.querySelectorAll('[src^="http"], [href^="http"]').length, 0);
-        assert.ok(document.getElementById('book-paper'));
-        assert.ok(document.getElementById('btn-import-book'));
+        assert.equal(document.getElementById('book-paper'), null, 'the entry mounts the React shell at runtime');
+        const entryUrl = document.querySelector('script[type="module"]').getAttribute('src');
+        const entry = await (await request(entryUrl)).text();
+        assert.ok(entry.includes('book-paper') && entry.includes('btn-import-book'), 'the shipped entry contains the workbench shell');
         for (const element of document.querySelectorAll('script[src], link[href]')) {
             const url = element.getAttribute('src') || element.getAttribute('href');
             const response = await request(url);

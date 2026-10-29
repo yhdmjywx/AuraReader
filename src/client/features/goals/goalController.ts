@@ -69,7 +69,6 @@ export class GoalController {
         if (elements.goalPanel) this.ui = new GoalUI(elements.goalPanel, {
             select: id => this.selectGoal(id), home: () => this.goHome(), up: () => this.goUp(), create: () => this.beginNew(),
             menu: (id, anchor, point) => this.actions.open(id, anchor, point),
-            collection: area => this.callbacks.openCollection?.(area),
             expand: () => { this.openPage().catch(() => {}); },
             items: () => { this.itemsOpen = !this.itemsOpen; this.render(); }, edit: mode => this.beginEdit(mode), input: text => this.updateDraft(text),
             finish: () => { this.finishInlineEdit().catch(() => {}); },

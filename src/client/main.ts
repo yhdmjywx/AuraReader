@@ -79,7 +79,6 @@ export function queryElements(): AppElements {
         btnExportMenu: document.getElementById('btn-export-menu') as HTMLButtonElement | null,
         exportPanel: document.getElementById('export-panel'),
         exportBookTitle: document.getElementById('export-book-title'),
-        btnFullscreen: document.getElementById('btn-fullscreen') as HTMLButtonElement | null,
         btnSwitchDemo: document.getElementById('btn-switch-demo') as HTMLButtonElement | null,
         fileInput: document.getElementById('file-input') as HTMLInputElement | null,
 

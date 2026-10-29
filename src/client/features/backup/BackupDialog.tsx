@@ -14,7 +14,7 @@ export function BackupDialog() {
     return <Dialog open={open} onOpenChange={value => {
         setOpen(value); if (!value) document.getElementById('backup-select-modal')?.classList.remove('active');
     }}>
-        <DialogContent id="backup-select-modal" keepMounted finalFocus={() => document.getElementById('btn-export-menu')}>
+        <DialogContent id="backup-select-modal" keepMounted finalFocus={() => document.getElementById('btn-workspace-settings')}>
             <DialogTitle>选择需要备份的图书</DialogTitle><DialogDescription>每本书生成一个独立文件。</DialogDescription>
             <Button id="btn-close-backup-modal" className="ui-dialog-close" size="icon" aria-label="关闭备份选择">×</Button>
             <div className="ui-backup-select-all"><Button id="btn-select-all-backup" size="sm">全选</Button><Button id="btn-deselect-all-backup" size="sm">取消全选</Button></div>

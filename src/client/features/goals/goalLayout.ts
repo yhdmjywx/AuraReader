@@ -26,6 +26,7 @@ export function positionGoals(elements: AppElements, mode: string, preferred = D
     if (!panel) return false;
     const geometry = goalSidebarGeometry(availableWidth(elements), preferred, mode);
     const visible = geometry.available && !closed;
+    panel.ownerDocument.documentElement.style.setProperty('--goal-sidebar-space', visible ? `${geometry.width}px` : '0px');
     panel.hidden = !visible;
     if (sidebar) { sidebar.hidden = !visible; sidebar.style.width = `${geometry.width}px`; }
     if (toggle) {

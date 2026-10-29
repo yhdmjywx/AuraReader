@@ -2,6 +2,7 @@ import { BackupDialog } from '../backup/BackupDialog.js';
 import { memo } from 'react';
 import { Button } from '../../components/ui/button.js';
 import { Input } from '../../components/ui/input.js';
+import { WorkspaceSettings } from './WorkspaceSettings.js';
 
 // Mount once before bootstrap. Controllers own only the explicit engine/view hosts below.
 // Keeping these hosts stable preserves EPUB ranges, imported fonts and export command state.
@@ -14,22 +15,8 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                 <i className="ri-book-open-fill brand-icon"></i>
                 <span className="brand-name">{"AuraReader"}</span>
             </div>
-            <Button id="btn-goal-sidebar" className="btn btn-icon-sm" type="button" aria-label="Toggle goals sidebar" aria-expanded="true" aria-controls="goal-sidebar" hidden><i className="ri-side-bar-line" aria-hidden="true"></i></Button>
         </div>
-        <div className="header-center"><Button id="btn-toc" className="book-nav-btn" type="button" title="打开章节目录" aria-expanded="false" aria-controls="toc-drawer">
-                <i className="ri-list-unordered"></i>
-                <span id="current-book-title" className="book-nav-title">{"未打开书籍"}</span>
-                <i className="ri-arrow-down-s-line book-nav-caret"></i>
-            </Button></div>
-        <div className="header-side header-actions">
-            <Button id="btn-shelf" className="btn btn-icon nav-icon" type="button" title="我的书库" aria-expanded="false" aria-controls="shelf-panel" aria-haspopup="dialog">
-                <i className="ri-book-shelf-line"></i>
-                <span className="badge-count" id="shelf-book-count" hidden>{"0"}</span>
-            </Button>
-            <Button id="btn-appearance" className="btn btn-icon nav-icon" type="button" title="视觉偏好" aria-expanded="false" aria-controls="appearance-panel"><i className="ri-palette-line"></i></Button>
-            <Button id="btn-export-menu" className="btn btn-icon nav-icon" type="button" title="导出与备份" aria-label="导出与备份" aria-expanded="false" aria-controls="export-panel"><i className="ri-download-line" aria-hidden="true"></i></Button>
-            <Button id="btn-fullscreen" className="btn btn-icon nav-icon" type="button" title="全屏阅读"><i className="ri-fullscreen-line"></i></Button>
-        </div>
+        <WorkspaceSettings />
     </header>
     <div id="appearance-panel" className="appearance-panel" role="dialog" aria-label="视觉偏好">
         <div className="appearance-row">
@@ -90,9 +77,9 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
         <div className="appearance-row">
             <span>{"阅读背景"}</span>
             <div className="paper-themes">
-                <Button className="paper-btn paper-white active" type="button" data-paper="white" title="纯白"></Button>
-                <Button className="paper-btn paper-sepia" type="button" data-paper="sepia" title="护眼羊皮纸"></Button>
-                <Button className="paper-btn paper-dark" type="button" data-paper="dark" title="夜间墨黑"></Button>
+                <Button className="paper-btn paper-white active" type="button" data-paper="white" title="纯白" aria-label="纯白纸张">白</Button>
+                <Button className="paper-btn paper-sepia" type="button" data-paper="sepia" title="护眼羊皮纸" aria-label="护眼羊皮纸">暖</Button>
+                <Button className="paper-btn paper-dark" type="button" data-paper="dark" title="夜间墨黑" aria-label="夜间墨黑纸张">夜</Button>
             </div>
         </div>
         <div className="appearance-row">
@@ -102,14 +89,10 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                 <Button id="btn-mode-single" className="btn btn-icon-sm mode-choice" type="button" title="单页阅读">{"单页"}</Button>
             </div>
         </div>
-        <div className="appearance-row">
-            <span>{"界面明暗"}</span>
-            <Button id="btn-theme-toggle" className="btn btn-icon-sm" type="button" title="切换主题"><i className="ri-sun-line"></i></Button>
-        </div>
     </div>
     <section id="export-panel" className="export-panel" role="dialog" aria-labelledby="export-panel-title" aria-hidden="true">
         <div className="export-panel-heading">
-            <h2 id="export-panel-title">{"导出与备份"}</h2>
+            <h2 id="export-panel-title">{"导出当前书籍"}</h2>
             <p>
                 {"当前书籍 ·"}
                 <span id="export-book-title">{"未打开书籍"}</span>
@@ -147,19 +130,6 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                 </div>
             </div>
         </div>
-        <hr className="export-panel-divider" />
-        <h3 className="export-section-title">{"书籍备份与恢复"}</h3>
-        <Button id="btn-export-full-backup" className="export-menu-action export-backup-action" type="button" data-export-action="">
-            <i className="ri-archive-line" aria-hidden="true"></i>
-            <span className="export-action-label">{"导出书籍备份"}</span>
-            <span className="export-extension">{".aurabackup"}</span>
-        </Button>
-        <Button id="btn-import-full-backup" className="export-menu-action export-backup-action" type="button" data-export-action="">
-            <i className="ri-upload-line" aria-hidden="true"></i>
-            <span className="export-action-label">{"从备份恢复书籍"}</span>
-        </Button>
-        <p className="export-panel-note">{"每本书一个备份文件 · 包含高亮与笔记"}</p>
-        <Input type="file" id="backup-file-input" accept=".aurabackup,.json" hidden />
     </section>
     <div className="reading-workspace" id="reading-workspace">
         <aside className="goal-sidebar" id="goal-sidebar" aria-label="Goals sidebar" hidden>
@@ -167,6 +137,19 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
             <div className="goal-resizer" id="goal-resizer" role="separator" tabIndex={0} aria-label="Resize goals sidebar" aria-orientation="vertical" aria-controls="goal-sidebar"></div>
         </aside>
         <main className="workspace-container immersive-notes" id="workspace-container">
+            <header className="reader-toolbar" aria-label="当前书籍操作">
+                <Button id="btn-goal-sidebar" className="btn btn-icon-sm" type="button" aria-label="Toggle goals sidebar" aria-expanded="true" aria-controls="goal-sidebar" hidden><i className="ri-side-bar-line" aria-hidden="true" /></Button>
+                <div className="header-center"><Button id="btn-toc" className="book-nav-btn" type="button" title="打开章节目录" aria-expanded="false" aria-controls="toc-drawer">
+                    <i className="ri-list-unordered" /><span id="current-book-title" className="book-nav-title">未打开书籍</span><i className="ri-arrow-down-s-line book-nav-caret" />
+                </Button></div>
+                <div className="header-actions">
+                    <Button id="btn-shelf" className="btn btn-icon nav-icon" type="button" title="我的书库" aria-expanded="false" aria-controls="shelf-panel" aria-haspopup="dialog">
+                        <i className="ri-book-shelf-line" /><span className="badge-count" id="shelf-book-count" hidden>0</span>
+                    </Button>
+                    <Button id="btn-appearance" className="btn reader-appearance-trigger" type="button" title="阅读设置" aria-label="阅读设置" aria-expanded="false" aria-controls="appearance-panel"><span aria-hidden="true">Aa</span><span className="reader-action-label">阅读设置</span></Button>
+                    <Button id="btn-export-menu" className="btn btn-icon nav-icon" type="button" title="导出当前书籍" aria-label="导出当前书籍" aria-expanded="false" aria-controls="export-panel"><i className="ri-more-line" aria-hidden="true" /></Button>
+                </div>
+            </header>
             <section className="reader-panel" id="reader-panel">
                 <aside className="toc-drawer" id="toc-drawer">
                     <div className="toc-header">

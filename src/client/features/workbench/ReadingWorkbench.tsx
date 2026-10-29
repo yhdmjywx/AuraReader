@@ -112,10 +112,6 @@ export function ReadingWorkbench({ application }: { application: ReadingApplicat
                 onClick={() => { void store.createFromSelection('note'); }}><i className="ri-sticky-note-line" aria-hidden="true" />笔记</Button>
         </>, doc.getElementById('react-selection-actions')!)}
         {createPortal(<>
-            <select aria-label="阅读书籍" value={state.reader.location.bookId} onChange={event => { void store.openBook(event.currentTarget.value); }}>
-                <option value="" disabled>选择书籍</option>
-                {state.books.map(book => <option key={book.id} value={book.id}>{book.title}</option>)}
-            </select>
             <span className="react-save-status" role="status">{state.saveState === 'saving' ? '保存中…' : state.saveState === 'error' ? '保存未完成' : '自动保存'}</span>
             {state.error && <span role="alert" className="react-workbench-error">{state.error}</span>}
         </>, doc.getElementById('react-reading-book')!)}

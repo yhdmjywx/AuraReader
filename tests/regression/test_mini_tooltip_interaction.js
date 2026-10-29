@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const { JSDOM } = require('jsdom');
 
 (async () => {
-    const dom = new JSDOM(fs.readFileSync('src/client/index.html', 'utf8'), { url: 'http://localhost/' });
+    const dom = require('../helpers/react-workbench.cjs').createWorkbench({ url: 'http://localhost/' });
     const globals = ['window', 'document', 'localStorage', 'NodeFilter'];
     const originals = new Map(globals.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     let storage;

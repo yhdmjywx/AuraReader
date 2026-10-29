@@ -262,7 +262,7 @@ body.theme-dark .btn-icon-sm.auto-downgraded {
    -------------------------------------------------------------------------- */
 .app-header {
     height: var(--header-height);
-    background-color: var(--bg-header);
+    background-color: var(--bg-app);
     border-bottom: 1px solid var(--border-color);
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
@@ -1649,7 +1649,7 @@ mark.hl-active {
 .goal-item-detail .goal-item-text { width:100%; }
 .goal-item-source { font-size:13px; color:var(--goal-secondary); margin-top:6px; overflow-wrap:anywhere; }
 .goal-empty { color:var(--goal-secondary); }
-.goal-header { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.goal-header { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-bottom:16px; }
 .goal-navigation { display:flex; align-items:center; gap:4px; }
 .goal-header .goal-icon { width:36px; height:36px; min-width:36px; }
 #goal-new { background:var(--goal-selected-bg); color:var(--goal-action); }
@@ -1662,7 +1662,8 @@ mark.hl-active {
 .goal-icon:hover { background:var(--goal-hover-bg); color:var(--goal-action); }
 .goal-current { display:flex; flex-direction:column; align-items:stretch; gap:8px; }
 .goal-title { width:100%; min-height:32px; padding:0; border:0; border-radius:4px; background:none; color:inherit; text-align:left; font-size:18px; font-weight:600; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; cursor:text; }
-.goal-children { margin:14px 0 0; }
+.goal-children { margin:16px 0 0; }
+.goal-content > .goal-children:first-child { margin-top:0; }
 .goal-child { display:block; width:100%; min-height:36px; padding:6px; border:0; border-radius:6px; background:none; color:var(--goal-text); text-align:left; font-size:15px; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; cursor:pointer; }
 .goal-child:hover { color:var(--goal-action); background:var(--goal-hover-bg); }
 .goal-items-toggle { display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:4px 6px; margin-top:20px; border:0; border-radius:6px; background:none; color:var(--goal-secondary); font-size:14px; font-weight:500; line-height:1.5; cursor:pointer; }
@@ -1800,6 +1801,5 @@ html[data-react-workbench="true"] #selection-tooltip > .tooltip-btn { display:no
 #react-notes,#react-selection-actions { display:contents; }
 .reader-pagination { position:relative; }
 #react-reading-book { position:absolute; left:16px; display:flex; gap:12px; align-items:center; max-width:35%; }
-#react-reading-book select { min-width:0; max-width:180px; border:0; background:transparent; color:var(--text-secondary); font-size:12px; }
 .react-save-status { color:var(--text-muted); font-size:11px; white-space:nowrap; }
 .react-workbench-error { color:#b42318; font-size:12px; }

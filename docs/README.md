@@ -27,4 +27,4 @@
 
 Electron [审计](electron-desktop-audit.md)、[阶段 2](electron-desktop-stage2.md)、[阶段 3](electron-desktop-stage3.md)、[阶段 4](electron-desktop-stage4.md)、[阶段 5](electron-desktop-stage5.md)、[阶段 6](electron-desktop-stage6.md) 保留各阶段设计、检查证据和未验收项。
 
-阶段记录、旧规划和 [历史状态记录](status.md) 描述当时版本。旧 HTML／章节 ZIP 导出、旧笔记侧栏和已被替代的首页布局不代表当前入口。阅读中的紧凑书库 Popover 与 Library 首页仍各自保留。当前使用规则见使用文档，源码与安装包的差别见已知限制；本次文档更新不重写历史验收结果。
+阶段记录和旧规划描述当时版本。旧 HTML／章节 ZIP 导出、旧笔记侧栏和已被替代的首页布局不代表当前入口。阅读中的紧凑书库 Popover 与 Library 首页仍各自保留。当前使用规则见使用文档，源码与安装包的差别见已知限制；本次文档更新不重写历史验收结果。

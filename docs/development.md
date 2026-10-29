@@ -47,9 +47,10 @@ npm run typecheck        # 只检查类型
 npm run test:unit        # 单元测试
 npm run test:regression  # 回归检查
 npm run test:syntax      # JavaScript 语法检查
+npm run test:migration   # React 迁移相关的 16 项核心检查，包含生产构建
 npm run desktop          # Windows x64 桌面预览，书库通过 IPC 访问，不启动 HTTP 服务
-npm run test:desktop     # 真实 Electron 窗口、SQLite 运行时与安全检查
-npm run test:reading-workflow # 单条 Electron 核心流程：首页/选书、IME 笔记、Goal/回跳、书库、偏好、导出选择、键盘弹层
+npm run test:desktop     # 默认运行当前 Vite 构建的 Electron 核心流程，使用独立临时书库
+npm run test:reading-workflow # 同一条流程：首页/选书、IME 笔记、Goal/回跳、偏好/导出、键盘弹层及重载后的数据
 npm run test:stability   # 独立 profile 的故障、异常终止恢复、大书及默认 300 秒持续读写；可附 -- 600
 npm run test:packaged:stability # 复验已有 win-unpacked 的真实 exe；先运行 dist:win
 npm run test:desktop:native # 交互验收真实 Windows 文件对话框，按终端提示选项目测试素材
@@ -68,7 +69,11 @@ npm run test:install      # 构建候选/升级测试包，真实安装、升级
 
 日常前端开发访问 `npm run dev` 输出的 `http://127.0.0.1:5173/`，API 请求由 Vite 转发至本地服务。生产预览仍使用 `npm start` 的 8095 端口；直接运行 `node src/server/server.js` 前需先构建。浏览器偏好按页面访问地址隔离。
 
-Electron 此阶段继续通过 `aurareader://app/index.html` 加载 Vite 构建资源，不启用桌面 HMR，也不改 IPC 来源校验。桌面改动后重新执行 `npm run desktop`。原有固定 `main.js` 入口、直接从 `index.html` 读取工作台 DOM 或同步操作旧 GoalUI 编辑器的测试，需要在后续测试迁移阶段适配 React 挂载；Node/JSDOM 模块测试的编译目录仍是 `dist/client/`。本阶段使用 `test:reading-workflow` 验证实际构建的核心交互，不宣称完整旧测试集已通过。
+Electron 此阶段继续通过 `aurareader://app/index.html` 加载 Vite 构建资源，不启用桌面 HMR，也不改 IPC 来源校验。桌面改动后重新执行 `npm run desktop`。
+
+日常验证先运行 `npm run test:migration`，再运行 `npm run test:desktop`。前者检查 React 挂载、阅读器边界、首页/Goal/书库/导出交互及 Vite 资源；后者直接加载带 hash 的实际生产入口，验证 EPUB、IME 笔记、SQLite 保存、Goal 关联、跨书回跳、键盘弹层，并重载 renderer 确认书籍、笔记和 Goal 仍可读取。本阶段不新增故障注入、长时间压力或安装器验收。
+
+`tests/helpers/react-workbench.cjs` 从真实 `WorkbenchShell` 创建测试 DOM，使用 React `act` 等待更新；原生引擎的静态 DOM 检查也从这个外壳生成快照。Node/JSDOM 模块测试仍使用 `dist/client/`，不再假设 `index.html` 内已有工作台，或 Goal 编辑器始终存在。旧桌面专项脚本保留在原目录，`scripts/test-desktop.cjs --legacy` 对应历史整套入口；它们仍有固定模块 URL 和旧 DOM 假设，未纳入本次通过范围。默认桌面入口已切到当前 React 核心流程；完整旧测试集、专项稳定性套件及安装包不在本阶段通过声明之内。
 
 测试素材 `tests/fixtures/test.epub` 是 Project Gutenberg 的英文版《爱丽丝梦游仙境》，保留书内原始声明与许可。素材来源见 [测试素材说明](../tests/fixtures/README.md)。嵌套目录另由自写测试样例验证。
 

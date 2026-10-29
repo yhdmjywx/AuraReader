@@ -241,7 +241,7 @@ export class AppShell {
         // Global Keyboard Shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.defaultPrevented || e.isComposing) return;
-            if (eventElement(e)?.closest('[role="menu"],[role="dialog"],[role="alertdialog"]')) return;
+            if (eventElement(e)?.closest('[role="menu"],[data-slot="dialog-content"]')) return;
             if (e.key === 'Escape' && elements.exportPanel && elements.exportPanel.classList.contains('open')) {
                 e.preventDefault();
                 this.closeExportPanel();

@@ -1,7 +1,7 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { Annotation } from '../../domain/annotation.js';
 import type { GoalLibraryState, GoalDraft } from '../../domain/goal.js';
-import { areaGoals, type GoalFilter, type GoalArea } from '../../domain/goalLifecycle.js';
+import { areaGoals } from '../../domain/goalLifecycle.js';
 import { Button } from '../../components/ui/button.js';
 import { Textarea } from '../../components/ui/input.js';
 import { renderSurface } from '../../components/ui/renderSurface.js';
@@ -17,7 +17,6 @@ interface Actions {
     edit(mode: 'root' | 'child' | 'edit'): void; input(text: string): void; finish(): void;
     unlink(id: string): void; jump(id: string): void;
     menu?(id: string, anchor: HTMLElement, point?: { x: number; y: number }): void;
-    collection?(area: GoalArea): void;
 }
 function GoalEditor({ view, ui }: { view: GoalView; ui: GoalUI }) {
     const editor = useRef<HTMLTextAreaElement>(null), composing = useRef(false);
@@ -44,10 +43,9 @@ function GoalEditor({ view, ui }: { view: GoalView; ui: GoalUI }) {
     </div>;
 }
 function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
-    const [filter, setFilter] = useState<GoalFilter>('all');
     const { actions } = ui;
     const goal = view.state.goals.find(g => g.id === view.selected);
-    const children = areaGoals(view.state, 'library', view.allGoals ? null : goal?.id || null, '', filter);
+    const children = areaGoals(view.state, 'library', view.allGoals ? null : goal?.id || null, '', 'ongoing');
     const materials = view.state.links.filter(link => link.goalId === goal?.id);
     const annotations = new Map(view.annotations.map(note => [note.id, note]));
     return <div onMouseDown={event => {
@@ -64,10 +62,6 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
             </div>
         </div>
         <div className="goal-content" id="goal-content">
-            <select className="goal-filter" aria-label="Filter goals by completion" value={filter} disabled={view.disabled}
-                onChange={event => setFilter(event.currentTarget.value as GoalFilter)}>
-                <option value="all">全部 Goal</option><option value="ongoing">进行中</option><option value="completed">已完成</option>
-            </select>
             {!view.allGoals && goal && <div className="goal-current">
                 <div className="goal-title-row">
                     {view.edit?.mode !== 'edit' && <Button className="goal-title" disabled={view.disabled} onClick={() => actions.edit('edit')}>{goal.text}</Button>}
@@ -83,11 +77,7 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
                 <Button className="goal-icon" aria-label={`Actions for ${child.text}`} aria-haspopup="menu" disabled={view.disabled}
                     onClick={event => actions.menu?.(child.id, event.currentTarget)}>⋯</Button>
             </div>)}</div>
-            {!children.length && !goal && !view.edit && <p className="goal-empty">从一个想弄明白的问题开始。</p>}
-            {view.allGoals && <nav className="goal-collections" aria-label="Goal collections">
-                <Button className="goal-action" onClick={() => actions.collection?.('archive')}>归档</Button>
-                <Button className="goal-action" onClick={() => actions.collection?.('trash')}>最近删除</Button>
-            </nav>}
+            {!children.length && !goal && !view.edit && <p className="goal-empty">{view.state.goals.length ? '当前层级暂无进行中的 Goal。' : '从一个想弄明白的问题开始。'}</p>}
             {!view.allGoals && goal && materials.length > 0 && <>
                 <Button className="goal-items-toggle" aria-expanded={view.itemsOpen} aria-controls="goal-linked-items" onClick={actions.items}>{materials.length} 条关联材料 <span>{view.itemsOpen ? '⌃' : '⌄'}</span></Button>
                 {view.itemsOpen && <div className="goal-items" id="goal-linked-items">{materials.map(link => {
