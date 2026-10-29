@@ -34,7 +34,7 @@ Electron Windows 桌面迁移已进入阶段 6 的本地验证，保留 Windows 
 
 首次创建书库需明确点击；桌面 SQLite 和导入字体位于 `%APPDATA%\AuraReader\data`，不在安装目录内。按当前范围只保证现用 SQLite 的读写、版本/幂等、备份与恢复，不提供旧数据库或 IndexedDB 的桌面迁移；未知或缺失数据库仍阻断启动，不静默清库。浏览器模式继续独立运行，[旧版迁移说明](data-and-backup.md#从旧版本迁移)仅适用于现有浏览器模式。阶段 6 增加实际 SQLite 容量、只读和锁竞争故障、Renderer/主进程终止恢复、大书与持续读写、打包程序及安装生命周期验证，并修复容量错误掩盖与页面关闭漏保存。发布验收仍有未验证项；最新证据与限制见 [阶段 6 记录](electron-desktop-stage6.md)，安装设计见 [阶段 5](electron-desktop-stage5.md)，文件功能见 [阶段 4](electron-desktop-stage4.md)，历史记录见 [阶段 3](electron-desktop-stage3.md)、[审计](electron-desktop-audit.md)和[外壳记录](electron-desktop-stage2.md)。
 
-源码位于 `src/client/` 和 `src/server/`。前端已接入 React + Vite：`entry.tsx` 挂载 React 启动组件，再按运行环境载入现有浏览器／桌面应用。启动后，React 接管阅读中的书籍切换、选区操作、页边笔记和 Goal 侧栏；首页、完整 Goal 页面、设置及导出继续使用现有界面。
+源码位于 `src/client/` 和 `src/server/`。前端使用 React + Vite：`entry.tsx` 先挂载 `WorkbenchShell`，再按运行环境载入浏览器／桌面应用。首页、完整 Goal 页面、阅读 Goal 侧栏、书库列表、选区操作和页边笔记均由 React 展示；偏好和导出面板也由 React 创建，原有 controller 继续执行字体、布局、保存和文件命令。
 
 `npm start` 会先检查类型并构建，再启动服务。`dist/renderer/` 是浏览器与 Electron 共用的 Vite 产物，包含带 hash 的 JS/CSS、本地图标和字体；`dist/client/` 保留逐模块编译输出，供现有测试导入，不随桌面版发布。依赖安装后，可以运行：
 
@@ -49,7 +49,7 @@ npm run test:regression  # 回归检查
 npm run test:syntax      # JavaScript 语法检查
 npm run desktop          # Windows x64 桌面预览，书库通过 IPC 访问，不启动 HTTP 服务
 npm run test:desktop     # 真实 Electron 窗口、SQLite 运行时与安全检查
-npm run test:reading-workflow # 单条 React 核心链路：选书、选区、IME 笔记、保存、关联 Goal、跨书回跳
+npm run test:reading-workflow # 单条 Electron 核心流程：首页/选书、IME 笔记、Goal/回跳、书库、偏好、导出选择、键盘弹层
 npm run test:stability   # 独立 profile 的故障、异常终止恢复、大书及默认 300 秒持续读写；可附 -- 600
 npm run test:packaged:stability # 复验已有 win-unpacked 的真实 exe；先运行 dist:win
 npm run test:desktop:native # 交互验收真实 Windows 文件对话框，按终端提示选项目测试素材
@@ -60,11 +60,15 @@ npm run test:install      # 构建候选/升级测试包，真实安装、升级
 
 阅读器现在通过 `features/reader/readerRuntime.ts` 提供 `mount`、`setBook`、`setAnnotations`、`setLayout`、翻页、`subscribe/getSnapshot` 和 `destroy`；当前应用也使用这个入口挂载。React 界面可直接使用 `readerReact.tsx` 中的 `ReaderSurface` 与 `useReaderSnapshot`。React 管理容器和周边界面，阅读器独占正文子节点；快照只包含普通数据，不传出 DOM 或 Range。卸载会移除阅读与选区监听、排版任务和尺寸观察；重新挂载保留书籍与源文档位置。业务数据保存仍由原有 repository/controller 负责。
 
-核心业务界面位于 `features/workbench/ReadingWorkbench.tsx`，通过 `WorkbenchStore` 订阅现有阅读、笔记、Goal 和导航状态。选书、创建/编辑笔记、关联 Goal 和回跳使用统一命令，继续调用原有 controller/coordinator 的保存与导航逻辑。页边笔记使用稳定的 React 节点，排版模块只测量和定位，不移动或重建这些节点。完整 Goal 页及其他外围视图留待后续迁移。
+核心业务界面位于 `features/workbench/ReadingWorkbench.tsx`，通过 `WorkbenchStore` 订阅现有阅读、笔记、Goal 和导航状态。选书、创建/编辑笔记、关联 Goal 和回跳使用统一命令，继续调用原有 controller/coordinator 的保存与导航逻辑。页边笔记使用稳定的 React 节点，排版模块只测量和定位，不移动或重建这些节点。
+
+`features/goals/goalHome.tsx` 管理首页展示和浏览命令；`goalUI.tsx` 是完整 Goal 页与阅读侧栏共用的 React 视图，切换页面时保留同一挂载容器。原有 controller 通过 `renderSurface` 更新稳定的 React 根，避免同时维护原生和 React 两套展示。React 外壳保持容器不变；正文、目录排版和选区仍是阅读器专属 DOM 边界，字体和导出列表则使用各自的 React 展示适配器。
+
+公共基础组件在 `components/ui/`：采用 shadcn 的源码归属和变体组织方式，以 Base UI 的 Button、Menu、Dialog 为基础，用现有 CSS 变量统一按钮、输入框、菜单、对话框、明暗主题、焦点环及短动效；当前没有引入 Tailwind 或运行 shadcn CLI。菜单支持方向键、Escape 和焦点返回，对话框管理焦点并支持 Escape；系统减少动态效果偏好会关闭这些过渡。Goal 菜单、书库移除确认、首页选书和备份选择共用弹层基础组件。
 
 日常前端开发访问 `npm run dev` 输出的 `http://127.0.0.1:5173/`，API 请求由 Vite 转发至本地服务。生产预览仍使用 `npm start` 的 8095 端口；直接运行 `node src/server/server.js` 前需先构建。浏览器偏好按页面访问地址隔离。
 
-Electron 此阶段继续通过 `aurareader://app/index.html` 加载 Vite 构建资源，不启用桌面 HMR，也不改 IPC 来源校验。桌面改动后重新执行 `npm run desktop`。原有通过固定 `main.js` URL 导入应用的 Electron 交互测试，需要在测试迁移阶段适配构建后的模块入口；现有 Node/JSDOM 模块测试继续使用 `dist/client/`。
+Electron 此阶段继续通过 `aurareader://app/index.html` 加载 Vite 构建资源，不启用桌面 HMR，也不改 IPC 来源校验。桌面改动后重新执行 `npm run desktop`。原有固定 `main.js` 入口、直接从 `index.html` 读取工作台 DOM 或同步操作旧 GoalUI 编辑器的测试，需要在后续测试迁移阶段适配 React 挂载；Node/JSDOM 模块测试的编译目录仍是 `dist/client/`。本阶段使用 `test:reading-workflow` 验证实际构建的核心交互，不宣称完整旧测试集已通过。
 
 测试素材 `tests/fixtures/test.epub` 是 Project Gutenberg 的英文版《爱丽丝梦游仙境》，保留书内原始声明与许可。素材来源见 [测试素材说明](../tests/fixtures/README.md)。嵌套目录另由自写测试样例验证。
 

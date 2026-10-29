@@ -120,7 +120,7 @@ export class GoalController {
         else try { storeLibraryDraft({ ...(libraryDrafts().find(d => d.draft.id === edit.draft.id) || {}), draft: edit.draft }); } catch (error) { this.fail(error); }
     }
     private endEdit() {
-        const edit = this.edit; if (!edit) return; if (this.ui) this.updateDraft(this.ui.editor.value); this.edit = null; this.ui?.releaseEditorFocus();
+        const edit = this.edit; if (!edit) return; if (this.ui?.editingText !== undefined) this.updateDraft(this.ui.editingText); this.edit = null; this.ui?.releaseEditorFocus();
         if (edit.mode === 'edit') this.persist(changeGoal(this.state, edit.draft.id, edit.draft.text.trim() ? edit.draft.text : edit.lastNonempty));
         else if (edit.draft.text.trim()) { this.persist(addGoal(this.state, edit.draft)); this.selected = edit.draft.parentId; this.rememberSelection(); this.allGoals = !this.selected; this.itemsOpen = true; }
         else { discardLibraryDraft(edit.draft.id); this.allGoals = edit.previousTree; } this.render();

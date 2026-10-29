@@ -1,3 +1,4 @@
+import { Button } from '../../components/ui/button.js';
 import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import type { Annotation } from '../../domain/annotation.js';
@@ -58,61 +59,21 @@ function Notes({ state, store }: { state: WorkbenchSnapshot; store: WorkbenchSto
                     : note.kind === 'note' ? note.comment : <span className="margin-highlight-label">划线</span>}
             </div>
             <div className="note-card-actions" hidden={state.editingNoteId === note.id}>
-                <button type="button" className={`btn btn-ghost-sm btn-goal-link${state.linkedIds.includes(note.id) ? ' is-linked' : ''}`}
+                <Button type="button" className={`btn btn-ghost-sm btn-goal-link${state.linkedIds.includes(note.id) ? ' is-linked' : ''}`}
                     data-annotation-id={note.id} disabled={!state.selectedGoal || state.goalDisabled || !state.goalVisible || state.linkedIds.includes(note.id)}
                     aria-label={state.linkedIds.includes(note.id) ? 'Added to goal' : 'Add to goal'}
                     title={state.selectedGoal ? '关联到当前 Goal' : '先在左侧选择一个 Goal'}
                     onClick={() => { void store.linkNote(note.id); }}>
                     <i aria-hidden="true" className={state.linkedIds.includes(note.id) ? 'ri-check-line' : 'ri-links-line'} />
                     <span>{state.linkedIds.includes(note.id) ? 'Linked' : 'Goal'}</span>
-                </button>
-                <button type="button" className="btn btn-ghost-sm" aria-label="回到原文"
-                    onClick={() => store.app.coordinator.jumpToAnnotation(note.id)}><i className="ri-focus-3-line" aria-hidden="true" /></button>
-                <button type="button" className="btn btn-ghost-sm" aria-label={note.kind === 'note' ? '删除笔记' : '删除高亮'}
-                    onClick={() => { void store.deleteNote(note.id); }}><i className="ri-delete-bin-line" aria-hidden="true" /></button>
+                </Button>
+                <Button type="button" className="btn btn-ghost-sm" aria-label="回到原文"
+                    onClick={() => store.app.coordinator.jumpToAnnotation(note.id)}><i className="ri-focus-3-line" aria-hidden="true" /></Button>
+                <Button type="button" className="btn btn-ghost-sm" aria-label={note.kind === 'note' ? '删除笔记' : '删除高亮'}
+                    onClick={() => { void store.deleteNote(note.id); }}><i className="ri-delete-bin-line" aria-hidden="true" /></Button>
             </div>
         </div>)}
     </div>;
-}
-
-function Goals({ state, store }: { state: WorkbenchSnapshot; store: WorkbenchStore }) {
-    const [draft, setDraft] = useState('');
-    if (state.surface !== 'reader' || !state.goalVisible) return null;
-    const selected = state.selectedGoal;
-    return <>
-        <nav className="goal-navigation" aria-label="Goal 导航">
-            <button type="button" className="goal-action" onClick={() => { void store.selectGoal(null); }}>全部 Goal</button>
-            {selected && <button type="button" className="goal-icon" aria-label="上一级 Goal" onClick={() => { void store.selectGoal(selected.parentId); }}>↑</button>}
-            <button type="button" className="goal-icon" aria-label="打开完整 Goal 页面"
-                onClick={() => { void store.run(() => store.app.goals.openPage()); }}>⤢</button>
-        </nav>
-        {selected && <div className="goal-heading"><h2 className="react-goal-title">{selected.text}</h2>
-            <button type="button" className="goal-icon" aria-label={`Actions for ${selected.text}`}
-                onClick={event => store.app.goals.actions.open(selected.id, event.currentTarget)}>⋯</button></div>}
-        <div className="goal-children">{state.children.map(goal => <div className="goal-row" key={goal.id}>
-            <button type="button" className="goal-child" disabled={state.goalDisabled}
-                onClick={() => { void store.selectGoal(goal.id); }}>{goal.text}{goal.completedAt ? ' ✓' : ''}</button>
-        </div>)}</div>
-        <form className="react-goal-create" onSubmit={event => {
-            event.preventDefault(); if (!draft.trim()) return;
-            void store.createGoal(draft).then(() => { if (!store.getSnapshot().error) setDraft(''); });
-        }}>
-            <input aria-label={selected ? '新建子 Goal' : '新建 Goal'} placeholder={selected ? '新建子 Goal' : '新建 Goal'}
-                value={draft} onChange={event => setDraft(event.currentTarget.value)} disabled={state.goalDisabled} />
-            <button type="submit" className="goal-icon" aria-label="创建 Goal" disabled={state.goalDisabled || !draft.trim()}>＋</button>
-        </form>
-        {selected && <section aria-label="Goal 关联材料">
-            <p className="react-material-count">{state.materials.length} 条关联材料</p>
-            {state.materials.map(({ link, annotation, title }) => <div className="goal-item" key={`${link.bookId}:${link.annotationId}`}>
-                <i aria-hidden="true" className={annotation?.kind === 'note' ? 'ri-sticky-note-line' : 'ri-mark-pen-line'} />
-                <div className="goal-item-detail">
-                    <button type="button" className="goal-item-text" data-annotation-id={link.annotationId} disabled={!annotation}
-                        onClick={() => { void store.jumpToSource(link); }}>{annotation ? annotation.comment || annotation.quote : '来源不可用'}</button>
-                    {link.bookId !== state.reader.location.bookId && <div className="goal-item-source">{title}</div>}
-                </div>
-            </div>)}
-        </section>}
-    </>;
 }
 
 export function ReadingWorkbench({ application }: { application: ReadingApplication }) {
@@ -144,12 +105,11 @@ export function ReadingWorkbench({ application }: { application: ReadingApplicat
     if (!ready) return null;
     return <>
         {createPortal(<Notes state={state} store={store} />, doc.getElementById('react-notes')!)}
-        {createPortal(<Goals state={state} store={store} />, doc.getElementById('react-reading-goals')!)}
         {createPortal(<>
-            <button type="button" className="tooltip-btn" onMouseDown={event => event.preventDefault()}
-                onClick={() => { void store.createFromSelection('highlight'); }}><i className="ri-mark-pen-line" aria-hidden="true" />高亮</button>
-            <button type="button" className="tooltip-btn" aria-label="添加笔记" onMouseDown={event => event.preventDefault()}
-                onClick={() => { void store.createFromSelection('note'); }}><i className="ri-sticky-note-line" aria-hidden="true" />笔记</button>
+            <Button type="button" className="tooltip-btn" onMouseDown={event => event.preventDefault()}
+                onClick={() => { void store.createFromSelection('highlight'); }}><i className="ri-mark-pen-line" aria-hidden="true" />高亮</Button>
+            <Button type="button" className="tooltip-btn" aria-label="添加笔记" onMouseDown={event => event.preventDefault()}
+                onClick={() => { void store.createFromSelection('note'); }}><i className="ri-sticky-note-line" aria-hidden="true" />笔记</Button>
         </>, doc.getElementById('react-selection-actions')!)}
         {createPortal(<>
             <select aria-label="阅读书籍" value={state.reader.location.bookId} onChange={event => { void store.openBook(event.currentTarget.value); }}>

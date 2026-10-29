@@ -91,7 +91,10 @@ export class AppShell {
             this.callbacks.onOpenPanel?.();
         }
         panel.classList.toggle('open', open);
+        panel.setAttribute('aria-hidden', String(!open));
         if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) requestAnimationFrame(() => { if (panel.classList.contains('open')) panel.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus(); });
+        else if (panel.contains(document.activeElement)) button?.focus({ preventScroll: true });
     }
 
     closeAppearance() {
@@ -117,6 +120,10 @@ export class AppShell {
         if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
         const PanelEvent = panel.ownerDocument?.defaultView?.Event || Event;
         if (!open) panel.dispatchEvent?.(new PanelEvent('exportpanelclose'));
+        if (open) requestAnimationFrame(() => {
+            if (panel.classList.contains('open')) [...panel.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')].find(control => !control.hidden && !control.closest('[hidden]'))?.focus();
+        });
+        else if (panel.contains(document.activeElement)) button?.focus({ preventScroll: true });
     }
 
     closeExportPanel() {
@@ -234,6 +241,7 @@ export class AppShell {
         // Global Keyboard Shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.defaultPrevented || e.isComposing) return;
+            if (eventElement(e)?.closest('[role="menu"],[role="dialog"],[role="alertdialog"]')) return;
             if (e.key === 'Escape' && elements.exportPanel && elements.exportPanel.classList.contains('open')) {
                 e.preventDefault();
                 this.closeExportPanel();

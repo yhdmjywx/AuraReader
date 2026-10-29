@@ -38,14 +38,12 @@ export class ShelfController {
                     }
                 },
                 onDeleteBook: async (book) => {
-                    if (confirm(`确定要从本地书库移除《${book.title}》及其划线笔记吗？`)) {
                         if (this.callbacks.onDeleteBook) await this.callbacks.onDeleteBook(book.id);
                         else await deleteBookFromDB(book.id);
                         await this.refreshShelf();
                         if (this.callbacks.showToast) {
                             this.callbacks.showToast(`已从书库移除：《${book.title}》`);
                         }
-                    }
                 }
             });
         }

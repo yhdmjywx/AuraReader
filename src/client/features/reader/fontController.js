@@ -1,5 +1,6 @@
 import { SYSTEM_FALLBACK, normalizeFontChoice, quoteFamily, resolveFont } from '../../domain/fontCatalog.js';
 import { unwrapDesktop } from '../../infrastructure/storageClient.js';
+import { renderCurrentFont, renderFontBrowser } from './fontPickerUI.js';
 
 const PREFERENCE_KEY = 'aura_font_preference';
 const SEARCH_KEY = 'aura_font_search';
@@ -204,18 +205,7 @@ export class FontController {
         this.elements.fontFamilySelect.title = `字体：${font.name}`;
         this.elements.fontFamilySelect.setAttribute('aria-label', `字体：${font.name}`);
         const current = this.elements.fontMenu.querySelector('#font-current-custom');
-        if (current) {
-            current.replaceChildren();
-            current.hidden = !['system', 'imported'].includes(this.choice.kind);
-            if (!current.hidden) {
-                const heading = document.createElement('p'); heading.className = 'font-group-label'; heading.textContent = '当前字体';
-                const button = document.createElement('button'); button.type = 'button'; button.className = 'font-option';
-                button.setAttribute('role', 'menuitemradio'); button.setAttribute('aria-checked', 'true'); button.textContent = font.name;
-                if (this.choice.kind === 'system') button.dataset.systemFamily = this.choice.family;
-                else button.dataset.importedFont = this.choice.id;
-                current.append(heading, button);
-            }
-        }
+        if (current) renderCurrentFont(current, this.choice, font);
         this.elements.fontMenu.querySelectorAll('[data-font-choice]').forEach(button => {
             const selected = button.dataset.fontChoice === (this.choice.kind === 'auto' ? 'auto' : this.choice.kind === 'builtin' ? this.choice.id : '');
             button.setAttribute('aria-checked', String(selected));
@@ -309,30 +299,8 @@ export class FontController {
 
     renderBrowser() {
         if (!this.elements) return;
-        const list = this.elements.fontBrowserList;
-        list.replaceChildren();
         const query = this.elements.fontSearch.value.trim().toLocaleLowerCase();
-        const addGroup = (title, fonts, kind) => {
-            if (!fonts.length) return;
-            const heading = document.createElement('p'); heading.className = 'font-group-label'; heading.textContent = title;
-            list.append(heading);
-            for (const font of fonts) {
-                const button = document.createElement('button');
-                button.type = 'button'; button.className = 'font-option'; button.setAttribute('role', 'menuitemradio');
-                button.textContent = font.name;
-                if (kind === 'imported') button.dataset.importedFont = font.id;
-                else button.dataset.systemFamily = font.name;
-                button.setAttribute('aria-checked', String(kind === 'imported' ? this.choice.kind === kind && this.choice.id === font.id
-                    : this.choice.kind === 'system' && this.choice.family === font.name));
-                list.append(button);
-            }
-        };
-        addGroup('已导入', this.imported.filter(font => font.name.toLocaleLowerCase().includes(query)), 'imported');
-        const families = [...new Set([...this.recent, ...this.systemFamilies])].sort((a, b) => a.localeCompare(b));
-        addGroup('本机字体', families.filter(name => name.toLocaleLowerCase().includes(query)).map(name => ({ name })), 'system');
-        if (!list.childNodes.length) {
-            const empty = document.createElement('p'); empty.className = 'font-empty';
-            empty.textContent = query ? '没有匹配的字体' : '读取本机字体，或导入字体文件'; list.append(empty);
-        }
+        renderFontBrowser(this.elements.fontBrowserList, { imported: this.imported, recent: this.recent,
+            systemFamilies: this.systemFamilies, choice: this.choice, query });
     }
 }

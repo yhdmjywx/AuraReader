@@ -8,9 +8,10 @@ import './styles.css';
 import '../desktop/renderer/shell.css';
 import { ReadingWorkbench } from './features/workbench/ReadingWorkbench.js';
 import type { ReadingApplication } from './features/workbench/workbenchStore.js';
+import { WorkbenchShell } from './features/workbench/WorkbenchShell.js';
+import './components/ui/workbench.css';
 
-// React mounts the core workflow into explicit portal hosts in the existing shell.
-// The reader continues to own the book/selection DOM.
+// Render stable shell hosts first, then connect the existing engines and commands.
 let startup: Promise<typeof import('./main.js')> | undefined;
 function startRuntime() {
     window.__AURA_BOOTSTRAPPED__ = true;
@@ -30,10 +31,10 @@ function App() {
         });
         return () => { active = false; };
     }, []);
-    return failure ? <section className="app-status" role="alert">
+    return <><WorkbenchShell />{failure ? <section className="app-status" role="alert">
         <p>{failure}</p>
         <button type="button" onClick={() => location.reload()}>重新加载</button>
-    </section> : application ? <ReadingWorkbench application={application} /> : null;
+    </section> : application ? <ReadingWorkbench application={application} /> : null}</>;
 }
 
 document.documentElement.dataset.renderer = 'react';

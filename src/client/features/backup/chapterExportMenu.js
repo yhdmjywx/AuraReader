@@ -1,4 +1,5 @@
 import { buildBookStructure } from '../../infrastructure/bookStructure.js';
+import { renderChapterChoices } from './exportChoicesUI.js';
 
 export class ChapterExportMenu {
     constructor(elements, callbacks) {
@@ -65,13 +66,7 @@ export class ChapterExportMenu {
                 const structure = buildBookStructure(book);
                 if (!structure.units.length) { this.callbacks.showToast?.('当前图书无可导出内容'); return; }
                 this.selectionBook = book;
-                e.chapterExportList.replaceChildren();
-                structure.units.forEach(unit => {
-                    const label = document.createElement('label'); label.className = 'chapter-export-item';
-                    const input = document.createElement('input'); input.type = 'checkbox'; input.value = unit.id;
-                    const text = document.createElement('span'); text.textContent = unit.title;
-                    label.append(input, text); e.chapterExportList.append(label);
-                });
+                renderChapterChoices(e.chapterExportList, structure.units);
                 e.chapterExportList.scrollTop = 0;
             }
         }
