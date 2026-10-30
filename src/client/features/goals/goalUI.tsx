@@ -3,8 +3,10 @@ import type { Annotation } from '../../domain/annotation.js';
 import type { GoalLibraryState, GoalDraft } from '../../domain/goal.js';
 import { areaGoals } from '../../domain/goalLifecycle.js';
 import { Button } from '../../components/ui/button.js';
+import { ActionIcon } from '../../components/ui/action-icon.js';
 import { Textarea } from '../../components/ui/input.js';
 import { renderSurface } from '../../components/ui/renderSurface.js';
+import { countLabel } from '../../domain/format.js';
 
 export interface GoalView {
     state: GoalLibraryState; selected: string | null; allGoals: boolean;
@@ -52,45 +54,46 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
         if (view.edit && (event.target as Element).closest('button')) event.preventDefault();
     }}>
         <div className="goal-header">
-            <nav className="goal-navigation" aria-label="Goal 导航">
-                <Button id="goal-home-nav" className="goal-icon" aria-label="Home" disabled={view.disabled || view.allGoals} onClick={actions.home}><i className="ri-home-4-line" /></Button>
-                <Button id="goal-up" className="goal-icon" aria-label="Up one level" disabled={view.disabled || view.allGoals} onClick={actions.up}>↑</Button>
+            <nav className="goal-navigation" aria-label="Goal navigation">
+                <Button id="goal-home-nav" size="icon-lg" className="goal-icon" aria-label="Home" title="Home" aria-current={view.allGoals ? 'page' : undefined} disabled={view.disabled || view.allGoals} onClick={actions.home}><ActionIcon name={view.allGoals ? 'home-filled' : 'home'} /></Button>
+                <Button id="goal-up" size="icon-lg" className="goal-icon" aria-label="Up one level" title="Up one level" disabled={view.disabled || view.allGoals} onClick={actions.up}><ActionIcon name="up" /></Button>
             </nav>
             <div className="goal-navigation">
-                <Button id="goal-new" className="goal-icon" aria-label="New goal" disabled={view.disabled} onClick={actions.create}>＋</Button>
-                {!view.fullPage && <Button id="goal-expand" className="goal-icon" aria-label="Expand goals" onClick={actions.expand}>⤢</Button>}
+                <Button id="goal-new" size="icon-lg" className="goal-icon" aria-label="New goal" title="New goal" disabled={view.disabled} onClick={actions.create}><ActionIcon name="plus" /></Button>
+                {!view.fullPage && <Button id="goal-expand" size="icon-lg" className="goal-icon" aria-label="Expand goals" title="Open full goal workspace" onClick={actions.expand}><ActionIcon name="expand" /></Button>}
             </div>
         </div>
         <div className="goal-content" id="goal-content">
             {!view.allGoals && goal && <div className="goal-current">
                 <div className="goal-title-row">
-                    {view.edit?.mode !== 'edit' && <Button className="goal-title" disabled={view.disabled} onClick={() => actions.edit('edit')}>{goal.text}</Button>}
-                    <Button className="goal-icon" aria-label={`Actions for ${goal.text}`} aria-haspopup="menu" disabled={view.disabled}
-                        onClick={event => actions.menu?.(goal.id, event.currentTarget)}>⋯</Button>
+                    {view.edit?.mode !== 'edit' && <Button className="goal-title" disabled={view.disabled} onClick={() => actions.select(goal.id)}>{goal.text}</Button>}
+                    <Button size="icon-lg" className="goal-icon goal-edit" aria-label="Edit goal" title="Edit goal" disabled={view.disabled} onClick={() => actions.edit('edit')}><ActionIcon name="edit" /></Button>
+                    <Button size="icon-lg" className="goal-icon" aria-label={`Actions for ${goal.text}`} title="Goal actions" aria-haspopup="menu" disabled={view.disabled}
+                        onClick={event => actions.menu?.(goal.id, event.currentTarget)}><ActionIcon name="more" /></Button>
                 </div>
-                {goal.completedAt && <span className="goal-completion">✓ 已完成</span>}
+                {goal.completedAt && <span className="goal-completion">✓ Completed</span>}
             </div>}
             {view.edit && <GoalEditor key={`${view.edit.mode}:${view.edit.draft.id}`} view={view} ui={ui} />}
             <div className="goal-children">{children.map(child => <div className="goal-row" key={child.id}>
                 <Button className="goal-child" disabled={view.disabled} onClick={() => actions.select(child.id)}>{child.text}</Button>
                 {child.completedAt && <span className="goal-completion">✓</span>}
-                <Button className="goal-icon" aria-label={`Actions for ${child.text}`} aria-haspopup="menu" disabled={view.disabled}
-                    onClick={event => actions.menu?.(child.id, event.currentTarget)}>⋯</Button>
+                <Button size="icon-lg" className="goal-icon" aria-label={`Actions for ${child.text}`} title="Goal actions" aria-haspopup="menu" disabled={view.disabled}
+                    onClick={event => actions.menu?.(child.id, event.currentTarget)}><ActionIcon name="more" /></Button>
             </div>)}</div>
-            {!children.length && !goal && !view.edit && <p className="goal-empty">{view.state.goals.length ? '当前层级暂无进行中的 Goal。' : '从一个想弄明白的问题开始。'}</p>}
+            {!children.length && !goal && !view.edit && <p className="goal-empty">{view.state.goals.length ? "No ongoing goals at this level." : "Start with a question you want to understand."}</p>}
             {!view.allGoals && goal && materials.length > 0 && <>
-                <Button className="goal-items-toggle" aria-expanded={view.itemsOpen} aria-controls="goal-linked-items" onClick={actions.items}>{materials.length} 条关联材料 <span>{view.itemsOpen ? '⌃' : '⌄'}</span></Button>
+                <Button className="goal-items-toggle" aria-expanded={view.itemsOpen} aria-controls="goal-linked-items" onClick={actions.items}>{countLabel(materials.length, 'linked item')} <span>{view.itemsOpen ? '⌃' : '⌄'}</span></Button>
                 {view.itemsOpen && <div className="goal-items" id="goal-linked-items">{materials.map(link => {
                     const note = annotations.get(link.annotationId);
                     return <div className="goal-item" key={`${link.bookId}:${link.annotationId}`}>
                         <i className={note?.kind === 'note' ? 'ri-sticky-note-line' : 'ri-mark-pen-line'} aria-hidden="true" />
                         <div className="goal-item-detail">
                             <Button className="goal-item-text" data-annotation-id={link.annotationId} disabled={!note} onClick={() => actions.jump(link.annotationId)}>
-                                {note ? note.comment || note.quote : view.materialStatus === 'loading' ? '载入中…' : '来源不可用'}
+                                {note ? note.comment || note.quote : view.materialStatus === 'loading' ? "Loading…" : "Source unavailable"}
                             </Button>
                             {(view.fullPage || link.bookId !== view.sourceBook) && <div className="goal-item-source">{view.titles.get(link.bookId) || link.bookId}</div>}
                         </div>
-                        <Button className="goal-icon" aria-label="Unlink" disabled={view.disabled} onClick={() => actions.unlink(link.annotationId)}>×</Button>
+                        <Button size="icon-lg" className="goal-icon" aria-label="Unlink" title="Unlink" disabled={view.disabled} onClick={() => actions.unlink(link.annotationId)}><ActionIcon name="close" /></Button>
                     </div>;
                 })}</div>}
             </>}

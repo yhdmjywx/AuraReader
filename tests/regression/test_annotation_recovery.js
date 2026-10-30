@@ -25,7 +25,7 @@ const { clientStorage } = require('../helpers/sqlite');
         });
         current.updateInlineNote('existing', '最新内容\n保留换行\n'); await current.finishInlineEdit();
         assert.equal(server.read('annotations', 'existing').comment, '旧内容');
-        assert.match(notices.at(-1), /已保留在本机缓存/);
+        assert.match(notices.at(-1), /preserved in the local cache/);
         const reopened = controller();
         assert.equal((await reopened.loadNotesForBook('book-a'))[0].comment, '最新内容\n保留换行\n');
         assert.equal((await repo.getNotesForBooks(['book-a']))[0].comment, '最新内容\n保留换行\n');
@@ -77,7 +77,7 @@ const { clientStorage } = require('../helpers/sqlite');
         server.configureClient((url, opts) => url.endsWith('/notes/save') ? Promise.reject(new Error('offline')) : fetch(url, opts));
         const denied = controller(); const draft = denied.createNote({ quote: '原文' });
         denied.updateInlineNote(draft.id, '两处存储都失败'); await denied.finishInlineEdit();
-        assert.match(notices.at(-1), /尚未可靠保存/);
+        assert.match(notices.at(-1), /not confirmed saved/);
         console.log('✅ SQLite 自动保存恢复：真实文件、失败更新／新增／删除、备份、丢失响应后的连续输入、旧缓存隔离与存储拒绝通过');
     } finally {
         console.warn = warn; console.error = logError;

@@ -11,7 +11,7 @@ export interface LibraryDraft { draft: GoalDraft; legacyBookId?: string }
 function read<T>(key: string, fallback: T): T {
     const value = localStorage.getItem(key);
     if (value === null) return fallback;
-    try { return JSON.parse(value) as T; } catch { throw new Error('Goal 恢复缓冲损坏，请保留站点数据'); }
+    try { return JSON.parse(value) as T; } catch { throw new Error("The goal recovery buffer is damaged. Preserve site data."); }
 }
 export function pendingBookIntents(): GoalBookLink[] {
     const links = read<GoalBookLink[]>(BOOK_INTENTS, []);
@@ -28,13 +28,13 @@ export function acknowledgeBookIntent(link: GoalBookLink) {
 }
 export function pendingLibrary(): Entry[] {
     const entries = read<Entry[]>(PENDING, []);
-    if (!Array.isArray(entries) || entries.some(e => !e.version || !Number.isSafeInteger(e.expected) || !e.state || !Array.isArray(e.state.goals) || !Array.isArray(e.state.links))) throw new Error('无效 Goal 恢复缓冲');
+    if (!Array.isArray(entries) || entries.some(e => !e.version || !Number.isSafeInteger(e.expected) || !e.state || !Array.isArray(e.state.goals) || !Array.isArray(e.state.links))) throw new Error("Invalid goal recovery buffer.");
     return entries;
 }
 function writePending(entries: Entry[]) { if (entries.length) localStorage.setItem(PENDING, JSON.stringify(entries)); else localStorage.removeItem(PENDING); }
 export function libraryDrafts(): LibraryDraft[] {
     const drafts = read<LibraryDraft[]>(DRAFTS, []);
-    if (!Array.isArray(drafts) || drafts.some(e => !e.draft?.id || typeof e.draft.text !== 'string')) throw new Error('无效 Goal 草稿');
+    if (!Array.isArray(drafts) || drafts.some(e => !e.draft?.id || typeof e.draft.text !== 'string')) throw new Error("Invalid goal draft.");
     return drafts;
 }
 export function storeLibraryDraft(draft: LibraryDraft) {
@@ -90,7 +90,7 @@ async function recoverLegacy() {
     for (const key of keys.filter(k => k.startsWith('aura_goals_draft_'))) {
         const bookId = key.slice('aura_goals_draft_'.length), entry = readGoalDraft(bookId); if (!entry) continue;
         const version = await bookVersion(bookId);
-        if (version.generation !== entry.generation) throw new Error('旧 Goal 草稿来源已变化，恢复内容已保留');
+        if (version.generation !== entry.generation) throw new Error("The legacy goal draft source has changed. Recovery content is preserved.");
         const draft = { ...entry.draft, id: await legacyId(bookId, entry.draft.id), parentId: entry.draft.parentId ? await legacyId(bookId, entry.draft.parentId) : null,
             origin: { ...(entry.draft.origin || { sourcePage: null, sectionId: '', chapter: '' }), bookId } };
         if (!libraryDrafts().some(e => e.draft.id === draft.id)) storeLibraryDraft({ draft, legacyBookId: bookId });
@@ -116,11 +116,11 @@ export async function loadGoalMaterials(state: GoalLibraryState) {
     return { annotations: notes.flatMap(n => n.deleted ? [] : [n.value]), titles: new Map(books.filter(b => !b.deleted).map(b => [b.id, b.deleted ? '' : b.value.title])) };
 }
 export function assertNoLibraryRecovery() {
-    if (pendingLibrary().length || libraryDrafts().length || pendingBookIntents().length) throw new Error('仍有未确认保存的 Goal，窗口已保留');
+    if (pendingLibrary().length || libraryDrafts().length || pendingBookIntents().length) throw new Error("Some goals are not confirmed saved. This window remains open.");
 }
 export async function goalGraphsForBooks(bookIds: string[]): Promise<Map<string, GoalGraphBackup>> {
     const loaded = await loadGoalLibrary(); if (loaded.error) throw loaded.error;
-    if (loaded.drafts.length || pendingBookIntents().length) throw new Error('请先完成 Goal 草稿或待确认书籍关联再导出');
+    if (loaded.drafts.length || pendingBookIntents().length) throw new Error("Finish goal drafts and pending book links before exporting.");
     const state = loaded.state, result = new Map<string, GoalGraphBackup>();
     for (const bookId of bookIds) {
         const seeds = new Set([...state.links.filter(l => l.bookId === bookId).map(l => l.goalId), ...(state.bookLinks || []).filter(l => l.bookId === bookId).map(l => l.goalId), ...state.goals.filter(g => g.origin?.bookId === bookId).map(g => g.id)]);

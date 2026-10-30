@@ -15,21 +15,21 @@ function canonical(value) {
 }
 const digest = value => createHash('sha256').update(canonical(value)).digest('hex');
 function id(value, name = 'id') {
-    if (typeof value !== 'string' || !value || value.length > 4096) throw new StorageError(`无效的 ${name}`);
+    if (typeof value !== 'string' || !value || value.length > 4096) throw new StorageError(`Invalid ${name}`);
     return value;
 }
 function bookRecord(book) {
-    if (!book || typeof book !== 'object' || Array.isArray(book)) throw new StorageError('无效书籍');
+    if (!book || typeof book !== 'object' || Array.isArray(book)) throw new StorageError("Invalid book.");
     id(book.id);
-    if (!Array.isArray(book.pages) || !book.pages.every(p => typeof p === 'string')) throw new StorageError('书籍缺少完整章节 HTML');
+    if (!Array.isArray(book.pages) || !book.pages.every(p => typeof p === 'string')) throw new StorageError("The book is missing complete chapter HTML.");
     return book;
 }
 function noteRecord(note) {
-    if (!note || typeof note !== 'object' || Array.isArray(note)) throw new StorageError('无效标注');
+    if (!note || typeof note !== 'object' || Array.isArray(note)) throw new StorageError("Invalid annotation.");
     id(note.id); id(note.bookId, 'bookId');
-    if (note.kind != null && !['note', 'highlight'].includes(note.kind)) throw new StorageError('无效标注类型');
-    if (note.quote != null && typeof note.quote !== 'string') throw new StorageError('无效引用');
-    if (note.comment != null && typeof note.comment !== 'string') throw new StorageError('无效笔记正文');
+    if (note.kind != null && !['note', 'highlight'].includes(note.kind)) throw new StorageError("Invalid annotation type.");
+    if (note.quote != null && typeof note.quote !== 'string') throw new StorageError("Invalid quote.");
+    if (note.comment != null && typeof note.comment !== 'string') throw new StorageError("Invalid note text.");
     return note;
 }
 
@@ -37,8 +37,8 @@ function goalRecord(value) {
     return validateGoalState(value, () => true, message => { throw new StorageError(message, 409); });
 }
 function goalBackupRecord(value) {
-    if (!value || typeof value !== 'object') throw new StorageError('无效 Goal 备份');
-    if (!Array.isArray(value.goals)) throw new StorageError('无效 Goal 备份');
+    if (!value || typeof value !== 'object') throw new StorageError("Invalid goal backup.");
+    if (!Array.isArray(value.goals)) throw new StorageError("Invalid goal backup.");
     // A partial import can reference a parent already in the destination.
     // Validate node fields here; validate the merged tree inside the transaction.
     goalRecord({ ...value, goals: value.goals.map(goal => ({ ...goal, parentId: null })), links: value.links === undefined ? [] : value.links });
@@ -51,11 +51,11 @@ function createDataStore(directory) {
     const filename = path.join(root, 'aurareader.sqlite');
     const installed = path.join(root, 'storage-installed.json');
     if (fs.existsSync(installed) && (!fs.existsSync(filename) || fs.statSync(filename).size === 0)) {
-        throw new StorageError('SQLite 文件丢失或为空；请保留 data 目录并从已验证备份恢复，禁止自动新建空书库', 500);
+        throw new StorageError("The SQLite file is missing or empty. Preserve the data directory and restore a verified backup. An empty library will not be created automatically.", 500);
     }
     const db = new DatabaseSync(filename, { timeout: 5000 });
     if (db.prepare('PRAGMA user_version').get().user_version > 4) {
-        db.close(); throw new StorageError('数据库版本高于本应用，禁止降级覆盖', 409);
+        db.close(); throw new StorageError("The database version is newer than this application. Downgrade overwrite is not allowed.", 409);
     }
     try { db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
         BEGIN IMMEDIATE;
@@ -88,7 +88,7 @@ function createDataStore(directory) {
         return transaction(() => {
             const prior = one('SELECT * FROM operations WHERE id=?', command.opId);
             if (prior) {
-                if (prior.hash !== hash) throw new StorageError('操作 ID 被用于不同内容', 409);
+                if (prior.hash !== hash) throw new StorageError("The operation ID was reused for different content.", 409);
                 return JSON.parse(prior.result);
             }
             const result = apply();
@@ -97,12 +97,12 @@ function createDataStore(directory) {
         });
     }
     function expected(row, revision) {
-        if (!Number.isSafeInteger(revision) || revision < 0) throw new StorageError('缺少有效保存版本');
-        if ((row?.revision || 0) !== revision) throw new StorageError('数据已被其他操作修改，请重新载入后处理', 409);
+        if (!Number.isSafeInteger(revision) || revision < 0) throw new StorageError("A valid save version is required.");
+        if ((row?.revision || 0) !== revision) throw new StorageError("Data was modified by another operation. Reload before continuing.", 409);
     }
     function activeBook(bookId, generation) {
         const row = one('SELECT * FROM books WHERE id=?', id(bookId, 'bookId'));
-        if (!row || row.deleted || row.generation !== generation) throw new StorageError('书籍已删除或已被重新导入', 409);
+        if (!row || row.deleted || row.generation !== generation) throw new StorageError("The book was deleted or reimported.", 409);
         return row;
     }
     function putBook(book, revision) {
@@ -116,7 +116,7 @@ function createDataStore(directory) {
     function putNote(note, revision, generation) {
         noteRecord(note); activeBook(note.bookId, generation);
         const row = one('SELECT * FROM annotations WHERE id=?', note.id);
-        if (row && row.book_id !== note.bookId) throw new StorageError('标注不能改变所属书籍', 409);
+        if (row && row.book_id !== note.bookId) throw new StorageError("An annotation cannot change its book.", 409);
         expected(row, revision);
         run(`INSERT INTO annotations VALUES(?,?,?,?,0) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload, revision=excluded.revision, deleted=0`, note.id, note.bookId, JSON.stringify(note), revision + 1);
         return { revision: revision + 1 };
@@ -152,13 +152,13 @@ function createDataStore(directory) {
         filename, root, db, transaction, one, all, run,
         books() { return all('SELECT * FROM books ORDER BY id').map(r => ({ id: r.id, revision: r.revision, generation: r.generation, deleted: !!r.deleted, value: r.deleted ? null : JSON.parse(r.payload) })); },
         notes(bookIds = []) {
-            if (!Array.isArray(bookIds)) throw new StorageError('无效的书籍列表');
+            if (!Array.isArray(bookIds)) throw new StorageError("Invalid book list.");
             bookIds.forEach(b => id(b));
             const rows = bookIds.length ? all(`SELECT * FROM annotations WHERE book_id IN (${bookIds.map(() => '?').join(',')}) ORDER BY id`, ...bookIds) : all('SELECT * FROM annotations ORDER BY id');
             return rows.map(r => ({ id: r.id, bookId: r.book_id, revision: r.revision, deleted: !!r.deleted, value: r.deleted ? null : JSON.parse(r.payload) }));
         },
         goals(bookIds = []) {
-            if (!Array.isArray(bookIds)) throw new StorageError('无效书籍列表');
+            if (!Array.isArray(bookIds)) throw new StorageError("Invalid book list.");
             bookIds.forEach(b => id(b));
             const ids = bookIds.length ? bookIds : all('SELECT book_id FROM goal_states').map(row => row.book_id);
             return ids.map(goalRow).filter(Boolean);
@@ -174,7 +174,7 @@ function createDataStore(directory) {
             return mutate(c, () => {
                 activeBook(c.bookId, c.generation); id(c.id);
                 const row = one('SELECT * FROM annotations WHERE id=?', c.id); expected(row, c.expected);
-                if (row && row.book_id !== c.bookId) throw new StorageError('标注不属于这本书', 409);
+                if (row && row.book_id !== c.bookId) throw new StorageError("The annotation does not belong to this book.", 409);
                 run(`INSERT INTO annotations VALUES(?,?,NULL,?,1) ON CONFLICT(id) DO UPDATE SET payload=NULL, revision=excluded.revision, deleted=1`, c.id, c.bookId, c.expected + 1);
                 const goalState = pruneGoalLinks(c.bookId, c.id);
                 const goalLibrary = library.prune(c.bookId, c.id);
@@ -198,37 +198,37 @@ function createDataStore(directory) {
         },
         restore(c) {
             return mutate(c, () => {
-                if (!Array.isArray(c.books) || !Array.isArray(c.notes)) throw new StorageError('备份必须包含书籍和标注数组');
+                if (!Array.isArray(c.books) || !Array.isArray(c.notes)) throw new StorageError("The backup must contain book and annotation arrays.");
                 const bookIds = new Set(); const noteIds = new Set();
                 for (const book of c.books) {
-                    bookRecord(book); if (bookIds.has(book.id)) throw new StorageError('备份包含重复书籍 ID', 409); bookIds.add(book.id);
+                    bookRecord(book); if (bookIds.has(book.id)) throw new StorageError("The backup contains duplicate book IDs.", 409); bookIds.add(book.id);
                     const row = one('SELECT * FROM books WHERE id=?', book.id);
                     putBook(book, row?.revision || 0);
                 }
                 for (const note of c.notes) {
-                    noteRecord(note); if (noteIds.has(note.id)) throw new StorageError('备份包含重复标注 ID', 409); noteIds.add(note.id);
+                    noteRecord(note); if (noteIds.has(note.id)) throw new StorageError("The backup contains duplicate annotation IDs.", 409); noteIds.add(note.id);
                     const book = one('SELECT * FROM books WHERE id=?', note.bookId);
-                    if (!book || book.deleted) throw new StorageError('备份标注缺少关联书籍', 409);
+                    if (!book || book.deleted) throw new StorageError("A backup annotation has no associated book.", 409);
                     const row = one('SELECT * FROM annotations WHERE id=?', note.id);
                     putNote(note, row?.revision || 0, book.generation);
                 }
                 if (c.goalStates !== undefined) {
-                    if (!Array.isArray(c.goalStates)) throw new StorageError('无效 Goal 备份');
+                    if (!Array.isArray(c.goalStates)) throw new StorageError("Invalid goal backup.");
                     const seen = new Set();
                     for (const incoming of c.goalStates) {
                         if (!incoming || !bookIds.has(incoming.bookId) || seen.has(incoming.bookId) || !Array.isArray(incoming.goals)
-                            || (incoming.links !== undefined && !Array.isArray(incoming.links))) throw new StorageError('无效或重复 Goal 备份');
+                            || (incoming.links !== undefined && !Array.isArray(incoming.links))) throw new StorageError("Invalid or duplicate goal backup.");
                         seen.add(incoming.bookId);
                         const current = goalRow(incoming.bookId);
                         const state = current && !current.deleted ? current.value : { bookId: incoming.bookId, goals: [], links: [] };
                         const ids = new Set();
                         for (const goal of incoming.goals) {
-                            if (!goal || ids.has(goal.id)) throw new StorageError('重复 Goal 节点', 409);
+                            if (!goal || ids.has(goal.id)) throw new StorageError("Duplicate goal node.", 409);
                             ids.add(goal.id);
                         }
                         state.goals = state.goals.filter(goal => !ids.has(goal.id)).concat(incoming.goals);
                         if (incoming.links !== undefined) {
-                            if (incoming.links.some(link => !ids.has(link?.goalId))) throw new StorageError('备份关联不属于备份节点', 409);
+                            if (incoming.links.some(link => !ids.has(link?.goalId))) throw new StorageError("The backup link does not belong to a backup node.", 409);
                             state.links = state.links.filter(link => !ids.has(link.goalId)).concat(incoming.links);
                         }
                         const book = one('SELECT * FROM books WHERE id=?', incoming.bookId);
@@ -246,10 +246,10 @@ function createDataStore(directory) {
         },
         check() {
             const integrity = all('PRAGMA integrity_check'); const foreignKeys = all('PRAGMA foreign_key_check');
-            if (integrity.some(r => r.integrity_check !== 'ok') || foreignKeys.length) throw new StorageError('数据库完整性检查失败', 500);
+            if (integrity.some(r => r.integrity_check !== 'ok') || foreignKeys.length) throw new StorageError("Database integrity check failed.", 500);
             for (const record of store.goals()) if (!record.deleted) {
                 const book = one('SELECT deleted FROM books WHERE id=?', record.bookId);
-                if (!book || book.deleted) throw new StorageError('Goal 缺少有效书籍', 409);
+                if (!book || book.deleted) throw new StorageError("The goal has no valid book.", 409);
                 validateGoals(record.value);
             }
             library.validate(library.read().value);

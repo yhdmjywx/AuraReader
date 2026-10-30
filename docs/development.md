@@ -2,6 +2,8 @@
 
 日常使用入口见 [README](../README.md#get-started)；本页保留完整运行、构建与验收说明。阶段记录描述当时的源码／安装包，不代表最新源码功能已全部进入候选安装包。
 
+2026-10-30：当前源码的产品界面与应用提示已统一英文，首次创建书库按钮为 `Create local library`；本文中文功能名称仍用于说明。书籍与用户内容保留原语言。实现范围、截图与验证见 [英文统一记录](english-ui-verification-2026-10-30.md)。本次未生成新版安装包。
+
 ## 安装与启动
 
 Windows x64 桌面候选版使用 `AuraReader-Setup-1.0.0-x64.exe` 安装，安装后从桌面或开始菜单的 AuraReader 快捷方式启动。应用自带 Electron、Node.js 与 SQLite，日常使用无需另装 Node.js、打开浏览器或运行终端。首次启动点击“创建独立桌面书库”，随后导入 EPUB/TXT。候选安装包和 SHA256 校验文件由下方 `npm run dist:win` 生成在 `release/`，未发布到在线下载服务。

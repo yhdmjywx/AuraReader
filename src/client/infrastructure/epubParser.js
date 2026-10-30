@@ -62,7 +62,7 @@ export async function processChapterImages(zip, chapterPath, chapDoc) {
                 if (img.hasAttribute("xlink:href")) img.setAttribute("xlink:href", dataUrl);
                 if (img.hasAttribute("href")) img.setAttribute("href", dataUrl);
             } catch (e) {
-                console.warn("未成功转换图片:", rawSrc, e);
+                console.warn("Could not convert image:", rawSrc, e);
             }
         }
     }
@@ -331,7 +331,7 @@ export async function extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap) {
                 hrefToPageMap
             });
         } catch (e) {
-            console.warn('NCX 目录解析失败，将降级处理:', e);
+            console.warn("Could not parse NCX contents. Using fallback:", e);
         }
     }
 
@@ -345,7 +345,7 @@ export async function extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap) {
                 hrefToPageMap
             });
         } catch (e) {
-            console.warn('NAV 目录解析错误:', e);
+            console.warn("Could not parse NAV contents:", e);
         }
     }
 
@@ -355,25 +355,25 @@ export async function extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap) {
 /** @returns {Promise<import('../domain/book.js').Book>} */
 export async function parseEpub(arrayBuffer, fileName, jszipLib) {
     if (!jszipLib) {
-        throw new Error("JSZip 解压库未加载，请刷新页面后重试");
+        throw new Error("JSZip is not loaded. Reload and try again.");
     }
 
     const zip = await jszipLib.loadAsync(arrayBuffer);
 
     // 1. Read container.xml to locate rootfile full-path
     const containerFile = findZipFile(zip, "META-INF/container.xml");
-    if (!containerFile) throw new Error("无效的 EPUB 格式：未找到 container.xml");
+    if (!containerFile) throw new Error("Invalid EPUB: container.xml not found.");
 
     const containerXmlText = await containerFile.async("string");
     const parser = new DOMParser();
     const containerDoc = parser.parseFromString(containerXmlText, "text/xml");
     const rootfilePath = containerDoc.querySelector("rootfile")?.getAttribute("full-path");
 
-    if (!rootfilePath) throw new Error("无法获取 EPUB 资源元数据路径 (rootfile)");
+    if (!rootfilePath) throw new Error("Could not locate EPUB package metadata (rootfile).");
 
     // 2. Read OPF file
     const opfFile = findZipFile(zip, rootfilePath);
-    if (!opfFile) throw new Error("未找到 OPF 配置文件: " + rootfilePath);
+    if (!opfFile) throw new Error("OPF package file not found: " + rootfilePath);
 
     const opfXmlText = await opfFile.async("string");
     const opfDoc = parser.parseFromString(opfXmlText, "text/xml");
@@ -423,7 +423,7 @@ export async function parseEpub(arrayBuffer, fileName, jszipLib) {
         }
     }
 
-    if (pages.length === 0) throw new Error("未能解析提取出有效的章节正文文本");
+    if (pages.length === 0) throw new Error("Could not extract valid chapter text.");
 
     // 4. Extract TOC
     let toc = await extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap);
@@ -433,7 +433,7 @@ export async function parseEpub(arrayBuffer, fileName, jszipLib) {
         pages.forEach((pageHtml, idx) => {
             const pDoc = parser.parseFromString(pageHtml, "text/html");
             const heading = pDoc.querySelector("h1, h2, h3, title");
-            const title = heading?.textContent.trim() || `第 ${idx + 1} 节`;
+            const title = heading?.textContent.trim() || `Section ${idx + 1}`;
             const tag = heading ? heading.tagName.toLowerCase() : '';
             const level = tag === 'h2' ? 1 : tag === 'h3' ? 2 : 0;
             toc.push({ title, page: idx + 1, level });
@@ -466,7 +466,7 @@ export function parseTxt(text, fileName) {
         id: bookId,
         title: fileName,
         format: fileName.split('.').pop().toUpperCase(),
-        toc: [{ title: '正文', page: 1 }],
+        toc: [{ title: "Text", page: 1 }],
         pages: [formattedHtml],
         updatedAt: new Date().toISOString()
     };

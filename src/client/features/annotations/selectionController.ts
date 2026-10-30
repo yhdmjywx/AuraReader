@@ -374,7 +374,7 @@ export class SelectionController {
             if (ids.length !== 1 || elements.btnAnnotationGoal?.disabled) return;
             const result = this.callbacks.onLinkGoal?.(ids[0]!);
             this.clearAnnotationContext();
-            Promise.resolve(result).catch(error => console.error('Goal 归入失败', error));
+            Promise.resolve(result).catch(error => console.error("Could not add to goal", error));
         }, { signal });
         if (elements.btnHlRemove) {
             elements.btnHlRemove.addEventListener('click', (e) => {

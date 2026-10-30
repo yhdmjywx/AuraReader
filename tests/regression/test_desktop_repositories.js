@@ -62,7 +62,7 @@ const { createDesktopStorage } = require('../../src/desktop/storage.cjs');
         const failed = controller.createNote({ quote: '失败恢复' });
         controller.updateInlineNote(failed.id, '不可丢失');
         await controller.finishInlineEdit();
-        await assert.rejects(controller.assertInlineWritesSaved(), /保存失败/);
+        await assert.rejects(controller.assertInlineWritesSaved(), /could not be saved/);
         assert.ok(localStorage.getItem('aura_notes_pending_' + note.bookId));
         failures = false;
         await notes.loadNotesForBook(note.bookId);
@@ -76,7 +76,7 @@ const { createDesktopStorage } = require('../../src/desktop/storage.cjs');
         const unsafe = unbuffered.createNote({ quote: '无恢复权限' });
         unbuffered.updateInlineNote(unsafe.id, '仅在内存中，不可退出');
         await unbuffered.finishInlineEdit();
-        await assert.rejects(unbuffered.assertInlineWritesSaved(), /保存失败/);
+        await assert.rejects(unbuffered.assertInlineWritesSaved(), /could not be saved/);
         globalThis.localStorage = durableStorage;
         console.log('PASS: desktop repositories without fetch, lost-response exact replay, error details, recovery buffers, fast inline inputs and failed-close save guard');
     } finally {

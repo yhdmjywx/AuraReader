@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
-if (nodeMajor < 24 || (nodeMajor === 24 && nodeMinor < 15)) throw new Error('AuraReader 需要 Node.js >= 24.15.0');
+if (nodeMajor < 24 || (nodeMajor === 24 && nodeMinor < 15)) throw new Error("AuraReader requires Node.js >= 24.15.0.");
 const { createDataStore } = require('./dataStore');
 const { createStorageApi } = require('./storageApi');
 const { createFontStore, listSystemFonts, MAX_FONT_BYTES } = require('./fontStore');
@@ -113,7 +113,7 @@ function handleApiRequest(req, res, pathname, parsedUrl) {
     if (pathname.startsWith('/api/fonts')) {
         handleFontRequest(req, res, pathname, parsedUrl).catch(error => {
             if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ error: '字体资源暂时不可用' }));
+            res.end(JSON.stringify({ error: "Font resources are temporarily unavailable." }));
             console.error('Font API:', error.message);
         });
         return;
@@ -126,7 +126,7 @@ function handleApiRequest(req, res, pathname, parsedUrl) {
     }
 
     res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: false, error: '未知 API 路径' }));
+    res.end(JSON.stringify({ success: false, error: "Unknown API path." }));
 }
 
 async function handleFontRequest(req, res, pathname, parsedUrl) {
@@ -138,7 +138,7 @@ async function handleFontRequest(req, res, pathname, parsedUrl) {
     };
     // Other websites must not enumerate this PC's fonts or write font files.
     if (origin && origin !== `http://${req.headers.host}` && origin !== `https://${req.headers.host}`) {
-        return reply(403, { error: '只允许从阅读器内访问字体资源' });
+        return reply(403, { error: "Font resources may only be accessed from the reader." });
     }
     if (req.method === 'GET' && pathname === '/api/fonts') return reply(200, { fonts: await fontStore.list() });
     if (req.method === 'GET' && pathname === '/api/fonts/system') {
@@ -151,12 +151,12 @@ async function handleFontRequest(req, res, pathname, parsedUrl) {
     }
     if (req.method === 'POST' && pathname === '/api/fonts/import') {
         const filename = parsedUrl.searchParams.get('name') || '';
-        if (!/\.(ttf|otf|woff2)$/i.test(filename)) return reply(400, { error: '请选择 TTF、OTF 或 WOFF2 文件' });
+        if (!/\.(ttf|otf|woff2)$/i.test(filename)) return reply(400, { error: "Choose a TTF, OTF, or WOFF2 file." });
         let length = 0;
         const chunks = [];
         for await (const chunk of req) {
             length += chunk.length;
-            if (length > MAX_FONT_BYTES) return reply(413, { error: '字体文件超过 64MB' });
+            if (length > MAX_FONT_BYTES) return reply(413, { error: "The font file exceeds 64 MB." });
             chunks.push(chunk);
         }
         try { return reply(200, { font: await fontStore.import(Buffer.concat(chunks), filename) }); }
@@ -164,21 +164,21 @@ async function handleFontRequest(req, res, pathname, parsedUrl) {
     }
     if (req.method === 'GET' && pathname.startsWith('/api/fonts/files/')) {
         const file = fontStore.file(pathname.slice('/api/fonts/files/'.length));
-        if (!file) return reply(404, { error: '字体不存在' });
+        if (!file) return reply(404, { error: "Font not found." });
         try {
             const bytes = await fs.promises.readFile(file.path);
             res.writeHead(200, { 'Content-Type': file.mime, 'Content-Length': bytes.length, 'Cache-Control': 'no-cache' });
             res.end(bytes);
-        } catch (_) { reply(404, { error: '字体文件已缺失' }); }
+        } catch (_) { reply(404, { error: "The font file is missing." }); }
         return;
     }
-    reply(404, { error: '未知字体请求' });
+    reply(404, { error: "Unknown font request." });
 }
 
 if (require.main === module) createServer().listen(PORT, '127.0.0.1', () => {
     console.log(`==================================================`);
     console.log(`🚀 AuraReader Workstation Node.js Web Server Live!`);
-    console.log(`🌐 访问地址: http://localhost:${PORT}`);
+    console.log(`🌐 Open: http://localhost:${PORT}`);
     console.log(`==================================================`);
 });
 module.exports = { createServer };

@@ -1,6 +1,7 @@
 import type { Annotation } from '../../domain/annotation.js';
 import type { Goal, GoalDraft, GoalLibraryState, GoalSourceLink } from '../../domain/goal.js';
 import type { AppElements } from '../../app/elements.js';
+import type { ShowToast } from '../../app/contracts.js';
 import type { ReadingLocation } from '../../domain/book.js';
 import { addGoal, changeGoal, goalOrigin } from '../../domain/goalEngine.js';
 import { normalizeAnnotation } from '../../domain/annotationEngine.js';
@@ -14,7 +15,7 @@ import { GoalActions } from './goalActions.js';
 import { AppNavigation } from '../../app/navigation.js';
 export interface GoalCallbacks {
     getAnnotations(): Annotation[]; getLocation(): ReadingLocation; getMode(): string;
-    showToast(message: string): void; jump(id: string, source?: GoalSourceLink): void | Promise<void>;
+    showToast: ShowToast; jump(id: string, source?: GoalSourceLink): void | Promise<void>;
     finishAnnotations(): Promise<void>; annotationsSaved(): Promise<void>; onEnterGoalPage?(): void;
     onActionsChanged?(): void; onBeforeSidebarResize?(): void; onSurfaceChanged?(): void; chooseBook?(): void;
     openCollection?(area: GoalArea): void;
@@ -45,7 +46,7 @@ export class GoalController {
         navigation.subscribe(() => { this.updateReadingContext(); this.callbacks.onSurfaceChanged?.(); });
         onGoalLibraryChanged(record => {
             if (record.deleted) return;
-            if (this.dirty || pendingLibrary().length) { this.disabled = true; this.fail(Object.assign(new Error('Goal 数据已变化，未保存内容已保留；请重新载入处理冲突'), { status: 409 })); }
+            if (this.dirty || pendingLibrary().length) { this.disabled = true; this.fail(Object.assign(new Error("Goal data has changed. Unsaved content is preserved. Reload to resolve the conflict."), { status: 409 })); }
             else { this.state = record.value; this.ensureSelection(); this.refreshMaterials(); }
             this.render();
         });
@@ -128,8 +129,8 @@ export class GoalController {
         if (this.edit) return;
         for (const item of libraryDrafts()) {
             const existing = this.state.goals.find(g => g.id === item.draft.id);
-            if (existing) { if (existing.text === item.draft.text) { discardLibraryDraft(existing.id); continue; } throw new Error('Goal 恢复草稿与已有内容冲突'); }
-            if (item.draft.parentId && !this.state.goals.some(g => g.id === item.draft.parentId)) throw new Error('Goal 恢复草稿缺少父节点');
+            if (existing) { if (existing.text === item.draft.text) { discardLibraryDraft(existing.id); continue; } throw new Error("The recovered goal draft conflicts with existing content."); }
+            if (item.draft.parentId && !this.state.goals.some(g => g.id === item.draft.parentId)) throw new Error("The recovered goal draft has no parent.");
             this.edit = { mode: item.draft.parentId ? 'child' : 'root', draft: item.draft, lastNonempty: item.draft.text, previousTree: false }; this.allGoals = !item.draft.parentId; if (item.draft.parentId) this.selected = item.draft.parentId; break;
         }
     }
@@ -175,7 +176,7 @@ export class GoalController {
         this.persist({ ...this.state, bookLinks: (this.state.bookLinks || []).filter(l => l.goalId !== goalId || l.bookId !== bookId) });
         await this.flush(); this.render();
     }
-    private fail(error: unknown) { if (this.failure !== error) this.callbacks.showToast(error instanceof Error ? error.message : 'Goal 尚未可靠保存，请保留页面'); this.failure = error; }
+    private fail(error: unknown) { if (this.failure !== error) this.callbacks.showToast(error instanceof Error ? error.message : "Goals are not confirmed saved. Keep this window open.", { kind: 'error' }); this.failure = error; }
     canLink(id: string) { return !this.lifecycleBusy && !this.page && !this.allGoals && this.visible && !this.disabled && goalEditable(this.state, this.selected) && this.callbacks.getAnnotations().some(n => n.id === id); }
     linked(id: string) { return this.state.links.some(l => l.goalId === this.selected && l.annotationId === id); }
     linkAnnotation(id: string): Promise<void> { const task = this.performLink(id); this.linksInFlight.add(task); task.finally(() => this.linksInFlight.delete(task)).catch(() => {}); return task; }
@@ -189,7 +190,7 @@ export class GoalController {
     async refreshMaterials() {
         const request = ++this.materialRequest; this.materialStatus = 'loading'; this.render();
         try { const result = await loadGoalMaterials(this.state); if (request !== this.materialRequest) return; this.materials = result.annotations.map(normalizeAnnotation).filter((n): n is Annotation => !!n); this.titles = result.titles; this.materialStatus = 'ready'; }
-        catch (error) { if (request !== this.materialRequest) return; this.materialStatus = 'error'; this.callbacks.showToast(error instanceof Error ? error.message : 'Goal 来源读取失败'); } this.render();
+        catch (error) { if (request !== this.materialRequest) return; this.materialStatus = 'error'; this.callbacks.showToast(error instanceof Error ? error.message : "Could not load goal sources.", { kind: 'error' }); } this.render();
     }
     updateReadingContext() {
         const e = this.elements;
@@ -233,10 +234,9 @@ export class GoalController {
             const changed = next.goals.filter(g => before.goals.find(old => old.id === g.id) !== g);
             const previous = before.goals.filter(g => changed.some(n => n.id === g.id));
             this.persist(next); const selected = this.selected; this.ensureSelection(); this.render(); await this.flush();
-            if (selected && !this.selected) this.callbacks.showToast(`Current goal ${operation === 'archive' ? 'archived' : 'deleted'}. Your book and annotations are unchanged.`);
             const messages: Record<GoalOperation, string> = { complete: `Completed ${changed.length} goal${changed.length === 1 ? '' : 's'}`, reopen: 'Goal reopened', archive: 'Goal branch archived', unarchive: 'Goal restored from archive', delete: 'Moved to Recently deleted', restore: 'Goal restored', 'restore-root': 'Goal restored to Library', purge: 'Goal permanently deleted' };
             if (['complete', 'reopen', 'archive', 'unarchive'].includes(operation) && changed.length) this.undoChange = { before: previous, after: changed, message: messages[operation] };
-            this.callbacks.showToast(messages[operation]); this.actions.notice(messages[operation]);
+            this.actions.notice(messages[operation] + (selected && !this.selected ? ' Your book and annotations are unchanged.' : ''));
         } finally { this.lifecycleBusy = false; this.render(); }
     }
     async undoLifecycle() {

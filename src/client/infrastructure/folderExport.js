@@ -32,7 +32,7 @@ export async function saveMarkdownFolder(folderName, files, destination) {
 }
 
 saveMarkdownFolder.pick = async () => {
-    if (typeof window.showDirectoryPicker !== 'function') throw new Error('当前浏览器不支持文件夹导出，请使用桌面版或支持文件夹保存的浏览器');
+    if (typeof window.showDirectoryPicker !== 'function') throw new Error("Folder export is unavailable in this browser. Use the desktop app or a browser that supports folder saving.");
     try { return await window.showDirectoryPicker({ mode: 'readwrite', id: 'aurareader-chapters' }); }
     catch (error) { if (error.name === 'AbortError') return null; throw error; }
 };

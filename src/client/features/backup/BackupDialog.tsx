@@ -15,13 +15,13 @@ export function BackupDialog() {
         setOpen(value); if (!value) document.getElementById('backup-select-modal')?.classList.remove('active');
     }}>
         <DialogContent id="backup-select-modal" keepMounted finalFocus={() => document.getElementById('btn-workspace-settings')}>
-            <DialogTitle>选择需要备份的图书</DialogTitle><DialogDescription>每本书生成一个独立文件。</DialogDescription>
-            <Button id="btn-close-backup-modal" className="ui-dialog-close" size="icon" aria-label="关闭备份选择">×</Button>
-            <div className="ui-backup-select-all"><Button id="btn-select-all-backup" size="sm">全选</Button><Button id="btn-deselect-all-backup" size="sm">取消全选</Button></div>
+            <DialogTitle>Select books to back up</DialogTitle><DialogDescription>One file per book.</DialogDescription>
+            <Button id="btn-close-backup-modal" className="ui-dialog-close" size="icon" aria-label="Close backup selection">×</Button>
+            <div className="ui-backup-select-all"><Button id="btn-select-all-backup" size="sm">Select all</Button><Button id="btn-deselect-all-backup" size="sm">Deselect all</Button></div>
             <div id="backup-book-checkbox-list" className="ui-backup-list" />
-            <label className="ui-backup-options"><Input type="checkbox" id="chk-backup-include-notes" defaultChecked />包含所选图书的划线与随笔笔记</label>
-            <div className="ui-dialog-actions"><Button id="btn-cancel-backup-modal">取消</Button>
-                <Button id="btn-confirm-export-backup" variant="default"><i className="ri-download-2-line" aria-hidden="true" />按书分别导出 (.aurabackup)</Button>
+            <label className="ui-backup-options"><Input type="checkbox" id="chk-backup-include-notes" defaultChecked />Include highlights and notes</label>
+            <div className="ui-dialog-actions"><Button id="btn-cancel-backup-modal">Cancel</Button>
+                <Button id="btn-confirm-export-backup" variant="default"><i className="ri-download-2-line" aria-hidden="true" />Export books (.aurabackup)</Button>
             </div>
         </DialogContent>
     </Dialog>;

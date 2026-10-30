@@ -12,12 +12,12 @@ function read<T>(key: string, fallback: T): T {
     const raw = localStorage.getItem(key);
     if (raw === null) return fallback;
     try { return JSON.parse(raw) as T; }
-    catch { throw new Error('Goal 恢复缓冲损坏，请保留页面及站点数据'); }
+    catch { throw new Error("The goal recovery buffer is damaged. Keep this window open and preserve site data."); }
 }
 export function pendingGoals(bookId: string): PendingGoalWrite[] {
     const entries = read<PendingGoalWrite[]>(PENDING + bookId, []);
     if (!Array.isArray(entries) || entries.some(entry => !entry?.state || entry.state.bookId !== bookId
-        || !entry.version || !entry.generation || !Number.isSafeInteger(entry.baseRevision))) throw new Error('无效 Goal 恢复缓冲');
+        || !entry.version || !entry.generation || !Number.isSafeInteger(entry.baseRevision))) throw new Error("Invalid goal recovery buffer.");
     return entries;
 }
 function writePending(bookId: string, entries: PendingGoalWrite[]) {
@@ -35,7 +35,7 @@ export function stageGoals(state: BookGoalState, generation: string, revision: n
 }
 export function attachGoalCommand(bookId: string, version: string, command: SaveGoalsCommand) {
     const entries = pendingGoals(bookId), entry = entries.find(item => item.version === version);
-    if (!entry) throw new Error('Goal 待写内容已改变');
+    if (!entry) throw new Error("Pending goal content has changed.");
     entry.command = command; writePending(bookId, entries);
 }
 export function acknowledgeGoals(bookId: string, version: string, revision: number, state: BookGoalState) {
@@ -48,7 +48,7 @@ export function acknowledgeGoals(bookId: string, version: string, revision: numb
 }
 export function readGoalDraft(bookId: string): RecoverableGoalDraft | null {
     const result = read<RecoverableGoalDraft | null>(DRAFT + bookId, null);
-    if (result && (result.bookId !== bookId || !result.generation || !result.draft?.id || typeof result.draft.text !== 'string')) throw new Error('无效 Goal 草稿恢复缓冲');
+    if (result && (result.bookId !== bookId || !result.generation || !result.draft?.id || typeof result.draft.text !== 'string')) throw new Error("Invalid goal draft recovery buffer.");
     return result;
 }
 export function storeGoalDraft(value: RecoverableGoalDraft) {
@@ -63,7 +63,7 @@ export function clearBookGoals(bookId: string) {
 export function assertNoGoalRecovery() {
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key?.startsWith(PENDING) && pendingGoals(key.slice(PENDING.length)).length) throw new Error('仍有未确认保存的 Goal，窗口已保留');
-        if (key?.startsWith(DRAFT) && readGoalDraft(key.slice(DRAFT.length))) throw new Error('仍有未提交的 Goal 草稿，窗口已保留');
+        if (key?.startsWith(PENDING) && pendingGoals(key.slice(PENDING.length)).length) throw new Error("Some goals are not confirmed saved. This window remains open.");
+        if (key?.startsWith(DRAFT) && readGoalDraft(key.slice(DRAFT.length))) throw new Error("There are unsubmitted goal drafts. This window remains open.");
     }
 }

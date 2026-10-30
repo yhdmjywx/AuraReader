@@ -91,7 +91,7 @@ export class AppCoordinator {
     }
 
     async openBook(bookId: string, sourceRequestId?: number, options: OpenBookOptions = {}): Promise<OpenBookResult> {
-        if (!bookId) return { status: 'failed', message: '请选择书籍' };
+        if (!bookId) return { status: 'failed', message: "Choose a book" };
         if (options.navigationRequest !== undefined && !this.navigation.isCurrent(options.navigationRequest)) return { status: 'superseded' };
         if (sourceRequestId === undefined) this.sourceRequest++;
         else if (sourceRequestId !== this.sourceRequest) return { status: 'superseded' };
@@ -120,13 +120,13 @@ export class AppCoordinator {
                 if (!current()) return { status: 'superseded' };
             }
             if (!book) {
-                throw new Error('未能载入图书，请重新导入');
+                throw new Error("Could not load this book. Please import it again.");
             }
 
             const notes = await loadNotesForBook(bookId);
             if (!current()) return { status: 'superseded' };
             if (options.source && ((await bookVersion(bookId)).generation !== options.source.generation || !notes.some(n => n.id === options.source!.annotationId))) {
-                throw new Error('原文来源已删除或变化');
+                throw new Error("The source has been deleted or changed.");
             }
             if (!current()) return { status: 'superseded' };
 
@@ -146,17 +146,17 @@ export class AppCoordinator {
             this.goals?.bookChanged();
 
             try { await this.shelf?.refreshShelf(); }
-            catch (error) { this.shell?.showToast(errorMessage(error, '书籍已打开，书库列表暂时未能刷新')); }
+            catch (error) { this.shell?.showToast(errorMessage(error, "Book opened, but the library list could not refresh."), { kind: 'error' }); }
             if (requestId === this.openBookRequestId) {
-                this.shell?.showToast(`已成功加载图书：《${book.title}》`);
+                this.shell?.showToast(`Opened: “${book.title}”`);
             }
             return { status: 'opened' };
         } catch (error) {
             // A superseded request may fail after the latest book has opened.
             if (current()) {
-                console.error('图书载入失败:', error);
-                this.shell?.showToast(errorMessage(error, '图书载入失败，请重试'));
-                return { status: 'failed', message: errorMessage(error, '图书载入失败，请重试') };
+                console.error("Could not open book:", error);
+                this.shell?.showToast(errorMessage(error, "Could not open this book. Please try again."), { kind: 'error' });
+                return { status: 'failed', message: errorMessage(error, "Could not open this book. Please try again.") };
             }
             return { status: 'superseded' };
         } finally {
@@ -169,7 +169,7 @@ export class AppCoordinator {
         const navigationRequest = this.navigation.begin();
 
         if (this.shell) {
-            this.shell.showToast(`正在导入图书: ${file.name}...`);
+            this.shell.showToast(`Importing book: ${file.name}...`);
         }
 
         try {
@@ -189,7 +189,7 @@ export class AppCoordinator {
                 }
             }
 
-            if (!bookObj) throw new Error("无法解析该文件格式");
+            if (!bookObj) throw new Error("This file format could not be read.");
 
             const saved = await saveBookToDB(bookObj);
             if (targetGoalId) {
@@ -202,16 +202,16 @@ export class AppCoordinator {
                 await this.shelf?.refreshShelf(); return bookObj.id;
             }
             const opened = await this.openBook(bookObj.id, undefined, { navigationRequest, ...(this.navigation.surface === 'home' ? { goalId: null } : {}) });
-            if (opened.status === 'failed') throw new Error(`书籍已入库，但未能打开：${opened.message}`);
+            if (opened.status === 'failed') throw new Error(`Book imported, but could not be opened: ${opened.message}`);
 
             if (this.shell) {
-                this.shell.showToast(`成功解析并入库《${bookObj.title}》！`);
+                this.shell.showToast(`Imported: “${bookObj.title}”`);
             }
             return bookObj.id;
         } catch (err) {
-            console.error("书籍导入失败:", err);
+            console.error("Book import failed:", err);
             if (this.shell) {
-                this.shell.showToast(`图书导入失败: ${errorMessage(err, '无法解析该文件格式')}`);
+                this.shell.showToast(`Book import failed: ${errorMessage(err, "This file format could not be read.")}`, { kind: 'error' });
             }
             if (targetGoalId) throw err;
         }
@@ -221,7 +221,7 @@ export class AppCoordinator {
         if (!data) return;
 
         const page = data.page || this.reader.getCurrentPage();
-        const chapter = data.chapter || (this.reader.getLocation() ? this.reader.getLocation().chapter : '章节选区');
+        const chapter = data.chapter || (this.reader.getLocation() ? this.reader.getLocation().chapter : "Chapter selection");
 
         if (data.type === 'note') {
             this.annotations.createNote({
@@ -265,7 +265,7 @@ export class AppCoordinator {
         await readBooks();
         const book = await bookVersion(source.bookId);
         if (request !== this.sourceRequest || !this.navigation.isCurrent(navigationRequest)) return;
-        if (book.generation !== source.generation) { this.shell?.showToast('原文来源已删除或变化'); return; }
+        if (book.generation !== source.generation) { this.shell?.showToast("The source has been deleted or changed.", { kind: 'error' }); return; }
         if (this.session.getCurrentBookId() !== source.bookId) {
             const result = await this.openBook(source.bookId, request, { navigationRequest, source, ...(fromHome ? { goalId: null } : {}) });
             if (result.status !== 'opened') return;
@@ -273,8 +273,8 @@ export class AppCoordinator {
         if (request !== this.sourceRequest || !this.navigation.isCurrent(navigationRequest) || this.session.getCurrentBookId() !== source.bookId) return;
         const latest = await bookVersion(source.bookId);
         if (request !== this.sourceRequest || !this.navigation.isCurrent(navigationRequest)) return;
-        if (latest.generation !== source.generation) { this.shell?.showToast('原文来源已变化'); return; }
-        if (!this.annotations.getNotes().some(n => n.id === source.annotationId)) { this.shell?.showToast('原文标注已不存在'); return; }
+        if (latest.generation !== source.generation) { this.shell?.showToast("The source has changed.", { kind: 'error' }); return; }
+        if (!this.annotations.getNotes().some(n => n.id === source.annotationId)) { this.shell?.showToast("The source annotation no longer exists.", { kind: 'error' }); return; }
         if (fromHome) this.goals?.goHome();
         this.navigation.commit('reader', navigationRequest); this.jumpToAnnotation(source.annotationId);
     }
@@ -292,7 +292,7 @@ export class AppCoordinator {
         if (!quote) {
             if (isNote(note)) this.annotations.focusNotes([note.id]);
             else this.annotations.focusHighlights([note.id]);
-            if (this.shell) this.shell.showToast('已定位到这条笔记');
+            if (this.shell) this.shell.showToast("Jumped to note");
             return;
         }
 
@@ -302,7 +302,7 @@ export class AppCoordinator {
             if (this.selection && typeof this.selection.activateAnnotationId === 'function') {
                 setTimeout(() => { if (current()) this.selection?.activateAnnotationId(note.id, { notify: false, showMenu }); }, 30);
             }
-            if (this.shell) this.shell.showToast(`跳转至第 ${note.page} 章原文所在位置`);
+            if (this.shell) this.shell.showToast(`Jumped to chapter ${note.page} source`);
             return;
         }
 
@@ -325,7 +325,7 @@ export class AppCoordinator {
         }
 
         if (this.shell) {
-            this.shell.showToast(`跳转至 P.${note.page} 原文所在位置`);
+            this.shell.showToast(`Jumped to p.${note.page} source`);
         }
     }
 

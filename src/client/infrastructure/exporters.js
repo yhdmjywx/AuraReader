@@ -10,6 +10,7 @@ import { renderAnnotationTokens } from '../features/reader/annotationRenderer.js
 import { buildBookStructure, structureSummary } from './bookStructure.js';
 import { unwrapDesktop } from './storageClient.js';
 import { saveMarkdownFolder } from './folderExport.js';
+import { countLabel, exportTimestamp } from '../domain/format.js';
 
 export function downloadFile(filename, data, type) {
     if (typeof window === 'undefined') return;
@@ -28,11 +29,13 @@ export function downloadFile(filename, data, type) {
     return { status: 'download-requested' };
 }
 
-export function exportMarkdown(bookTitle = '图书笔记', notes = []) {
+export function exportMarkdown(bookTitle = "Book notes", notes = []) {
     const groups = groupAnnotationsByRange(notes);
-    let md = `# 划线与随笔笔记：《${bookTitle}》\n\n`;
-    md += `> 导出时间：${new Date().toLocaleString()}\n\n`;
-    md += `## 划线与随笔精选 (${notes.length} 条)\n\n`;
+    let md = `# Highlights and notes: “${bookTitle}”\n\n`;
+    md += `> Exported: ${exportTimestamp()}\n\n`;
+    md += `## Highlights and notes (${notes.length})
+
+`;
 
     groups.forEach((group, idx) => {
         md += `### ${idx + 1}. P.${group.page} ${group.chapter || ''}\n`;
@@ -43,22 +46,22 @@ export function exportMarkdown(bookTitle = '图书笔记', notes = []) {
         md += `---\n\n`;
     });
 
-    return downloadFile(`${bookTitle}_划线随笔.md`, md, 'text/markdown');
+    return downloadFile(`${bookTitle}_notes.md`, md, 'text/markdown');
 }
 
 export function buildChapterDocuments(book, notes = [], { selectedUnitIds } = {}) {
     if (!book || !Array.isArray(book.pages)) {
-        throw new Error('当前图书无可导出内容');
+        throw new Error("This book has no content to export.");
     }
 
     const structure = buildBookStructure(book);
     const selection = selectedUnitIds == null ? null : new Set(selectedUnitIds);
     const units = structure.units.filter(unit => !selection || selection.has(unit.id));
-    if (!units.length) throw new Error('请至少选择一个要导出的章节');
+    if (!units.length) throw new Error("Select at least one chapter to export.");
     const selectedPages = new Set(units.flatMap(unit => unit.sourcePages));
     const isPartial = units.length < structure.units.length;
-    const bookTitle = safeExportTitle(book.title || '图书');
-    const folderName = `${bookTitle}_${isPartial ? '所选章节笔记包' : '分章节笔记包'}`;
+    const bookTitle = safeExportTitle(book.title || "Book");
+    const folderName = `${bookTitle}_${isPartial ? "selected-chapter-notes" : "chapter-notes"}`;
     const files = [];
     const chapterFiles = [];
     const annotations = (Array.isArray(notes) ? notes : []).map(normalizeAnnotation).filter(Boolean)
@@ -68,15 +71,18 @@ export function buildChapterDocuments(book, notes = [], { selectedUnitIds } = {}
 
     const filesByUnit = new Map(structure.units.map((unit, index) => [unit.id,
         `${String(index + 1).padStart(2, '0')}_${safeExportTitle(unit.title)}.md`]));
-    let indexMd = `# 《${book.title}》 导读书册与笔记全览\n\n`;
-    indexMd += `- 格式：${book.format || 'EPUB'}\n`;
-    indexMd += `- ${isPartial ? '全书内容结构' : '内容结构'}：${structureSummary(structure)}\n`;
-    indexMd += `- 导出范围：${isPartial ? '所选章节' : '整本书'}\n`;
-    indexMd += `- 导出内容文件：${units.length}\n`;
-    indexMd += `- 划线数：${annotations.filter(isHighlight).length}\n`;
-    indexMd += `- 笔记数：${annotations.filter(isNote).length}\n`;
-    indexMd += `- 导出时间：${new Date().toLocaleString()}\n\n`;
-    indexMd += `## 目录结构\n`;
+    let indexMd = `# “${book.title}” — Reading and notes overview
+
+`;
+    indexMd += `- Format: ${book.format || 'EPUB'}\n`;
+    indexMd += `- ${isPartial ? "Full book structure" : "Content structure"}: ${structureSummary(structure)}\n`;
+    indexMd += `- Export scope: ${isPartial ? "Selected chapters" : "Whole book"}\n`;
+    indexMd += `- Content files: ${units.length}\n`;
+    indexMd += `- Highlights: ${annotations.filter(isHighlight).length}\n`;
+    indexMd += `- Notes: ${annotations.filter(isNote).length}\n`;
+    indexMd += `- Exported: ${exportTimestamp()}\n\n`;
+    indexMd += `## Contents
+`;
     let unmatchedHighlights = 0;
 
     // Preserve TOC hierarchy, including multiple nodes/anchors sharing a file.
@@ -95,7 +101,7 @@ export function buildChapterDocuments(book, notes = [], { selectedUnitIds } = {}
     }
     const untitledUnits = units.filter(unit => !structure.nodes.some(node => unit.sourcePages.includes(node.page)));
     if (untitledUnits.length) {
-        indexMd += '\n## 其他保留内容\n';
+        indexMd += "\n## Other retained content\n";
         untitledUnits.forEach(unit => { indexMd += `- [${escapeMarkdownText(unit.title)}](./${encodeURIComponent(filesByUnit.get(unit.id))})\n`; });
     }
 
@@ -130,7 +136,11 @@ export function buildChapterDocuments(book, notes = [], { selectedUnitIds } = {}
         // A source heading already provides the title for prefixed units:
         // 第一卷 → 大堂. Do not add a second artificial “大堂” before 第一卷.
         if (!unit.prefixPages.length) markdown += `# ${escapeMarkdownText(unit.title)}\n\n`;
-        markdown += `> 本章划线：${unitNotes.filter(isHighlight).length} 条 | 笔记：${unitNotes.filter(isNote).length} 条\n\n---\n\n`;
+        markdown += `> Highlights: ${unitNotes.filter(isHighlight).length} | Notes: ${unitNotes.filter(isNote).length}
+
+---
+
+`;
         markdown += unit.sourcePages.map(sourceMarkdown).join('\n');
         const file = { filename: filesByUnit.get(unit.id), text: markdown };
         files.push(file);
@@ -139,18 +149,22 @@ export function buildChapterDocuments(book, notes = [], { selectedUnitIds } = {}
 
     const invalidPage = note => !Number.isInteger(note.page) || note.page < 1 || note.page > book.pages.length;
     const unassigned = annotations.filter(isNote).filter(invalidPage);
+    let unassignedDocument = null;
     if (unassigned.length) {
-        files.push({ filename: '未归属笔记.md', text: '# 未归属笔记\n\n以下笔记的章节位置无效，保留引用与笔记内容以避免遗漏。\n\n' + chapterAnnotationMarkdown(unassigned) });
-        indexMd += '\n[未归属笔记](./未归属笔记.md)\n';
+        unassignedDocument = { filename: "unassigned-notes.md", text: "# Unassigned notes\n\nThese notes have invalid chapter locations. Their quotes and text are preserved here.\n\n" + chapterAnnotationMarkdown(unassigned) };
+        files.push(unassignedDocument);
+        indexMd += `\n[Unassigned notes](./${encodeURIComponent(unassignedDocument.filename)})\n`;
     }
     unmatchedHighlights += annotations.filter(isHighlight).filter(invalidPage).length;
-    if (unmatchedHighlights) indexMd += `\n> 有 ${unmatchedHighlights} 条高亮未能定位到正文，未生成正文标记。原始标注仍保留在书库及书籍备份中。\n`;
-    files.push({ filename: '00_目录概览.md', text: indexMd });
-    return { bookTitle, folderName, chapterFiles, files, unmatchedHighlights };
+    if (unmatchedHighlights) indexMd += `
+> ${countLabel(unmatchedHighlights, 'highlight')} could not be located in the text and were not marked. Original annotations remain in the library and book backups.
+`;
+    files.push({ filename: "00_contents.md", text: indexMd });
+    return { bookTitle, folderName, chapterFiles, files, unmatchedHighlights, unassignedDocument };
 }
 
 function safeExportTitle(title) {
-    let name = String(title).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 120).replace(/[\uD800-\uDBFF]$/, '').replace(/[. ]+$/, '') || '图书';
+    let name = String(title).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 120).replace(/[\uD800-\uDBFF]$/, '').replace(/[. ]+$/, '') || "Book";
     if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) name = '_' + name;
     return name;
 }
@@ -159,7 +173,7 @@ export async function exportChapters(book, notes = [], options = {}) {
     const structure = buildBookStructure(book);
     const selection = options.selectedUnitIds == null ? null : new Set(options.selectedUnitIds);
     const count = structure.units.filter(unit => !selection || selection.has(unit.id)).length;
-    if (!count) throw new Error('请至少选择一个要导出的章节');
+    if (!count) throw new Error("Select at least one chapter to export.");
     // Browser pickers must start during the click, before expensive conversion.
     const destination = count > 1 && !window.auraDesktop ? await saveMarkdownFolder.pick() : null;
     if (count > 1 && !window.auraDesktop && !destination) return { status: 'canceled' };
@@ -167,18 +181,21 @@ export async function exportChapters(book, notes = [], options = {}) {
     if (documents.chapterFiles.length === 1) {
         const chapter = documents.chapterFiles[0];
         let text = chapter.text;
-        const orphan = documents.files.find(file => file.filename === '未归属笔记.md');
+        const orphan = documents.unassignedDocument;
         if (orphan) text += '\n\n' + orphan.text;
-        if (documents.unmatchedHighlights) text += `\n\n> 有 ${documents.unmatchedHighlights} 条高亮未能定位到正文，原始标注仍保留在书库及书籍备份中。\n`;
+        if (documents.unmatchedHighlights) text += `
+
+> ${countLabel(documents.unmatchedHighlights, 'highlight')} could not be located in the text. Original annotations remain in the library and book backups.
+`;
         const filename = safeExportTitle(`${documents.bookTitle}_${chapter.filename.slice(0, -3)}`) + '.md';
         return { ...await downloadFile(filename, text, 'text/markdown;charset=utf-8'), kind: 'file' };
     }
-    return saveMarkdownFolder(`${documents.bookTitle}_章节导出`, documents.files, destination);
+    return saveMarkdownFolder(`${documents.bookTitle}_chapters`, documents.files, destination);
 }
 
 // Compatibility adapter for legacy consumers; the product UI exports .md/folders.
 export async function exportChapterZip(book, notes = [], jszipLib, options = {}) {
-    if (!jszipLib) throw new Error('JSZip 尚未就绪，请检查网络连接');
+    if (!jszipLib) throw new Error("JSZip is not ready. Check that application resources are available.");
     const { folderName, files } = buildChapterDocuments(book, notes, options);
     const zip = new jszipLib();
     const folder = zip.folder(folderName);
@@ -206,9 +223,9 @@ function resolveNoteRange(text, note) {
 function chapterAnnotationMarkdown(notes) {
     const thoughts = notes.filter(isNote);
     if (!thoughts.length) return '';
-    let md = '## 本章笔记\n\n';
+    let md = "## Chapter notes\n\n";
     thoughts.forEach((note, idx) => {
-        md += `### ${idx + 1}. 笔记 | P.${note.page}\n\n`;
+        md += `### ${idx + 1}. Note | p.${note.page}\n\n`;
         md += chapterNoteContent(note);
     });
     return md;
@@ -217,11 +234,11 @@ function chapterAnnotationMarkdown(notes) {
 function chapterNoteContent(note) {
     let md = '';
     if (note.quote.trim()) {
-        md += '> **原文引用**\n';
+        md += "> **Source quote**\n";
         md += note.quote.trim().split(/\r?\n/).map(line => `> ${escapeMarkdownText(line)}`).join('\n') + '\n';
         md += '>\n';
     } else {
-        md += '> 独立随笔（未绑定原文）\n';
+        md += "> Standalone note (no source link)\n";
         md += '>\n';
     }
     if (note.comment.trim()) {
@@ -358,7 +375,7 @@ export function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStat
                 ? state : { bookId: state.bookId, goals: state.goals })
         };
         if (goalGraphs) { const graph = goalGraphs.get(book.id) || { goals: [], links: [], bookLinks: [] }; delete backupPayload.goalStates; backupPayload.goalGraph = includeNotes ? graph : { goals: graph.goals, ...(graph.bookLinks !== undefined ? { bookLinks: graph.bookLinks } : {}) }; }
-        const bookTitle = String(book.title || book.id || '图书')
+        const bookTitle = String(book.title || book.id || "Book")
             .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_');
         const fileName = `AuraReader_Backup_${bookTitle}_${yyyymmdd}.aurabackup`;
 
@@ -386,13 +403,13 @@ export function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStat
 
 export function parseBackupFile(file) {
     return new Promise((resolve, reject) => {
-        if (!file) return reject(new Error('未提供备份文件'));
+        if (!file) return reject(new Error("No backup file provided."));
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target.result);
                 if (!data || (data.type !== 'aurareader_full_backup' && !Array.isArray(data.notes) && !Array.isArray(data.books))) {
-                    return reject(new Error('未识别的备份包格式'));
+                    return reject(new Error("Unrecognized backup format."));
                 }
                 resolve(data);
             } catch (err) {

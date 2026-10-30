@@ -10,6 +10,7 @@ import { ReadingWorkbench } from './features/workbench/ReadingWorkbench.js';
 import type { ReadingApplication } from './features/workbench/workbenchStore.js';
 import { WorkbenchShell } from './features/workbench/WorkbenchShell.js';
 import './components/ui/workbench.css';
+import './components/ui/action-button.css';
 
 // Render stable shell hosts first, then connect the existing engines and commands.
 let startup: Promise<typeof import('./main.js')> | undefined;
@@ -26,14 +27,14 @@ function App() {
     useEffect(() => {
         let active = true;
         void startRuntime().then(app => { if (active) setApplication(app.appInstance); }).catch(error => {
-            console.error('应用启动失败', error);
-            if (active) setFailure(error instanceof Error ? error.message : '应用暂时无法启动');
+            console.error("Application startup failed", error);
+            if (active) setFailure(error instanceof Error ? error.message : "The application could not start.");
         });
         return () => { active = false; };
     }, []);
     return <><WorkbenchShell />{failure ? <section className="app-status" role="alert">
         <p>{failure}</p>
-        <button type="button" onClick={() => location.reload()}>重新加载</button>
+        <button type="button" onClick={() => location.reload()}>Reload</button>
     </section> : application ? <ReadingWorkbench application={application} /> : null}</>;
 }
 

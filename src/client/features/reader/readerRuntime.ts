@@ -72,7 +72,7 @@ export class ReaderRuntime {
             bookPaper: root.querySelector<HTMLElement>('[data-reader-paper], .book-paper'),
         };
         if (!elements.readerViewport || !elements.paperContainer || !elements.bookPaper) {
-            throw new Error('阅读区域需要 viewport、container 和 paper 元素');
+            throw new Error("The reader requires viewport, container, and paper elements.");
         }
         this.root = root;
         this.reader.initUI(elements);

@@ -9,6 +9,7 @@ const { flushSync } = require('react-dom');
         { url: 'http://localhost', pretendToBeVisual: true });
     Object.assign(global, { window: dom.window, document: dom.window.document, localStorage: dom.window.localStorage,
         HTMLElement: dom.window.HTMLElement, Node: dom.window.Node, NodeFilter: dom.window.NodeFilter });
+    document.documentElement.lang = 'en';
     const { ReaderRuntime } = await import('../../dist/client/features/reader/readerRuntime.js');
     const { ReaderSurface, useReaderSnapshot } = await import('../../dist/client/features/reader/readerReact.js');
     const runtime = new ReaderRuntime(), other = new ReaderRuntime();
@@ -23,10 +24,12 @@ const { flushSync } = require('react-dom');
         other.mount(document.getElementById('other'));
         const book = { id: 'runtime-book', title: 'Runtime', pages: ['<p>First <a href="second.xhtml">chapter</a></p>', '<p>Second source</p>', '<p>Third source</p>'],
             hrefToPageMap: { 'second.xhtml': 2 } };
-        flushSync(() => { runtime.setBook(book); other.setBook({ ...book, id: 'other-book' }); });
+        flushSync(() => { runtime.setBook(book); other.setBook({ ...book, id: 'other-book', language: 'zh-CN' }); });
         assert.equal(runtime.getSnapshot().mounted, true);
         assert.equal(runtime.getSnapshot(), runtime.getSnapshot(), 'snapshot identity stays stable between changes');
         const paper = document.querySelector('#react .book-paper');
+        assert.equal(paper.getAttribute('lang'), '', 'Unknown source language must not inherit English UI language');
+        assert.equal(document.querySelector('#other .book-paper').lang, 'zh-CN', 'Known book language stays independent of the UI');
         const firstParagraph = paper.firstChild;
         flushSync(() => root.render(h(Workspace, { revision: 1 })));
         assert.equal(paper.firstChild, firstParagraph, 'React workbench rerenders do not replace reader descendants');

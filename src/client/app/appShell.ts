@@ -1,7 +1,7 @@
 import { eventElement } from './dom.js';
 import { unwrapDesktop } from '../infrastructure/storageClient.js';
 import type { AppElements } from './elements.js';
-import type { ShellCallbacks } from './contracts.js';
+import type { ShellCallbacks, ToastOptions } from './contracts.js';
 import type { AppSurface } from './navigation.js';
 /* ==========================================================================
    AppShell - Application Shell & Global Presentation / Input Dispatcher
@@ -15,6 +15,9 @@ export class AppShell {
     appTheme: 'light' | 'dark';
     elements: AppElements | null;
     resizeDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+    private toastTimer?: ReturnType<typeof setTimeout>;
+    private feedbackAnchor: HTMLElement | null = null;
+    private feedbackRect?: DOMRect;
     constructor(callbacks: ShellCallbacks = {}) {
         this.callbacks = callbacks;
         this.appTheme = 'light';
@@ -22,15 +25,29 @@ export class AppShell {
         this.resizeDebounceTimer = undefined;
     }
 
-    showToast(msg: string) {
+    showToast(msg: string, { kind = 'success', anchor = this.feedbackAnchor }: ToastOptions = {}) {
         if (!this.elements || !this.elements.toastMsg || !msg) return;
-        this.elements.toastMsg.textContent = msg;
-        this.elements.toastMsg.classList.add('show');
-        setTimeout(() => {
-            if (this.elements && this.elements.toastMsg) {
-                this.elements.toastMsg.classList.remove('show');
-            }
-        }, 2600);
+        clearTimeout(this.toastTimer);
+        const toast = this.elements.toastMsg;
+        toast.textContent = msg;
+        toast.dataset.kind = kind;
+        toast.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+        if (kind === 'error') {
+            const close = toast.ownerDocument.createElement('button');
+            close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Dismiss error'); close.title = 'Dismiss error';
+            close.onclick = () => toast.classList.remove('show'); toast.append(close);
+        }
+        toast.style.removeProperty('left'); toast.style.removeProperty('top'); toast.style.removeProperty('bottom');
+        const rect = anchor?.isConnected ? anchor.getBoundingClientRect() : anchor === this.feedbackAnchor ? this.feedbackRect : undefined;
+        toast.classList.toggle('is-local', !!rect?.width);
+        if (rect?.width) {
+            const width = toast.offsetWidth, height = toast.offsetHeight;
+            toast.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`;
+            toast.style.top = `${Math.max(12, rect.bottom + height + 20 <= window.innerHeight ? rect.bottom + 8 : rect.top - height - 8)}px`;
+            toast.style.bottom = 'auto';
+        }
+        toast.classList.add('show');
+        if (kind !== 'error') this.toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
     }
 
     setBookLoading(loading: boolean) {
@@ -55,7 +72,7 @@ export class AppShell {
         const status = document.getElementById('app-status');
         if (status) { status.hidden = true; status.replaceChildren(); }
         const back = e?.btnGoalBack;
-        if (back) { back.title = back.getAttribute('aria-label') || '返回'; }
+        if (back) { back.title = back.getAttribute('aria-label') || "Back"; }
         requestAnimationFrame(() => {
             if (document.documentElement.dataset.appSurface !== surface || document.body.inert) return;
             const target = surface === 'home' ? document.getElementById('home-goal-title')
@@ -112,7 +129,7 @@ export class AppShell {
             if (this.elements?.exportBookTitle) {
                 this.elements.exportBookTitle.textContent = this.elements.currentBookTitle
                     ? this.elements.currentBookTitle.textContent
-                    : '未打开书籍';
+                    : "No book open";
             }
         }
         panel.classList.toggle('open', open);
@@ -136,17 +153,17 @@ export class AppShell {
                 const { fullscreen } = unwrapDesktop(result);
                 const icon = this.elements?.btnFullscreen?.querySelector('i');
                 if (icon) icon.className = fullscreen ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
-            }).catch(error => this.showToast(error instanceof Error ? error.message : '全屏切换失败'));
+            }).catch(error => this.showToast(error instanceof Error ? error.message : "Could not toggle fullscreen.", { kind: 'error' }));
             return;
         }
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => {
-                console.warn("全屏模式不可用:", err);
+                console.warn("Fullscreen unavailable:", err);
             });
         } else {
             if (document.exitFullscreen) {
                 document.exitFullscreen().catch(err => {
-                    console.warn("退出全屏异常:", err);
+                    console.warn("Could not exit fullscreen:", err);
                 });
             }
         }
@@ -156,6 +173,10 @@ export class AppShell {
         this.elements = elements;
         this.callbacks = { ...this.callbacks, ...callbacks };
         if (!elements) return;
+        document.addEventListener('click', event => {
+            this.feedbackAnchor = eventElement(event)?.closest<HTMLElement>('button, [role="menuitem"], [role="menuitemradio"]') || null;
+            this.feedbackRect = this.feedbackAnchor?.getBoundingClientRect();
+        }, true);
 
         // Theme Toggle Button
         if (elements.btnThemeToggle) {
@@ -213,7 +234,7 @@ export class AppShell {
                 const icon = button?.querySelector('i');
                 if (!button || !icon) return;
                 icon.className = document.fullscreenElement ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
-                button.title = document.fullscreenElement ? '退出全屏' : '全屏阅读';
+                button.title = document.fullscreenElement ? "Exit fullscreen" : "Fullscreen";
             });
         }
 

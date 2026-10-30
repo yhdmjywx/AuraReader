@@ -7,12 +7,12 @@ const { APP_URL } = require('./assets.cjs');
 function assertSender(event, window) {
     if (window.isDestroyed() || event.sender !== window.webContents || !event.senderFrame
         || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== APP_URL) {
-        throw new StorageError('只允许已登记的阅读器主窗口访问本地服务', 403);
+        throw new StorageError("Only registered reader windows may access local services.", 403);
     }
 }
 
 /** @param {unknown} error */
-function failure(error, fallback = '本地书库操作失败，原数据未清除') {
+function failure(error, fallback = "Local library operation failed. Existing data has been preserved.") {
     if (error instanceof StorageError) return { ok: false, error: { message: error.message, status: error.status, details: error.details } };
     console.error('Desktop service failed:', error);
     return { ok: false, error: { message: fallback, status: 500 } };
@@ -25,11 +25,11 @@ function registerFileIpc(window, files) {
         ipcMain.handle('aura:files:' + action, async (event, ...args) => {
             try {
                 assertSender(event, window);
-                if (args.length !== 1) throw new StorageError('无效参数数量');
+                if (args.length !== 1) throw new StorageError("Invalid argument count.");
                 const value = await files.call(action, args[0], () => assertSender(event, window));
                 assertSender(event, window);
                 return { ok: true, value };
-            } catch (error) { return failure(error, '文件或字体操作失败，请检查文件和目录权限'); }
+            } catch (error) { return failure(error, "File or font operation failed. Check file and folder permissions."); }
         });
     }
     ipcMain.handle('aura:window:fullscreen', event => {
@@ -37,7 +37,7 @@ function registerFileIpc(window, files) {
             assertSender(event, window);
             window.setFullScreen(!window.isFullScreen());
             return { ok: true, value: { fullscreen: window.isFullScreen() } };
-        } catch (error) { return failure(error, '窗口全屏切换失败'); }
+        } catch (error) { return failure(error, "Could not toggle window fullscreen."); }
     });
     return () => {
         actions.forEach(action => ipcMain.removeHandler('aura:files:' + action));
@@ -52,7 +52,7 @@ function registerStorageIpc(window, storage) {
         ipcMain.handle('aura:storage:' + action, async (event, ...args) => {
             try {
                 assertSender(event, window);
-                if (args.length !== 1) throw new StorageError('无效参数数量');
+                if (args.length !== 1) throw new StorageError("Invalid argument count.");
                 return { ok: true, value: await storage.call(action, args[0]) };
             } catch (error) { return failure(error); }
         });
@@ -79,19 +79,19 @@ function coordinateClose(window, storage) {
         // are already in SQLite; keep its recovery journal and let the user exit.
         if (window.webContents.isCrashed()) {
             storage.settle().then(() => { allowed = true; window.close(); })
-                .catch(error => console.error('崩溃后的书库关闭未完成', error));
+                .catch(error => console.error("Could not close the library after the crash.", error));
             return;
         }
-        if (window.webContents.mainFrame.url !== APP_URL) { cancel('页面尚未就绪，关闭已取消；请保留窗口并重试。'); return; }
+        if (window.webContents.mainFrame.url !== APP_URL) { cancel("The page is not ready. Closing was canceled. Keep this window open and try again."); return; }
         const id = randomUUID();
         pending = { id, frame: window.webContents.mainFrame,
-            timer: setTimeout(() => cancel('保存确认超时，窗口已保留；请检查未保存内容后重试。'), 30000) };
+            timer: setTimeout(() => cancel("Save confirmation timed out. This window remains open. Check unsaved content and try again."), 30000) };
         window.webContents.send('aura:lifecycle:prepare-close', id);
     });
     ipcMain.handle('aura:lifecycle:request-close', (event, ...args) => {
         try {
             assertSender(event, window);
-            if (args.length) throw new StorageError('关闭请求不接受参数');
+            if (args.length) throw new StorageError("Close requests do not accept arguments.");
             setImmediate(() => { if (!window.isDestroyed()) window.close(); });
             return { ok: true, value: { requested: true } };
         } catch (error) { return failure(error); }
@@ -103,14 +103,14 @@ function coordinateClose(window, storage) {
     ipcMain.handle('aura:lifecycle:complete-close', async (event, id, result) => {
         try {
             assertSender(event, window);
-            if (!pending || pending.id !== id || event.senderFrame !== pending.frame) throw new StorageError('无效或已过期的关闭请求', 409);
+            if (!pending || pending.id !== id || event.senderFrame !== pending.frame) throw new StorageError("Invalid or expired close request.", 409);
             if (!result || typeof result !== 'object' || typeof result.ok !== 'boolean'
                 || Object.keys(result).some(key => !['ok', 'message'].includes(key))
-                || (result.message !== undefined && (typeof result.message !== 'string' || result.message.length > 1000))) throw new StorageError('无效关闭结果');
-            if (!result.ok) { cancel(result.message || '存在未确认保存的内容，窗口已保留。'); return { ok: true, value: { accepted: false } }; }
+                || (result.message !== undefined && (typeof result.message !== 'string' || result.message.length > 1000))) throw new StorageError("Invalid close result.");
+            if (!result.ok) { cancel(result.message || "Some content is not confirmed saved. This window remains open."); return { ok: true, value: { accepted: false } }; }
             const request = pending;
             await storage.settle();
-            if (pending !== request) throw new StorageError('关闭请求已取消', 409);
+            if (pending !== request) throw new StorageError("Close request canceled.", 409);
             clearTimeout(request.timer); pending = null; allowed = true;
             // Let invoke deliver its response before destroying the sender.
             setImmediate(() => window.close());

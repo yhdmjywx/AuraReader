@@ -119,7 +119,7 @@ const { JSDOM } = require('jsdom');
         assert.deepEqual(cards(), []);
         assert.ok(elements.notesList.contains(elements.emptyNotesState), '空状态节点不能在重绘时被移出侧栏');
         assert.equal(elements.emptyNotesState.style.display, 'block');
-        assert.equal(elements.emptyNotesState.querySelector('p').textContent, '当前页暂无划线与笔记');
+        assert.equal(elements.emptyNotesState.querySelector('p').textContent, 'Page: no highlights or notes');
 
         const before = annotations.getNotes().length;
         await annotations.saveQuickNote('不再创建独立随笔');
@@ -127,7 +127,7 @@ const { JSDOM } = require('jsdom');
         await annotations.saveModalNote({ quote: '', comment: '无原文笔记' });
         await annotations.addOrUpdateNote({ id: 'no-quote', kind: 'note', comment: '无原文笔记' });
         assert.equal(annotations.getNotes().length, before, '所有用户创建入口均拒绝无引用笔记');
-        assert.ok(messages.includes('请先在正文中选择需要引用的文字'));
+        assert.ok(messages.includes('Select text in the book to quote first.'));
         await annotations.saveModalNote({ quote: '选中的原文', comment: '合法笔记', page: 1 });
         assert.equal(annotations.getNotes().length, before + 1, '引用笔记仍可保存');
         const saved = annotations.getNotes()[0];

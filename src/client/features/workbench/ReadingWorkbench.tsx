@@ -22,7 +22,7 @@ function NoteEditor({ note, store }: { note: Annotation; store: WorkbenchStore }
         editor.style.height = `${Math.max(editor.scrollHeight, 26)}px`;
     }, [note.comment]);
     return <div ref={shell} className="note-editor-shell">
-        <textarea ref={input} className="note-editor" aria-label="笔记内容" rows={1} defaultValue={note.comment}
+        <textarea ref={input} className="note-editor" aria-label="Note text" rows={1} defaultValue={note.comment}
             aria-keyshortcuts="Escape Control+Enter Meta+Enter"
             onInput={event => store.updateNote(note.id, event.currentTarget.value)}
             onCompositionStart={() => { composing.current = true; }}
@@ -39,10 +39,10 @@ function NoteEditor({ note, store }: { note: Annotation; store: WorkbenchStore }
 
 function Notes({ state, store }: { state: WorkbenchSnapshot; store: WorkbenchStore }) {
     useLayoutEffect(() => { positionMarginNotes(store.app.elements); }, [state, store]);
-    return <div className="margin-notes-lane" data-margin-side="right" role="group" aria-label="当前可见正文的笔记">
+    return <div className="margin-notes-lane" data-margin-side="right" role="group" aria-label="Notes for visible text">
         {state.notes.map(note => <div key={note.id} id={`card-${note.id}`} data-annotation-id={note.id}
             className={`note-card ${note.kind === 'note' ? 'hl-green-card' : 'pure-highlight-card'}${state.focusedIds.includes(note.id) ? ' is-focused' : ''}`}
-            tabIndex={0} role="group" aria-label={note.kind === 'note' ? '关联正文的笔记' : '高亮操作'}
+            tabIndex={0} role="group" aria-label={note.kind === 'note' ? "Note linked to source text" : "Highlight actions"}
             onClick={event => {
                 if ((event.target as HTMLElement).closest('button,textarea')) return;
                 if (note.kind === 'note') store.editNote(note);
@@ -56,20 +56,20 @@ function Notes({ state, store }: { state: WorkbenchSnapshot; store: WorkbenchSto
             }}>
             <div className="note-comment-text">
                 {state.editingNoteId === note.id ? <NoteEditor note={note} store={store} />
-                    : note.kind === 'note' ? note.comment : <span className="margin-highlight-label">划线</span>}
+                    : note.kind === 'note' ? note.comment : <span className="margin-highlight-label">Highlight</span>}
             </div>
             <div className="note-card-actions" hidden={state.editingNoteId === note.id}>
                 <Button type="button" className={`btn btn-ghost-sm btn-goal-link${state.linkedIds.includes(note.id) ? ' is-linked' : ''}`}
                     data-annotation-id={note.id} disabled={!state.selectedGoal || state.goalDisabled || !state.goalVisible || state.linkedIds.includes(note.id)}
                     aria-label={state.linkedIds.includes(note.id) ? 'Added to goal' : 'Add to goal'}
-                    title={state.selectedGoal ? '关联到当前 Goal' : '先在左侧选择一个 Goal'}
+                    title={state.selectedGoal ? "Add to current goal" : "Select a goal on the left first"}
                     onClick={() => { void store.linkNote(note.id); }}>
                     <i aria-hidden="true" className={state.linkedIds.includes(note.id) ? 'ri-check-line' : 'ri-links-line'} />
                     <span>{state.linkedIds.includes(note.id) ? 'Linked' : 'Goal'}</span>
                 </Button>
-                <Button type="button" className="btn btn-ghost-sm" aria-label="回到原文"
+                <Button type="button" className="btn btn-ghost-sm" aria-label="Back to source"
                     onClick={() => store.app.coordinator.jumpToAnnotation(note.id)}><i className="ri-focus-3-line" aria-hidden="true" /></Button>
-                <Button type="button" className="btn btn-ghost-sm" aria-label={note.kind === 'note' ? '删除笔记' : '删除高亮'}
+                <Button type="button" className="btn btn-ghost-sm" aria-label={note.kind === 'note' ? "Delete note" : "Delete highlight"}
                     onClick={() => { void store.deleteNote(note.id); }}><i className="ri-delete-bin-line" aria-hidden="true" /></Button>
             </div>
         </div>)}
@@ -107,12 +107,12 @@ export function ReadingWorkbench({ application }: { application: ReadingApplicat
         {createPortal(<Notes state={state} store={store} />, doc.getElementById('react-notes')!)}
         {createPortal(<>
             <Button type="button" className="tooltip-btn" onMouseDown={event => event.preventDefault()}
-                onClick={() => { void store.createFromSelection('highlight'); }}><i className="ri-mark-pen-line" aria-hidden="true" />高亮</Button>
-            <Button type="button" className="tooltip-btn" aria-label="添加笔记" onMouseDown={event => event.preventDefault()}
-                onClick={() => { void store.createFromSelection('note'); }}><i className="ri-sticky-note-line" aria-hidden="true" />笔记</Button>
+                onClick={() => { void store.createFromSelection('highlight'); }}><i className="ri-mark-pen-line" aria-hidden="true" />Highlight</Button>
+            <Button type="button" className="tooltip-btn" aria-label="Add note" onMouseDown={event => event.preventDefault()}
+                onClick={() => { void store.createFromSelection('note'); }}><i className="ri-sticky-note-line" aria-hidden="true" />Note</Button>
         </>, doc.getElementById('react-selection-actions')!)}
         {createPortal(<>
-            <span className="react-save-status" role="status">{state.saveState === 'saving' ? '保存中…' : state.saveState === 'error' ? '保存未完成' : '自动保存'}</span>
+            {state.saveState !== 'saved' && <span className="react-save-status" role="status">{state.saveState === 'saving' ? "Saving…" : "Save incomplete"}</span>}
             {state.error && <span role="alert" className="react-workbench-error">{state.error}</span>}
         </>, doc.getElementById('react-reading-book')!)}
     </>;

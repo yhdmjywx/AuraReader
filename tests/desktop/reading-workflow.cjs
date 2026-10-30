@@ -12,7 +12,7 @@ const noteText = 'A React note\n中文输入保持光标';
 app.on('web-contents-created', (_event, contents) => {
     contents.on('console-message', details => { if (details.level === 'error') errors.push(details.message); });
 });
-const watchdog = setTimeout(() => { console.error('React workflow timed out', errors); app.exit(1); }, 40000);
+const watchdog = setTimeout(() => { console.error('React workflow timed out', errors); app.exit(1); }, 60000);
 
 (async () => {
     const output = path.resolve(process.argv[2]);
@@ -26,12 +26,19 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     const capture = async name => {
         await run(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 500))))`);
         await fs.writeFile(path.join(output, name + '.png'), (await window.webContents.capturePage()).toPNG());
+        const geometry = await run(`Object.fromEntries(['reading-workspace', 'goal-sidebar', 'workspace-container', 'reader-panel', 'reader-viewport', 'book-paper', 'appearance-panel', 'workspace-settings-panel', 'goal-home', 'goal-page'].map(id => {
+            const element = document.getElementById(id), rect = element?.getBoundingClientRect();
+            return [id, rect && { x: rect.x, y: rect.y, width: rect.width, height: rect.height }];
+        }))`);
+        await fs.writeFile(path.join(output, name + '-geometry.json'), JSON.stringify(geometry, null, 2));
     };
     await waitFor(`document.documentElement.dataset.desktopReady === 'setup'`);
+    await capture('library-setup');
     await run(`document.getElementById('desktop-create-library').click()`);
     await waitFor(`document.documentElement.dataset.reactWorkbench === 'true'`);
     const files = await fs.readdir(path.resolve('dist/renderer/assets'));
     const mainUrl = 'aurareader://app/assets/' + files.find(file => /^main-.*\.js$/.test(file));
+    await capture('home-welcome');
     const zip = new JSZip();
     zip.file('META-INF/container.xml', '<container><rootfiles><rootfile full-path="book.opf"/></rootfiles></container>');
     zip.file('book.opf', '<package><metadata><dc:language xmlns:dc="http://purl.org/dc/elements/1.1/">en</dc:language></metadata><manifest><item id="one" href="one.xhtml"/><item id="two" href="two.xhtml"/></manifest><spine><itemref idref="one"/><itemref idref="two"/></spine></package>');
@@ -56,6 +63,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     })()`);
     await run(`document.getElementById('home-goal-form').requestSubmit()`);
     await waitFor(`document.querySelector('#home-goal-folders .home-goal-folder')?.textContent.includes('Connect evidence')`);
+    await capture('home-library');
     await run(`document.querySelector('#home-goal-folders .home-goal-folder').click()`);
     await waitFor(`document.getElementById('home-add-book')`);
     await run(`document.getElementById('home-add-book').click()`);
@@ -64,6 +72,8 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`!document.querySelector('.ui-dialog[data-open]') && document.querySelector('#home-books .goal-home-book')`);
     await run(`document.querySelector('#home-books .goal-home-book').click()`);
     await waitFor(`document.documentElement.dataset.appSurface === 'reader' && document.getElementById('book-paper').textContent.includes('Alpha evidence') && document.querySelector('#goal-panel .goal-title')`);
+    assert.equal(await run(`document.documentElement.lang`), 'en');
+    assert.equal(await run(`document.getElementById('book-paper').lang`), 'en', 'reader keeps the source book language independently of UI copy');
     assert.equal(await run(`!!document.querySelector('#goal-panel select, #goal-panel .goal-collections, #react-reading-book select')`), false, 'reader omits redundant filters, collections and book picker');
     assert.equal(await run(`document.getElementById('btn-fullscreen') === null && document.getElementById('goal-expand') !== null`), true, 'EPUB fullscreen is removed and Goal expansion remains');
     assert.equal(await run(`['btn-toc', 'btn-shelf', 'btn-appearance', 'btn-export-menu'].every(id => !!document.getElementById(id).closest('.reader-toolbar'))`), true, 'book actions belong to the reading surface');
@@ -74,7 +84,19 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
         await fs.writeFile(path.join(output, `reader-ui-${theme}.png`), (await window.webContents.capturePage()).toPNG());
     }
     await run(`(async () => { const a = await import(${JSON.stringify(mainUrl)}); a.appShell.toggleAppTheme(); })()`);
-    await run(`document.querySelector('#goal-panel .goal-title').click()`);
+    assert.equal(await run(`document.getElementById('btn-goal-sidebar').closest('.reader-toolbar') === null && document.getElementById('btn-goal-sidebar').getBoundingClientRect().right <= document.getElementById('goal-sidebar').getBoundingClientRect().right`), true, 'sidebar control belongs to the left Goal area');
+    assert.equal(await run(`document.getElementById('react-reading-book').textContent.includes('Autosave')`), false, 'automatic saving has no persistent label');
+    await run(`document.getElementById('btn-goal-sidebar').click()`);
+    await waitFor(`document.getElementById('goal-sidebar').hidden`);
+    await capture('reader-sidebar-closed');
+    await run(`document.getElementById('btn-goal-sidebar').click()`);
+    await waitFor(`!document.getElementById('goal-sidebar').hidden`);
+    await capture('reader-workspace');
+    assert.equal(await run(`['btn-goal-sidebar', 'goal-home-nav', 'goal-up', 'goal-new', 'goal-expand', 'btn-shelf', 'btn-appearance', 'btn-export-menu'].every(id => {
+        const control = document.getElementById(id), rect = control.getBoundingClientRect();
+        return Math.abs(rect.width - 40) < 1 && Math.abs(rect.height - 40) < 1 && !!control.querySelector('svg');
+    })`), true, 'workbench icon actions share 40px SVG button targets');
+    await run(`document.querySelector('#goal-panel .goal-edit').click()`);
     await waitFor(`document.querySelector('#goal-panel textarea')`);
     await run(`(() => {
         window.goalCaretCheck = document.querySelector('#goal-panel textarea');
@@ -92,7 +114,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
         paper.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     })()`);
     await waitFor(`document.getElementById('selection-tooltip').style.display === 'flex'`);
-    await run(`document.querySelector('#react-selection-actions [aria-label="添加笔记"]').click()`);
+    await run(`document.querySelector('#react-selection-actions [aria-label="Add note"]').click()`);
     await waitFor(`document.activeElement?.classList.contains('note-editor')`);
     await run(`(() => {
         const editor = document.querySelector('#react-notes textarea');
@@ -129,7 +151,8 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`document.querySelector('#goal-panel .goal-item-text').click()`);
     await waitFor(`document.getElementById('book-paper').textContent.includes('Alpha evidence') && document.querySelector('.annotation-token.is-active')`);
     await run(`document.getElementById('btn-shelf').click()`);
-    await waitFor(`document.querySelector('#shelf-list [aria-label="搜索书库"]')`);
+    await waitFor(`document.querySelector('#shelf-list [aria-label="Search library"]')`);
+    await capture('shelf');
     await run(`(() => {
         const input = document.querySelector('#shelf-list input');
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'workflow B');
@@ -138,20 +161,39 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`document.querySelectorAll('#shelf-list .shelf-entry').length === 1 && document.querySelector('#shelf-list .shelf-book-title').textContent.includes('workflow B')`);
     await run(`document.getElementById('btn-close-shelf').click(); document.getElementById('btn-appearance').click()`);
     await waitFor(`document.activeElement?.id === 'font-family-select'`);
+    assert.equal(await run(`document.getElementById('btn-appearance').textContent.trim()`), '', 'reading settings trigger stays icon-only');
+    assert.equal(await run(`document.getElementById('btn-appearance').getAttribute('aria-label')`), 'Reading settings', 'icon-only settings retains its accessible name');
     await capture('reader-settings');
     await run(`document.getElementById('btn-font-inc').click()`);
     await waitFor(`document.getElementById('font-size-label').textContent === '19px'`);
+    await run(`document.getElementById('btn-font-dec').click()`);
+    await waitFor(`document.getElementById('font-size-label').textContent === '18px'`);
+    await run(`(() => { const input = document.getElementById('indent-select'); input.value = '3em'; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(`document.getElementById('book-paper').style.getPropertyValue('--book-text-indent') === '3em'`);
+    await run(`(() => { const input = document.getElementById('indent-select'); input.value = '2em'; input.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-paper="sepia"]').click(); })()`);
+    await waitFor(`document.getElementById('reader-panel').classList.contains('paper-sepia')`);
+    await run(`document.querySelector('[data-paper="white"]').click(); document.getElementById('btn-mode-scroll').click()`);
+    await waitFor(`document.getElementById('workspace-container').classList.contains('layout-scroll') && document.getElementById('btn-mode-scroll').getAttribute('aria-pressed') === 'true'`);
+    await run(`document.getElementById('btn-mode-single').click(); document.getElementById('font-family-select').click()`);
+    await waitFor(`!document.getElementById('font-menu').hidden && document.getElementById('btn-mode-single').getAttribute('aria-pressed') === 'true'`);
+    await capture('reader-font-menu');
+    await run(`document.querySelector('[data-font-choice="sarasa"]').click()`);
+    await waitFor(`document.getElementById('font-choice-label').textContent === 'Sarasa Gothic SC' && document.getElementById('font-menu').hidden`);
+    await run(`document.getElementById('font-family-select').click(); document.querySelector('[data-font-choice="auto"]').click()`);
+    await waitFor(`document.getElementById('font-choice-label').textContent === 'Auto' && document.getElementById('font-menu').hidden`);
     await run(`document.getElementById('btn-export-menu').click()`);
     await waitFor(`document.getElementById('export-panel').classList.contains('open') && !document.getElementById('appearance-panel').classList.contains('open')`);
     await run(`document.getElementById('btn-export-chapters').click(); document.getElementById('btn-select-chapters').click()`);
     await waitFor(`document.querySelectorAll('#chapter-export-list input').length > 0`);
     await run(`document.querySelector('#chapter-export-list input').click()`);
     await waitFor(`document.getElementById('btn-confirm-chapter-export').disabled === false`);
+    await capture('chapter-export');
     await run(`document.getElementById('btn-workspace-settings').click()`);
     await waitFor(`document.getElementById('workspace-settings-panel').getClientRects().length > 0 && !document.getElementById('export-panel').classList.contains('open')`);
     await capture('workspace-settings');
     await run(`document.getElementById('btn-export-full-backup').click()`);
     await waitFor(`document.querySelector('#backup-select-modal[data-open] input.chk-backup-book')`);
+    await capture('backup-selection');
     await run(`document.getElementById('btn-deselect-all-backup').click()`);
     assert.equal(await run(`document.querySelectorAll('#backup-select-modal input.chk-backup-book:checked').length`), 0);
     await run(`document.getElementById('btn-cancel-backup-modal').click()`);
@@ -159,7 +201,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`document.getElementById('goal-expand').click()`);
     await waitFor(`document.documentElement.dataset.appSurface === 'goal' && document.querySelector('#goal-page-content #goal-panel .goal-title')`);
     await capture('goal-workspace');
-    await run(`document.querySelector('#goal-panel .goal-title').click()`);
+    await run(`document.querySelector('#goal-panel .goal-edit').click()`);
     await waitFor(`document.activeElement === document.querySelector('#goal-panel textarea')`);
     await run(`(() => {
         const editor = document.querySelector('#goal-panel textarea'); editor.value = 'A shared React workbench';
@@ -178,7 +220,8 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`document.querySelector('#goal-panel .goal-title-row [aria-haspopup="menu"]').click()`);
     await waitFor(`document.querySelector('[role="menu"] [data-operation="delete"]')`);
     await run(`document.querySelector('[data-operation="delete"]').click()`);
-    await waitFor(`document.querySelector('.ui-dialog[data-open]')?.textContent.includes('删除 Goal')`);
+    await waitFor(`document.querySelector('.ui-dialog[data-open]')?.textContent.includes('Delete goal')`);
+    await capture('goal-delete');
     window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
     await waitFor(`!document.querySelector('.ui-dialog[data-open]')`);
     await run(`(async () => { const a = await import(${JSON.stringify(mainUrl)}); await a.goals.assertWritesSaved(); await a.annotations.assertInlineWritesSaved(); })()`);
@@ -197,6 +240,20 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     })()`);
     assert.equal(reloaded.comment, noteText);
     assert.equal(reloaded.goal, 'A shared React workbench');
+    await run(`(async () => {
+        const a = await import(${JSON.stringify(mainUrl)});
+        a.appShell.showToast('Saved', { anchor: document.querySelector('#goal-panel .goal-edit') });
+    })()`);
+    await capture('reader-success-feedback');
+    await run(`(async () => {
+        const a = await import(${JSON.stringify(mainUrl)});
+        a.appShell.showToast('Save incomplete — feedback preview', { kind: 'error', anchor: document.querySelector('#goal-panel .goal-edit') });
+        await new Promise(resolve => setTimeout(resolve, 2800));
+    })()`);
+    assert.equal(await run(`document.getElementById('toast-msg').matches('.show[data-kind="error"][role="alert"]')`), true, 'error feedback remains visible beyond the success timeout');
+    await capture('reader-error-feedback');
+    await run(`document.querySelector('#toast-msg [aria-label="Dismiss error"]').click()`);
+    assert.equal(await run(`document.getElementById('toast-msg').classList.contains('show')`), false);
     assert.deepEqual(errors, []);
     clearTimeout(watchdog);
     console.log('PASS: React Home → Goal/book picker → EPUB/IME note → SQLite/Goal link → cross-book source → shelf/search → preferences/export/backup → full Goal edit → keyboard menu/dialog → reload/persisted data');

@@ -78,7 +78,7 @@ export class WorkbenchStore {
         this.error = '';
         return Promise.resolve().then(action).catch(error => {
             this.error = error instanceof Error ? error.message : String(error);
-            this.app.appShell.showToast(this.error);
+            this.app.appShell.showToast(this.error, { kind: 'error' });
         }).finally(this.publish);
     }
     async finishNote() {

@@ -86,7 +86,7 @@ const { JSDOM } = require('jsdom');
         await annotations.saveModalNote({ quote: '同一段正文', comment: '此处第一条笔记', location });
         await annotations.saveModalNote({ quote: '同一段正文', comment: '此处第二条笔记', location });
         selection.activateToken(elements.bookPaper.querySelector('.annotation-token'), 1, { force: true });
-        assert.equal(elements.btnNoteRemove.querySelector('span').textContent, '删除笔记（2）', '多条关联笔记显示明确数量');
+        assert.equal(elements.btnNoteRemove.querySelector('span').textContent, 'Delete notes (2)', '多条关联笔记显示明确数量');
         elements.btnNoteRemove.click(); await deletion;
         assert.deepEqual(annotations.getNotes().map(item => item.id), [remainingHighlight.id], '删除重叠笔记不会连带删除高亮');
         assert.ok(elements.bookPaper.querySelector('.annotation-token').getAttribute('data-highlight-ids'));

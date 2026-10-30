@@ -33,7 +33,7 @@ function submit(entry: PendingNoteWrite, retry = false) {
             if (!command) {
                 const book = await bookVersion(entry.bookId);
                 const note = await noteVersion(entry.id, entry.bookId);
-                if (!book.generation) throw new Error('书籍已删除或不存在');
+                if (!book.generation) throw new Error("The book was deleted or does not exist.");
                 const version = { opId: entry.version, expected: note.revision, generation: book.generation };
                 command = entry.operation === 'save' ? { ...version, note: entry.note }
                     : { ...version, id: entry.id, bookId: entry.bookId };
@@ -44,7 +44,7 @@ function submit(entry: PendingNoteWrite, retry = false) {
             acceptNote(entry.id, entry.bookId, result, entry.operation === 'delete');
             acknowledgeNoteWrite(entry); commands.delete(entry.version);
         } catch (cause) {
-            const error = new StorageClientError(errorMessage(cause, '笔记保存失败'), { cause });
+            const error = new StorageClientError(errorMessage(cause, "Could not save note"), { cause });
             error.status = cause instanceof StorageClientError ? cause.status : undefined; error.recoveryAvailable = entry.durable !== false;
             error.details = cause instanceof StorageClientError ? cause.details : undefined;
             throw error;
@@ -61,7 +61,7 @@ export async function loadNotesForBook(bookId: string): Promise<Annotation[]> {
     const pending = pendingNoteWrites(bookId);
     for (const entry of pending) {
         try { await submit(entry, true); }
-        catch (error) { console.warn('笔记补写失败，保留本机恢复内容', error); }
+        catch (error) { console.warn("Could not recover note writes. Local recovery content is preserved.", error); }
     }
     if (pending.length) notes = await loadNotesFromDB(bookId);
     return overlay(notes, pendingNoteWrites(bookId));

@@ -71,7 +71,7 @@ const { JSDOM } = require('jsdom');
             assert.equal(selection.pendingSelection, null);
             controller.createNote(data);
         } } });
-        selection.initUI({ btnAddNote: button });
+        selection.initUI({ btnAddNote: button, bookPaper: elements.bookPaper });
         elements.bookPaper.textContent = '关联的原文';
         const range = document.createRange(); range.selectNodeContents(elements.bookPaper);
         window.getSelection().addRange(range);

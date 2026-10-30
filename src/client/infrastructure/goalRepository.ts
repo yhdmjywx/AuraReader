@@ -25,7 +25,7 @@ export function flushGoals(bookId: string): Promise<void> {
 export async function loadGoalsForBook(bookId: string) {
     let record = (await readGoals([bookId]))[0];
     const book = await bookVersion(bookId);
-    if (!book.generation) throw new Error('Goal 缺少有效书籍');
+    if (!book.generation) throw new Error("The goal has no valid book.");
     let error: unknown;
     if (pendingGoals(bookId).length) {
         try { await flushGoals(bookId); record = (await readGoals([bookId]))[0]; }
@@ -33,7 +33,7 @@ export async function loadGoalsForBook(bookId: string) {
     }
     const pending = pendingGoals(bookId);
     const draft = readGoalDraft(bookId);
-    if (draft && draft.generation !== book.generation) throw new Error('Goal 草稿属于旧书籍代次，请保留恢复内容');
+    if (draft && draft.generation !== book.generation) throw new Error("The goal draft belongs to an older book generation. Preserve recovery content.");
     return { draft, pending: pending.length > 0,
         state: pending.at(-1)?.state || (record && !record.deleted ? record.value : emptyGoals(bookId)),
         generation: book.generation, error
@@ -44,7 +44,7 @@ export async function getGoalsForBooks(bookIds: string[]): Promise<BookGoalState
     for (const bookId of bookIds) {
         const loaded = await loadGoalsForBook(bookId);
         if (loaded.error) throw loaded.error;
-        if (loaded.draft) throw new Error('书籍存在未提交的 Goal 草稿，请先打开该书完成编辑');
+        if (loaded.draft) throw new Error("This book has an unsubmitted goal draft. Open the book and finish editing first.");
         states.push(loaded.state);
     }
     return states;

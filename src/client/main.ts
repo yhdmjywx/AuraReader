@@ -3,6 +3,7 @@ import { GoalHome } from './features/goals/goalHome.js';
 import { updateNoteGoalActions } from './features/annotations/notesUI.js';
 import type { AppElements } from './app/elements.js';
 import { errorMessage } from './infrastructure/storageError.js';
+import { countLabel } from './domain/format.js';
 /* ==========================================================================
    AuraReader Workstation - Main Application Bootstrap Layer
    Responsible ONLY for application lifecycle, module wiring, dependency injection,
@@ -156,13 +157,13 @@ export function bootstrapApp() {
         readerEngine,
         layoutController: layout,
         callbacks: {
-            showToast: (msg) => appShell.showToast(msg)
+            showToast: (msg, options) => appShell.showToast(msg, options)
         }
     });
 
     const annotations = new AnnotationController({
         callbacks: {
-            showToast: (msg) => appShell.showToast(msg),
+            showToast: (msg, options) => appShell.showToast(msg, options),
             getCurrentBookId: () => session.getCurrentBookId()
         }
     });
@@ -181,7 +182,7 @@ export function bootstrapApp() {
 
     const shelf = new ShelfController({
         callbacks: {
-            showToast: (msg) => appShell.showToast(msg)
+            showToast: (msg, options) => appShell.showToast(msg, options)
         }
     });
 
@@ -189,7 +190,7 @@ export function bootstrapApp() {
 
     const backup = new BackupController({
         callbacks: {
-            showToast: (msg) => appShell.showToast(msg),
+            showToast: (msg, options) => appShell.showToast(msg, options),
             getCurrentBook: () => reader.getCurrentBook(),
             getCurrentNotes: () => annotations.getNotes(),
             getCurrentPage: () => reader.getCurrentPage(),
@@ -199,7 +200,7 @@ export function bootstrapApp() {
 
     const goals: GoalController = new GoalController({
         getAnnotations: () => annotations.getNotes(), getLocation: () => reader.getLocation(),
-        getMode: () => layout.getLayoutMode(), showToast: message => appShell.showToast(message),
+        getMode: () => layout.getLayoutMode(), showToast: (message, options) => appShell.showToast(message, options),
         jump: (id, source) => source ? coordinator.jumpToGoalSource(source) : coordinator.jumpToAnnotation(id),
         finishAnnotations: () => annotations.finishInlineEdit(), annotationsSaved: () => annotations.assertInlineWritesSaved()
     }, navigation);
@@ -226,7 +227,7 @@ export function bootstrapApp() {
     const brand = typeof document !== 'undefined' ? document.querySelector<HTMLElement>('.brand') : null;
     if (brand && home) {
         brand.setAttribute('role', 'button'); brand.tabIndex = 0; brand.setAttribute('aria-label', 'Open reading home');
-        const openHome = () => { home.open().catch(error => appShell.showToast(errorMessage(error, 'Could not open reading home'))); };
+        const openHome = () => { home.open().catch(error => appShell.showToast(errorMessage(error, 'Could not open reading home'), { kind: 'error' })); };
         brand.addEventListener('click', openHome);
         brand.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openHome(); } });
     }
@@ -238,7 +239,7 @@ export function bootstrapApp() {
         if (elements.btnGoalBack) elements.btnGoalBack.setAttribute('aria-label', navigation.returnTarget === 'home' || !session.getCurrentBookId() ? 'Back to home' : 'Back to reading');
         appShell.presentSurface(surface);
     });
-    goals.callbacks.openCollection = area => { if (home) void home.open().then(() => home.showArea(area)).catch(error => appShell.showToast(errorMessage(error, 'Could not open goals'))); };
+    goals.callbacks.openCollection = area => { if (home) void home.open().then(() => home.showArea(area)).catch(error => appShell.showToast(errorMessage(error, 'Could not open goals'), { kind: 'error' })); };
 
     const goalAction = (id: string) => ({ visible: goals.visible, disabled: !goals.canLink(id) || goals.linked(id), linked: goals.linked(id) });
     annotations.callbacks.getGoalAction = goalAction;
@@ -246,13 +247,13 @@ export function bootstrapApp() {
     annotations.callbacks.beforeDeleteAnnotations = () => goals.finishInlineEdit();
     annotations.callbacks.onAnnotationContentChanged = () => goals.refreshAnnotations();
     selection.callbacks.getGoalAction = goalAction;
-    selection.callbacks.onLinkGoal = id => goals.linkAnnotation(id).catch(error => { appShell.showToast(error.message); });
+    selection.callbacks.onLinkGoal = id => goals.linkAnnotation(id).catch(error => { appShell.showToast(error.message, { kind: 'error' }); });
     goals.callbacks.onActionsChanged = () => {
         updateNoteGoalActions(elements, goalAction); selection.refreshGoalAction();
         home?.changed();
     };
     goals.callbacks.onBeforeSidebarResize = () => reader.rememberAnchor();
-    goals.callbacks.chooseBook = () => { void home?.open().catch(error => appShell.showToast(errorMessage(error, 'Could not open reading home'))); };
+    goals.callbacks.chooseBook = () => { void home?.open().catch(error => appShell.showToast(errorMessage(error, 'Could not open reading home'), { kind: 'error' })); };
     goals.callbacks.onSurfaceChanged = () => requestAnimationFrame(() => appShell.callbacks.onWindowResize?.(false));
 
     // 3. Connect Cross-Module Callbacks
@@ -342,7 +343,7 @@ export function bootstrapApp() {
         if (data.books?.some(book => book.id === session.getCurrentBookId())) coordinator.clearReadingSession();
         await shelf.refreshShelf();
         await home?.open();
-        appShell.showToast(`成功从备份恢复 ${importedBooksCount} 本图书、${importedNotesCount} 条标注，请在首页选择书籍。`);
+        appShell.showToast(`Restored from backup: ${countLabel(importedBooksCount, 'book')}, ${countLabel(importedNotesCount, 'annotation')}. Choose a book on the home page.`);
     };
     const finishReadingEdits = async () => { await goals.finishInlineEdit(); await annotations.finishInlineEdit(); await annotations.assertInlineWritesSaved(); await goals.assertWritesSaved(); };
     backup.callbacks.beforeRestore = finishReadingEdits;
@@ -356,7 +357,9 @@ export function bootstrapApp() {
     layout.callbacks.beforeGeometryChange = () => { goals.finishInlineEdit().catch(() => {}); reader.rememberAnchor(); };
     layout.callbacks.onLayoutChange = (res) => {
         syncReaderLayout();
-        appShell.showToast(res.layoutMode === 'scroll' ? '已切换为连续滚动' : '已切换为单页阅读模式');
+        appShell.showToast(res.layoutMode === 'scroll' ? "Continuous scroll enabled" : "Single page enabled", {
+            anchor: document.getElementById(res.layoutMode === 'scroll' ? 'btn-mode-scroll' : 'btn-mode-single')
+        });
     };
     // 4. Initialize UI Listeners (Browser DOM only)
     if (typeof document !== 'undefined') {
@@ -446,15 +449,15 @@ async function initializeApp() {
 
     try { await initDB(); }
     catch (error) {
-        appInstance.appShell.showToast(errorMessage(error, '数据库迁移未完成，旧数据已保留'));
-        console.error('数据库启动／迁移停止', error);
+        appInstance.appShell.showToast(errorMessage(error, "Database migration is incomplete. Legacy data is preserved."), { kind: 'error' });
+        console.error("Database startup or migration stopped", error);
         throw error;
     }
     await appInstance.reader.fonts.ready;
     if (appInstance.elements.goalPanel) await appInstance.goals.initialize();
     if (!appInstance.goals.disabled) {
         try { await appInstance.goals.recoverBookIntents(); }
-        catch (error) { appInstance.appShell.showToast(errorMessage(error, 'Book association needs a retry in reading home')); }
+        catch (error) { appInstance.appShell.showToast(errorMessage(error, 'Book association needs a retry in reading home'), { kind: 'error' }); }
     }
     if (appInstance.home) await appInstance.home.open();
     return appInstance;
@@ -464,8 +467,8 @@ function showStartupError(error: unknown) {
     const host = document.getElementById('app-status');
     if (!host) return;
     host.hidden = false;
-    const message = document.createElement('p'); message.textContent = errorMessage(error, '书库暂时不可用，请重试');
-    const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '重试';
+    const message = document.createElement('p'); message.textContent = errorMessage(error, "The library is temporarily unavailable. Please try again.");
+    const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = "Retry";
     retry.addEventListener('click', () => { retry.disabled = true; void startApp().catch(showStartupError); });
     host.replaceChildren(message, retry);
 }

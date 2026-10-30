@@ -1,6 +1,7 @@
 import { BackupDialog } from '../backup/BackupDialog.js';
 import { memo } from 'react';
 import { Button } from '../../components/ui/button.js';
+import { ActionIcon } from '../../components/ui/action-icon.js';
 import { Input } from '../../components/ui/input.js';
 import { WorkspaceSettings } from './WorkspaceSettings.js';
 
@@ -8,7 +9,7 @@ import { WorkspaceSettings } from './WorkspaceSettings.js';
 // Keeping these hosts stable preserves EPUB ranges, imported fonts and export command state.
 export const WorkbenchShell = memo(function WorkbenchShell() {
     return <>
-    <section id="app-status" className="app-status" role="status" aria-live="polite"><p>{"正在打开书库…"}</p></section>
+    <section id="app-status" className="app-status" role="status" aria-live="polite"><p>{"Opening library…"}</p></section>
     <header className="app-header">
         <div className="header-side header-brand">
             <div className="brand">
@@ -16,116 +17,118 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                 <span className="brand-name">{"AuraReader"}</span>
             </div>
         </div>
+        <Button id="btn-goal-sidebar" size="icon-lg" className="btn btn-icon-sm" type="button" aria-label="Toggle goals sidebar" aria-expanded="true" aria-controls="goal-sidebar" hidden><ActionIcon name="sidebar" /></Button>
         <WorkspaceSettings />
     </header>
-    <div id="appearance-panel" className="appearance-panel" role="dialog" aria-label="视觉偏好">
+    <div id="appearance-panel" className="appearance-panel" role="dialog" aria-label="Reading settings">
+        <h2 className="appearance-heading">Reading settings</h2>
         <div className="appearance-row">
-            <label htmlFor="font-family-select">{"字体"}</label>
+            <label htmlFor="font-family-select">{"Font"}</label>
             <div id="font-picker" className="font-picker">
-                <Button id="font-family-select" className="font-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="font-menu" title="字体：自动选择">
-                    <span id="font-choice-label">{"自动选择"}</span>
-                    <span aria-hidden="true">{"⌄"}</span>
+                <Button id="font-family-select" size="lg" className="font-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="font-menu" title="Font: Auto">
+                    <span id="font-choice-label">{"Auto"}</span>
+                    <ActionIcon name="down" />
                 </Button>
-                <div id="font-menu" className="font-menu" role="menu" aria-label="字体" hidden>
+                <div id="font-menu" className="font-menu" role="menu" aria-label="Font" hidden>
                     <div id="font-main-view">
                         <div id="font-current-custom" hidden></div>
-                        <p className="font-group-label">{"基础"}</p>
-                        <Button className="font-option" type="button" role="menuitemradio" aria-checked="true" data-font-choice="auto">{"自动选择"}</Button>
-                        <Button className="font-option" type="button" role="menuitemradio" aria-checked="false" disabled title="原书字体恢复将在后续支持">
-                            {"原书字体"}
-                            <span className="font-option-note">{"暂未启用"}</span>
+                        <p className="font-group-label">{"Basic"}</p>
+                        <Button className="font-option" type="button" role="menuitemradio" aria-checked="true" data-font-choice="auto">{"Auto"}</Button>
+                        <Button className="font-option" type="button" role="menuitemradio" aria-checked="false" disabled title="Original book fonts are not available yet">
+                            {"Book font"}
+                            <span className="font-option-note">{"Not yet"}</span>
                         </Button>
-                        <p className="font-group-label">{"中文"}</p>
-                        <Button className="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="sarasa">{"更纱黑体"}</Button>
-                        <p className="font-group-label">{"英文"}</p>
+                        <p className="font-group-label">{"Chinese"}</p>
+                        <Button className="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="sarasa">{"Sarasa Gothic SC"}</Button>
+                        <p className="font-group-label">{"English"}</p>
                         <Button className="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="literata">{"Literata"}</Button>
                         <Button id="btn-more-fonts" className="font-more-entry" type="button" role="menuitem">
-                            {"更多字体…"}
-                            <span aria-hidden="true">{"›"}</span>
+                            <i className="ri-font-size" aria-hidden="true" />{"More fonts…"}
+                            <i className="ri-arrow-right-s-line" aria-hidden="true" />
                         </Button>
                     </div>
                     <div id="font-more-view" hidden>
-                        <Button id="btn-font-back" className="font-back" type="button">{"‹ 返回字体列表"}</Button>
-                        <Input id="font-search" className="font-search" type="search" maxLength={160} placeholder="搜索字体" aria-label="搜索字体" />
+                        <Button id="btn-font-back" className="font-back" type="button"><i className="ri-arrow-left-s-line" aria-hidden="true" />{"Back to fonts"}</Button>
+                        <Input id="font-search" className="font-search" type="search" maxLength={160} placeholder="Search fonts" aria-label="Search fonts" />
                         <div className="font-browser-actions">
-                            <Button id="btn-read-system-fonts" type="button">{"读取本机字体"}</Button>
-                            <Button id="btn-import-font" type="button">{"导入字体文件"}</Button>
+                            <Button id="btn-read-system-fonts" type="button"><i className="ri-computer-line" aria-hidden="true" />{"Read fonts"}</Button>
+                            <Button id="btn-import-font" type="button"><i className="ri-upload-line" aria-hidden="true" />{"Import font"}</Button>
                         </div>
                         <Input id="font-file-input" type="file" accept=".ttf,.otf,.woff2" hidden />
                         <p id="font-status" className="font-status" role="status" aria-live="polite"></p>
-                        <div id="font-browser-list" className="font-browser-list" role="group" aria-label="更多字体"></div>
+                        <div id="font-browser-list" className="font-browser-list" role="group" aria-label="More fonts"></div>
                     </div>
                 </div>
             </div>
         </div>
         <div className="appearance-row">
-            <span>{"字号"}</span>
+            <span>{"Size"}</span>
             <div className="appearance-stepper">
-                <Button id="btn-font-dec" className="btn btn-icon-sm" type="button" title="减小字号">{"A-"}</Button>
+                <Button id="btn-font-dec" size="icon-lg" className="btn btn-icon-sm" type="button" title="Decrease font size" aria-label="Decrease font size"><ActionIcon name="minus" /></Button>
                 <span id="font-size-label" className="font-size-text">{"18px"}</span>
-                <Button id="btn-font-inc" className="btn btn-icon-sm" type="button" title="增大字号">{"A+"}</Button>
+                <Button id="btn-font-inc" size="icon-lg" className="btn btn-icon-sm" type="button" title="Increase font size" aria-label="Increase font size"><ActionIcon name="plus" /></Button>
             </div>
         </div>
         <div className="appearance-row">
-            <label htmlFor="indent-select">{"段落缩进"}</label>
-            <select id="indent-select" className="select-sm" title="首行缩进模式" defaultValue="2em">
-                <option value="0em">{"无"}</option>
-                <option value="2em">{"2字"}</option>
-                <option value="3em">{"3字"}</option>
+            <label htmlFor="indent-select">{"Indent"}</label>
+            <select id="indent-select" className="select-sm" title="First-line indent" defaultValue="2em">
+                <option value="0em">{"None"}</option>
+                <option value="2em">{"2 em"}</option>
+                <option value="3em">{"3 em"}</option>
             </select>
         </div>
         <div className="appearance-row">
-            <span>{"阅读背景"}</span>
+            <span>{"Paper"}</span>
             <div className="paper-themes">
-                <Button className="paper-btn paper-white active" type="button" data-paper="white" title="纯白" aria-label="纯白纸张">白</Button>
-                <Button className="paper-btn paper-sepia" type="button" data-paper="sepia" title="护眼羊皮纸" aria-label="护眼羊皮纸">暖</Button>
-                <Button className="paper-btn paper-dark" type="button" data-paper="dark" title="夜间墨黑" aria-label="夜间墨黑纸张">夜</Button>
+                <Button size="icon-lg" className="paper-btn paper-white active" type="button" data-paper="white" title="White" aria-label="White paper">W</Button>
+                <Button size="icon-lg" className="paper-btn paper-sepia" type="button" data-paper="sepia" title="Sepia paper" aria-label="Sepia paper">S</Button>
+                <Button size="icon-lg" className="paper-btn paper-dark" type="button" data-paper="dark" title="Dark" aria-label="Dark paper">D</Button>
             </div>
         </div>
         <div className="appearance-row">
-            <span>{"版式"}</span>
+            <span>{"Layout"}</span>
             <div className="reader-mode-group">
-                <Button id="btn-mode-scroll" className="btn btn-icon-sm mode-choice" type="button" title="连续滚动">{"滚动"}</Button>
-                <Button id="btn-mode-single" className="btn btn-icon-sm mode-choice" type="button" title="单页阅读">{"单页"}</Button>
+                <Button id="btn-mode-scroll" size="lg" className="btn btn-icon-sm mode-choice" type="button" title="Continuous scroll">{"Scroll"}</Button>
+                <Button id="btn-mode-single" size="lg" className="btn btn-icon-sm mode-choice" type="button" title="Single page">{"Page"}</Button>
             </div>
         </div>
     </div>
     <section id="export-panel" className="export-panel" role="dialog" aria-labelledby="export-panel-title" aria-hidden="true">
         <div className="export-panel-heading">
-            <h2 id="export-panel-title">{"导出当前书籍"}</h2>
+            <h2 id="export-panel-title">{"Export book"}</h2>
             <p>
-                {"当前书籍 ·"}
-                <span id="export-book-title">{"未打开书籍"}</span>
+                {"Book · "}
+                <span id="export-book-title">{"No book open"}</span>
             </p>
         </div>
-        <h3 className="export-section-title">{"导出"}</h3>
+        <h3 className="export-section-title">{"Export"}</h3>
         <Button id="btn-export-markdown" className="export-menu-action" type="button" data-export-action="">
             <i className="ri-file-text-line" aria-hidden="true"></i>
-            <span className="export-action-label">{"笔记摘要"}</span>
+            <span className="export-action-label">{"Notes summary"}</span>
             <span className="export-extension">{".md"}</span>
         </Button>
         <div id="chapter-export-entry" className="chapter-export-entry">
             <Button id="btn-export-chapters" className="export-menu-action" type="button" aria-expanded="false" aria-controls="chapter-export-options">
                 <i className="ri-folder-download-line" aria-hidden="true"></i>
-                <span className="export-action-label">{"按章节导出"}</span>
+                <span className="export-action-label">{"Chapters"}</span>
                 <span className="export-extension">{".md"}</span>
             </Button>
             <div id="chapter-export-options" className="chapter-export-options" hidden>
-                <Button id="btn-collapse-chapter-export" className="chapter-export-back" type="button" aria-label="返回导出菜单">
+                <Button id="btn-collapse-chapter-export" className="chapter-export-back" type="button" aria-label="Back to export menu">
                     <i className="ri-arrow-left-s-line" aria-hidden="true"></i>
-                    {"按章节导出"}
+                    {"Chapters"}
                 </Button>
-                <Button id="btn-export-current-chapter" className="chapter-export-range" type="button">{"当前章节"}</Button>
-                <Button id="btn-export-all-chapters" className="chapter-export-range" type="button">{"全部章节"}</Button>
+                <Button id="btn-export-current-chapter" className="chapter-export-range" type="button">{"Current chapter"}</Button>
+                <Button id="btn-export-all-chapters" className="chapter-export-range" type="button">{"All chapters"}</Button>
                 <Button id="btn-select-chapters" className="chapter-export-range" type="button" aria-expanded="false" aria-controls="chapter-export-custom">
-                    {"选择章节"}
+                    {"Select chapters"}
                     <i className="ri-arrow-right-s-line" aria-hidden="true"></i>
                 </Button>
                 <div id="chapter-export-custom" hidden>
-                    <div id="chapter-export-list" className="chapter-export-list" role="group" aria-label="选择需要导出的章节"></div>
+                    <div id="chapter-export-list" className="chapter-export-list" role="group" aria-label="Select chapters to export"></div>
                     <div className="chapter-export-actions">
-                        <Button id="btn-cancel-chapter-export" className="btn btn-ghost-sm" type="button">{"取消"}</Button>
-                        <Button id="btn-confirm-chapter-export" className="btn btn-primary" type="button" disabled>{"导出"}</Button>
+                        <Button id="btn-cancel-chapter-export" className="btn btn-ghost-sm" type="button">{"Cancel"}</Button>
+                        <Button id="btn-confirm-chapter-export" className="btn btn-primary" type="button" disabled>{"Export"}</Button>
                     </div>
                 </div>
             </div>
@@ -137,17 +140,16 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
             <div className="goal-resizer" id="goal-resizer" role="separator" tabIndex={0} aria-label="Resize goals sidebar" aria-orientation="vertical" aria-controls="goal-sidebar"></div>
         </aside>
         <main className="workspace-container immersive-notes" id="workspace-container">
-            <header className="reader-toolbar" aria-label="当前书籍操作">
-                <Button id="btn-goal-sidebar" className="btn btn-icon-sm" type="button" aria-label="Toggle goals sidebar" aria-expanded="true" aria-controls="goal-sidebar" hidden><i className="ri-side-bar-line" aria-hidden="true" /></Button>
-                <div className="header-center"><Button id="btn-toc" className="book-nav-btn" type="button" title="打开章节目录" aria-expanded="false" aria-controls="toc-drawer">
-                    <i className="ri-list-unordered" /><span id="current-book-title" className="book-nav-title">未打开书籍</span><i className="ri-arrow-down-s-line book-nav-caret" />
+            <header className="reader-toolbar" aria-label="Book actions">
+                <div className="header-center"><Button id="btn-toc" size="lg" className="book-nav-btn" type="button" title="Open contents" aria-expanded="false" aria-controls="toc-drawer">
+                    <ActionIcon name="contents" /><span id="current-book-title" className="book-nav-title">No book open</span><ActionIcon name="down" className="book-nav-caret" />
                 </Button></div>
                 <div className="header-actions">
-                    <Button id="btn-shelf" className="btn btn-icon nav-icon" type="button" title="我的书库" aria-expanded="false" aria-controls="shelf-panel" aria-haspopup="dialog">
-                        <i className="ri-book-shelf-line" /><span className="badge-count" id="shelf-book-count" hidden>0</span>
+                    <Button id="btn-shelf" size="icon-lg" className="btn btn-icon nav-icon" type="button" title="My library" aria-expanded="false" aria-controls="shelf-panel" aria-haspopup="dialog">
+                        <ActionIcon name="library" /><span className="badge-count" id="shelf-book-count" hidden>0</span>
                     </Button>
-                    <Button id="btn-appearance" className="btn reader-appearance-trigger" type="button" title="阅读设置" aria-label="阅读设置" aria-expanded="false" aria-controls="appearance-panel"><span aria-hidden="true">Aa</span><span className="reader-action-label">阅读设置</span></Button>
-                    <Button id="btn-export-menu" className="btn btn-icon nav-icon" type="button" title="导出当前书籍" aria-label="导出当前书籍" aria-expanded="false" aria-controls="export-panel"><i className="ri-more-line" aria-hidden="true" /></Button>
+                    <Button id="btn-appearance" size="icon-lg" className="btn btn-icon reader-appearance-trigger" type="button" title="Reading settings" aria-label="Reading settings" aria-expanded="false" aria-controls="appearance-panel"><ActionIcon name="palette" /></Button>
+                    <Button id="btn-export-menu" size="icon-lg" className="btn btn-icon nav-icon" type="button" title="Export book" aria-label="Export book" aria-expanded="false" aria-controls="export-panel"><ActionIcon name="more" /></Button>
                 </div>
             </header>
             <section className="reader-panel" id="reader-panel">
@@ -155,43 +157,43 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                     <div className="toc-header">
                         <h4>
                             <i className="ri-list-check"></i>
-                            {"书籍目录"}
+                            {"Contents"}
                         </h4>
                         <Button id="btn-close-toc" className="btn btn-icon-sm"><i className="ri-close-line"></i></Button>
                     </div>
                     <ul className="toc-list" id="toc-list"></ul>
                 </aside>
                 <div className="reader-viewport" id="reader-viewport"><div className="paper-container" id="paper-container"><article className="book-paper" id="book-paper"></article></div></div>
-                <nav className="reader-pagination" aria-label="翻页">
+                <nav className="reader-pagination" aria-label="Pagination">
                     <span id="react-reading-book"></span>
-                    <Button id="btn-prev-page" className="page-turn-btn" type="button" title="上一页 (←)">{"‹"}</Button>
+                    <Button id="btn-prev-page" size="icon-lg" className="page-turn-btn" type="button" title="Previous page (←)" aria-label="Previous page"><ActionIcon name="left" /></Button>
                     <span className="page-indicator">
                         <span id="current-page">{"1"}</span>
                         {"/"}
                         <span id="total-pages">{"1"}</span>
-                        <span id="page-unit">{"页"}</span>
+                        <span id="page-unit">{" page"}</span>
                     </span>
-                    <Button id="btn-next-page" className="page-turn-btn" type="button" title="下一页 (→)">{"›"}</Button>
+                    <Button id="btn-next-page" size="icon-lg" className="page-turn-btn" type="button" title="Next page (→)" aria-label="Next page"><ActionIcon name="right" /></Button>
                 </nav>
                 <div className="selection-tooltip" id="selection-tooltip">
                     <span id="react-selection-actions"></span>
-                    <Button className="tooltip-btn hl-yellow" data-color="yellow" title="高亮标记">
+                    <Button className="tooltip-btn hl-yellow" data-color="yellow" title="Highlight text">
                         <i className="ri-mark-pen-line"></i>
-                        {"高亮"}
+                        {"Highlight"}
                     </Button>
-                    <Button className="tooltip-btn" id="btn-add-note" title="添加随笔">
+                    <Button className="tooltip-btn" id="btn-add-note" title="Add note">
                         <i className="ri-sticky-note-line"></i>
-                        {"笔记"}
+                        {"Note"}
                     </Button>
                 </div>
                 <div className="selection-tooltip" id="highlight-action-tooltip">
-                    <Button className="tooltip-btn" id="btn-hl-remove" type="button" style={{"color":"#fca5a5"}} title="只移除黄色高亮">
+                    <Button className="tooltip-btn" id="btn-hl-remove" type="button" style={{"color":"#fca5a5"}} title="Remove only the yellow highlight">
                         <i className="ri-delete-bin-line"></i>
-                        {"删除高亮"}
+                        {"Delete highlight"}
                     </Button>
-                    <Button className="tooltip-btn" id="btn-note-remove" type="button" style={{"color":"#fca5a5"}} title="只删除此处关联的笔记">
+                    <Button className="tooltip-btn" id="btn-note-remove" type="button" style={{"color":"#fca5a5"}} title="Delete only the linked note">
                         <i className="ri-delete-bin-line"></i>
-                        <span>{"删除笔记"}</span>
+                        <span>{"Delete note"}</span>
                     </Button>
                     <Button className="tooltip-btn" id="btn-annotation-goal" type="button" hidden aria-label="Add to goal">
                         <i className="ri-links-line" aria-hidden="true"></i>
@@ -202,18 +204,18 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
             <section className="notes-panel" id="notes-panel">
                 <div className="tabs-header"><Button className="tab-btn active" data-tab="tab-highlights">
                         <i className="ri-quill-pen-line"></i>
-                        <span>{"划线与笔记"}</span>
+                        <span>{"Highlights and notes"}</span>
                         <span className="badge-count" id="count-highlights">{"0"}</span>
                     </Button></div>
                 <div className="tab-content active" id="tab-highlights">
                     <div className="notes-toolbar">
                         <span className="notes-count-text">
                             <strong id="notes-total-count">{"0"}</strong>
-                            {"条笔记"}
+                            {" notes"}
                         </span>
-                        <div className="notes-actions" style={{"display":"flex","gap":"6px","alignItems":"center"}}><Button id="btn-toggle-show-highlights" className="btn btn-outline-sm" style={{"fontSize":"0.78rem","padding":"3px 8px"}} title="点击切换是否在笔记区显示纯划线">
+                        <div className="notes-actions" style={{"display":"flex","gap":"6px","alignItems":"center"}}><Button id="btn-toggle-show-highlights" className="btn btn-outline-sm" style={{"fontSize":"0.78rem","padding":"3px 8px"}} title="Toggle highlights in the notes panel">
                                 <i className="ri-eye-line"></i>
-                                {"显示划线 ("}
+                                {"Show highlights ("}
                                 <span id="count-pure-highlights">{"0"}</span>
                                 {")"}
                             </Button></div>
@@ -222,8 +224,8 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                         <div id="react-notes"></div>
                         <div className="empty-state" id="empty-notes-state">
                             <i className="ri-draft-line"></i>
-                            <p>{"暂无划线或笔记"}</p>
-                            <small>{"在左侧图书中选中文本即可高亮或添加笔记"}</small>
+                            <p>{"No highlights or notes"}</p>
+                            <small>{"Select text in the book to highlight or add a note."}</small>
                         </div>
                     </div>
                 </div>
@@ -238,16 +240,16 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
     <BackupDialog />
     <section id="shelf-panel" className="appearance-panel shelf-panel" role="dialog" aria-modal="false" aria-labelledby="shelf-panel-title" aria-hidden="true">
         <div className="shelf-header">
-            <h2 id="shelf-panel-title">{"本地书库"}</h2>
-            <Button id="btn-close-shelf" className="btn btn-icon-sm" type="button" aria-label="关闭书库" title="关闭书库"><i className="ri-close-line" aria-hidden="true"></i></Button>
+            <h2 id="shelf-panel-title">{"Local library"}</h2>
+            <Button id="btn-close-shelf" className="btn btn-icon-sm" type="button" aria-label="Close library" title="Close library"><i className="ri-close-line" aria-hidden="true"></i></Button>
         </div>
         <div className="shelf-actions">
-            <Button id="btn-import-book" className="btn btn-ghost-sm" type="button" title="打开本地 EPUB / PDF / TXT">{"导入书籍"}</Button>
-            <Button id="btn-switch-demo" className="btn btn-ghost-sm" type="button" title="切换示例图书">{"示例图书"}</Button>
+            <Button id="btn-import-book" className="btn btn-ghost-sm" type="button" title="Open local EPUB / PDF / TXT">{"Import book"}</Button>
+            <Button id="btn-switch-demo" className="btn btn-ghost-sm" type="button" title="Switch sample book">{"Sample book"}</Button>
             <Input type="file" id="file-input" accept=".epub,.pdf,.txt" hidden />
         </div>
-        <ul className="shelf-list" id="shelf-list" aria-label="本地书籍"></ul>
-        <p className="shelf-hint">{"书籍与标注保存在本机。请定期备份阅读成果，并保持本地服务运行。"}</p>
+        <ul className="shelf-list" id="shelf-list" aria-label="Local books"></ul>
+        <p className="shelf-hint">{"Books and annotations are stored locally. Back up regularly and keep the local service running."}</p>
     </section>
     <div className="toast" id="toast-msg"></div>
     </>;

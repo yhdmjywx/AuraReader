@@ -1,6 +1,6 @@
 # Project profile
 
-verified: 2026-10-29 · owner rules: AGENTS.md
+verified: 2026-10-30 · owner rules: AGENTS.md
 
 ## Identity
 - AuraReader: a reader centered on the reader achieving their own goals. Goal is
@@ -45,6 +45,10 @@ verified: 2026-10-29 · owner rules: AGENTS.md
 ## Code locations
 - interface and application coordination: src/client/
 - shared interface primitives: src/client/components/ui/
+- workbench action-button variants: components/ui/button.tsx,
+  components/ui/action-button.css, and components/ui/action-icon.tsx under
+  src/client/. Vega recipes are adapted to the existing CSS build; SVG paths
+  reuse the installed Remix Icon package.
 - workbench presentation: src/client/features/workbench/
 - shared Goal presentation: src/client/features/goals/goalUI.tsx
 - reader runtime boundary: src/client/features/reader/readerRuntime.ts
@@ -65,7 +69,10 @@ verified: 2026-10-29 · owner rules: AGENTS.md
   docs/product/2026-10-29-workspace-ui-decision.md
 - UI/UX specification: docs/product/ui-ux-design.md. The visual and interaction
   baseline is approved; detailed measurements, action placement, and remaining
-  decisions are listed under Open. shadcn/ui is the chosen visual design system.
+  decisions are listed under Open. shadcn/ui with the Vega classic style is the
+  chosen visual baseline. Keep compatible presentation unchanged; Vega governs
+  conflicts. Prefer direct reuse of official Vega code and styles as described
+  in the UI/UX specification.
   This records a design decision, not a completed implementation or dependency
   migration. Do not treat the current interface as approval for disputed changes.
 
@@ -88,6 +95,11 @@ verified: 2026-10-29 · owner rules: AGENTS.md
 (source: existing project documents; owner-stated maintenance rules, 2026-10-29)
 
 ## Conventions
+- Product copy is English, including application feedback and generated export
+  descriptions. Reader content and historical saved values retain their original
+  language. Layout and interaction paths remain unchanged. Windows-owned dialog
+  controls follow the system language. (source: owner-approved English unification,
+  docs/product/ui-ux-design.md, 2026-10-30)
 - New agent rules and project profiles: English.
 - Owner-facing explanations, questions, and summaries: Chinese.
 - Existing product documents retain their language unless translation is requested.

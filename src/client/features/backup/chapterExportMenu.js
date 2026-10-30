@@ -13,7 +13,7 @@ export class ChapterExportMenu {
         });
         elements.btnExportChapters.addEventListener('click', () => {
             const book = callbacks.getCurrentBook?.();
-            if (!book?.pages?.length) { callbacks.showToast?.('当前图书无可导出内容'); return; }
+            if (!book?.pages?.length) { callbacks.showToast?.("This book has no content to export."); return; }
             this.expand(true);
             elements.btnExportCurrentChapter.focus({ preventScroll: true });
         });
@@ -64,7 +64,7 @@ export class ChapterExportMenu {
             const book = this.callbacks.getCurrentBook?.();
             if (book !== this.selectionBook) {
                 const structure = buildBookStructure(book);
-                if (!structure.units.length) { this.callbacks.showToast?.('当前图书无可导出内容'); return; }
+                if (!structure.units.length) { this.callbacks.showToast?.("This book has no content to export."); return; }
                 this.selectionBook = book;
                 renderChapterChoices(e.chapterExportList, structure.units);
                 e.chapterExportList.scrollTop = 0;
@@ -83,7 +83,7 @@ export class ChapterExportMenu {
         const e = this.elements;
         for (const button of [e.btnExportChapters, e.btnCollapseChapterExport, e.btnExportCurrentChapter, e.btnExportAllChapters, e.btnSelectChapters, e.btnCancelChapterExport]) button.disabled = this.busy;
         e.btnConfirmChapterExport.disabled = this.busy || !this.selectedIds().length;
-        e.btnConfirmChapterExport.textContent = this.busy ? '正在导出…' : '导出';
+        e.btnConfirmChapterExport.textContent = this.busy ? "Exporting…" : "Export";
         e.chapterExportList.querySelectorAll('input').forEach(input => { input.disabled = this.busy; });
         e.chapterExportEntry.setAttribute('aria-busy', String(this.busy));
     }
@@ -98,10 +98,10 @@ export class ChapterExportMenu {
             selectedUnitIds = unit ? [unit.id] : [];
         } else if (scope === 'all') selectedUnitIds = structure.units.map(unit => unit.id);
         else {
-            if (book !== this.selectionBook) { this.custom(true); this.callbacks.showToast?.('当前书籍已切换，请重新选择章节'); return; }
+            if (book !== this.selectionBook) { this.custom(true); this.callbacks.showToast?.("The current book has changed. Select chapters again."); return; }
             selectedUnitIds = this.selectedIds();
         }
-        if (!selectedUnitIds.length) { this.callbacks.showToast?.('请至少选择一个要导出的章节'); return; }
+        if (!selectedUnitIds.length) { this.callbacks.showToast?.("Select at least one chapter to export."); return; }
         this.busy = true; this.update();
         let saved = false;
         try {

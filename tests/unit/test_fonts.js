@@ -38,6 +38,13 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
     const english = resolveFont({ kind: 'builtin', id: 'literata' }, {});
     assert.match(english.family, /Literata.*Sarasa Gothic SC/);
     assert.deepEqual(english.loadFamilies, ['Literata', 'Sarasa Gothic SC']);
+    const originalGroup = CURATED_FONTS[1].group;
+    try {
+        CURATED_FONTS[1].group = 'Renamed display group';
+        assert.equal(resolveFont({ kind: 'builtin', id: 'literata' }, {}).family, english.family);
+        assert.deepEqual(resolveFont({ kind: 'builtin', id: 'literata' }, {}).loadFamilies, english.loadFamilies,
+            'Changing a display label must not change font fallback behavior');
+    } finally { CURATED_FONTS[1].group = originalGroup; }
     assert.match(resolveFont({ kind: 'auto' }, { language: 'zh-CN' }).family, /Sarasa Gothic SC/);
     assert.match(resolveFont({ kind: 'auto' }, { language: 'en' }).family, /Literata/);
     assert.match(resolveFont({ kind: 'auto' }, {}).family, /system-ui/);
@@ -114,7 +121,7 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
         }
         const fonts = new FontController({ getBook: () => ({ language: 'en' }), onChange: () => applied++ });
         await require('../helpers/react-workbench.cjs').ui(async () => { fonts.initUI(elements); await fonts.ready; });
-        assert.equal(elements.fontChoiceLabel.textContent, '自动选择');
+        assert.equal(elements.fontChoiceLabel.textContent, 'Auto');
         assert.equal(elements.fontMenu.querySelector('[data-font-choice="auto"]').getAttribute('aria-checked'), 'true');
         elements.fontFamilySelect.click();
         assert.equal(elements.fontMenu.hidden, false);

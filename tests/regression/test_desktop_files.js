@@ -73,7 +73,7 @@ const { createFileService, readBounded, exportName } = require('../../src/deskto
         assert.equal(exportName('C:\\folder\\CON.md'), '_CON.md');
         const folderRequest = { folderName: '章节导出', files: [
             { filename: '01_一.md', bytes: new TextEncoder().encode('# 一\n原文😀') },
-            { filename: '00_目录概览.md', bytes: new TextEncoder().encode('[一](./01_一.md)') }
+            { filename: '00_contents.md', bytes: new TextEncoder().encode('[一](./01_一.md)') }
         ] };
         choose(directory);
         const folder = await service.call('saveExportFolder', folderRequest);
@@ -118,7 +118,7 @@ const { createFileService, readBounded, exportName } = require('../../src/deskto
             if (++authorizations > 1) throw Object.assign(new Error('sender changed'), { status: 403 });
         }), { status: 403 });
         await fs.writeFile(path.join(data, 'fonts', name), 'tampered');
-        await assert.rejects(service.fontResource(name), /完整性/);
+        await assert.rejects(service.fontResource(name), /integrity/);
         assert.ok(options.some(value => value.properties.includes('showOverwriteConfirmation')));
         console.log('PASS: bounded native-file service, cancellation, destination control, atomic bytes, font persistence/hash, concurrent dialog denial and shutdown waiting');
     } finally {

@@ -24,7 +24,7 @@ export class ReaderEngine {
         const pages = (this.bookData && Array.isArray(this.bookData.pages)) ? this.bookData.pages : [];
         const totalPages = Math.max(1, pages.length);
         const toc = ensureTocHierarchy(this.bookData && this.bookData!.toc);
-        const chapter = toc.length ? findChapterForPage(toc, 1) : '正文';
+        const chapter = toc.length ? findChapterForPage(toc, 1) : "Text";
 
         this.location = createReadingLocation({
             bookId,
@@ -76,10 +76,10 @@ export class ReaderEngine {
     prevPage() { return this.goToPage(this.location.page - 1); }
 
     getPageContent(pageNum: number) {
-        if (!this.hasBook()) return '<p>页面暂无内容</p>';
+        if (!this.hasBook()) return "<p>No content on this page</p>";
         const total = this.location.totalPages;
         const validPage = clampPage(pageNum, total);
-        return this.bookData!.pages[validPage - 1] || '<p>页面暂无内容</p>';
+        return this.bookData!.pages[validPage - 1] || "<p>No content on this page</p>";
     }
 
 }

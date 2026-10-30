@@ -29,7 +29,7 @@ export function clearChapterFlow(elements) {
         elements.bookPaper.style.overflow = '';
         elements.bookPaper.style.width = '';
     }
-    if (elements.pageUnit) elements.pageUnit.textContent = '页';
+    if (elements.pageUnit) elements.pageUnit.textContent = ' page';
 }
 
 export function layoutChapterStrip(elements, mode) {
@@ -217,7 +217,7 @@ export function writeChapterIndicator(elements, mode) {
         total = Math.max(1, Math.ceil(scrollHeight / Math.max(1, height)));
         current = Math.min(total, Math.floor(scrollTop / Math.max(1, height)) + 1);
         label = String(current);
-        if (elements.pageUnit) elements.pageUnit.textContent = '屏';
+        if (elements.pageUnit) elements.pageUnit.textContent = total === 1 ? ' screen' : ' screens';
     } else if (paper) {
         const metrics = columnMetrics(paper.clientWidth, mode);
         const contentTotal = contentColumnCount(paper, metrics);
@@ -225,7 +225,7 @@ export function writeChapterIndicator(elements, mode) {
         current = columnFromScroll(paper.scrollLeft, metrics.stride, contentTotal);
         if (current > contentTotal) current = contentTotal;
         label = String(current);
-        if (elements.pageUnit) elements.pageUnit.textContent = '栏';
+        if (elements.pageUnit) elements.pageUnit.textContent = total === 1 ? ' column' : ' columns';
     }
     elements.currentPageSpan.textContent = label;
     elements.totalPagesSpan.textContent = String(total);

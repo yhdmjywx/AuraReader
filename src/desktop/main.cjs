@@ -19,11 +19,11 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
     // Honor Electron's explicit profile switch for isolated acceptance and user-
     // selected data locations. Renderer cannot change this main-process setting.
     const profile = profileDirectory || app.commandLine.getSwitchValue('user-data-dir') || path.join(app.getPath('appData'), 'AuraReader');
-    if (!path.isAbsolute(profile)) throw new Error('用户数据目录必须使用绝对路径。');
+    if (!path.isAbsolute(profile)) throw new Error("The user data directory must use an absolute path.");
     if (app.isPackaged) {
         const relative = path.relative(path.dirname(process.execPath), path.resolve(profile));
         const outside = relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative);
-        if (!outside) throw new Error('用户数据目录必须位于安装目录之外。');
+        if (!outside) throw new Error("The user data directory must be outside the installation directory.");
     }
     fs.mkdirSync(profile, { recursive: true });
     app.setPath('userData', profile);
@@ -71,7 +71,7 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
     app.on('window-all-closed', () => app.quit());
     window.webContents.on('preload-error', (_event, _file, error) => {
         console.error('Desktop preload failed:', error);
-        dialog.showErrorBox('AuraReader 启动失败', '安全隔离入口加载失败，请保留现有数据并重新安装应用。');
+        dialog.showErrorBox("AuraReader startup failed", "The secure preload could not be loaded. Preserve existing data and reinstall the application.");
         app.exit(1);
     });
     await window.loadURL(APP_URL);
@@ -82,7 +82,7 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
 if (require.main === module) {
     startDesktop().catch(error => {
         console.error('Desktop startup failed:', error);
-        dialog.showErrorBox('AuraReader 启动失败', error instanceof Error ? error.message : String(error));
+        dialog.showErrorBox("AuraReader startup failed", error instanceof Error ? error.message : String(error));
         app.exit(1);
     });
 }

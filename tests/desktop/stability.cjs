@@ -27,7 +27,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     const wait = expression => run(`(async()=>{const end=Date.now()+20000;while(!(${expression})){if(Date.now()>end)throw new Error('Stability state timeout');await new Promise(r=>setTimeout(r,20));}})()`);
     if (mode === 'corrupt') {
         await wait(`document.documentElement.dataset.desktopReady==='error'`);
-        assert.match(await run(`document.getElementById('desktop-status').textContent`), /本地书库操作失败，原数据未清除/);
+        assert.match(await run(`document.getElementById('desktop-status').textContent`), /Local library operation failed. Existing data has been preserved./);
         assert.equal((await run('auraDesktop.storage.status()')).error.status, 500);
         assert.equal((await fs.readFile(path.join(profile, 'data/aurareader.sqlite'))).toString(), 'corrupted test specimen');
         await fs.writeFile(path.join(output, 'corrupt.json'), JSON.stringify({ passed: true, noSilentReset: true }));
@@ -147,7 +147,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
         const importMs = Date.now() - importStart;
         opens.push({ canceled: false, filePaths: [output] });
         await run(`(async()=>{const a=await import('./main.js');await a.backup.exportChapters(a.reader.getCurrentBook(),[]);})()`);
-        const exported = await fs.readdir(path.join(output, 'large_章节导出'));
+        const exported = await fs.readdir(path.join(output, 'large_chapters'));
         assert.equal(exported.filter(name => name.endsWith('.md')).length, chapters + 1);
         checks.push(`offline generated EPUB: ${chapters} chapters, ${decodedBytes} decoded bytes; original parser, SQLite, reader and real chapter folder verified (${importMs}ms import)`);
 

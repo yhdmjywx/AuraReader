@@ -118,7 +118,7 @@ export class ReaderController {
                 if (this.isChapterFlow() && !this._flowPage) { this.applyTypography(); return; }
                 this.rememberAnchor(); this.applyTypography(); this.refitAfterTypography();
             },
-            notify: message => this.callbacks.showToast?.(message)
+            notify: (message, options) => this.callbacks.showToast?.(message, options)
         });
     }
 
@@ -157,7 +157,7 @@ export class ReaderController {
         this.bookStructure = null; this.flowAnchorText = ''; this._flowPage = 0; this._volumeTitlePages = [];
         this.currentPage = this.totalPages = 1;
         for (const paper of [this.elements?.bookPaper]) paper?.replaceChildren();
-        if (this.elements?.currentBookTitle) this.elements.currentBookTitle.textContent = '未打开书籍';
+        if (this.elements?.currentBookTitle) this.elements.currentBookTitle.textContent = "No book open";
         this.renderTOC([]);
         this.emit('location');
     }
@@ -310,14 +310,14 @@ export class ReaderController {
             this.flowAnchorText = '';
             this.renderChapterPage(targetPage, false, notes, { toStart: !anchor, anchorId: anchor || '' });
             if (this.callbacks.showToast) {
-                this.callbacks.showToast(`书内关联跳转至第 ${targetPage} 章`);
+                this.callbacks.showToast(`Followed book link to chapter ${targetPage}`);
             }
             return;
         }
 
         this.renderPage(targetPage, false, notes);
         if (this.callbacks.showToast) {
-            this.callbacks.showToast(`书内关联跳转至 P.${targetPage}`);
+            this.callbacks.showToast(`Followed book link to p.${targetPage}`);
         }
 
         if (anchor && this.elements) {
@@ -361,7 +361,7 @@ export class ReaderController {
             }
             domCloseTOC(this.elements);
             if (this.callbacks.showToast) {
-                this.callbacks.showToast(`跳转至：${item.title}`);
+                this.callbacks.showToast(`Jumped to: ${item.title}`);
             }
         });
     }
@@ -431,7 +431,7 @@ export class ReaderController {
                 this.applyTypography();
                 this.refitAfterTypography();
                 if (this.callbacks.showToast) {
-                    this.callbacks.showToast(`已切换首行缩进：${input.options[input.selectedIndex].text}`);
+                    this.callbacks.showToast(`First-line indent: ${input.options[input.selectedIndex].text}`, { anchor: input });
                 }
             }, { signal });
         }
@@ -488,6 +488,11 @@ export class ReaderController {
     }
 
     applyTypography() {
+        if (this.elements?.bookPaper) {
+            const book = this.getCurrentBook();
+            // The English application language must not override source-book language.
+            this.elements.bookPaper.lang = String(book?.language || book?.languages?.[0] || '').replace(/_/g, '-');
+        }
         const elements = this.elements;
         if (!elements) return;
         const papers = [elements.bookPaper];

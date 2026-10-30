@@ -1,3 +1,4 @@
+import { countLabel } from '../../domain/format.js';
 import { goalGraphsForBooks } from '../../infrastructure/goalLibraryRepository.js';
 /* ==========================================================================
    BackupController - Exporters & Backup Feature Controller
@@ -61,7 +62,7 @@ export class BackupController {
         this.availableBackupBooks = Array.from(map.values());
 
         if (this.availableBackupBooks.length === 0) {
-            if (this.callbacks.showToast) this.callbacks.showToast('本地暂无可用于备份的图书');
+            if (this.callbacks.showToast) this.callbacks.showToast("No local books to back up.");
             return;
         }
 
@@ -90,7 +91,7 @@ export class BackupController {
         if (!this.elements) return;
         const selectedIds = getSelectedBookIds(this.elements);
         if (selectedIds.length === 0) {
-            if (this.callbacks.showToast) this.callbacks.showToast('请至少勾选一本要备份的图书');
+            if (this.callbacks.showToast) this.callbacks.showToast("Select at least one book to back up.");
             return;
         }
 
@@ -115,9 +116,9 @@ export class BackupController {
             if (window.auraDesktop) {
                 const saved = results.filter(result => result.status === 'saved').length;
                 const failed = results.find(result => result.status === 'failed');
-                this.callbacks.showToast(`已保存 ${saved}/${selectedBooks.length} 份书籍备份` +
-                    (failed ? `；保存失败：${failed.message}` : saved < selectedBooks.length ? '；其余未保存，已取消后续操作' : ''));
-            } else this.callbacks.showToast(`已为 ${selectedBooks.length} 本图书分别发起备份下载，包含 ${notesToExport.length} 条高亮与笔记`);
+                this.callbacks.showToast(`Saved ${saved}/${selectedBooks.length} ${selectedBooks.length === 1 ? 'book backup' : 'book backups'}` +
+                    (failed ? `; save failed: ${failed.message}` : saved < selectedBooks.length ? "; remaining backups were not saved because the operation was canceled" : ''));
+            } else this.callbacks.showToast(`Requested backups for ${countLabel(selectedBooks.length, 'book')}, containing ${countLabel(notesToExport.length, 'annotation')}`);
         }
     }
 
@@ -170,29 +171,29 @@ export class BackupController {
                 });
             }
         } catch (err) {
-            console.error("备份解析失败:", err);
+            console.error("Backup parsing failed:", err);
             if (this.callbacks.showToast) {
-                this.callbacks.showToast("备份恢复失败: " + err.message);
+                this.callbacks.showToast("Backup restore failed: " + err.message, { kind: 'error' });
             }
         }
     }
 
     async exportMarkdown(bookTitle, notes) {
-        try { this.exportFeedback(await adapterExportMarkdown(bookTitle, notes), 'Markdown 文件'); }
-        catch (error) { this.callbacks.showToast?.('导出 Markdown 失败: ' + error.message); }
+        try { this.exportFeedback(await adapterExportMarkdown(bookTitle, notes), "Markdown file"); }
+        catch (error) { this.callbacks.showToast?.("Markdown export failed: " + error.message, { kind: 'error' }); }
     }
 
     exportFeedback(result, label) {
-        this.callbacks.showToast?.(result?.status === 'canceled' ? '已取消保存' :
-            result?.status === 'saved' ? `已保存${label}` : `已发起${label}下载`);
+        this.callbacks.showToast?.(result?.status === 'canceled' ? "Save canceled" :
+            result?.status === 'saved' ? `Saved ${label}` : `Requested download: ${label}`);
     }
 
     async exportChapters(book, notes, options) {
         try {
             const result = await adapterExportChapters(book, notes, options);
-            this.exportFeedback(result, result.kind === 'folder' ? `章节文件夹「${result.name}」` : '章节 Markdown 文件');
+            this.exportFeedback(result, result.kind === 'folder' ? `chapter folder “${result.name}”` : "chapter Markdown file");
             return result;
-        } catch (error) { this.callbacks.showToast?.('章节导出失败: ' + error.message); }
+        } catch (error) { this.callbacks.showToast?.("Chapter export failed: " + error.message, { kind: 'error' }); }
     }
 
     initUI(elements) {
@@ -201,9 +202,9 @@ export class BackupController {
 
         if (elements.btnExportMarkdown) {
             elements.btnExportMarkdown.addEventListener('click', () => {
-                const book = this.callbacks.getCurrentBook ? this.callbacks.getCurrentBook() : { title: '图书' };
+                const book = this.callbacks.getCurrentBook ? this.callbacks.getCurrentBook() : { title: "Book" };
                 const notes = this.callbacks.getCurrentNotes ? this.callbacks.getCurrentNotes() : [];
-                this.exportMarkdown(book ? book.title : '图书', notes);
+                this.exportMarkdown(book ? book.title : "Book", notes);
             });
         }
 
@@ -224,7 +225,7 @@ export class BackupController {
             elements.btnImportFullBackup.addEventListener('click', async () => {
                 if (window.auraDesktop) {
                     try { const file = await chooseDesktopFile('backup'); if (file) await this.importFullBackup(file); }
-                    catch (error) { this.callbacks.showToast?.('备份文件读取失败: ' + error.message); }
+                    catch (error) { this.callbacks.showToast?.("Could not read backup file: " + error.message, { kind: 'error' }); }
                     return;
                 }
                 if (elements.backupFileInput) elements.backupFileInput.click();

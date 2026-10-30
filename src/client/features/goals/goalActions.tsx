@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog.js';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '../../components/ui/dropdown-menu.js';
 import { renderSurface } from '../../components/ui/renderSurface.js';
+import { countLabel } from '../../domain/format.js';
 
 /** One React/Base UI overlay shared by every Goal surface. */
 export class GoalActions {
@@ -17,6 +18,9 @@ export class GoalActions {
     private busy = false;
     private error = '';
     private message = '';
+    private messageError = false;
+    private noticeTimer?: ReturnType<typeof setTimeout>;
+    private noticePoint?: { left: number; top: number };
     constructor(private goals: GoalController) {
         this.host.dataset.reactGoalOverlays = '';
         document.body.append(this.host);
@@ -30,13 +34,18 @@ export class GoalActions {
         if (this.goals.disabled || this.goals.lifecycleBusy || this.confirmation) return;
         this.anchor?.setAttribute('aria-expanded', 'false');
         this.goalId = id; this.anchor = anchor; this.point = point; this.restoreFocus = true;
+        const rect = anchor.getBoundingClientRect();
+        this.noticePoint = { left: rect.left, top: rect.bottom + 8 };
         this.menuOpen = true; anchor.setAttribute('aria-expanded', 'true'); this.render();
     }
     private async run(id: string, operation: GoalOperation) {
         try { await this.goals.operate(id, operation); }
-        catch (error) { this.notice(error instanceof Error ? error.message : '无法保存 Goal'); }
+        catch (error) { this.notice(error instanceof Error ? error.message : "Could not save goal", true); }
     }
-    notice(message: string) { this.message = message; this.render(); }
+    notice(message: string, error = false) {
+        clearTimeout(this.noticeTimer); this.message = message; this.messageError = error; this.render();
+        if (!error && !this.goals.undoChange) this.noticeTimer = setTimeout(() => { this.message = ''; this.render(); }, 2600);
+    }
     refresh() { this.render(); }
     private render() {
         const state = this.goals.state, goal = state.goals.find(g => g.id === this.goalId);
@@ -59,38 +68,39 @@ export class GoalActions {
                 {anchor && <DropdownMenuContent anchor={anchor} aria-label={goal ? `Actions for ${goal.text}` : 'Goal actions'}
                     finalFocus={() => this.restoreFocus ? this.anchor : false}>
                     {goal && area === 'library' && <>
-                        {item(goal.completedAt ? '重新开始' : '标记完成', goal.completedAt ? 'reopen' : 'complete')}
-                        {item('归档', 'archive')}
+                        {item(goal.completedAt ? "Reopen" : "Mark complete", goal.completedAt ? 'reopen' : 'complete')}
+                        {item("Archive", 'archive')}
                     </>}
-                    {goal && area === 'archive' && item('从归档恢复', 'unarchive', goalAncestors(state, goal.id).slice(1).some(g => !!g.archivedAt))}
+                    {goal && area === 'archive' && item("Unarchive", 'unarchive', goalAncestors(state, goal.id).slice(1).some(g => !!g.archivedAt))}
                     {goal && area === 'trash' && <>
-                        {item('恢复', 'restore', !!goal.parentId && goalArea(state, goal.parentId) === 'trash')}
-                        {goal.parentId && goalArea(state, goal.parentId) === 'trash' && item('恢复到书库根目录', 'restore-root')}
+                        {item("Restore", 'restore', !!goal.parentId && goalArea(state, goal.parentId) === 'trash')}
+                        {goal.parentId && goalArea(state, goal.parentId) === 'trash' && item("Restore to library root", 'restore-root')}
                     </>}
                     <DropdownMenuSeparator />
-                    {item(area === 'trash' ? '永久删除…' : '删除…', area === 'trash' ? 'purge' : 'delete', true, true)}
+                    {item(area === 'trash' ? "Delete permanently…" : "Delete…", area === 'trash' ? 'purge' : 'delete', true, true)}
                 </DropdownMenuContent>}
             </DropdownMenu>
             <Dialog open={!!current} onOpenChange={open => { if (!open) closeDialog(); }}>
                 <DialogContent finalFocus={() => this.anchor}>
-                    <DialogTitle>{operation === 'purge' ? '永久删除 Goal？' : deleting ? '删除 Goal？' : '恢复 Goal 及上级？'}</DialogTitle>
-                    <DialogDescription>{current && <>“{current.text}”及其 {goalBranch(state, current.id).size - 1} 个子 Goal。
-                        {operation === 'purge' ? '此操作无法撤销。' : deleting ? '可在最近删除中恢复。' : '所需的上级 Goal 将一并恢复。'}原书、高亮和笔记保留。</>}</DialogDescription>
+                    <DialogTitle>{operation === 'purge' ? "Delete goal permanently?" : deleting ? "Delete goal?" : "Restore goal and ancestors?"}</DialogTitle>
+                    <DialogDescription>{current && <>“{current.text}” and {countLabel(goalBranch(state, current.id).size - 1, 'child goal')}.{' '}
+                        {operation === 'purge' ? "This cannot be undone. " : deleting ? "You can restore it from Recently Deleted. " : "Required ancestor goals will also be restored. "}Books, highlights, and notes are kept.</>}</DialogDescription>
                     {this.error && <p role="alert">{this.error}</p>}
                     <div className="ui-dialog-actions">
-                        <Button disabled={this.busy} onClick={closeDialog}>取消</Button>
+                        <Button disabled={this.busy} onClick={closeDialog}>Cancel</Button>
                         <Button variant={deleting ? 'destructive' : 'default'} disabled={this.busy} onClick={() => {
                             const action = this.confirmation!; this.busy = true; this.render();
                             void this.goals.operate(action.id, action.operation).then(() => { this.confirmation = null; })
-                                .catch(error => { this.error = error instanceof Error ? error.message : '保存失败'; })
+                                .catch(error => { this.error = error instanceof Error ? error.message : "Save failed"; })
                                 .finally(() => { this.busy = false; this.render(); });
-                        }}>{this.busy ? '保存中…' : deleting ? '删除' : '恢复'}</Button>
+                        }}>{this.busy ? "Saving…" : deleting ? "Delete" : "Restore"}</Button>
                     </div>
                 </DialogContent>
             </Dialog>
-            {this.message && <div className="goal-lifecycle-notice" role="status"><span>{this.message}</span>
+            {this.message && <div className="goal-lifecycle-notice" role={this.messageError ? 'alert' : 'status'} data-kind={this.messageError ? 'error' : 'success'}
+                style={this.noticePoint ? { left: Math.max(12, Math.min(this.noticePoint.left, window.innerWidth - 372)), top: Math.min(this.noticePoint.top, window.innerHeight - 120), bottom: 'auto', transform: 'none', maxWidth: 'min(360px, calc(100vw - 24px))' } : undefined}><span>{this.message}</span>
                 {this.goals.undoChange && <Button disabled={this.goals.lifecycleBusy || this.goals.disabled}
-                    onClick={() => { void this.goals.undoLifecycle().catch(error => this.notice(error.message)); }}>撤销</Button>}
+                    onClick={() => { void this.goals.undoLifecycle().catch(error => this.notice(error.message, true)); }}>Undo</Button>}
                 <Button aria-label="Dismiss" onClick={() => { this.message = ''; this.render(); }}>×</Button>
             </div>}
         </>);

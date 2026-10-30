@@ -24,7 +24,7 @@ const { backupDatabase, verifyDatabase } = require('../../src/server/storageMain
         assert.equal(backup.notes, 1); assert.equal(backup.integrity, 'ok');
         store.close(); store = null;
         await fs.rename(path.join(directory, 'aurareader.sqlite'), path.join(directory, 'preserved-original.sqlite'));
-        assert.throws(() => createDataStore(directory), /禁止自动新建空书库/);
+        assert.throws(() => createDataStore(directory), /will not be created automatically/);
         await fs.copyFile(backup.filename, path.join(directory, 'aurareader.sqlite'));
         store = createDataStore(directory);
         assert.equal(store.notes(['b'])[0].value.comment, '迁移后新增修改', '一致性备份恢复包含切换后的修改');

@@ -9,12 +9,12 @@ const DESKTOP_SOURCE = 'aurareader-desktop-v1';
 
 /** @param {unknown} value */
 function identifier(value) {
-    if (typeof value !== 'string' || !value || value.length > 4096) throw new StorageError('无效标识');
+    if (typeof value !== 'string' || !value || value.length > 4096) throw new StorageError("Invalid identifier.");
     return value;
 }
 /** @param {Record<string, unknown>} row */
 function writeVersion(row) {
-    if (typeof row.expected !== 'number' || !Number.isSafeInteger(row.expected) || row.expected < 0) throw new StorageError('缺少有效保存版本');
+    if (typeof row.expected !== 'number' || !Number.isSafeInteger(row.expected) || row.expected < 0) throw new StorageError("A valid save version is required.");
     return { opId: identifier(row.opId), expected: row.expected };
 }
 
@@ -23,37 +23,37 @@ function jsonValue(value, ancestors = new WeakSet()) {
     if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
     if (typeof value === 'number' && Number.isFinite(value)) return;
     if (value && typeof value === 'object' && (Array.isArray(value) || [Object.prototype, null].includes(Object.getPrototypeOf(value)))) {
-        if (ancestors.has(value)) throw new StorageError('请求包含循环引用，无法无损保存');
+        if (ancestors.has(value)) throw new StorageError("The request contains circular references and cannot be saved without loss.");
         ancestors.add(value);
         try {
             if (Array.isArray(value)) {
-                if (Object.keys(value).length !== value.length) throw new StorageError('请求包含稀疏数组或数组附加字段');
+                if (Object.keys(value).length !== value.length) throw new StorageError("The request contains sparse arrays or additional array fields.");
                 for (let index = 0; index < value.length; index++) {
-                    if (!Object.hasOwn(value, index)) throw new StorageError('请求包含稀疏数组');
+                    if (!Object.hasOwn(value, index)) throw new StorageError("The request contains sparse arrays.");
                     jsonValue(value[index], ancestors);
                 }
             } else for (const item of Object.values(value)) jsonValue(item, ancestors);
         } finally { ancestors.delete(value); }
         return;
     }
-    throw new StorageError('请求只能包含无损 JSON 数据');
+    throw new StorageError("The request must contain lossless JSON data only.");
 }
 
 /** @param {unknown} input @param {string[]} keys @param {number} [limit] */
 function command(input, keys, limit = MAX_JSON_BYTES) {
-    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new StorageError('无效请求对象');
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new StorageError("Invalid request object.");
     const row = /** @type {Record<string, unknown>} */ (input);
-    if (Object.keys(row).length !== keys.length || keys.some(key => !Object.hasOwn(row, key))) throw new StorageError('请求字段不匹配');
+    if (Object.keys(row).length !== keys.length || keys.some(key => !Object.hasOwn(row, key))) throw new StorageError("Request fields do not match.");
     try {
         jsonValue(row);
-        if (Buffer.byteLength(JSON.stringify(row), 'utf8') > limit) throw new StorageError('数据超过单次 256MB 上限', 413);
+        if (Buffer.byteLength(JSON.stringify(row), 'utf8') > limit) throw new StorageError("Data exceeds the 256 MB request limit.", 413);
     } catch (error) {
-        if (error instanceof RangeError) throw new StorageError('JSON 数据嵌套过深，原数据未修改');
+        if (error instanceof RangeError) throw new StorageError("JSON data is nested too deeply. Existing data has not been modified.");
         throw error;
     }
-    if ('opId' in row && (typeof row.opId !== 'string' || !row.opId || row.opId.length > 4096)) throw new StorageError('无效操作 ID');
-    if ('expected' in row && (!Number.isSafeInteger(row.expected) || /** @type {number} */ (row.expected) < 0)) throw new StorageError('缺少有效保存版本');
-    if ('generation' in row && (typeof row.generation !== 'string' || !row.generation || row.generation.length > 4096)) throw new StorageError('无效书籍代次');
+    if ('opId' in row && (typeof row.opId !== 'string' || !row.opId || row.opId.length > 4096)) throw new StorageError("Invalid operation ID.");
+    if ('expected' in row && (!Number.isSafeInteger(row.expected) || /** @type {number} */ (row.expected) < 0)) throw new StorageError("A valid save version is required.");
+    if ('generation' in row && (typeof row.generation !== 'string' || !row.generation || row.generation.length > 4096)) throw new StorageError("Invalid book generation.");
     return row;
 }
 
@@ -67,12 +67,12 @@ function createDesktopStorage(directory) {
     const active = new Set();
     let closed = false;
     function openExisting() {
-        if (closed) throw new StorageError('书库已关闭', 503);
+        if (closed) throw new StorageError("The library is closed.", 503);
         if (store) return store;
         const files = fs.existsSync(directory) ? fs.readdirSync(directory) : [];
         if (!files.length) return null;
         // Never call createDataStore on an unknown directory or a missing library.
-        if (!files.includes('storage-installed.json')) throw new StorageError('发现未识别的数据目录，请保留原文件并通过迁移或恢复处理', 409);
+        if (!files.includes('storage-installed.json')) throw new StorageError("Unrecognized data directory. Preserve original files and use migration or recovery.", 409);
         store = createDataStore(directory); // Retains missing/empty DB and schema-version guards.
         return store;
     }
@@ -82,19 +82,19 @@ function createDesktopStorage(directory) {
         if (createMigration(current).status(DESKTOP_SOURCE).completed) return { initialized: true };
         if (current.all('SELECT 1 FROM books LIMIT 1').length || current.all('SELECT 1 FROM operations LIMIT 1').length
             || current.all('SELECT 1 FROM migrations LIMIT 1').length) {
-            throw new StorageError('此目录不是当前桌面书库，请保留原文件；不支持旧数据库', 409);
+            throw new StorageError("This is not a current desktop library directory. Preserve original files. Legacy databases are not supported.", 409);
         }
         return { initialized: false }; // Interrupted empty initialization may be resumed explicitly.
     }
     function readyStore() {
-        if (!status().initialized || !store) throw new StorageError('请先明确创建独立桌面书库；原浏览器数据尚未迁移', 423);
+        if (!status().initialized || !store) throw new StorageError("Create a local desktop library first. Original browser data has not been migrated.", 423);
         return store;
     }
     async function initialize() {
         if (status().initialized) return { initialized: true };
         if (creating) return creating;
         creating = (async () => {
-            if (closed) throw new StorageError('书库已关闭', 503);
+            if (closed) throw new StorageError("The library is closed.", 503);
             store = store || createDataStore(directory);
             const migration = createMigration(store);
             const snapshot = migration.snapshot(DESKTOP_SOURCE, {
@@ -111,7 +111,7 @@ function createDesktopStorage(directory) {
         async call(action, body) {
             // This dispatcher is main-process-only; no renderer-controlled action channel is registered.
             const operation = (async () => {
-                if (['status', 'createLibrary', 'listBooks', 'backup', 'queryGoalLibrary'].includes(action) && body !== undefined) throw new StorageError('请求不接受参数');
+                if (['status', 'createLibrary', 'listBooks', 'backup', 'queryGoalLibrary'].includes(action) && body !== undefined) throw new StorageError("This request does not accept arguments.");
                 if (action === 'status') return status();
                 if (action === 'createLibrary') return initialize();
                 const current = readyStore();
@@ -127,7 +127,7 @@ function createDesktopStorage(directory) {
                     }
                     case 'queryGoals': {
                         const c = command(body, ['bookIds']);
-                        if (!Array.isArray(c.bookIds)) throw new StorageError('无效书籍列表');
+                        if (!Array.isArray(c.bookIds)) throw new StorageError("Invalid book list.");
                         return { records: current.goals(c.bookIds.map(identifier)) };
                     }
                     case 'queryGoalLibrary': return current.goalLibrary();
@@ -141,7 +141,7 @@ function createDesktopStorage(directory) {
                     }
                     case 'queryNotes': {
                         const query = command(body, ['bookIds']);
-                        if (!Array.isArray(query.bookIds)) throw new StorageError('无效书籍列表');
+                        if (!Array.isArray(query.bookIds)) throw new StorageError("Invalid book list.");
                         return { records: current.notes(query.bookIds.map(identifier)) };
                     }
                     case 'saveNote': {
@@ -156,15 +156,15 @@ function createDesktopStorage(directory) {
                         const withGoals = !!body && Object.hasOwn(body, 'goalStates');
                         const withGraph = !!body && Object.hasOwn(body, 'goalGraph');
                         const c = command(body, ['opId', 'books', 'notes', ...(withGoals ? ['goalStates'] : []), ...(withGraph ? ['goalGraph'] : [])]);
-                        if (!Array.isArray(c.books) || !Array.isArray(c.notes)) throw new StorageError('备份必须包含书籍和标注数组');
-                        if (withGoals && !Array.isArray(c.goalStates)) throw new StorageError('无效 Goal 备份');
+                        if (!Array.isArray(c.books) || !Array.isArray(c.notes)) throw new StorageError("The backup must contain book and annotation arrays.");
+                        if (withGoals && !Array.isArray(c.goalStates)) throw new StorageError("Invalid goal backup.");
                         return current.restore({ opId: identifier(c.opId), books: c.books.map(bookRecord), notes: c.notes.map(noteRecord), ...(withGoals ? { goalStates: /** @type {unknown[]} */ (c.goalStates).map(goalBackupRecord) } : {}), ...(withGraph ? { goalGraph: /** @type {import('../client/domain/goal.js').GoalGraphBackup} */ (c.goalGraph) } : {}) });
                     }
                     case 'backup': {
                         const result = await backupDatabase(directory);
                         return { name: path.basename(result.filename), integrity: result.integrity, books: result.books, notes: result.notes };
                     }
-                    default: throw new StorageError('未知存储能力', 404);
+                    default: throw new StorageError("Unknown storage capability.", 404);
                 }
             })();
             active.add(operation);

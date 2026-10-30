@@ -12,11 +12,11 @@ function localRequest(req) {
     return !req.headers.origin || req.headers.origin === url.origin;
 }
 async function readJson(req) {
-    if (!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) throw new StorageError('请求必须使用 JSON', 415);
+    if (!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) throw new StorageError("The request must use JSON.", 415);
     let size = 0; const chunks = [];
     for await (const chunk of req) {
         size += chunk.length;
-        if (size > MAX_JSON_BYTES) throw new StorageError('数据超过单次 256MB 上限，请保留原数据并分批迁移', 413);
+        if (size > MAX_JSON_BYTES) throw new StorageError("Data exceeds the 256 MB request limit. Preserve original data and migrate in smaller batches.", 413);
         chunks.push(chunk);
     }
     try {
@@ -24,7 +24,7 @@ async function readJson(req) {
         if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
         return value;
     }
-    catch (_) { throw new StorageError('无效 JSON'); }
+    catch (_) { throw new StorageError("Invalid JSON."); }
 }
 function createStorageApi(store) {
     const token = randomUUID();
@@ -36,15 +36,15 @@ function createStorageApi(store) {
             res.end(JSON.stringify(body));
         };
         try {
-            if (!localRequest(req)) throw new StorageError('只允许本机阅读器访问数据库', 403);
+            if (!localRequest(req)) throw new StorageError("Only the local reader may access the database.", 403);
             if (req.method === 'GET' && url.pathname === '/api/storage/session') return reply(200, { token });
-            if (req.headers['x-aura-token'] !== token) throw new StorageError('无效的数据库会话', 403);
+            if (req.headers['x-aura-token'] !== token) throw new StorageError("Invalid database session.", 403);
             const source = req.headers['x-aura-source'];
-            if (typeof source !== 'string' || !source || source.length > 200) throw new StorageError('缺少迁移来源', 400);
+            if (typeof source !== 'string' || !source || source.length > 200) throw new StorageError("Migration source is required.", 400);
             if (req.method === 'GET' && url.pathname === '/api/storage/migration/status') return reply(200, migration.status(source));
             if (req.method === 'POST' && url.pathname === '/api/storage/migration/snapshot') return reply(200, migration.snapshot(source, await readJson(req)));
             if (req.method === 'POST' && url.pathname === '/api/storage/migration/commit') return reply(200, migration.commit(source, (await readJson(req)).snapshotId));
-            if (!migration.status(source).completed) throw new StorageError('旧数据尚未迁移，请先完成迁移校验', 423);
+            if (!migration.status(source).completed) throw new StorageError("Legacy data has not been migrated. Complete migration validation first.", 423);
             if (req.method === 'GET' && url.pathname === '/api/storage/books') return reply(200, { records: store.books() });
             if (req.method === 'GET' && url.pathname === '/api/storage/goals/library') return reply(200, store.goalLibrary());
             if (req.method === 'POST') {
@@ -62,10 +62,10 @@ function createStorageApi(store) {
                 };
                 if (actions[url.pathname]) return reply(200, actions[url.pathname]());
             }
-            throw new StorageError('未知数据库请求', 404);
+            throw new StorageError("Unknown database request.", 404);
         } catch (error) {
             if (!error.status) console.error('Storage API:', error);
-            reply(error.status || 500, { error: error.status ? error.message : '数据库操作失败，原数据未清除', details: error.details });
+            reply(error.status || 500, { error: error.status ? error.message : "Database operation failed. Existing data has been preserved.", details: error.details });
         }
     };
 }

@@ -1,3 +1,4 @@
+import { noteTimestamp } from './format.js';
 import type { AnnotationKind, Annotation, AnnotationInput, AnnotationLocation, CreateAnnotation } from './annotation.js';
 /* ==========================================================================
    AnnotationEngine - Pure Annotation Core Algorithms (Domain Layer)
@@ -39,7 +40,7 @@ export function normalizeAnnotation(annotation: AnnotationInput | null | undefin
         comment,
         color,
         page,
-        chapter: annotation.chapter || '章节选区',
+        chapter: annotation.chapter || "Chapter selection",
         timestamp: annotation.timestamp || '',
         location: normalizeLocation(annotation, page)
     };
@@ -187,7 +188,7 @@ export function createAnnotationObject({
     comment = '',
     color = null,
     page = 1,
-    chapter = '章节选区',
+    chapter = "Chapter selection",
     timestamp = null,
     sectionId = '',
     offset = 0,
@@ -221,8 +222,8 @@ export function createAnnotationObject({
         comment: cleanComment,
         color: finalColor,
         page: validPage,
-        chapter: chapter || '章节选区',
-        timestamp: timestamp || new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16),
+        chapter: chapter || "Chapter selection",
+        timestamp: timestamp || noteTimestamp(),
         location: loc
     };
 }

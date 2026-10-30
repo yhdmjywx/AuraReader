@@ -51,7 +51,7 @@ async function desktopRequest<R extends keyof StorageRoutes>(bridge: DesktopStor
         case 'notes/save': result = unwrapDesktop(await bridge.saveNote(body as StorageRoutes['notes/save']['request'])); break;
         case 'notes/delete': result = unwrapDesktop(await bridge.deleteNote(body as StorageRoutes['notes/delete']['request'])); break;
         case 'restore': result = unwrapDesktop(await bridge.restore(body as StorageRoutes['restore']['request'])); break;
-        default: throw new StorageClientError('浏览器旧数据迁移不能通过桌面存储入口执行');
+        default: throw new StorageClientError("Legacy browser data cannot be migrated through desktop storage.");
     }
     return result as StorageRoutes[R]['response'];
 }
@@ -60,12 +60,12 @@ function sourceId(): string {
     try {
         source = localStorage.getItem('aura_sqlite_source');
         if (!source) { source = operationId(); localStorage.setItem('aura_sqlite_source', source); }
-    } catch (_) { throw new Error('无法读取迁移标识，请恢复浏览器本地存储权限；旧数据未清除'); }
+    } catch (_) { throw new Error("Could not read the migration identifier. Restore browser local storage access. Legacy data has been preserved."); }
     return source!;
 }
 async function session() {
     const response = await transport(base + '/session', { signal: globalThis.AbortSignal?.timeout?.(15000) });
-    if (!response.ok) throw new Error('本地数据库服务不可用');
+    if (!response.ok) throw new Error("The local database service is unavailable.");
     token = (await response.json()).token;
 }
 export async function storageRequest<R extends keyof StorageRoutes>(route: R, body: StorageRoutes[R]['request'], retried = false): Promise<StorageRoutes[R]['response']> {
@@ -98,7 +98,7 @@ export async function storageRequest<R extends keyof StorageRoutes>(route: R, bo
         throw error;
     }
     if (!response.ok) {
-        const error = new StorageClientError(result.error || '数据库请求失败');
+        const error = new StorageClientError(result.error || "Database request failed.");
         error.status = response.status; error.details = result.details;
         throw error;
     }
@@ -109,7 +109,7 @@ export function initializeStorage() {
     if (desktop) {
         if (!ready) ready = desktop.status().then(result => {
             if (!unwrapDesktop(result).initialized) {
-                const error = new StorageClientError('请先明确创建独立桌面书库；原浏览器数据尚未迁移');
+                const error = new StorageClientError("Create a local desktop library first. Original browser data has not been migrated.");
                 error.status = 423; throw error;
             }
             return { completed: true };

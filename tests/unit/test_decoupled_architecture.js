@@ -280,7 +280,7 @@ let storage;
 
     // 验证 Coordinator.jumpToAnnotation 委托至 ReaderController 而无 DOM 依赖侵入
     coord.jumpToAnnotation(notesInAnnot[0].id);
-    assert.ok(toastMessage.includes('跳转至 P.2'), "jumpToAnnotation 提示通知正确触发");
+    assert.ok(toastMessage.includes('Jumped to p.2'), "jumpToAnnotation 提示通知正确触发");
     assert.strictEqual(notesInAnnot[0].kind, 'highlight');
 
     await testAnnotations.saveModalNote({

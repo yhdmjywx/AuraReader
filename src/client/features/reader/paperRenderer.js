@@ -28,7 +28,7 @@ export function renderPaper({
     const totalPages = readerEngine.getTotalPages();
     if (elements.currentPageSpan) elements.currentPageSpan.textContent = currentPage;
     if (elements.totalPagesSpan) elements.totalPagesSpan.textContent = totalPages;
-    if (elements.pageUnit) elements.pageUnit.textContent = '页';
+    if (elements.pageUnit) elements.pageUnit.textContent = totalPages === 1 ? ' page' : ' pages';
 
 
     const htmlContent = readerEngine.getPageContent(currentPage);
@@ -59,7 +59,7 @@ export function applyHighlightsToPaper(targetPaper, targetPage, notes = []) {
     try {
         renderAnnotationTokens(targetPaper, notesForPage, targetPage);
     } catch (e) {
-        console.error("高亮渲染异常:", e);
+        console.error("Highlight rendering failed:", e);
     }
 }
 

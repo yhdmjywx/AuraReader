@@ -84,7 +84,7 @@ export function positionMarginNotes(elements) {
             node.className = 'margin-notes-lane';
             node.dataset.marginSide = side;
             node.setAttribute('role', 'group');
-            node.setAttribute('aria-label', '当前可见正文的笔记');
+            node.setAttribute('aria-label', "Notes for visible text");
             list.appendChild(node);
         }
         node.style.left = `${geometry.rightNoteLeft}px`;

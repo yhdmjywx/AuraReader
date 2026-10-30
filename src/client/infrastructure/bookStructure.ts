@@ -1,6 +1,7 @@
 import type { Book } from '../domain/book.js';
 import type { BookStructure, DocumentKind, ReadingUnit, ReadingUnitPosition, SourceDocument, TocNode } from '../domain/bookStructure.js';
 import { ensureTocHierarchy, isVolumeTitle } from '../domain/readingLocation.js';
+import { countLabel } from '../domain/format.js';
 
 const compact = (text: unknown) => String(text || '').replace(/\s+/g, '');
 const frontMatter = /^(?:作者原序|原序|自序|代序|序言|序|前言|引言|楔子|译者序|译序|出版说明|版权信息|献辞|致谢)$/;
@@ -27,7 +28,7 @@ export function buildBookStructure(book: Book | null | undefined): BookStructure
         const entries = nodes.filter(node => node.page === page);
         const heading = root?.querySelector('h1, h2, h3, h4, h5, h6');
         const legacy = toc[index]?.page == null ? toc[index] : null;
-        const title = entries[0]?.title || legacy?.title || heading?.textContent?.trim() || `内容 ${page}`;
+        const title = entries[0]?.title || legacy?.title || heading?.textContent?.trim() || `Content ${page}`;
         const media = root?.querySelector('img, svg, math, video, audio, table, iframe, object, canvas, hr');
         // Hierarchy and an exact, content-only title are required in addition
         // to the name. Never remove a preface, illustration or ambiguous node.
@@ -82,11 +83,11 @@ export function readingUnitForPage(structure: BookStructure | null | undefined, 
 export function structureSummary(structure: BookStructure) {
     const { counts } = structure;
     const parts = [];
-    if (counts.chapters) parts.push(`${counts.chapters} 章节`);
-    if (counts.frontmatter) parts.push(`${counts.frontmatter} 前置内容`);
-    if (counts.appendix) parts.push(`${counts.appendix} 附录`);
-    if (counts.volumeContent) parts.push(`${counts.volumeContent} 卷前内容`);
-    if (counts.resources) parts.push(`${counts.resources} 其他内容`);
-    if (counts.content) parts.push(`${counts.content} 内容单元`);
-    return parts.join(' · ') || '0 内容单元';
+    if (counts.chapters) parts.push(countLabel(counts.chapters, 'chapter'));
+    if (counts.frontmatter) parts.push(countLabel(counts.frontmatter, 'front matter item'));
+    if (counts.appendix) parts.push(countLabel(counts.appendix, 'appendix', 'appendices'));
+    if (counts.volumeContent) parts.push(countLabel(counts.volumeContent, 'volume introduction'));
+    if (counts.resources) parts.push(countLabel(counts.resources, 'other item'));
+    if (counts.content) parts.push(countLabel(counts.content, 'content unit'));
+    return parts.join(' · ') || "0 content units";
 }

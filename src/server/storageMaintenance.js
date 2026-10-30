@@ -10,12 +10,12 @@ function verifyDatabase(filename) {
     try {
         const integrity = db.prepare('PRAGMA integrity_check').all();
         const foreignKeys = db.prepare('PRAGMA foreign_key_check').all();
-        if (integrity.some(row => row.integrity_check !== 'ok') || foreignKeys.length) throw new Error('SQLite 完整性校验失败');
+        if (integrity.some(row => row.integrity_check !== 'ok') || foreignKeys.length) throw new Error("SQLite integrity check failed.");
         if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='goal_states'").get()) {
             for (const row of db.prepare('SELECT payload FROM goal_states WHERE deleted=0').all()) {
                 const state = JSON.parse(row.payload);
                 const book = db.prepare('SELECT deleted FROM books WHERE id=?').get(state.bookId);
-                if (!book || book.deleted) throw new Error('Goal 缺少有效书籍');
+                if (!book || book.deleted) throw new Error("The goal has no valid book.");
                 validateGoalState(state, (id, bookId) => {
                     const note = db.prepare('SELECT book_id,deleted FROM annotations WHERE id=?').get(id);
                     return !!note && !note.deleted && note.book_id === bookId;
@@ -53,7 +53,7 @@ if (require.main === module) {
     Promise.resolve().then(() => {
         if (action === 'verify') return verifyDatabase(path.join(directory, 'aurareader.sqlite'));
         if (action === 'backup') return backupDatabase(directory);
-        throw new Error('用法: node src/server/storageMaintenance.js verify|backup');
+        throw new Error("Usage: node src/server/storageMaintenance.js verify|backup");
     }).then(result => console.log(JSON.stringify(result, null, 2))).catch(error => { console.error(error.message); process.exitCode = 1; });
 }
 module.exports = { verifyDatabase, backupDatabase };

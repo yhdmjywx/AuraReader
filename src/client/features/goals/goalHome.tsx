@@ -14,7 +14,7 @@ interface HomeDependencies {
     goals: GoalController; coordinator: AppCoordinator; finishAnnotations(): Promise<void>;
     currentBookId(): string; beforeOpen(): void;
 }
-const labels: Record<GoalArea, string> = { library: '书库', archive: '归档', trash: '最近删除' };
+const labels: Record<GoalArea, string> = { library: "Library", archive: "Archive", trash: "Recently Deleted" };
 function HomeView({ home }: { home: GoalHome }) {
     const { goals, coordinator } = home.deps, state = goals.state;
     const selected = state.goals.find(g => g.id === home.chosen);
@@ -42,10 +42,10 @@ function HomeView({ home }: { home: GoalHome }) {
             {home.deps.currentBookId() && <Button id="home-continue" className="home-resume" disabled={home.busy} onClick={() => { void home.perform(async () => {
                 const request = goals.navigation.begin(); await goals.assertWritesSaved(); await home.deps.finishAnnotations();
                 goals.navigation.commit('reader', request);
-            }); }}><i className="ri-play-line" />{resume?.title || '继续阅读'}</Button>}
+            }); }}><i className="ri-play-line" />{resume?.title || "Continue reading"}</Button>}
         </header>
         <div className="home-heading"><h1 id="home-goal-title" tabIndex={-1}>{selected?.text || labels[home.area]}</h1>
-            {selected && <div className="home-current-actions">{selected.completedAt && <span className="goal-completion">✓ 已完成</span>}{menu(selected.id, selected.text)}</div>}
+            {selected && <div className="home-current-actions">{selected.completedAt && <span className="goal-completion">✓ Completed</span>}{menu(selected.id, selected.text)}</div>}
             {!readOnly && !home.creating && !firstUse && <div className="goal-home-actions">
                 <Button id="home-new-goal" className="home-icon" aria-label="New goal" disabled={disabled} onClick={() => home.showCreate()}>＋</Button>
                 <Button id="home-library-import" className="home-icon" aria-label="Import a book" disabled={home.busy} onClick={() => { void home.chooseImport(); }}><i className="ri-download-2-line" /></Button>
@@ -56,28 +56,28 @@ function HomeView({ home }: { home: GoalHome }) {
             {(['library', 'archive', 'trash'] as const).map(area => <Button key={area} id={`home-${area === 'library' ? 'active' : area}`}
                 aria-current={home.area === area ? 'page' : undefined} disabled={home.busy} onClick={() => home.showArea(area)}>{labels[area]}</Button>)}
         </nav><div className="home-goal-filters">
-            <Input id="home-goal-search" type="search" aria-label="Search goals" placeholder="搜索 Goal" value={home.query}
+            <Input id="home-goal-search" type="search" aria-label="Search goals" placeholder="Search goals" value={home.query}
                 onChange={event => { home.query = event.currentTarget.value; home.render(); }} />
             <select id="home-goal-filter" className="goal-filter" aria-label="Filter goals by completion" value={home.filter}
                 onChange={event => { home.filter = event.currentTarget.value as GoalFilter; home.render(); }}>
-                <option value="all">全部</option><option value="ongoing">进行中</option><option value="completed">已完成</option>
+                <option value="all">All</option><option value="ongoing">Ongoing</option><option value="completed">Completed</option>
             </select>
         </div></div>}
         {home.creating ? <form id="home-goal-form" onSubmit={event => { event.preventDefault(); void home.perform(() => home.finishDraft().then(() => {})); }}>
-            <label htmlFor="home-goal-draft">新建 Goal</label>
-            <Textarea id="home-goal-draft" key={home.draftId} autoFocus rows={2} placeholder="你想弄明白什么？" aria-label="New goal" defaultValue={home.draftText}
+            <label htmlFor="home-goal-draft">New goal</label>
+            <Textarea id="home-goal-draft" key={home.draftId} autoFocus rows={2} placeholder="What do you want to understand?" aria-label="New goal" defaultValue={home.draftText}
                 disabled={disabled} onInput={event => home.updateDraft(event.currentTarget.value)}
                 onKeyDown={event => {
                     event.stopPropagation(); if (event.nativeEvent.isComposing) return;
                     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
                     if (event.key === 'Escape') { event.preventDefault(); home.clearDraft(); home.render(); }
                 }} />
-            <div className="goal-home-actions"><Button variant="default" type="submit" disabled={disabled}>创建</Button>
-                <Button id="home-cancel-goal" disabled={home.busy} onClick={() => { home.clearDraft(); home.render(); }}>取消</Button></div>
+            <div className="goal-home-actions"><Button variant="default" type="submit" disabled={disabled}>Create</Button>
+                <Button id="home-cancel-goal" disabled={home.busy} onClick={() => { home.clearDraft(); home.render(); }}>Cancel</Button></div>
         </form> : <>
-            {firstUse && home.area === 'library' && <section id="home-welcome"><p>一本书，一个问题，从这里开始。</p><div className="goal-home-actions">
-                <Button id="home-start-goal" disabled={disabled} onClick={() => home.showCreate()}>创建 Goal</Button>
-                <Button id="home-start-import" variant="default" disabled={home.busy} onClick={() => { void home.chooseImport(); }}>导入书籍</Button>
+            {firstUse && home.area === 'library' && <section id="home-welcome"><p>Start with a book and a question.</p><div className="goal-home-actions">
+                <Button id="home-start-goal" disabled={disabled} onClick={() => home.showCreate()}>Create goal</Button>
+                <Button id="home-start-import" variant="default" disabled={home.busy} onClick={() => { void home.chooseImport(); }}>Import book</Button>
             </div></section>}
             <section id="home-work">
                 <section id="home-folder-section"><h2>Goals</h2><div id="home-goal-folders" className="home-goal-folders">
@@ -87,20 +87,20 @@ function HomeView({ home }: { home: GoalHome }) {
                             <span>{goal.text}{(readOnly || home.query) && <small className="goal-original-path">{goalPath(state, goal.id)}</small>}</span><i className="ri-arrow-right-s-line" /></Button>
                         {menu(goal.id, goal.text)}
                     </div>)}
-                    {!children.length && <p className="home-empty">{home.query ? '没有匹配的 Goal' : '这里还没有 Goal'}</p>}
+                    {!children.length && <p className="home-empty">{home.query ? "No matching goals" : "No goals here yet"}</p>}
                 </div></section>
-                {(!readOnly || selected) && <section id="home-book-section"><h2>书籍</h2><ul id="home-books" className="home-book-grid" aria-label={selected ? 'Books added to this goal' : 'All books'}>
+                {(!readOnly || selected) && <section id="home-book-section"><h2>Books</h2><ul id="home-books" className="home-book-grid" aria-label={selected ? 'Books added to this goal' : 'All books'}>
                     {books.map(({ id, book }) => <li className="home-book-card" key={id}>
                         <Button className="goal-home-book" aria-label={`Read: ${book?.title || 'Book unavailable'}`} disabled={home.busy || !book} onClick={() => openBook(id)}>
-                            <span className="home-book-cover"><i className="ri-book-2-line" /></span><span className="home-book-title">{book?.title || '书籍不可用'}</span><span className="home-book-meta">{book?.format || ''}</span>
+                            <span className="home-book-cover"><i className="ri-book-2-line" /></span><span className="home-book-title">{book?.title || "Book unavailable"}</span><span className="home-book-meta">{book?.format || ''}</span>
                         </Button>
                         {selected && !readOnly && <Button className="home-book-remove home-icon" aria-label={`Remove ${book?.title} from goal`} disabled={disabled}
                             onClick={() => { void home.perform(() => goals.removeBook(selected.id, id)); }}><i className="ri-link-unlink-m" /></Button>}
                     </li>)}
-                </ul>{!books.length && <p className="home-empty" id="home-books-empty">{selected ? '添加一本书，围绕这个 Goal 开始阅读。' : '导入书籍开始阅读。'}</p>}</section>}
-                {selected && <section id="home-materials"><h2>关联笔记与高亮</h2><div id="home-material-list">
+                </ul>{!books.length && <p className="home-empty" id="home-books-empty">{selected ? "Add a book to start reading toward this goal." : "Import a book to start reading."}</p>}</section>}
+                {selected && <section id="home-materials"><h2>Linked notes and highlights</h2><div id="home-material-list">
                     {goals.materialEntries(selected.id).map(({ link, annotation, title }) => <div className="goal-item" key={`${link.bookId}:${link.annotationId}`}>
-                        <Button className="goal-item-text" disabled={!annotation || home.busy} onClick={() => { void home.perform(() => goals.jumpMaterial(link)); }}>{annotation ? annotation.comment || annotation.quote : '来源不可用'}</Button>
+                        <Button className="goal-item-text" disabled={!annotation || home.busy} onClick={() => { void home.perform(() => goals.jumpMaterial(link)); }}>{annotation ? annotation.comment || annotation.quote : "Source unavailable"}</Button>
                         <small className="goal-item-source">{title}</small>
                     </div>)}
                 </div></section>}
@@ -108,21 +108,21 @@ function HomeView({ home }: { home: GoalHome }) {
         </>}
         <Dialog open={!!home.picking && home.active} onOpenChange={open => { if (!open && !home.busy) { home.picking = null; home.render(); } }}>
             <DialogContent finalFocus={() => home.host.querySelector<HTMLButtonElement>('#home-add-book')}>
-                <DialogTitle>添加书籍</DialogTitle><DialogDescription>选择一本已导入的书，或导入新书。</DialogDescription>
+                <DialogTitle>Add book</DialogTitle><DialogDescription>Choose an imported book, or import a new one.</DialogDescription>
                 <ul className="ui-book-picker">{home.picking && home.candidatesFor(home.picking).map(book => {
                     const added = state.bookLinks?.some(link => link.goalId === home.picking && link.bookId === book.id);
                     return <li key={book.id}><span>{book.title}</span><Button disabled={disabled || added} onClick={() => { const id = home.picking!;
                         void home.perform(async () => { await goals.addBook(id, book.id); home.picking = null; });
-                    }}>{added ? '已添加' : '添加'}</Button></li>;
+                    }}>{added ? "Added" : "Add"}</Button></li>;
                 })}</ul>
-                <div className="ui-dialog-actions"><Button disabled={home.busy} onClick={() => { home.picking = null; home.render(); }}>取消</Button>
-                    <Button variant="default" disabled={home.busy} onClick={() => { void home.chooseImport(home.picking || undefined); }}>导入书籍</Button></div>
+                <div className="ui-dialog-actions"><Button disabled={home.busy} onClick={() => { home.picking = null; home.render(); }}>Cancel</Button>
+                    <Button variant="default" disabled={home.busy} onClick={() => { void home.chooseImport(home.picking || undefined); }}>Import book</Button></div>
             </DialogContent>
         </Dialog>
         <p id="home-status" role="status" aria-live="polite">{home.status || (goals.saveError instanceof Error ? goals.saveError.message : '')}</p>
         {(goals.disabled || home.status) && <Button id="home-retry" disabled={home.busy} onClick={() => { void home.perform(async () => {
             await goals.initialize(); await goals.assertWritesSaved(); await goals.recoverBookIntents(); await home.refresh();
-        }); }}>重试</Button>}
+        }); }}>Retry</Button>}
         <Input id="home-book-file" type="file" accept=".epub,.pdf,.txt" hidden onChange={event => {
             const file = event.currentTarget.files?.[0]; event.currentTarget.value = '';
             if (file) void home.importFile(file, home.fileTarget);
@@ -142,14 +142,14 @@ export class GoalHome {
         try {
             const raw = localStorage.getItem('aura_goal_home_draft');
             if (raw) { const draft = JSON.parse(raw); this.draftId = draft.id; this.draftText = draft.text; this.draftParent = draft.parentId || null; this.creating = true; }
-        } catch { this.status = '无法读取已保存的 Goal 草稿'; }
+        } catch { this.status = "Could not read the saved goal draft."; }
         deps.goals.navigation.subscribe(() => { host.hidden = !this.active; if (!this.active) { this.request++; this.picking = null; } this.render(); });
     }
     showCreate() { if (this.area !== 'library') return; this.draftParent = this.chosen; this.creating = true; this.render(); }
     updateDraft(text: string) {
         this.draftText = text;
         try { localStorage.setItem('aura_goal_home_draft', JSON.stringify({ id: this.draftId, parentId: this.draftParent, text })); }
-        catch { this.status = '草稿暂未保存，请保持页面打开'; this.render(); }
+        catch { this.status = "The draft is not saved. Keep this window open."; this.render(); }
     }
     clearDraft() { localStorage.removeItem('aura_goal_home_draft'); this.creating = false; this.draftText = ''; this.draftId = operationId(); this.draftParent = null; }
     async finishDraft() {
@@ -164,17 +164,17 @@ export class GoalHome {
     perform(run: () => Promise<void>): Promise<void> {
         if (this.busy) return this.running || Promise.resolve();
         this.busy = true; this.status = ''; this.render();
-        return this.running = run().catch(error => { this.status = error instanceof Error ? error.message : '请重试'; }).finally(() => { this.busy = false; this.render(); });
+        return this.running = run().catch(error => { this.status = error instanceof Error ? error.message : "Please try again."; }).finally(() => { this.busy = false; this.render(); });
     }
     async chooseImport(target?: string) {
         if (this.busy) return;
         if (window.auraDesktop) {
             try { const file = await chooseDesktopFile('book'); if (file) await this.importFile(file, target); }
-            catch (error) { this.status = error instanceof Error ? error.message : '打开文件失败'; this.render(); }
+            catch (error) { this.status = error instanceof Error ? error.message : "Could not open file"; this.render(); }
         } else { this.fileTarget = target; this.host.querySelector<HTMLInputElement>('#home-book-file')?.click(); }
     }
     async importFile(file: File, target?: string) {
-        await this.perform(async () => { const id = await this.deps.coordinator.importBook(file, target); if (!id) throw new Error('书籍导入失败'); this.picking = null; await this.refresh(); });
+        await this.perform(async () => { const id = await this.deps.coordinator.importBook(file, target); if (!id) throw new Error("Book import failed"); this.picking = null; await this.refresh(); });
         if (this.active) await this.refresh();
     }
     async open() {
@@ -183,7 +183,7 @@ export class GoalHome {
         if (!nav.isCurrent(request)) return;
         this.deps.beforeOpen(); this.area = 'library'; this.query = ''; this.filter = 'all'; this.picking = null;
         this.chosen = this.creating ? this.draftParent : null; nav.commit('home', request);
-        try { await this.deps.goals.recoverBookIntents(); } catch (error) { this.status = error instanceof Error ? error.message : '书籍关联需要重试'; this.render(); }
+        try { await this.deps.goals.recoverBookIntents(); } catch (error) { this.status = error instanceof Error ? error.message : "Please retry linking the book."; this.render(); }
     }
     leave() { if (this.active && this.deps.currentBookId()) this.deps.goals.navigation.show('reader'); }
     async refresh() {

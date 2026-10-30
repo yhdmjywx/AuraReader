@@ -19,7 +19,7 @@ export function createReadingLocation({
         bookId,
         page: validPage,
         totalPages: Math.max(1, totalPages),
-        chapter: chapter || '章节选区',
+        chapter: chapter || "Chapter selection",
         anchor: anchor || '',
         sectionId: sectionId || `chapter-${validPage}`,
         offset: Number(offset) || 0
@@ -45,7 +45,7 @@ export function resolveTargetPage(href: string, hrefToPageMap: Record<string, nu
 }
 
 export function findChapterForPage(toc: TocEntry[] = [], page = 1): string {
-    if (!toc || !Array.isArray(toc) || toc.length === 0) return '当前章节';
+    if (!toc || !Array.isArray(toc) || toc.length === 0) return "Current chapter";
     const sorted = [...toc].sort((a, b) => {
         const pageDiff = (a.page || 1) - (b.page || 1);
         if (pageDiff !== 0) return pageDiff;
