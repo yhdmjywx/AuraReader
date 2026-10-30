@@ -210,7 +210,7 @@ function startInlineEditor({ card, note, elements, onInput, onFinish }) {
     const editor = document.createElement('textarea');
     editor.className = 'note-editor';
     editor.setAttribute('aria-label', "Note text");
-    editor.setAttribute('aria-keyshortcuts', 'Escape Control+Enter Meta+Enter');
+    editor.setAttribute('aria-keyshortcuts', 'Enter Shift+Enter Escape Control+Enter Meta+Enter');
     editor.rows = 1;
     editor.value = note.comment || '';
     const shell = document.createElement('div');
@@ -239,7 +239,7 @@ function startInlineEditor({ card, note, elements, onInput, onFinish }) {
     editor.addEventListener('keydown', event => {
         event.stopPropagation();
         if (composing || event.isComposing || event.keyCode === 229) return;
-        if (event.key === 'Escape' || (event.key === 'Enter' && (event.ctrlKey || event.metaKey))) {
+        if (event.key === 'Escape' || (event.key === 'Enter' && (!event.shiftKey || event.ctrlKey || event.metaKey))) {
             event.preventDefault();
             onFinish?.();
         }

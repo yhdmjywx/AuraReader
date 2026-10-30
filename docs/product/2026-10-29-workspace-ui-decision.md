@@ -77,3 +77,10 @@ date: 2026-10-29 · source: explicit owner confirmation
 - Preserve the current horizontal/vertical layout, action bindings, book-title
   context, menus, and preferences. Reuse the Base UI primitive and installed
   icons; no new dependency or whole-project component migration is required.
+
+### 2026-10-30: Margin note repair
+- Remove the note-card source-location button and visible input-box chrome.
+  Enter finishes; Shift+Enter inserts a newline. Preserve the other existing
+  edit, save, IME, Goal-link, delete, and navigation behavior.
+- Use a fully opaque saturated-red caret at half its former width. The detailed
+  presentation and shortcut contract is in the UI/UX baseline.

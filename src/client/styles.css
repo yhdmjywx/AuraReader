@@ -1578,9 +1578,9 @@ mark.hl-active {
 }
 .note-block-caret {
     position: absolute;
-    width: 1ch;
-    background: #d95353;
-    opacity: .65;
+    width: .5ch;
+    background: #dc2626;
+    opacity: 1;
     pointer-events: none;
     animation: note-caret-blink 1s step-end infinite;
 }
@@ -1610,8 +1610,9 @@ mark.hl-active {
     overflow-wrap: anywhere;
     overflow: hidden;
     resize: none;
-    caret-color: #d95353;
+    caret-color: #dc2626;
 }
+textarea.note-editor:focus-visible { outline: none; outline-offset: 0; box-shadow: none; }
 .note-card-actions[hidden] { display: none; }
 .immersive-notes .margin-highlight-label { font-size: 12px; color: var(--text-muted); }
 

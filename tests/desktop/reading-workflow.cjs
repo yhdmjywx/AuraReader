@@ -8,7 +8,7 @@ const { startDesktop } = require('../../src/desktop/main.cjs');
 
 BrowserWindow.prototype.show = function () {};
 const errors = [];
-const noteText = 'A React note\n中文输入保持光标';
+const noteText = 'A React note\n中文输入保持光标\n';
 app.on('web-contents-created', (_event, contents) => {
     contents.on('console-message', details => { if (details.level === 'error') errors.push(details.message); });
 });
@@ -119,7 +119,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`(() => {
         const editor = document.querySelector('#react-notes textarea');
         editor.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
-        editor.value = ${JSON.stringify(noteText)};
+        editor.value = ${JSON.stringify(noteText.slice(0, -1))};
         editor.dispatchEvent(new Event('input', { bubbles: true }));
         editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, isComposing: true, bubbles: true }));
     })()`);
@@ -127,9 +127,28 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`(() => {
         const editor = document.querySelector('#react-notes textarea');
         editor.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
-        editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+        editor.setSelectionRange(editor.value.length, editor.value.length);
     })()`);
+    assert.equal(await run(`document.querySelector('#react-notes textarea').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true }))`), true, 'Shift+Enter allows native newline input');
+    await window.webContents.insertText('\n');
+    await waitFor(`document.querySelector('#react-notes textarea')?.value === ${JSON.stringify(noteText)}`);
+    const noteAppearance = await run(`(() => {
+        const editor = document.querySelector('#react-notes textarea'), style = getComputedStyle(editor);
+        const caret = document.querySelector('#react-notes .note-block-caret');
+        caret.style.animation = 'none'; editor.dispatchEvent(new Event('select'));
+        const probe = document.createElement('span'); probe.style.font = getComputedStyle(caret).font; probe.style.position = 'fixed'; probe.style.width = 'max-content'; probe.textContent = '0'; document.body.append(probe);
+        const halfWidth = probe.getBoundingClientRect().width / 2; probe.remove();
+        return { border: style.borderTopWidth, outline: style.outlineStyle, shadow: style.boxShadow,
+            caretWidth: caret.getBoundingClientRect().width, halfWidth, color: getComputedStyle(caret).backgroundColor, opacity: getComputedStyle(caret).opacity };
+    })()`);
+    assert.deepEqual([noteAppearance.border, noteAppearance.outline, noteAppearance.shadow], ['0px', 'none', 'none'], 'inline note editing has no input-box chrome');
+    await capture('note-editing');
+    assert.ok(Math.abs(noteAppearance.caretWidth - noteAppearance.halfWidth) < .15, 'caret is half a character wide: ' + JSON.stringify(noteAppearance));
+    assert.deepEqual([noteAppearance.color, noteAppearance.opacity], ['rgb(220, 38, 38)', '1'], 'caret is saturated and opaque');
+    await run(`document.querySelector('#react-notes textarea').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))`);
     await waitFor(`!document.querySelector('#react-notes textarea') && document.querySelector('#react-notes [aria-label="Add to goal"]:not(:disabled)')`);
+    assert.equal(await run(`document.querySelector('#react-notes [aria-label="Back to source"]') === null`), true, 'note actions omit the source-location button');
+    await capture('note-actions');
     await run(`document.querySelector('#react-notes [aria-label="Add to goal"]').click()`);
     await waitFor(`document.querySelector('#goal-panel .goal-item-text')?.textContent.includes('A React note') && document.querySelector('#react-notes [aria-label="Added to goal"]')`);
     const saved = await run(`(async () => {

@@ -87,6 +87,19 @@ workspace changes and their scope.
   entry. Reading-settings action controls share this treatment; font menu rows
   retain Vega menu styling. Preserve commands, IDs, values, and control placement.
 
+### Margin note editing
+
+- Do not show a separate source-location button on note cards. Keep Goal linking,
+  deletion, and the existing source relationships and other navigation actions.
+- Edit inline without a visible input box, border, shadow, or focus outline.
+  Keep the native textarea responsible for text, selection, and IME input.
+- Enter finishes editing; Shift+Enter inserts a newline. Preserve Escape,
+  Ctrl/Meta+Enter, blur completion, automatic saving, and IME composition handling.
+  Goal editor shortcuts are unchanged.
+- The custom caret is saturated red (#dc2626), fully opaque during its visible
+  blink phase, and 0.5ch wide, half its previous width. Keep its existing height,
+  positioning, blink timing, selection handling, and IME fallback.
+
 ## Feedback
 
 - Show short success feedback near the action, such as "Saved" or "Linked", then

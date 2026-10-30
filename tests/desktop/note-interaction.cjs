@@ -82,7 +82,7 @@ const watchdog = setTimeout(() => app.exit(1), 45000);
             const caret = elements.notesList.querySelector('.note-block-caret');
             check(!caret.hidden && editor.classList.contains('has-block-caret'), 'Block caret not shown');
             const probe = document.createElement('span'); probe.style.font = getComputedStyle(editor).font; probe.textContent = '0'; document.body.appendChild(probe);
-            check(Math.abs(caret.getBoundingClientRect().width - probe.getBoundingClientRect().width) < 0.1, 'Caret must be one English character wide');
+            check(Math.abs(caret.getBoundingClientRect().width - probe.getBoundingClientRect().width / 2) < 0.1, 'Caret must be half an English character wide');
             probe.remove();
             const firstTop = parseFloat(caret.style.top);
             editor.setSelectionRange(editor.value.length, editor.value.length); editor.dispatchEvent(new Event('select'));
@@ -95,7 +95,7 @@ const watchdog = setTimeout(() => app.exit(1), 45000);
             editor.dispatchEvent(new CompositionEvent('compositionend'));
             check(!caret.hidden, 'Caret should return after IME composition');
             await annotations.finishInlineEdit(); annotations.setNotesForBook([]); annotations.renderNotesUI();
-            checks.push(mode + ': stable line boxes, exact scroll, click to edit, 1ch caret, newline, selection and IME');
+            checks.push(mode + ': stable line boxes, exact scroll, click to edit, 0.5ch caret, newline, selection and IME');
         }
         return checks;
     })()`, true);

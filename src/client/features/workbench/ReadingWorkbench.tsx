@@ -23,14 +23,14 @@ function NoteEditor({ note, store }: { note: Annotation; store: WorkbenchStore }
     }, [note.comment]);
     return <div ref={shell} className="note-editor-shell">
         <textarea ref={input} className="note-editor" aria-label="Note text" rows={1} defaultValue={note.comment}
-            aria-keyshortcuts="Escape Control+Enter Meta+Enter"
+            aria-keyshortcuts="Enter Shift+Enter Escape Control+Enter Meta+Enter"
             onInput={event => store.updateNote(note.id, event.currentTarget.value)}
             onCompositionStart={() => { composing.current = true; }}
             onCompositionEnd={event => { composing.current = false; store.updateNote(note.id, event.currentTarget.value); }}
             onKeyDown={event => {
                 event.stopPropagation();
-                if (composing.current || event.nativeEvent.isComposing) return;
-                if (event.key === 'Escape' || (event.key === 'Enter' && (event.ctrlKey || event.metaKey))) {
+                if (composing.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+                if (event.key === 'Escape' || (event.key === 'Enter' && (!event.shiftKey || event.ctrlKey || event.metaKey))) {
                     event.preventDefault(); void store.run(() => store.finishNote());
                 }
             }} onBlur={() => { void store.run(() => store.finishNote()); }} />
@@ -67,8 +67,6 @@ function Notes({ state, store }: { state: WorkbenchSnapshot; store: WorkbenchSto
                     <i aria-hidden="true" className={state.linkedIds.includes(note.id) ? 'ri-check-line' : 'ri-links-line'} />
                     <span>{state.linkedIds.includes(note.id) ? 'Linked' : 'Goal'}</span>
                 </Button>
-                <Button type="button" className="btn btn-ghost-sm" aria-label="Back to source"
-                    onClick={() => store.app.coordinator.jumpToAnnotation(note.id)}><i className="ri-focus-3-line" aria-hidden="true" /></Button>
                 <Button type="button" className="btn btn-ghost-sm" aria-label={note.kind === 'note' ? "Delete note" : "Delete highlight"}
                     onClick={() => { void store.deleteNote(note.id); }}><i className="ri-delete-bin-line" aria-hidden="true" /></Button>
             </div>
