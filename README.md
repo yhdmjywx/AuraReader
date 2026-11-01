@@ -1,59 +1,63 @@
 # AuraReader
 
-**以阅读者为主体的阅读工作台**
+[中文](README.zh-CN.md)
 
-阅读从自己的意图展开，并随着跨越书籍的材料，原文旁的想法，生长或毁灭。
+**A reading workspace centered on the reader**
 
-## 产品演示
+Reading begins with your own intentions. As you gather material across books and leave thoughts beside the text, those intentions can grow or fade away.
 
-![Goal 从建立、关联两本书的笔记到改写目的的完整过程](docs/assets/goal-lifecycle.gif)
+## Product Demo
 
-39 秒看一个 Goal 如何建立、关联跨书材料，并随着阅读而改变。动画按实际功能重建界面；[演示说明与素材来源](docs/product-demo.md)。
+![The full lifecycle of a Goal: creating it, linking notes from two books, and revising its purpose](docs/assets/goal-lifecycle.gif)
+
+In 39 seconds, see how a Goal takes shape, brings together material across books, and changes through reading. The animation recreates the interface based on actual features; see the [demo notes and sources](docs/product-demo.md).
 
 ## Why AuraReader?
 
-**让阅读者的意志主导阅读，不被书籍和固定目标主导与限制。**
+**Let your own intentions guide your reading, with the freedom to move beyond any book or fixed goal.**
 
-AuraReader 希望让读者始终拥有阅读的主动权：从自己的意图出发，在阅读中形成自己的联系，也自由决定接下来往哪里走。
+AuraReader aims to keep you in charge of your reading: start from your own intentions, form your own connections as you read, and freely decide where to go next.
 
-- **阅读从你出发。** 可以为了研究、探索或放松，也可以没有明确目的。你无需为阅读预先规定用途，也无需证明它会带来什么成果。
-- **让联系跨越书籍与页面。** 同一本书不同位置、不同书籍中的内容，可以因为你的目的联系起来。你可以沿着自己的关注展开阅读，让材料进入自己的思考脉络。
-- **目的也可以生长或消亡。** Goal 可以随着阅读被改写、展开为子 Goal，也可以被放下、删除，或从未设立。新的发现可以改变出发时的想法，你有权决定是否继续原来的方向。
-- **让自己的声音留在阅读之中。** 沉浸式高亮与页边笔记让你在原文旁表达、编辑自己的关注与想法，并按自己的意愿与 Goal 联系起来，让阅读、思考与目的的发展保持连贯。
+- **Reading starts with you.** Read for research, exploration, relaxation, or without a clear purpose. You do not need to define a use for your reading in advance or prove that it will produce results.
+- **Connect ideas across books and pages.** Passages from different parts of a book, or from different books, can come together around your purpose. Follow your interests and weave material into your own thinking.
+- **Purposes can grow or come to an end.** A Goal can be rewritten as you read, branch into sub-Goals, be set aside or deleted, or never be created at all. New discoveries can change your initial ideas; you decide whether to keep following the same direction.
+- **Keep your own voice in your reading.** In-text highlights and margin notes let you express and edit your interests and thoughts beside the original text. Link them to Goals as you choose, keeping reading, thinking, and the development of your purposes connected.
 
 ## Core Features
 
-- **自由发展的 Goal 与跨书组织**：用自己的文字建立阅读目的，关联书籍，并将不同书籍、不同位置的高亮与笔记汇集到同一个 Goal 中。Goal 独立于书籍，可以随阅读改写、展开为子 Goal，也支持完成、归档、删除与恢复。你可以先有目的，也可以在阅读中形成目的，或完全不设置 Goal。
-- **沉浸式高亮与页边笔记**：在原文中高亮关注的内容，直接在旁边记录和编辑想法。笔记跟随当前可见正文，让阅读与表达保持连贯；高亮和笔记可以按你的意愿关联到 Goal，成为围绕同一目的查看的材料，并随时定位回原文继续阅读。
-- **按自己的习惯阅读**：支持 EPUB、TXT，以及单页、双页和连续滚动阅读。调整字体、字号、缩进与阅读背景，使用内置字体、本机字体或自行导入字体，让阅读环境适合自己的习惯。
-- **本地保存与整合导出**：书籍、Goal、高亮与笔记保存在本机。将书籍正文、高亮与笔记按章节整合导出为 Markdown，保留引用与上下文，在其他编辑器和平台继续使用；也可导出逐书备份，在 AuraReader 中恢复书籍及相关阅读内容。
+- **Evolving Goals and organization across books**: Describe your reading purposes in your own words, associate books with them, and bring highlights and notes from different books and passages into the same Goal. Goals exist independently of books. You can revise them as you read, branch them into sub-Goals, and complete, archive, delete, or restore them. Start with a purpose, discover one through reading, or read without a Goal.
+- **In-text highlights and margin notes**: Highlight passages that matter to you and record or edit your thoughts beside them. Notes follow the currently visible text to keep reading and writing connected. Link highlights and notes to Goals as you choose, review material around a shared purpose, and return to the original passage whenever you want to continue reading.
+- **Read your way**: Read EPUB and TXT files in single-page or continuous scrolling mode. Adjust fonts, text size, indentation, and reading backgrounds. Use bundled fonts, system fonts, or fonts you import yourself to suit your reading habits.
+- **Local storage and combined exports**: Books, Goals, highlights, and notes are stored on your device. Export book text, highlights, and notes together as Markdown organized by chapter, preserving quotations and context for use in other editors and platforms. You can also export per-book backups to restore books and their associated reading content in AuraReader.
 
-具体操作见 [阅读、Goal 与导出](docs/reading-guide.md)，备份范围见 [数据与备份](docs/data-and-backup.md)。
+For instructions, see [Reading, Goals, and Export](docs/reading-guide.md). For backup coverage, see [Data and Backups](docs/data-and-backup.md).
 
 ## Get Started
 
-当前面向 PC，支持 EPUB、TXT。Windows x64 Electron 桌面版处于候选阶段，安装包未签名、尚未公开发布；也可从源码运行。需 **Node.js ≥ 24.15.0**，已在 Windows / Node.js 24.16.0 验证。
+AuraReader currently targets PCs and supports EPUB and TXT. The Windows x64 Electron desktop app is at the release candidate stage; its installer is unsigned and has not been publicly released. You can also run it from source. Source development requires **Node.js ≥ 24.15.0** and has been verified on Windows with Node.js 24.16.0.
 
-在项目根目录运行：
+Run these commands in the project root:
 
 ```powershell
 npm ci
 npm run desktop
 ```
 
-首次启动点击“创建独立桌面书库”，随后导入书籍即可阅读。
+On first launch, click “Create local library” to reach the Goal and book selection home page. You can create a Goal first or import a book and start reading. Later launches also open the home page so you can choose a book. While reading, click the AuraReader logo in the upper-left corner to return home; “Continue reading” returns to the book and position from the current session.
 
-浏览器模式：依赖安装后运行 `npm start`，打开 [localhost:8095](http://localhost:8095/)，使用期间保持服务运行，建议使用近期 Chrome / Edge。更多安装、端口与打包说明见 [开发文档](docs/development.md)。
+For browser mode, run `npm start` after installing dependencies and open [localhost:8095](http://localhost:8095/). Keep the service running while you use the app. A recent version of Chrome or Edge is recommended. See the [development guide](docs/development.md) for more on installation, ports, and packaging.
 
 ## Documentation
 
-- [阅读、Goal 与导出](docs/reading-guide.md)
-- [安装、开发与桌面验收](docs/development.md)
-- [数据、迁移与备份](docs/data-and-backup.md)
-- [产品需求与原则（PRD）](docs/prd_v0_5.md)
-- [已知限制](docs/known-limitations.md)
-- [技术实现与文档索引](docs/README.md)
+The linked documents are currently in Chinese.
+
+- [Reading, Goals, and Export](docs/reading-guide.md)
+- [Installation, Development, and Desktop Acceptance Checks](docs/development.md)
+- [Data, Migration, and Backups](docs/data-and-backup.md)
+- [Product Requirements and Principles (PRD)](docs/prd_v0_5.md)
+- [Known Limitations](docs/known-limitations.md)
+- [Technical Implementation and Documentation Index](docs/README.md)
 
 ## License
 
-项目代码采用 [Apache License 2.0](LICENSE)。内置字体、第三方依赖与演示书籍遵循各自许可，见 [资源说明](docs/known-limitations.md#阅读资源与许可边界) 和 [演示来源](docs/product-demo.md#素材与更新)。
+The project code is licensed under the [Apache License 2.0](LICENSE). Bundled fonts, third-party dependencies, and demo books follow their respective licenses; see the [resource notes](docs/known-limitations.md#阅读资源与许可边界) and [demo sources](docs/product-demo.md#素材与更新).
