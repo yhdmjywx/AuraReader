@@ -126,11 +126,17 @@ workspace changes and their scope.
   grow with its text. Keep existing Goal save, blur, IME, and shortcut behavior;
   the new-Goal draft placement is unchanged.
 - Default, hover, editing and disabled rows share the same text origin, usable
-  width, typography and minimum height. Use 10px horizontal text insets, the
-  reference's approximately 41.12px single-line parent row and 40px child row in
-  the sidebar. Full Goal rows retain their existing larger typography in every
-  state. Keep explicit and trailing line breaks visible in both display and
-  editing, without trimming the stored Goal text.
+  width, typography and minimum height. Follow the actual Goal Sidebar instances:
+  root-level rows and the current parent use 16px Medium text; nested children
+  use 14px Regular text. All three use compact 40px single-line rows with 10px
+  horizontal text insets. The Root instance overrides the base Child component's
+  typography, and the Expanded instance overrides the base Parent's height.
+  Full Goal rows retain their existing larger typography in every state.
+- Terminal empty lines must not enlarge a displayed row or an unchanged editor.
+  Preserve internal authored line breaks and the original stored value when
+  opening/closing without edits. Newly typed line breaks remain editable and
+  grow the active input normally. Do not force terminal empty display lines just
+  to make a state comparison match.
 - Every listed Goal also has its own edit icon. Edit that Goal in its row without
   entering it, switching the active Goal, or changing the parent's text or linked
   materials. Clicking Goal text continues to enter it. Reuse the same editor and

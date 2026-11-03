@@ -20,10 +20,14 @@ interface Actions {
     unlink(id: string): void; jump(id: string): void;
     menu?(id: string, anchor: HTMLElement, point?: { x: number; y: number }): void;
 }
+// Terminal blank lines do not add empty rows to the compact Goal presentation.
+function rowDisplayText(text: string) { return text.replace(/[\r\n]+$/u, ''); }
 function GoalEditor({ view, ui }: { view: GoalView; ui: GoalUI }) {
     const editor = useRef<HTMLTextAreaElement>(null), composing = useRef(false);
     const inline = view.edit?.mode === 'edit';
-    const [text, setText] = useState(view.edit!.draft.text);
+    const originalText = useRef(view.edit!.draft.text);
+    const initialText = inline ? rowDisplayText(originalText.current) : originalText.current;
+    const [text, setText] = useState(initialText);
     useLayoutEffect(() => {
         const input = editor.current!;
         input.focus({ preventScroll: true }); input.setSelectionRange(input.value.length, input.value.length);
@@ -36,7 +40,8 @@ function GoalEditor({ view, ui }: { view: GoalView; ui: GoalUI }) {
     useLayoutEffect(resize, []);
     return <div className={`goal-editor${view.edit?.mode === 'edit' ? ' is-inline' : ' is-new'}`}>
         {inline && <span className="goal-editor-measure" aria-hidden="true">{text}</span>}
-        <Textarea ref={editor} rows={1} defaultValue={view.edit!.draft.text} disabled={view.disabled}
+        <Textarea ref={editor} rows={1} defaultValue={initialText} disabled={view.disabled}
+            data-original-text={inline ? originalText.current : undefined}
             aria-label={view.edit?.mode === 'edit' ? 'Edit goal' : 'New goal'} placeholder="Goal"
             aria-keyshortcuts="Escape Control+Enter Meta+Enter"
             onInput={event => { setText(event.currentTarget.value); ui.actions.input(event.currentTarget.value); resize(); }}
@@ -75,7 +80,7 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
                 <div className="goal-title-row" data-disabled={view.disabled ? '' : undefined}>
                     {view.edit?.mode === 'edit' && view.edit.draft.id === goal.id
                         ? <GoalEditor key={`edit:${view.edit.draft.id}`} view={view} ui={ui} />
-                        : <Button className="goal-title" aria-current="page" disabled={view.disabled} onClick={() => actions.select(goal.id)}><span className="goal-row-label">{goal.text}</span></Button>}
+                        : <Button className="goal-title" aria-current="page" disabled={view.disabled} onClick={() => actions.select(goal.id)}><span className="goal-row-label">{rowDisplayText(goal.text)}</span></Button>}
                     <Button size="icon-lg" className="goal-icon goal-edit" aria-label="Edit goal" title="Edit goal" disabled={view.disabled} onClick={() => actions.edit('edit')}><ActionIcon name="edit" /></Button>
                     <Button size="icon-lg" className="goal-icon" aria-label={`Actions for ${goal.text}`} title="Goal actions" aria-haspopup="menu" disabled={view.disabled}
                         onClick={event => actions.menu?.(goal.id, event.currentTarget)}><ActionIcon name="more" /></Button>
@@ -85,10 +90,10 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
             <div className={`goal-descendants${!view.allGoals && goal ? ' is-nested' : ''}`}>
             {view.edit && view.edit.mode !== 'edit' && <GoalEditor key={`${view.edit.mode}:${view.edit.draft.id}`} view={view} ui={ui} />}
             <div className="goal-children">
-            {children.map(child => <div className="goal-row" key={child.id} data-goal-id={child.id} data-disabled={view.disabled ? '' : undefined}>
+            {children.map(child => <div className="goal-row" key={child.id} data-goal-id={child.id} data-goal-kind={view.allGoals ? 'root' : 'child'} data-disabled={view.disabled ? '' : undefined}>
                 {view.edit?.mode === 'edit' && view.edit.draft.id === child.id
                     ? <GoalEditor key={`edit:${child.id}`} view={view} ui={ui} />
-                    : <Button className="goal-child" disabled={view.disabled} onClick={() => actions.select(child.id)}><span className="goal-row-label">{child.text}</span></Button>}
+                    : <Button className="goal-child" disabled={view.disabled} onClick={() => actions.select(child.id)}><span className="goal-row-label">{rowDisplayText(child.text)}</span></Button>}
                 {child.completedAt && <span className="goal-completion">✓</span>}
                 <Button size="icon-lg" className="goal-icon goal-child-edit" aria-label={`Edit ${child.text}`} title="Edit goal" disabled={view.disabled} onClick={() => actions.edit('edit', child.id)}><ActionIcon name="edit" /></Button>
                 <Button size="icon-lg" className="goal-icon" aria-label={`Actions for ${child.text}`} title="Goal actions" aria-haspopup="menu" disabled={view.disabled}
@@ -123,7 +128,12 @@ export class GoalUI {
     releasingFocus = false;
     message = '';
     constructor(readonly panel: HTMLElement, readonly actions: Actions) {}
-    get editingText() { return this.panel.querySelector('textarea')?.value; }
+    get editingText() {
+        const input = this.panel.querySelector('textarea');
+        if (!input) return undefined;
+        const original = input.dataset.originalText;
+        return original !== undefined && input.value === rowDisplayText(original) ? original : input.value;
+    }
     releaseEditorFocus() {
         this.releasingFocus = true;
         this.panel.querySelector('textarea')?.blur();
