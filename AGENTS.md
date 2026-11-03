@@ -59,8 +59,10 @@
 
 ## Validation
 - Run the profile's validation baseline before reporting a change complete.
-- Every interface change requires before-and-after screenshots. Inspect the
-  rendered result and verify the affected behavior.
+- Verify interface changes in the running web app using ChatGPT's built-in
+  browser-use tool. Exercise affected interactions and check their outcomes.
+  Screenshots show the final appearance only; they do not replace interaction
+  verification. Before-and-after screenshots are no longer required.
 - Report checks that were not run and evidence that could not be obtained.
 - Report the requested changes and each nearby fix separately. Passing tests does
   not expand the authorized scope.

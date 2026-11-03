@@ -136,7 +136,10 @@ export class ReaderController {
         this._flowPage = 0;
 
         if (this.elements) {
-            if (this.elements.currentBookTitle) this.elements.currentBookTitle.textContent = bookObj.title;
+            if (this.elements.currentBookTitle) {
+                this.elements.currentBookTitle.textContent = bookObj.title;
+                this.elements.currentBookTitle.title = bookObj.title;
+            }
             if (this.elements.currentBookTag) this.elements.currentBookTag.textContent = bookObj.format || 'EPUB';
             if (this.elements.totalPagesSpan) this.elements.totalPagesSpan.textContent = String(this.totalPages);
         }
@@ -157,7 +160,10 @@ export class ReaderController {
         this.bookStructure = null; this.flowAnchorText = ''; this._flowPage = 0; this._volumeTitlePages = [];
         this.currentPage = this.totalPages = 1;
         for (const paper of [this.elements?.bookPaper]) paper?.replaceChildren();
-        if (this.elements?.currentBookTitle) this.elements.currentBookTitle.textContent = "No book open";
+        if (this.elements?.currentBookTitle) {
+            this.elements.currentBookTitle.textContent = "No book open";
+            this.elements.currentBookTitle.removeAttribute('title');
+        }
         this.renderTOC([]);
         this.emit('location');
     }

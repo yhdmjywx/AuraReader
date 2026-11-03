@@ -2,7 +2,8 @@ const assert = require('node:assert/strict');
 const { ui, click, input, waitFor } = require('../helpers/react-workbench.cjs');
 (async () => {
     const books = ['a','z'].map(id => ({ id, title: 'Book ' + id.toUpperCase(), pages: ['<p>Source</p>'] }));
-    const c = await require('../helpers/goal-workbench.cjs').goalWorkbench(books);
+    const note = { id: 'n', bookId: 'z', kind: 'note', quote: 'Source\nAnother paragraph', comment: 'My thought', page: 1 };
+    const c = await require('../helpers/goal-workbench.cjs').goalWorkbench(books, [note]);
     try {
         const { GoalHome } = await import('../../dist/client/features/goals/goalHome.js');
         const { goals } = c;
@@ -36,6 +37,11 @@ const { ui, click, input, waitFor } = require('../helpers/react-workbench.cjs');
         assert.equal(document.querySelectorAll('#home-books .home-book-card').length, 0, 'children do not copy parent books');
         await click('#home-up'); await click('#home-books .goal-home-book');
         assert.deepEqual(opens[0], { id: 'z', goalId: root });
+        await waitFor(() => !c.home.busy);
+        await ui(async () => { goals.selectGoal(root); await goals.linkAnnotation(note.id); await c.home.open(); c.home.navigate(root); });
+        await waitFor(() => document.querySelector('#home-material-list .goal-material-quote'));
+        assert.equal(document.querySelector('#home-material-list .goal-material-quote').textContent, note.quote, 'Home linked notes include source text');
+        assert.equal(document.querySelector('#home-material-list .goal-material-comment').textContent, note.comment);
         console.log('PASS: React Home navigation, draft save, hierarchy, book dialog and explicit reading intent');
     } finally { await c.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

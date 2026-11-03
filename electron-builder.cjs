@@ -13,7 +13,8 @@ module.exports = {
         'dist/renderer/**/*',
         'src/desktop/**/*.cjs', 'src/desktop/renderer/**/*',
         'src/server/dataStore.js', 'src/server/fontStore.js',
-        'src/server/migration.js', 'src/server/storageMaintenance.js'
+        'src/server/goalLibrary.js', 'src/server/goalValidation.js', 'src/server/migration.js',
+        'src/server/storageMaintenance.js'
     ],
     extraFiles: [{ from: '.commandcode/package-resources/THIRD-PARTY-NOTICES.txt', to: 'THIRD-PARTY-NOTICES.txt' },
         { from: 'LICENSE', to: 'LICENSE-AuraReader.txt' }],

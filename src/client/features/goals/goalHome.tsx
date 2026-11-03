@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/button.js';
 import { Input, Textarea } from '../../components/ui/input.js';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog.js';
 import { renderSurface } from '../../components/ui/renderSurface.js';
+import { GoalMaterialText } from './GoalMaterialText.js';
 
 interface HomeDependencies {
     goals: GoalController; coordinator: AppCoordinator; finishAnnotations(): Promise<void>;
@@ -100,7 +101,7 @@ function HomeView({ home }: { home: GoalHome }) {
                 </ul>{!books.length && <p className="home-empty" id="home-books-empty">{selected ? "Add a book to start reading toward this goal." : "Import a book to start reading."}</p>}</section>}
                 {selected && <section id="home-materials"><h2>Linked notes and highlights</h2><div id="home-material-list">
                     {goals.materialEntries(selected.id).map(({ link, annotation, title }) => <div className="goal-item" key={`${link.bookId}:${link.annotationId}`}>
-                        <Button className="goal-item-text" disabled={!annotation || home.busy} onClick={() => { void home.perform(() => goals.jumpMaterial(link)); }}>{annotation ? annotation.comment || annotation.quote : "Source unavailable"}</Button>
+                        <Button className="goal-item-text" disabled={!annotation || home.busy} onClick={() => { void home.perform(() => goals.jumpMaterial(link)); }}>{annotation ? <GoalMaterialText annotation={annotation} /> : "Source unavailable"}</Button>
                         <small className="goal-item-source">{title}</small>
                     </div>)}
                 </div></section>}

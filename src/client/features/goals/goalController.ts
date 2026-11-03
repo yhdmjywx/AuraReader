@@ -71,7 +71,7 @@ export class GoalController {
             select: id => this.selectGoal(id), home: () => this.goHome(), up: () => this.goUp(), create: () => this.beginNew(),
             menu: (id, anchor, point) => this.actions.open(id, anchor, point),
             expand: () => { this.openPage().catch(() => {}); },
-            items: () => { this.itemsOpen = !this.itemsOpen; this.render(); }, edit: mode => this.beginEdit(mode), input: text => this.updateDraft(text),
+            items: () => { this.itemsOpen = !this.itemsOpen; this.render(); }, edit: (mode, id) => this.beginEdit(mode, id), input: text => this.updateDraft(text),
             finish: () => { this.finishInlineEdit().catch(() => {}); },
             unlink: id => { if (!goalEditable(this.state, this.selected) || this.lifecycleBusy) return; this.endEdit(); this.persist({ ...this.state, links: this.state.links.filter(l => l.goalId !== this.selected || l.annotationId !== id) }); this.render(); this.ui?.announce('Item unlinked from goal'); },
             jump: id => { this.endEdit(); const source = this.state.links.find(l => l.goalId === this.selected && l.annotationId === id); Promise.resolve(this.callbacks.jump(id, source)).catch(error => this.fail(error)); }
@@ -107,8 +107,8 @@ export class GoalController {
         this.endEdit(); this.selected = parentId; this.allGoals = !parentId; this.rememberSelection();
         this.beginEdit(parentId ? 'child' : 'root');
     }
-    beginEdit(mode: 'root' | 'child' | 'edit') {
-        if (this.disabled || this.lifecycleBusy) return; this.endEdit(); const goal = this.state.goals.find(g => g.id === this.selected); if (mode !== 'root' && (!goal || !goalEditable(this.state, goal.id))) return;
+    beginEdit(mode: 'root' | 'child' | 'edit', id?: string) {
+        if (this.disabled || this.lifecycleBusy) return; this.endEdit(); const goal = this.state.goals.find(g => g.id === (mode === 'edit' ? id ?? this.selected : this.selected)); if (mode !== 'root' && (!goal || !goalEditable(this.state, goal.id))) return;
         const location = this.callbacks.getLocation();
         const draft: GoalDraft = mode === 'edit' ? { id: goal!.id, parentId: goal!.parentId, text: goal!.text, origin: goal!.origin }
             : { id: operationId(), parentId: mode === 'child' ? goal!.id : null, text: '', origin: !this.page && location.bookId ? { ...goalOrigin(location.page, location.sectionId, location.chapter), bookId: location.bookId } : null };

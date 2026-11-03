@@ -32,15 +32,19 @@ verified: 2026-10-30 · owner rules: AGENTS.md
 
 ## Validation baseline
 - Code changes: production build and checks covering the changed behavior.
-- Workbench interface changes: run the React integration checks and desktop core
-  workflow described in docs/development.md.
-- Every interface change: capture before-and-after screenshots under comparable
-  conditions, inspect the rendered result, and verify the affected behavior.
+- Interface changes: use ChatGPT's built-in browser-use tool against the running
+  web app. Exercise affected mouse and keyboard interactions, check visible
+  outcomes, and verify saving or reload behavior when affected. Run automated
+  checks relevant to the change; desktop checks are required only for changes
+  involving Electron-specific behavior.
+- Screenshots document the final appearance only. They are not interaction-test
+  evidence, and before-and-after capture is no longer required. If browser-use
+  verification is unavailable, report the gap rather than substitute screenshots.
 - Storage, recovery, packaging, and installation have separate checks. Choose
   those relevant to the change; a successful build does not establish that an
   installer or recovery path works.
 
-(source: owner-stated, 2026-10-29; docs/development.md)
+(source: docs/development.md; owner-approved browser-use validation, 2026-11-03)
 
 ## Code locations
 - interface and application coordination: src/client/

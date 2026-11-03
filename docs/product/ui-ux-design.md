@@ -86,6 +86,49 @@ workspace changes and their scope.
   and contents triggers, reading settings, export, pagination, and the Settings
   entry. Reading-settings action controls share this treatment; font menu rows
   retain Vega menu styling. Preserve commands, IDs, values, and control placement.
+- Exception approved for Goal row actions: edit, more, and unlink use 28px
+  targets, 8px corners, and 16px icons. Reveal on row hover, keyboard focus,
+  or while its menu is open. Overlay them at the row end without reserving text
+  width or causing reflow. Use the row surface behind the revealed controls.
+  Hide these overlays while the textarea has focus so input stays unobscured. On
+  devices without hover, keep actions visible. Goal navigation keeps 40px targets.
+  This replaces the earlier 40px rule for these row actions only.
+
+### Goal content hierarchy
+
+- Indent the current parent Goal's contents as one group by 16px: child Goals,
+  child drafts, and linked materials. Apply in
+  both the sidebar and full Goal workspace. Root-level Goals stay unindented.
+- Do not indent the material list separately. Preserve hierarchy and interactions.
+- Use indentation and a vertical guide to make ownership visible. Do not add
+  "Current goal" or "Child goals" labels; the owner rejected these extra labels.
+- The current Goal's neutral selected background covers its entire row,
+  including its action area, and stays stable during editing.
+- The linked-material disclosure stays transparent at rest even when expanded.
+  Use neutral background feedback only on hover or keyboard focus.
+- Place material type icons inside their material rows, followed by the text;
+  never position them on or across the hierarchy guide. This replaces the
+  rejected left-gutter icon placement. Align source labels with material text.
+- Do not display a linked-material count or "linked items" heading. Preserve
+  the existing disclosure as a 44 by 28px icon-only control: a 16px links icon
+  identifies linked materials; a separate 12px caret shows expansion state.
+  Keep its tooltip and accessible name. A caret alone does not identify the
+  function. Do not change what expansion/collapse does.
+- Use 4px gaps before the material disclosure and between material-list/rows,
+  avoiding stacked large margins that separate materials from their parent.
+
+### Existing Goal editing
+
+- Clicking the edit icon replaces the current Goal's title in the same row and
+  text position. Keep edit and more-action buttons in place. Do not move the
+  editor below them or show a separate input box or focus frame.
+- Preserve title typography and wrapping width while editing. Let the editor
+  grow with its text. Keep existing Goal save, blur, IME, and shortcut behavior;
+  the new-Goal draft placement is unchanged.
+- Every listed Goal also has its own edit icon. Edit that Goal in its row without
+  entering it, switching the active Goal, or changing the parent's text or linked
+  materials. Clicking Goal text continues to enter it. Reuse the same editor and
+  save behavior for current and listed Goals.
 
 ### Margin note editing
 
@@ -99,6 +142,25 @@ workspace changes and their scope.
 - The custom caret is saturated red (#dc2626), fully opaque during its visible
   blink phase, and 0.5ch wide, half its previous width. Keep its existing height,
   positioning, blink timing, selection handling, and IME fallback.
+
+## Linked source text and reading navigation (2026-11-03)
+
+- Linked Goal materials show the saved source quote before the reader's comment,
+  in Home, the reading sidebar, and the full Goal workspace. Distinguish the quote
+  with the existing neutral palette and a vertical rule; do not add a source-quote
+  heading. Omit empty quote/comment blocks and preserve source line breaks.
+- Keep the existing compact three-line preview independently for quote and comment;
+  the full Goal workspace shows both without a line limit. A long quote must not
+  consume the comment's preview. Preserve source jumps, unlinking and persistence.
+- Place the existing pagination inside the book-actions toolbar, between the
+  book title and the right-side actions. Keep the toolbar at 52px, without an
+  additional row or bar. Keep one pagination instance and retain its commands,
+  states and 40px action targets. This supersedes the initial separate-row
+  interpretation and earlier bottom-pagination placement requirements.
+- The top book title is single-line, with a maximum width of 18ch and an ellipsis
+  on overflow; it may shrink further with available space. This is a width limit,
+  not a substring or an 18-character data limit. Keep the full title as text and
+  provide it on hover. Preserve the contents trigger and neighboring actions.
 
 ## Feedback
 
@@ -159,9 +221,12 @@ workspace changes and their scope.
 - The owner selected dark solid buttons in an independent control comparison.
   This records an earlier preference, superseded by the component-state decision
   below; it is not evidence of a completed application interface.
-- For an implemented interface change, provide before-and-after screenshots,
-  inspect the rendered result, and verify affected behavior. Report unverified
-  items. No implementation or product validation is claimed by this document.
+- Verify implemented interface changes through ChatGPT's built-in browser-use
+  tool in the running web app. Exercise affected interactions and check their
+  outcomes; a screenshot alone does not verify usability or behavior.
+- Provide screenshots of the final appearance only; before-and-after capture is
+  no longer required. Report interactions that could not be verified. No
+  implementation or product validation is claimed by this document.
 
 ## Amendments
 

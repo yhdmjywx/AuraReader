@@ -144,6 +144,16 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                 <div className="header-center"><Button id="btn-toc" size="lg" className="book-nav-btn" type="button" title="Open contents" aria-expanded="false" aria-controls="toc-drawer">
                     <ActionIcon name="contents" /><span id="current-book-title" className="book-nav-title">No book open</span><ActionIcon name="down" className="book-nav-caret" />
                 </Button></div>
+                <nav className="reader-pagination" aria-label="Pagination">
+                    <Button id="btn-prev-page" size="icon-lg" className="page-turn-btn" type="button" title="Previous page (←)" aria-label="Previous page"><ActionIcon name="left" /></Button>
+                    <span className="page-indicator">
+                        <span id="current-page">{"1"}</span>
+                        {"/"}
+                        <span id="total-pages">{"1"}</span>
+                        <span id="page-unit">{" page"}</span>
+                    </span>
+                    <Button id="btn-next-page" size="icon-lg" className="page-turn-btn" type="button" title="Next page (→)" aria-label="Next page"><ActionIcon name="right" /></Button>
+                </nav>
                 <div className="header-actions">
                     <Button id="btn-shelf" size="icon-lg" className="btn btn-icon nav-icon" type="button" title="My library" aria-expanded="false" aria-controls="shelf-panel" aria-haspopup="dialog">
                         <ActionIcon name="library" /><span className="badge-count" id="shelf-book-count" hidden>0</span>
@@ -151,6 +161,7 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                     <Button id="btn-appearance" size="icon-lg" className="btn btn-icon reader-appearance-trigger" type="button" title="Reading settings" aria-label="Reading settings" aria-expanded="false" aria-controls="appearance-panel"><ActionIcon name="palette" /></Button>
                     <Button id="btn-export-menu" size="icon-lg" className="btn btn-icon nav-icon" type="button" title="Export book" aria-label="Export book" aria-expanded="false" aria-controls="export-panel"><ActionIcon name="more" /></Button>
                 </div>
+                <span id="react-reading-book"></span>
             </header>
             <section className="reader-panel" id="reader-panel">
                 <aside className="toc-drawer" id="toc-drawer">
@@ -164,17 +175,6 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                     <ul className="toc-list" id="toc-list"></ul>
                 </aside>
                 <div className="reader-viewport" id="reader-viewport"><div className="paper-container" id="paper-container"><article className="book-paper" id="book-paper"></article></div></div>
-                <nav className="reader-pagination" aria-label="Pagination">
-                    <span id="react-reading-book"></span>
-                    <Button id="btn-prev-page" size="icon-lg" className="page-turn-btn" type="button" title="Previous page (←)" aria-label="Previous page"><ActionIcon name="left" /></Button>
-                    <span className="page-indicator">
-                        <span id="current-page">{"1"}</span>
-                        {"/"}
-                        <span id="total-pages">{"1"}</span>
-                        <span id="page-unit">{" page"}</span>
-                    </span>
-                    <Button id="btn-next-page" size="icon-lg" className="page-turn-btn" type="button" title="Next page (→)" aria-label="Next page"><ActionIcon name="right" /></Button>
-                </nav>
                 <div className="selection-tooltip" id="selection-tooltip">
                     <span id="react-selection-actions"></span>
                     <Button className="tooltip-btn hl-yellow" data-color="yellow" title="Highlight text">

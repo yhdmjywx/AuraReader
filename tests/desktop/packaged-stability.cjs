@@ -26,7 +26,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         const timer = setTimeout(() => child.kill(), 90000);
         current = { child, exited, timer, phase, log: () => log };
         for (let attempt = 0; attempt < 150 && !port && child.exitCode === null; attempt++) await delay(100);
-        assert.ok(port, log); const client = await connect(port); current.client = client;
+        assert.ok(port, `Packaged app did not start its debugger (exit=${child.exitCode}, signal=${child.signalCode}).\n${log}`);
+        const client = await connect(port); current.client = client;
         // The exact URL can appear in /json/list before Chromium replaces its
         // initial execution context. Retry that navigation race only at boot.
         const bootDeadline = Date.now() + 15000;

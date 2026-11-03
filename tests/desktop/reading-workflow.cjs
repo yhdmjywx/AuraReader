@@ -92,12 +92,65 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`document.getElementById('btn-goal-sidebar').click()`);
     await waitFor(`!document.getElementById('goal-sidebar').hidden`);
     await capture('reader-workspace');
+    assert.equal(await run(`(() => {
+        const pagination = document.querySelector('.reader-pagination').getBoundingClientRect();
+        const toolbar = document.querySelector('.reader-toolbar').getBoundingClientRect();
+        const viewport = document.getElementById('reader-viewport').getBoundingClientRect();
+        const title = document.getElementById('btn-toc').getBoundingClientRect();
+        const actions = document.querySelector('.reader-toolbar .header-actions').getBoundingClientRect();
+        return document.querySelectorAll('.reader-pagination').length === 1 && document.querySelector('.reader-toolbar > .reader-pagination')
+            && Math.abs(toolbar.height - 52) < 1 && pagination.top >= toolbar.top && pagination.bottom <= toolbar.bottom
+            && Math.abs(viewport.top - toolbar.bottom) < 1 && title.right <= pagination.left + 1 && pagination.right <= actions.left + 1;
+    })()`), true, 'one pagination control shares the existing 52px toolbar with no extra row');
+    await run(`document.getElementById('btn-next-page').click()`);
+    await waitFor(`Number(document.getElementById('current-page').textContent) > 1`);
+    await run(`document.getElementById('btn-prev-page').click()`);
+    await waitFor(`document.getElementById('current-page').textContent === '1' && document.getElementById('btn-prev-page').disabled`);
+    assert.equal(await run(`document.getElementById('current-book-title').title === document.getElementById('current-book-title').textContent`), true, 'the original full book title remains available on hover');
+    // Measure layout with short, long, mixed-language and unbroken titles, then restore the source title.
+    await run(`window.originalTitle = document.getElementById('current-book-title').textContent`);
+    for (const title of ['Short', 'A very long English book title that must be truncated', '中文书名 Mixed English 标题与数字1234567890', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789']) {
+        await run(`document.getElementById('current-book-title').textContent = ${JSON.stringify(title)}`);
+        assert.equal(await run(`(() => {
+            const title = document.getElementById('current-book-title'), style = getComputedStyle(title);
+            return style.textOverflow === 'ellipsis' && style.whiteSpace === 'nowrap' && title.getBoundingClientRect().width <= parseFloat(style.maxWidth) + 1
+                && (title.textContent === 'Short' ? title.scrollWidth <= title.clientWidth + 1 : title.scrollWidth > title.clientWidth);
+        })()`), true, 'book title preserves short text and truncates overflowing text: ' + title);
+    }
+    await capture('reader-long-title');
+    const originalBounds = window.getBounds();
+    window.setSize(800, 600);
+    await run(`new Promise(resolve => setTimeout(resolve, 350))`);
+    assert.equal(await run(`(() => {
+        const title = document.getElementById('btn-toc').getBoundingClientRect(), actions = document.querySelector('.reader-toolbar .header-actions').getBoundingClientRect();
+        const pagination = document.querySelector('.reader-pagination').getBoundingClientRect();
+        return title.right <= pagination.left + 1 && pagination.right <= actions.left + 1 && pagination.left >= 0 && pagination.right <= innerWidth + 1
+            && ['btn-prev-page', 'btn-next-page'].every(id => { const r = document.getElementById(id).getBoundingClientRect(); return r.left >= pagination.left && r.right <= pagination.right; });
+    })()`), true, 'title and pagination remain usable at the minimum supported desktop size');
+    await capture('reader-minimum-window');
+    window.setBounds(originalBounds);
+    await run(`document.getElementById('current-book-title').textContent = window.originalTitle; delete window.originalTitle; new Promise(resolve => setTimeout(resolve, 350))`);
     assert.equal(await run(`['btn-goal-sidebar', 'goal-home-nav', 'goal-up', 'goal-new', 'goal-expand', 'btn-shelf', 'btn-appearance', 'btn-export-menu'].every(id => {
         const control = document.getElementById(id), rect = control.getBoundingClientRect();
         return Math.abs(rect.width - 40) < 1 && Math.abs(rect.height - 40) < 1 && !!control.querySelector('svg');
     })`), true, 'workbench icon actions share 40px SVG button targets');
+    const goalTitleBounds = await run(`(() => {
+        const panel = document.getElementById('goal-panel');
+        const rect = element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width }; };
+        return { title: rect(panel.querySelector('.goal-title')), edit: rect(panel.querySelector('.goal-edit')), more: rect(panel.querySelector('.goal-title-row [aria-haspopup="menu"]')) };
+    })()`);
     await run(`document.querySelector('#goal-panel .goal-edit').click()`);
     await waitFor(`document.querySelector('#goal-panel textarea')`);
+    const goalEditBounds = await run(`(() => {
+        const panel = document.getElementById('goal-panel'), editor = panel.querySelector('textarea');
+        const rect = element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width }; };
+        return { title: rect(editor.closest('.goal-editor')), edit: rect(panel.querySelector('.goal-edit')), more: rect(panel.querySelector('.goal-title-row [aria-haspopup="menu"]')),
+            outline: getComputedStyle(editor).outlineStyle, border: getComputedStyle(editor).borderTopWidth };
+    })()`);
+    for (const part of ['title', 'edit', 'more']) for (const coordinate of ['x', 'y', 'width'])
+        assert.ok(Math.abs(goalTitleBounds[part][coordinate] - goalEditBounds[part][coordinate]) < 1, 'Goal editing preserves ' + part + ' ' + coordinate);
+    assert.deepEqual([goalEditBounds.outline, goalEditBounds.border], ['none', '0px']);
+    await capture('goal-editing-inline');
     await run(`(() => {
         window.goalCaretCheck = document.querySelector('#goal-panel textarea');
         goalCaretCheck.setSelectionRange(4, 4);
@@ -151,6 +204,39 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await capture('note-actions');
     await run(`document.querySelector('#react-notes [aria-label="Add to goal"]').click()`);
     await waitFor(`document.querySelector('#goal-panel .goal-item-text')?.textContent.includes('A React note') && document.querySelector('#react-notes [aria-label="Added to goal"]')`);
+    assert.equal(await run(`document.querySelector('#goal-panel .goal-material-quote')?.textContent`), 'Alpha evidence 0', 'linked note displays the actual selected source text');
+    assert.equal(await run(`document.querySelector('#goal-panel .goal-material-comment')?.textContent`), noteText);
+    assert.equal(await run(`(() => {
+        const quote = document.querySelector('#goal-panel .goal-material-quote').getBoundingClientRect();
+        const comment = document.querySelector('#goal-panel .goal-material-comment').getBoundingClientRect();
+        return comment.top >= quote.bottom + 5 && Math.abs(comment.left - quote.left) < 1;
+    })()`), true, 'source and comment stack vertically instead of sharing a button flex row');
+    await run(`(async () => {
+        const a = await import(${JSON.stringify(mainUrl)}), parent = a.goals.selected;
+        await a.goals.createGoal('Explore the evidence', parent); a.goals.selectGoal(parent);
+    })()`);
+    await waitFor(`document.querySelector('#goal-panel .goal-child-edit')`);
+    await run(`document.querySelector('#goal-panel .goal-child-edit').click()`);
+    await waitFor(`document.activeElement === document.querySelector('#goal-panel .goal-row textarea')`);
+    assert.equal(await run(`document.querySelector('#goal-panel .goal-title').textContent`), 'Connect evidence across books', 'child editing keeps the parent visible');
+    await capture('goal-child-editing');
+    await run(`(() => {
+        const editor = document.querySelector('#goal-panel .goal-row textarea');
+        editor.value = 'Explore the evidence together'; editor.dispatchEvent(new Event('input', { bubbles: true }));
+        editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+    })()`);
+    await waitFor(`document.querySelector('#goal-panel .goal-child')?.textContent === 'Explore the evidence together'`);
+    assert.equal(await run(`document.querySelector('#goal-panel .goal-items-toggle').textContent.trim()`), '', 'material disclosure has no visible count or heading');
+    assert.equal(await run(`(() => {
+        const icon = document.querySelector('#goal-panel .goal-material-icon');
+        return icon.getBoundingClientRect().left >= icon.closest('.goal-item').getBoundingClientRect().left;
+    })()`), true, 'material icon stays inside its row instead of crossing the hierarchy guide');
+    await capture('goal-content-after');
+    assert.equal(await run(`document.querySelector('#goal-panel .goal-child-edit').getBoundingClientRect().width`), 28, 'row actions use compact targets');
+    await run(`document.querySelector('#goal-panel .goal-child').focus()`);
+    assert.equal(await run(`getComputedStyle(document.querySelector('#goal-panel .goal-child-edit')).opacity`), '1', 'keyboard focus reveals row actions');
+    await capture('goal-row-actions-visible');
+    await run(`document.activeElement.blur()`);
     const saved = await run(`(async () => {
         const a = await import(${JSON.stringify(mainUrl)}); await a.annotations.assertInlineWritesSaved(); await a.goals.assertWritesSaved();
         const notes = (await auraDesktop.storage.queryNotes({ bookIds: [a.session.getCurrentBookId()] })).value.records;
@@ -219,6 +305,10 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`!document.querySelector('#backup-select-modal[data-open]')`);
     await run(`document.getElementById('goal-expand').click()`);
     await waitFor(`document.documentElement.dataset.appSurface === 'goal' && document.querySelector('#goal-page-content #goal-panel .goal-title')`);
+    assert.equal(await run(`(() => {
+        const quote = document.querySelector('#goal-page .goal-material-quote').getBoundingClientRect();
+        return document.querySelector('#goal-page .goal-material-comment').getBoundingClientRect().top >= quote.bottom + 5;
+    })()`), true, 'the shared full Goal workspace also stacks source before comment');
     await capture('goal-workspace');
     await run(`document.querySelector('#goal-panel .goal-edit').click()`);
     await waitFor(`document.activeElement === document.querySelector('#goal-panel textarea')`);
@@ -249,6 +339,8 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`document.querySelector('#home-goal-folders [data-goal-id]')?.textContent.includes('A shared React workbench')`);
     await run(`document.querySelector('#home-goal-folders .home-goal-folder').click()`);
     await waitFor(`document.querySelector('#home-books .goal-home-book')`);
+    assert.equal(await run(`document.querySelector('#home-material-list .goal-material-quote')?.textContent`), 'Alpha evidence 0', 'Home retains linked source text after reloading');
+    await capture('home-linked-materials');
     await run(`document.querySelector('#home-books .goal-home-book').click()`);
     await waitFor(`document.documentElement.dataset.appSurface === 'reader' && document.getElementById('book-paper').textContent.includes('Alpha evidence')`);
     await waitFor(`document.querySelector('#goal-panel .goal-item-text')?.textContent.includes('A React note')`);
