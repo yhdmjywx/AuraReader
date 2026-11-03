@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { Annotation } from '../../domain/annotation.js';
 import type { GoalLibraryState, GoalDraft } from '../../domain/goal.js';
 import { areaGoals } from '../../domain/goalLifecycle.js';
@@ -22,23 +22,26 @@ interface Actions {
 }
 function GoalEditor({ view, ui }: { view: GoalView; ui: GoalUI }) {
     const editor = useRef<HTMLTextAreaElement>(null), composing = useRef(false);
+    const inline = view.edit?.mode === 'edit';
+    const [text, setText] = useState(view.edit!.draft.text);
     useLayoutEffect(() => {
         const input = editor.current!;
         input.focus({ preventScroll: true }); input.setSelectionRange(input.value.length, input.value.length);
     }, []);
     const resize = () => {
+        if (inline) return;
         const input = editor.current!;
-        const minimum = view.edit?.mode === 'edit' ? parseFloat(input.ownerDocument.defaultView!.getComputedStyle(input).lineHeight) || 32 : 32;
-        input.style.height = '0px'; input.style.height = `${Math.max(minimum, input.scrollHeight)}px`;
+        input.style.height = '0px'; input.style.height = `${Math.max(32, input.scrollHeight)}px`;
     };
     useLayoutEffect(resize, []);
     return <div className={`goal-editor${view.edit?.mode === 'edit' ? ' is-inline' : ' is-new'}`}>
+        {inline && <span className="goal-editor-measure" aria-hidden="true">{text}</span>}
         <Textarea ref={editor} rows={1} defaultValue={view.edit!.draft.text} disabled={view.disabled}
             aria-label={view.edit?.mode === 'edit' ? 'Edit goal' : 'New goal'} placeholder="Goal"
             aria-keyshortcuts="Escape Control+Enter Meta+Enter"
-            onInput={event => { ui.actions.input(event.currentTarget.value); resize(); }}
+            onInput={event => { setText(event.currentTarget.value); ui.actions.input(event.currentTarget.value); resize(); }}
             onCompositionStart={() => { composing.current = true; }}
-            onCompositionEnd={event => { composing.current = false; ui.actions.input(event.currentTarget.value); resize(); }}
+            onCompositionEnd={event => { composing.current = false; setText(event.currentTarget.value); ui.actions.input(event.currentTarget.value); resize(); }}
             onKeyDown={event => {
                 event.stopPropagation();
                 if (composing.current || event.nativeEvent.isComposing) return;
@@ -69,10 +72,10 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
         </div>
         <div className="goal-content" id="goal-content">
             {!view.allGoals && goal && <div className="goal-current">
-                <div className="goal-title-row">
+                <div className="goal-title-row" data-disabled={view.disabled ? '' : undefined}>
                     {view.edit?.mode === 'edit' && view.edit.draft.id === goal.id
                         ? <GoalEditor key={`edit:${view.edit.draft.id}`} view={view} ui={ui} />
-                        : <Button className="goal-title" aria-current="page" disabled={view.disabled} onClick={() => actions.select(goal.id)}>{goal.text}</Button>}
+                        : <Button className="goal-title" aria-current="page" disabled={view.disabled} onClick={() => actions.select(goal.id)}><span className="goal-row-label">{goal.text}</span></Button>}
                     <Button size="icon-lg" className="goal-icon goal-edit" aria-label="Edit goal" title="Edit goal" disabled={view.disabled} onClick={() => actions.edit('edit')}><ActionIcon name="edit" /></Button>
                     <Button size="icon-lg" className="goal-icon" aria-label={`Actions for ${goal.text}`} title="Goal actions" aria-haspopup="menu" disabled={view.disabled}
                         onClick={event => actions.menu?.(goal.id, event.currentTarget)}><ActionIcon name="more" /></Button>
@@ -82,10 +85,10 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
             <div className={`goal-descendants${!view.allGoals && goal ? ' is-nested' : ''}`}>
             {view.edit && view.edit.mode !== 'edit' && <GoalEditor key={`${view.edit.mode}:${view.edit.draft.id}`} view={view} ui={ui} />}
             <div className="goal-children">
-            {children.map(child => <div className="goal-row" key={child.id} data-goal-id={child.id}>
+            {children.map(child => <div className="goal-row" key={child.id} data-goal-id={child.id} data-disabled={view.disabled ? '' : undefined}>
                 {view.edit?.mode === 'edit' && view.edit.draft.id === child.id
                     ? <GoalEditor key={`edit:${child.id}`} view={view} ui={ui} />
-                    : <Button className="goal-child" disabled={view.disabled} onClick={() => actions.select(child.id)}>{child.text}</Button>}
+                    : <Button className="goal-child" disabled={view.disabled} onClick={() => actions.select(child.id)}><span className="goal-row-label">{child.text}</span></Button>}
                 {child.completedAt && <span className="goal-completion">✓</span>}
                 <Button size="icon-lg" className="goal-icon goal-child-edit" aria-label={`Edit ${child.text}`} title="Edit goal" disabled={view.disabled} onClick={() => actions.edit('edit', child.id)}><ActionIcon name="edit" /></Button>
                 <Button size="icon-lg" className="goal-icon" aria-label={`Actions for ${child.text}`} title="Goal actions" aria-haspopup="menu" disabled={view.disabled}

@@ -125,6 +125,12 @@ workspace changes and their scope.
 - Preserve title typography and wrapping width while editing. Let the editor
   grow with its text. Keep existing Goal save, blur, IME, and shortcut behavior;
   the new-Goal draft placement is unchanged.
+- Default, hover, editing and disabled rows share the same text origin, usable
+  width, typography and minimum height. Use 10px horizontal text insets, the
+  reference's approximately 41.12px single-line parent row and 40px child row in
+  the sidebar. Full Goal rows retain their existing larger typography in every
+  state. Keep explicit and trailing line breaks visible in both display and
+  editing, without trimming the stored Goal text.
 - Every listed Goal also has its own edit icon. Edit that Goal in its row without
   entering it, switching the active Goal, or changing the parent's text or linked
   materials. Clicking Goal text continues to enter it. Reuse the same editor and
@@ -165,6 +171,40 @@ workspace changes and their scope.
   on overflow; it may shrink further with available space. This is a width limit,
   not a substring or an 18-character data limit. Keep the full title as text and
   provide it on hover. Preserve the contents trigger and neighboring actions.
+
+## 2026-11-03: Figma component alignment
+
+- The owner's requested visual reference is [Product UI Extraction — Goal &
+  Reading](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi/Product-UI-Extraction---Goal---Reading?node-id=15-348).
+  Scope: Local Library, Reading Settings, Menu Item, Goal Row, and the Book
+  Toolbar, including its at-rest state. Preserve their existing commands and
+  business behavior; example books, Goal text, and setting values are not defaults.
+- Local Library uses a 300px popover with 8px padding, a 38px header, a 28px
+  close action with a 16px icon, and compact 36px book rows. Show book titles
+  and their existing remove actions without structure metadata, row separators,
+  or the bottom service/backup hint. Keep search, import, sample-book access,
+  removal confirmation and errors. Use the reference's 370px maximum popover
+  height, constrained by the viewport; shorter lists fit their actual contents.
+- Reading Settings retains its existing layout. Paper choices are unlabeled
+  40px swatches (#fafaf7, #f3ead7, #222321), including while selected or hovered.
+  Keep their accessible names, tooltips, keyboard focus and existing selection
+  behavior. The size readout uses the interface font, 13px with 1.4 line height.
+  These colors describe the controls; document paper rendering is unchanged.
+- Menu items use 13px text with 1.4 line height and 8px vertical padding
+  (approximately 34.2px per row). Preserve neutral highlight and destructive
+  treatment, menu commands and keyboard handling. The ongoing Goal menu displays
+  `complete`, `Archive`, and `Delete`; Delete still opens the existing confirmation.
+  Use the reference's compact separator and lower inset (about 123px overall
+  for the three-item menu).
+- Goal row edit and more targets must occupy separate slots: edit is 36px from
+  the row end and more is 4px from it. Row hover/focus/open-menu feedback covers
+  the whole child row, including when the pointer is over an action. Disabled
+  rows dim their whole surface. Retain the existing inline editor and action
+  disclosure behavior.
+- The workspace behind the hidden Book Toolbar uses the white panel surface,
+  so the transparent toolbar does not reveal the gray app background. Retain
+  52px toolbar space, pagination, hover/focus/open-panel disclosure and the
+  18ch title limit. This corrects the initial incomplete implementation check.
 
 ## Feedback
 

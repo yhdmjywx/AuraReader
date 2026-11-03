@@ -65,10 +65,10 @@ export class GoalActions {
         const anchor = this.point ? { getBoundingClientRect: () => new DOMRect(this.point!.x, this.point!.y, 0, 0) } : this.anchor;
         renderSurface(this.host, <>
             <DropdownMenu open={this.menuOpen && !!goal} onOpenChange={open => { if (!open) this.close(); }} modal={false}>
-                {anchor && <DropdownMenuContent anchor={anchor} aria-label={goal ? `Actions for ${goal.text}` : 'Goal actions'}
+                {anchor && <DropdownMenuContent anchor={anchor} className="goal-action-menu" aria-label={goal ? `Actions for ${goal.text}` : 'Goal actions'}
                     finalFocus={() => this.restoreFocus ? this.anchor : false}>
                     {goal && area === 'library' && <>
-                        {item(goal.completedAt ? "Reopen" : "Mark complete", goal.completedAt ? 'reopen' : 'complete')}
+                        {item(goal.completedAt ? "Reopen" : "complete", goal.completedAt ? 'reopen' : 'complete')}
                         {item("Archive", 'archive')}
                     </>}
                     {goal && area === 'archive' && item("Unarchive", 'unarchive', goalAncestors(state, goal.id).slice(1).some(g => !!g.archivedAt))}
@@ -77,7 +77,7 @@ export class GoalActions {
                         {goal.parentId && goalArea(state, goal.parentId) === 'trash' && item("Restore to library root", 'restore-root')}
                     </>}
                     <DropdownMenuSeparator />
-                    {item(area === 'trash' ? "Delete permanently…" : "Delete…", area === 'trash' ? 'purge' : 'delete', true, true)}
+                    {item(area === 'trash' ? "Delete permanently…" : "Delete", area === 'trash' ? 'purge' : 'delete', true, true)}
                 </DropdownMenuContent>}
             </DropdownMenu>
             <Dialog open={!!current} onOpenChange={open => { if (!open) closeDialog(); }}>

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { AppElements } from '../../app/elements.js';
 import type { Book } from '../../domain/book.js';
-import { buildBookStructure, structureSummary } from '../../infrastructure/bookStructure.js';
 import { Button } from '../../components/ui/button.js';
 import { Input } from '../../components/ui/input.js';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog.js';
@@ -21,7 +20,6 @@ function ShelfBooks({ elements, books, onOpenBook, onDeleteBook }: ShelfProps) {
         {visible.map(book => <li className="shelf-entry" key={book.id}>
             <Button className="shelf-book-open" aria-label={`Open: “${book.title}”`} onClick={() => { closeShelf(elements); onOpenBook?.(book.id); }}>
                 <span className="shelf-book-title">{book.title}</span>
-                <span className="shelf-book-meta">{book.format || 'EPUB'} · {structureSummary(buildBookStructure(book))}</span>
             </Button>
             <Button className="btn btn-icon-sm shelf-book-delete" aria-label={`Remove from library: “${book.title}”`}
                 onClick={() => { setRemoving(book); setError(''); }}><i className="ri-delete-bin-line" aria-hidden="true" /></Button>

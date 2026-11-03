@@ -29,6 +29,8 @@ const { ui, click, input } = require('../helpers/react-workbench.cjs');
         assert.ok(document.querySelector('.goal-row > .goal-editor.is-inline textarea'), 'child edits in its own row');
         assert.equal(document.querySelector('.goal-title').textContent, 'A question\n我的阅读意图');
         await input('#goal-panel textarea', 'Child question revised');
+        assert.equal(document.querySelector('.goal-editor-measure').textContent, 'Child question revised', 'inline measurement follows native input');
+        assert.equal(document.querySelector('.goal-editor-measure').getAttribute('aria-hidden'), 'true', 'measurement text is not announced twice');
         await ui(() => goals.finishInlineEdit());
         assert.equal(goals.state.goals.find(g => g.id === child).text, 'Child question revised');
         assert.equal(goals.state.goals.find(g => g.id === root).text, 'A question\n我的阅读意图', 'child edit does not overwrite its parent');

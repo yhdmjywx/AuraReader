@@ -80,9 +80,9 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
         <div className="appearance-row">
             <span>{"Paper"}</span>
             <div className="paper-themes">
-                <Button size="icon-lg" className="paper-btn paper-white active" type="button" data-paper="white" title="White" aria-label="White paper">W</Button>
-                <Button size="icon-lg" className="paper-btn paper-sepia" type="button" data-paper="sepia" title="Sepia paper" aria-label="Sepia paper">S</Button>
-                <Button size="icon-lg" className="paper-btn paper-dark" type="button" data-paper="dark" title="Dark" aria-label="Dark paper">D</Button>
+                <Button size="icon-lg" className="paper-btn paper-white active" type="button" data-paper="white" title="White" aria-label="White paper" />
+                <Button size="icon-lg" className="paper-btn paper-sepia" type="button" data-paper="sepia" title="Sepia paper" aria-label="Sepia paper" />
+                <Button size="icon-lg" className="paper-btn paper-dark" type="button" data-paper="dark" title="Dark" aria-label="Dark paper" />
             </div>
         </div>
         <div className="appearance-row">
@@ -241,7 +241,7 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
     <section id="shelf-panel" className="appearance-panel shelf-panel" role="dialog" aria-modal="false" aria-labelledby="shelf-panel-title" aria-hidden="true">
         <div className="shelf-header">
             <h2 id="shelf-panel-title">{"Local library"}</h2>
-            <Button id="btn-close-shelf" className="btn btn-icon-sm" type="button" aria-label="Close library" title="Close library"><i className="ri-close-line" aria-hidden="true"></i></Button>
+            <Button id="btn-close-shelf" size="icon" className="btn btn-icon-sm" type="button" aria-label="Close library" title="Close library"><ActionIcon name="close" /></Button>
         </div>
         <div className="shelf-actions">
             <Button id="btn-import-book" className="btn btn-ghost-sm" type="button" title="Open local EPUB / PDF / TXT">{"Import book"}</Button>
@@ -249,7 +249,6 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
             <Input type="file" id="file-input" accept=".epub,.pdf,.txt" hidden />
         </div>
         <ul className="shelf-list" id="shelf-list" aria-label="Local books"></ul>
-        <p className="shelf-hint">{"Books and annotations are stored locally. Back up regularly and keep the local service running."}</p>
     </section>
     <div className="toast" id="toast-msg"></div>
     </>;

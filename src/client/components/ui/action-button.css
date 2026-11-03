@@ -33,7 +33,7 @@
     border-radius: 8px; opacity: 0; pointer-events: none;
     z-index: 2; background: var(--goal-row-surface); box-shadow: -6px 0 6px var(--goal-row-surface);
 }
-.goal-panel :is(.goal-title-row, .goal-row) > :is(.goal-edit, .goal-child-edit) { right: 36px; }
+.goal-panel :is(.goal-title-row, .goal-row) > .goal-icon.vega-action:is(.goal-edit, .goal-child-edit) { right: 36px; }
 .goal-panel :is(.goal-title-row, .goal-row, .goal-item) > .goal-icon.vega-action:focus-visible {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--goal-focus) 50%, transparent);
 }

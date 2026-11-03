@@ -100,7 +100,7 @@ const JSZip = require('jszip');
         assert.ok(allSelectedZip.file('结构测试_chapter-notes/unassigned-notes.md'), '全选与整书导出一致，继续保留未归属笔记');
         const list = document.createElement('ul');
         await require('../helpers/react-workbench.cjs').ui(() => renderShelf({ elements: { shelfList: list }, books: [book] }));
-        assert.equal(list.querySelector('.shelf-book-meta').textContent, `EPUB · ${structureSummary(structure)}`);
+        assert.equal(list.querySelector('.shelf-book-title').textContent, book.title);
         const backupList = document.createElement('div');
         await require('../helpers/react-workbench.cjs').ui(() => renderBackupBookList({ backupBookCheckboxList: backupList }, [book], notes));
         assert.ok(backupList.textContent.includes(structureSummary(structure)), '备份选择列表复用同一统计');

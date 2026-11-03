@@ -1385,7 +1385,7 @@ mark.hl-active {
 
 /* Library popover inherits the appearance panel's surface and spacing. */
 .shelf-panel {
-    max-height: min(560px, calc(100vh - var(--header-height) - 24px));
+    max-height: min(370px, calc(100dvh - var(--header-height) - 24px));
     overflow: hidden;
 }
 .shelf-panel.open {
@@ -1397,20 +1397,23 @@ mark.hl-active {
     align-items: center;
     justify-content: space-between;
     flex: none;
-    padding: 4px 8px;
+    height: 38px;
+    padding: 0 8px;
 }
 .shelf-header h2 {
     margin: 0;
     font-size: 14px;
     font-weight: 500;
+    line-height: 1.4;
 }
+#btn-close-shelf { width: 28px; height: 28px; min-height: 28px; padding: 0; border-radius: 8px; }
+#btn-close-shelf svg { width: 16px; height: 16px; }
 .shelf-actions {
     display: flex;
     align-items: center;
     gap: 8px;
     flex: none;
     padding: 6px 0 10px;
-    border-bottom: 1px solid var(--border-color);
 }
 .shelf-list {
     list-style: none;
@@ -1427,16 +1430,15 @@ mark.hl-active {
     gap: 4px;
     padding: 3px 0;
 }
-.shelf-entry + .shelf-entry { border-top: 1px solid var(--border-color); }
 .shelf-book-open {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     min-width: 0;
-    padding: 9px 8px;
+    padding: 5px 9px;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--ui-radius);
     background: transparent;
     color: var(--text-primary);
     text-align: left;
@@ -1453,21 +1455,12 @@ mark.hl-active {
     white-space: nowrap;
     font-size: 13px;
     font-weight: 500;
+    line-height: 1.4;
 }
-.shelf-book-meta { color: var(--text-muted); font-size: 11px; }
-.shelf-book-delete { flex: none; color: var(--text-muted); }
+.shelf-book-delete { flex: none; width: 33px; height: 30px; padding: 0; font-size: 13px; color: var(--text-primary); }
 .shelf-book-delete:hover, .shelf-book-delete:focus-visible { color: #d95353; }
 .shelf-empty { padding: 20px 8px; color: var(--text-muted); font-size: 12px; line-height: 1.7; }
 .shelf-empty p { margin: 0 0 4px; color: var(--text-secondary); font-size: 13px; }
-.shelf-hint {
-    flex: none;
-    margin: 0;
-    padding: 10px 8px 4px;
-    border-top: 1px solid var(--border-color);
-    color: var(--text-muted);
-    font-size: 11px;
-    line-height: 1.6;
-}
 
 /* Immersive notes share the reading surface. */
 .workspace-container.immersive-notes {
