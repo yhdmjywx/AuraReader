@@ -200,6 +200,12 @@ html[data-app-surface="reader"]:has(#goal-sidebar[hidden]) .workspace-settings >
     height: 52px; min-width: 0; padding: 0 18px; border-bottom: 1px solid var(--border-color);
     background: var(--bg-panel); color: var(--text-secondary); border-radius: var(--content-radius) var(--content-radius) 0 0;
 }
+@media (hover: hover) {
+    .reader-toolbar { opacity: 0; }
+    .reader-toolbar:hover,
+    .reader-toolbar:has(:focus-visible),
+    .reader-toolbar:has([aria-expanded="true"]) { opacity: 1; }
+}
 .reader-toolbar .header-center { justify-self: stretch; width: 100%; max-width: none; min-width: 0; }
 .reader-toolbar .header-actions { display: flex; justify-self: end; align-items: center; gap: 4px; }
 .reader-toolbar .reader-pagination { height: 40px; gap: 8px; border: 0; background: transparent; }

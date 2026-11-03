@@ -157,6 +157,10 @@ workspace changes and their scope.
   additional row or bar. Keep one pagination instance and retain its commands,
   states and 40px action targets. This supersedes the initial separate-row
   interpretation and earlier bottom-pagination placement requirements.
+- On hover-capable devices, the book-actions toolbar is hidden until the pointer
+  enters its existing top area, then hides when it leaves. Retain its 52px space,
+  appearance and controls so the reading content never shifts. Keep it visible
+  for keyboard focus or an open toolbar panel; devices without hover retain access.
 - The top book title is single-line, with a maximum width of 18ch and an ellipsis
   on overflow; it may shrink further with available space. This is a width limit,
   not a substring or an 18-character data limit. Keep the full title as text and

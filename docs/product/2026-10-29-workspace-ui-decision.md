@@ -44,6 +44,9 @@ date: 2026-10-29 · source: explicit owner confirmation
   row as the book title and actions. The owner clarified that no additional row
   or bar is allowed; this replaces the initial separate-row interpretation.
   Keep the toolbar height and existing actions; remove the bottom instance.
+- The owner subsequently approved simple hover disclosure for this toolbar:
+  show on top-area hover and hide on leave, preserving its appearance and space.
+  Keep keyboard and open-panel access. No other interface changes are in scope.
 - Limit the top book title to 18ch with single-line ellipsis and allow further
   shrinkage. Retain the full title in data, accessible text and a hover title.
 - These approved changes override earlier placement/width-preservation rules
