@@ -7,6 +7,7 @@ import { ActionIcon } from '../../components/ui/action-icon.js';
 import { Textarea } from '../../components/ui/input.js';
 import { renderSurface } from '../../components/ui/renderSurface.js';
 import { GoalMaterialText } from './GoalMaterialText.js';
+import { GoalBreadcrumbs } from './GoalBreadcrumbs.js';
 
 export interface GoalView {
     state: GoalLibraryState; selected: string | null; allGoals: boolean;
@@ -15,7 +16,7 @@ export interface GoalView {
     sourceBook: string; fullPage: boolean; titles: Map<string, string>; materialStatus: 'ready' | 'loading' | 'error';
 }
 interface Actions {
-    select(id: string): void; home(): void; up(): void; create(): void; expand(): void; items(): void;
+    select(id: string): void; navigate(id: string | null): Promise<boolean>; create(): void; expand(): void; items(): void;
     edit(mode: 'root' | 'child' | 'edit', id?: string): void; input(text: string): void; finish(): void;
     unlink(id: string): void; jump(id: string): void;
     menu?(id: string, anchor: HTMLElement, point?: { x: number; y: number }): void;
@@ -66,10 +67,7 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
         if (view.edit && (event.target as Element).closest('button')) event.preventDefault();
     }}>
         <div className="goal-header">
-            <nav className="goal-navigation" aria-label="Goal navigation">
-                <Button id="goal-home-nav" size="icon-lg" className="goal-icon" aria-label="Goal root" title="Goal root" aria-current={view.allGoals ? 'page' : undefined} disabled={view.disabled || view.allGoals} onClick={actions.home}><ActionIcon name={view.allGoals ? 'home-filled' : 'home'} /></Button>
-                <Button id="goal-up" size="icon-lg" className="goal-icon" aria-label="Up one level" title="Up one level" disabled={view.disabled || view.allGoals} onClick={actions.up}><ActionIcon name="up" /></Button>
-            </nav>
+            <GoalBreadcrumbs state={view.state} selected={view.allGoals ? null : goal?.id || null} disabled={view.disabled} navigate={actions.navigate} />
             <div className="goal-navigation">
                 <Button id="goal-new" size="icon-lg" className="goal-icon" aria-label={view.allGoals ? 'New goal' : 'New child goal'} title={view.allGoals ? 'New goal' : 'New child goal'} disabled={view.disabled} onClick={actions.create}><ActionIcon name="plus" /></Button>
                 {!view.fullPage && <Button id="goal-expand" size="icon-lg" className="goal-icon" aria-label="Expand goals" title="Open full goal workspace" onClick={actions.expand}><ActionIcon name="expand" /></Button>}

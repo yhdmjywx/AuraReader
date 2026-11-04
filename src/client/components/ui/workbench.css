@@ -151,6 +151,30 @@ html[data-app-surface="reader"]:has(#goal-sidebar:not([hidden])) .workspace-sett
 html[data-app-surface="reader"]:has(#goal-sidebar[hidden]) .workspace-settings > span { display: none; }
 .goal-sidebar .goal-panel { height: calc(100% - 56px); padding: 80px 20px 24px; }
 .goal-sidebar .goal-header { margin-bottom: 24px; }
+.goal-header:has(.goal-breadcrumbs) { flex-wrap: nowrap; }
+.goal-breadcrumbs { display: flex; align-items: center; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.goal-breadcrumbs::-webkit-scrollbar { display: none; }
+.goal-crumb-segment { display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 0; }
+.goal-crumb-segment:last-child { flex-shrink: 0; max-width: 60%; }
+.goal-breadcrumbs > .goal-crumb { flex: none; }
+.goal-breadcrumbs .goal-crumb {
+    min-height: 40px; padding: 0 4px; border: 0; color: var(--text-primary); font-size: 13px; font-weight: 400;
+    min-width: 0; line-height: 1.4; white-space: nowrap;
+}
+.goal-crumb > span { overflow: hidden; text-overflow: ellipsis; }
+.goal-breadcrumbs .goal-crumb:is(:active, [aria-current="page"]) { color: var(--text-primary); transform: none; }
+.goal-breadcrumbs .goal-crumb[aria-expanded="true"] { background: var(--goal-hover-bg); }
+.goal-crumb-separator { width: 12px; height: 12px; flex: none; color: var(--text-secondary); }
+.goal-breadcrumb-positioner::before { content: ''; position: absolute; inset: -4px 0 0; z-index: -1; }
+.goal-breadcrumb-picker { width: 280px; max-width: var(--available-width); max-height: var(--available-height); border-radius: var(--content-radius, 12px); overflow-y: auto; }
+.goal-breadcrumb-picker[data-closed] { display: none; }
+.goal-breadcrumb-option.ui-button {
+    display: flex; justify-content: space-between; width: 100%; min-height: 32px; padding: 6px 10px;
+    border: 0; text-align: left; font-size: 13px; font-weight: 400;
+}
+.goal-breadcrumb-option > span:first-child { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.goal-breadcrumb-option[aria-current="page"] { background: var(--goal-hover-bg); }
+.goal-breadcrumb-check { flex: none; }
 .goal-sidebar .goal-item-text { font-size: 13px; line-height: 1.85; }
 .goal-sidebar .goal-item-source { font-size: 11px; }
 .goal-panel .goal-title { cursor: pointer; }

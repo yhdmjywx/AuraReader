@@ -37,6 +37,7 @@ export class GoalController {
     private failure: unknown; private ready: Promise<void> | null = null;
     get saveError() { return this.failure; }
     private materialRequest = 0; private materials: Annotation[] = []; private titles = new Map<string, string>();
+    private breadcrumbNavigating = false;
     private materialStatus: 'ready' | 'loading' | 'error' = 'ready';
     lifecycleBusy = false;
     undoChange: { before: Goal[]; after: Goal[]; message: string } | null = null;
@@ -68,7 +69,7 @@ export class GoalController {
     initUI(elements: AppElements) {
         this.elements = elements;
         if (elements.goalPanel) this.ui = new GoalUI(elements.goalPanel, {
-            select: id => this.selectGoal(id), home: () => this.goHome(), up: () => this.goUp(), create: () => this.beginNew(),
+            select: id => this.selectGoal(id), navigate: id => this.navigateGoal(id), create: () => this.beginNew(),
             menu: (id, anchor, point) => this.actions.open(id, anchor, point),
             expand: () => { this.openPage().catch(() => {}); },
             items: () => { this.itemsOpen = !this.itemsOpen; this.render(); }, edit: (mode, id) => this.beginEdit(mode, id), input: text => this.updateDraft(text),
@@ -102,6 +103,25 @@ export class GoalController {
     selectGoal(id: string) { if (!goalEditable(this.state, id)) return; this.endEdit(); this.selected = id; this.rememberSelection(); this.allGoals = false; this.itemsOpen = true; this.render(); }
     goHome() { this.endEdit(); this.selected = null; this.allGoals = true; this.rememberSelection(); this.render(); }
     goUp() { const parent = this.state.goals.find(g => g.id === this.selected)?.parentId; if (parent) this.selectGoal(parent); else this.goHome(); }
+    async navigateGoal(id: string | null): Promise<boolean> {
+        if (this.disabled || this.lifecycleBusy || this.breadcrumbNavigating || (id && !goalEditable(this.state, id))) return false;
+        if (id === this.selected && this.allGoals === (id === null)) return true;
+        const previous = { selected: this.selected, allGoals: this.allGoals, edit: this.edit };
+        this.breadcrumbNavigating = true;
+        try {
+            await this.assertWritesSaved();
+            if (id && !goalEditable(this.state, id)) return false;
+            if (id) this.selectGoal(id); else this.goHome();
+            return true;
+        } catch (error) {
+            this.selected = previous.selected; this.allGoals = previous.allGoals;
+            if (previous.edit) this.edit = { ...previous.edit,
+                mode: this.state.goals.some(goal => goal.id === previous.edit!.draft.id) ? 'edit' : previous.edit.mode };
+            this.rememberSelection(); this.fail(error); this.render();
+            if (this.edit) this.ui?.focusEditor();
+            return false;
+        } finally { this.breadcrumbNavigating = false; }
+    }
     beginNew() {
         const parentId = this.allGoals ? null : this.selected;
         this.endEdit(); this.selected = parentId; this.allGoals = !parentId; this.rememberSelection();
