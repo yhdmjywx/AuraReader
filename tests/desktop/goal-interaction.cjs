@@ -83,7 +83,7 @@ const timer = setTimeout(() => app.exit(1), 85000);
     await click('#goal-new');
     await wait("document.querySelector('.goal-editor textarea').getAttribute('aria-label')==='New goal'");
     await input('A deeper question'); await run('a.goals.finishInlineEdit()');
-    await click('.goal-child');await click('.goal-crumb-segment:nth-last-child(2) .goal-crumb'); assert.equal(await run("document.querySelectorAll('.goal-item').length"), 2, await run('JSON.stringify({selected:a.goals.selected,goals:a.goals.state,edit:a.goals.edit})'));
+    await click('.goal-child');await click('#goal-up'); assert.equal(await run("document.querySelectorAll('.goal-item').length"), 2, await run('JSON.stringify({selected:a.goals.selected,goals:a.goals.state,edit:a.goals.edit})'));
     await click('.note-comment-text'); await wait("document.activeElement.matches('.note-editor')");
     await run(`(()=>{window.__noteEditor=document.activeElement;__noteEditor.value='A clock measures change. Does that explain time itself?';__noteEditor.setSelectionRange(4,4);__noteEditor.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     assert.equal(await run('document.activeElement===window.__noteEditor && __noteEditor.selectionStart===4'), true);

@@ -120,22 +120,14 @@ Other shadcn styles and previously explored libraries remain historical referenc
 
 Applies to the shared reading sidebar and full Goal workspace unless distinguished.
 
-- The owner approved Notion-style navigation on 2026-11-04, scoped to the
-  breadcrumb module and its popup. It replaces the former Home/up controls.
-  Goals text returns to the root Goal list and has no hover popup. Clicking
-  named path text enters that Goal; clicking the current Goal does not edit it.
-  Hovering named text opens one shared, flat list of ongoing sibling Goals in
-  the existing Library area, marking the hovered path item. The popup stays open
-  across the pointer bridge and while the pointer is inside it. Leaving both
-  areas closes it; hovering another named item changes its contents; choosing
-  an item closes it and updates the path and workspace together.
-  Hover does not finish editing, move input focus or modify Goal data. Explicit
-  breadcrumb navigation checks saving first; failure preserves the prior
-  selection and editable content. Current app delays are 150ms entry and 250ms
-  exit. There are no independent dropdown buttons, pinned lists or recursive
-  trees in this module. Sidebar layout, creation, full-workspace, editing and
-  material actions remain unchanged. Keyboard interaction is not expanded in
-  this revision. See the [current Figma references](design-index.md#goal-breadcrumbs-design).
+- On 2026-11-04 the owner requested a Git rollback of breadcrumb navigation.
+  The current interface uses the original Home and Up one level controls, with
+  the complete current Goal text, direct child Goals and linked materials in
+  the existing content area. Creation and full-workspace actions retain their
+  original behavior. The breadcrumb hover prototype is historical exploration,
+  not the current implementation or an active design requirement. Parent
+  previews and a last-reading Goal shortcut remain unimplemented proposals.
+  See the [design status](design-index.md#goal-breadcrumbs-design).
 
 - Indent child Goals, child drafts, and linked materials together under the parent;
   root Goals stay unindented. Do not indent the material list again. Use the

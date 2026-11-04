@@ -130,7 +130,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await capture('reader-minimum-window');
     window.setBounds(originalBounds);
     await run(`document.getElementById('current-book-title').textContent = window.originalTitle; delete window.originalTitle; new Promise(resolve => setTimeout(resolve, 350))`);
-    assert.equal(await run(`['btn-goal-sidebar', 'goal-new', 'goal-expand', 'btn-shelf', 'btn-appearance', 'btn-export-menu'].every(id => {
+    assert.equal(await run(`['btn-goal-sidebar', 'goal-home-nav', 'goal-up', 'goal-new', 'goal-expand', 'btn-shelf', 'btn-appearance', 'btn-export-menu'].every(id => {
         const control = document.getElementById(id), rect = control.getBoundingClientRect();
         return Math.abs(rect.width - 40) < 1 && Math.abs(rect.height - 40) < 1 && !!control.querySelector('svg');
     })`), true, 'workbench icon actions share 40px SVG button targets');

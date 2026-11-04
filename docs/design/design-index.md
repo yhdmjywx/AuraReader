@@ -74,28 +74,23 @@ approved root/parent typography and row-height overrides are recorded in
 ## Goal Breadcrumbs Design
 
 Historical baseline: [Original Goal hierarchy-navigation requirements](goal-breadcrumbs-original-requirements.md).
-The owner's latest approval adopts Notion navigation and limits this change to
-breadcrumbs and their popup. It supersedes earlier child-tree hover, full-tree,
-independent dropdown and pinned-picker proposals. The sidebar is not redesigned.
+On 2026-11-04 the owner requested a Git rollback to the original Home / Up one
+level navigation. That interface is the current implementation. Breadcrumb
+designs below are retained as historical exploration. This rollback does not
+edit the remote Figma file.
 
 | Resource on 02 - Components | Exact location | Scope |
 | --- | --- | --- |
-| Current compact review | [122:1756](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=122-1756) | Normal path, ancestor hover with root siblings, current hover with sibling Goals |
-| Interactive prototype | [105:1769](https://www.figma.com/proto/eib6b1sDBsFa7hTzY2Zmsi?node-id=105-1769&starting-point-node-id=105%3A1769) | Existing workspace foundation with direct path navigation and flat hover lists |
-| Existing workspace foundation | [64:3500](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=64-3500) | One reusable workspace variant; only breadcrumb navigation was revised |
-| Sibling picker | [97:6051](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=97-6051) | Shared flat sibling list, reusing existing typography, icons, variables and popup appearance |
+| Original Goal Sidebar | [14:581](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-581) | Current design reference: Home / Up, current Goal, children and materials |
+| Historical compact review | [122:1756](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=122-1756) | Breadcrumb and sibling-hover exploration |
+| Historical interactive prototype | [105:1769](https://www.figma.com/proto/eib6b1sDBsFa7hTzY2Zmsi?node-id=105-1769&starting-point-node-id=105%3A1769) | Superseded breadcrumb flow |
+| Historical workspace foundation | [64:3500](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=64-3500) | Breadcrumb workspace variant |
+| Historical sibling picker | [97:6051](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=97-6051) | Flat sibling-list exploration |
 
-Named text enters its Goal on click and shows siblings on hover. Goals returns
-to the root list without a hover tree. The list remains usable when the pointer
-moves into it, closes after leaving, and closes on selection. No recursive
-expansion or independent dropdown buttons are part of this module.
-
-Implementation: `GoalBreadcrumbs.tsx`, mounted by the existing shared `goalUI.tsx`;
-`GoalController.navigateGoal` checks saving before selecting. Source UI and
-controller checks cover hover focus preservation and save-failure recovery;
-Figma variables demonstrate presentation only. Original component set `14:581`
-and unrelated design references remain preserved. Older variants and reviews
-are historical references, not additional requirements for this implementation.
+Current source: the original shared `goalUI.tsx` and `GoalController` selection
+commands. The breadcrumb component and its dedicated regression were removed
+by the rollback. The original requirements and verification record remain
+available for history; they do not prescribe current navigation behavior.
 
 ## Shared Components
 
