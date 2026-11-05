@@ -444,6 +444,21 @@ export class ReaderController {
 
         const viewport = readerViewport(this.elements);
         if (viewport) {
+            let lastWheelTurn = -Infinity;
+            viewport.addEventListener('wheel', event => {
+                if (event.defaultPrevented || !this.getCurrentBook() || this.effectiveReaderMode() !== 'single') return;
+                if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+                if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+                if (eventElement(event)?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+                event.preventDefault();
+                // A wheel gesture may emit many events; limit repeated page turns.
+                const now = Date.now();
+                if (now - lastWheelTurn < 250) return;
+                lastWheelTurn = now;
+                const notes = this.callbacks.getNotes?.() || [];
+                if (event.deltaY > 0) this.nextPage(notes);
+                else this.prevPage(notes);
+            }, { passive: false, signal });
             // Capture scrolls from both the vertical viewport and its paged
             // chapter strip (horizontal scroll events do not bubble).
             viewport.addEventListener('scroll', () => this.scheduleViewportChange(), { capture: true, passive: true, signal });
