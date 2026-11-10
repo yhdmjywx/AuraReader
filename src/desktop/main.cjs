@@ -5,7 +5,7 @@ const { assertRuntime } = require('./runtime.cjs');
 const { APP_URL, createAssetHandler } = require('./assets.cjs');
 const { secureSession, secureWindow } = require('./security.cjs');
 const { createDesktopStorage } = require('./storage.cjs');
-const { registerStorageIpc, registerFileIpc, coordinateClose } = require('./ipc.cjs');
+const { registerStorageIpc, registerFileIpc, registerWikiIpc, coordinateClose } = require('./ipc.cjs');
 const { createFileService } = require('./files.cjs');
 
 protocol.registerSchemesAsPrivileged([{
@@ -64,9 +64,10 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
     const storage = createDesktopStorage(dataDirectory);
     const removeStorageHandlers = registerStorageIpc(window, storage);
     const removeFileHandlers = registerFileIpc(window, files);
+    const removeWikiHandlers = registerWikiIpc(window);
     const removeCloseHandlers = coordinateClose(window, { ...storage, async settle() { await storage.settle(); await files.settle(); } });
     window.once('closed', () => {
-        removeStorageHandlers(); removeFileHandlers(); removeCloseHandlers(); storage.close();
+        removeStorageHandlers(); removeFileHandlers(); removeWikiHandlers(); removeCloseHandlers(); storage.close();
     });
     app.on('window-all-closed', () => app.quit());
     window.webContents.on('preload-error', (_event, _file, error) => {

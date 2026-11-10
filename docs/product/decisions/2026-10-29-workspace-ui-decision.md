@@ -2,6 +2,32 @@
 
 date: 2026-10-29 · source: explicit owner confirmation
 
+Current global visual authority is defined by the
+[design system](../../design/design-system.md); use the
+[design index](../../design/design-index.md) to locate explicit Figma designs.
+Historical Vega-priority wording here applies to unspecified details, not over
+explicit Figma visuals. The approved local decisions below retain their scope.
+
+## Record status
+
+Migrated on 2026-11-04 from the former product-level workspace decision file.
+The dated approval text below is retained as historical evidence; only relative
+link destinations have been updated. Use the [Design System](../../design/design-system.md)
+for current constraints and the [design index](../../design/design-index.md) for Figma.
+Do not implement superseded wording from this record.
+
+| Earlier wording | Later approval / current owner |
+| --- | --- |
+| Reserve width for hidden Goal-row actions | “Goal content alignment and usable text width” below replaced it with overlays |
+| Earlier 40px Goal-row actions | “Quiet, compact Goal row actions” below introduced the compact exception |
+| Left-gutter material icons; count or caret-only disclosure | “Material-row correction” below replaced these rejected treatments |
+| Bottom pagination or an additional toolbar row | 2026-11-03 reading-navigation amendment below fixes one instance in the existing toolbar |
+| Blanket Vega priority | The current Design System applies explicit Figma visuals first |
+| Before-and-after screenshots | Current [agent validation](../../../AGENTS.md#validation) and [profile](../../agents/project-profile.md#validation-baseline) supersede this requirement |
+| Shared visual rules owned by a separate UI/UX baseline | The owner consolidated current rules into the Design System on 2026-11-04 |
+
+## Original approval record
+
 ## Approved changes
 - Reorganize the top bar.
 - Remove the EPUB enlargement entry.
@@ -15,7 +41,7 @@ date: 2026-10-29 · source: explicit owner confirmation
 - Reduce redundancy and avoid adding steps.
 - Reuse existing actions. Preserve filtering, selection, editing, saving, and
   material relationships unless a behavior change is explicitly authorized.
-- Follow the approved [UI/UX baseline](ui-ux-design.md); its Open section records
+- Follow the approved [UI/UX baseline](../../design/design-system.md); its Open section records
   unresolved details.
 - Decide unspecified visual details only within the requested change. Never
   change visual details of existing UI components outside that scope.
@@ -30,7 +56,7 @@ date: 2026-10-29 · source: explicit owner confirmation
 - Other changes made during the earlier implementation are not approved by
   inclusion in the current code.
 - This record covers the approved workspace changes. The shared visual and
-  interaction rules are owned by [the UI/UX baseline](ui-ux-design.md).
+  interaction rules are owned by [the UI/UX baseline](../../design/design-system.md).
 
 ## Amendments
 - Record later owner-approved changes here, identifying which earlier rule they
@@ -80,7 +106,7 @@ date: 2026-10-29 · source: explicit owner confirmation
 - Preserve the existing persistence, commands, filtering, and relationships.
 
 ### 2026-10-30: Vega visual baseline
-- Follow the Vega decision in [the UI/UX baseline](ui-ux-design.md). It owns the
+- Follow the Vega decision in [the UI/UX baseline](../../design/design-system.md). It owns the
   selected style, compatibility rule, direct-code-reuse approach, and menu
   presentation. Preserve compatible presentation; use Vega for conflicts.
   Earlier component-alignment text is not an independent shape or spacing rule.
@@ -161,3 +187,26 @@ date: 2026-10-29 · source: explicit owner confirmation
 - Correction: include a links icon to identify the linked-material function;
   keep a smaller caret for expansion state. The owner rejected the caret-only
   replacement. The combined icon control is 44px wide and 28px high.
+
+### 2026-11-04: Goal Breadcrumbs and separate root/tree actions
+- The owner approved the Breadcrumbs review `66:1947`, prototype `66:2473`, and
+  component family `64:3500` as the basis for implementation planning.
+- The owner subsequently approved splitting the Goals entry into two targets:
+  Goals text returns to the root level using the former Home action; the adjacent
+  downward arrow opens the complete hierarchy without changing the current Goal.
+  Do not add a redundant Goals root item inside the picker.
+- The Figma update includes root-context tree states and a focused review at
+  `75:2619`. The original Goal Sidebar `14:581` is retained. This approval records
+  design behavior; it does not establish source implementation or package delivery.
+
+### 2026-11-04: Direct text navigation and clickable hover selectors
+- The owner requested adapting the existing Figma design to the discussed
+  mouse/touch scheme: click named path text to enter; hover to open an operable
+  selector. The owner explicitly clarified that hover-open structure must be
+  clickable. Keyboard behavior is outside this revision.
+- Retain adjacent downward-arrow click targets to pin the same selector. Pointer
+  movement into the popup must not close it; pinned popups do not close on exit.
+  Ellipsis remains a selector entry rather than a direct Goal destination.
+- The review is at `80:5049`, pointer-state family at `79:5114`, and the existing
+  prototype `66:2473` uses the new interaction family. Scoped initial timings are
+  300ms to open and 200ms to close on exit. Application implementation is pending.

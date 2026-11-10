@@ -13,6 +13,7 @@ module.exports = {
         'dist/renderer/**/*',
         'src/desktop/**/*.cjs', 'src/desktop/renderer/**/*',
         'src/server/dataStore.js', 'src/server/fontStore.js',
+        'src/server/wikiService.js', 'src/shared/wikiSites.js',
         'src/server/goalLibrary.js', 'src/server/goalValidation.js', 'src/server/migration.js',
         'src/server/storageMaintenance.js'
     ],

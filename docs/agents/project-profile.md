@@ -38,8 +38,7 @@ verified: 2026-10-30 · owner rules: AGENTS.md
   checks relevant to the change; desktop checks are required only for changes
   involving Electron-specific behavior.
 - Screenshots document the final appearance only. They are not interaction-test
-  evidence, and before-and-after capture is no longer required. If browser-use
-  verification is unavailable, report the gap rather than substitute screenshots.
+  evidence, and before-and-after capture is no longer required.
 - Storage, recovery, packaging, and installation have separate checks. Choose
   those relevant to the change; a successful build does not establish that an
   installer or recovery path works.
@@ -64,58 +63,61 @@ verified: 2026-10-30 · owner rules: AGENTS.md
 (source: docs/development.md, inspected source paths)
 
 ## Product and design sources
+- Wiki MVP: docs/product/wiki/feature-spec.md; independent Figma Wiki Sidebar
+  component `236:1614` on 02 - Components in `eib6b1sDBsFa7hTzY2Zmsi`
+  (converted from original dialog `194:1665`). Scope: literal-title lookup with
+  existing redirects and manual switching among the article's linked language
+  editions. No candidate search, entity discovery, or automatic translation.
+  Decision: docs/product/decisions/2026-11-05-wiki-mvp.md. Implemented in source;
+  validation and remaining desktop/package checks: docs/product/wiki/implementation.md.
+  Later owner comments on 2026-11-05 updated Figma to a right notes-area sidebar,
+  an underlined query and a six-language dropdown; these are implemented in source
+  as a 337 × 341 sidebar, fixed at the margin-note horizontal position. Built-in
+  browser scroll-position verification completed on 2026-11-06; desktop exit and
+  package limitations remain in the implementation record. Current scope:
+  docs/product/wiki/feature-spec.md.
+  The owner subsequently requested standalone component organization: Reading
+  Interface `15:129` is restored and Wiki is maintained separately on 02 - Components.
 - Goal positioning: docs/goal-positioning-correction-2026-10-27.md
-- Goal behavior contract: docs/goal-system-implementation-plan.md
+- Goal user input and Response MVP: docs/product/goals/user-input-response/feature-spec.md.
+  Owner-confirmed requirements, 2026-11-09: a unified Goal content area without
+  the separate Linked group marker; preserve Highlight/Note Link components;
+  offer only the optional, Goal-specific Response label. The unified content
+  area retains the former Link group's position below child Goals and shows
+  newly added content first. On 2026-11-10 the owner confirmed passive region
+  icons and independent multiline records owned by their creating Goal. The
+  original Figma Sidebar now integrates the module; UX states and inherited
+  editing behavior: docs/product/goals/user-input-response/interaction.md.
+  Application implementation and Response control design remain outstanding.
+- Goal behavior contract: docs/archive/plans-and-implementation/goal-system-implementation-plan.md
 - cross-book Goal and shared editor:
-  docs/goal-cross-book-sidebar-plan.md
-- book and material relationships: docs/goal-books-module-design.md
-- approved workspace changes:
-  docs/product/2026-10-29-workspace-ui-decision.md
-- UI/UX specification: docs/product/ui-ux-design.md. The visual and interaction
-  baseline is approved; detailed measurements, action placement, and remaining
-  decisions are listed under Open. shadcn/ui with the Vega classic style is the
-  chosen visual baseline. Keep compatible presentation unchanged; Vega governs
-  conflicts. Prefer direct reuse of official Vega code and styles as described
-  in the UI/UX specification.
-  This records a design decision, not a completed implementation or dependency
-  migration. Do not treat the current interface as approval for disputed changes.
-
-(source: owner-stated, 2026-10-29; existing project documents)
+  docs/archive/plans-and-implementation/goal-cross-book-sidebar-plan.md
+- book and material relationships: docs/archive/plans-and-implementation/goal-books-module-design.md
+- Current UI/UX specification: docs/design/design-system.md. It owns global
+  principles, authority, scoped component/interaction constraints, and Open items.
+- Figma navigation and design status: docs/design/design-index.md.
+- Approval history: docs/product/decisions/README.md; workspace approvals are in
+  docs/product/decisions/2026-10-29-workspace-ui-decision.md.
+- Product language and copy: docs/design/design-system.md#feedback-and-product-copy.
+  (source: owner-approved English unification, 2026-10-30)
 
 ## Artifact locations
-- prototypes: docs/prototypes/; retain the original when asked to make a copy.
+- prototypes: docs/prototypes/.
 - retained local materials: .local-materials/font-source/ for original fonts;
   .local-materials/pending-patches/ for retained patches. Both are git-ignored.
 - retired document backup: .document-backups/deprecated-docs-2026-10-29.zip;
   local only and git-ignored.
-- project facts: this file.
-- UI/UX baseline: docs/product/ui-ux-design.md.
-- approved workspace decisions:
-  docs/product/2026-10-29-workspace-ui-decision.md
 - development commands and acceptance guidance: docs/development.md
-- progress and validation: use the relevant implementation or verification record
-  under docs/; keep temporary status out of AGENTS.md.
+- historical plans and implementation: docs/archive/plans-and-implementation/.
+- acceptance and verification records: docs/archive/verification/.
+- archive index and monthly cleanup policy: docs/archive/README.md.
 
 (source: existing project documents; owner-stated maintenance rules, 2026-10-29)
 
-## Conventions
-- Product copy is English, including application feedback and generated export
-  descriptions. Reader content and historical saved values retain their original
-  language. Layout and interaction paths remain unchanged. Windows-owned dialog
-  controls follow the system language. (source: owner-approved English unification,
-  docs/product/ui-ux-design.md, 2026-10-30)
-- New agent rules and project profiles: English.
-- Owner-facing explanations, questions, and summaries: Chinese.
-- Existing product documents retain their language unless translation is requested.
-
-(source: owner-stated, 2026-10-29; existing project documents)
-
 ## Delivery
 - Windows x64 NSIS candidate packages are generated under release/.
-- Source changes and local validation do not establish that a new package was
-  built, installed, or published. Report the artifact actually verified.
 
 (source: docs/development.md)
 
 ## Unknowns
-- UI/UX details still open: see docs/product/ui-ux-design.md#open.
+- UI/UX details still open: see docs/design/design-system.md#open.

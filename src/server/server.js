@@ -5,6 +5,7 @@ const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
 if (nodeMajor < 24 || (nodeMajor === 24 && nodeMinor < 15)) throw new Error("AuraReader requires Node.js >= 24.15.0.");
 const { createDataStore } = require('./dataStore');
 const { createStorageApi } = require('./storageApi');
+const { handleWikiRequest } = require('./wikiApi');
 const { createFontStore, listSystemFonts, MAX_FONT_BYTES } = require('./fontStore');
 const fontStore = createFontStore(path.resolve(__dirname, '../../data/fonts'));
 
@@ -110,6 +111,10 @@ return server;
 }
 
 function handleApiRequest(req, res, pathname, parsedUrl) {
+    if (pathname === '/api/wiki') {
+        void handleWikiRequest(req, res, parsedUrl);
+        return;
+    }
     if (pathname.startsWith('/api/fonts')) {
         handleFontRequest(req, res, pathname, parsedUrl).catch(error => {
             if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });

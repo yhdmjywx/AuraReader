@@ -6,6 +6,8 @@ import type { ReaderSnapshot } from '../reader/readerRuntime.js';
 import { areaGoals } from '../../domain/goalLifecycle.js';
 import { findChapterForPage } from '../../domain/readingLocation.js';
 import { getAllBooksFromDB } from '../../infrastructure/bookRepository.js';
+import { initialWikiSite } from '../../../shared/wiki.js';
+import { WikiController, type WikiState } from '../wiki/wikiController.js';
 
 export type ReadingApplication = ReturnType<typeof bootstrapApp>;
 export interface WorkbenchSnapshot {
@@ -23,6 +25,7 @@ export interface WorkbenchSnapshot {
     materials: { link: GoalSourceLink; annotation?: Annotation; title: string }[];
     linkedIds: string[];
     error: string;
+    wiki: WikiState | null;
 }
 
 /** A subscribed view of existing authorities. Commands reuse their persistence and navigation. */
@@ -32,6 +35,8 @@ export class WorkbenchStore {
     private books: WorkbenchSnapshot['books'] = [];
     private error = '';
     private snapshot: WorkbenchSnapshot;
+    private wikiBookId = '';
+    readonly wiki = new WikiController(() => this.publish());
     constructor(readonly app: ReadingApplication) { this.snapshot = this.read(); }
     getSnapshot = () => this.snapshot;
     subscribe = (listener: () => void) => {
@@ -52,10 +57,15 @@ export class WorkbenchStore {
             materials: selected ? goals.materialEntries(selected.id) : [],
             linkedIds: goals.state.links.filter(link => link.goalId === selected?.id).map(link => link.annotationId),
             error: this.error,
+            wiki: this.wiki.state,
         };
         return JSON.parse(JSON.stringify(value)) as WorkbenchSnapshot;
     }
     private publish = () => {
+        if (this.wiki.state && (this.app.reader.getCurrentBook()?.id !== this.wikiBookId
+            || this.app.navigation.surface !== 'reader' || this.app.readerRuntime.getSnapshot().selection)) {
+            this.closeWiki();
+        }
         const next = this.read();
         if (JSON.stringify(next) === JSON.stringify(this.snapshot)) return;
         this.snapshot = next;
@@ -68,7 +78,21 @@ export class WorkbenchStore {
             session.subscribe(() => { this.publish(); this.run(() => this.refreshBooks()); })];
         this.run(() => this.refreshBooks());
         this.publish();
-        return () => { this.detach.splice(0).forEach(unsubscribe => unsubscribe()); };
+        return () => { this.detach.splice(0).forEach(unsubscribe => unsubscribe()); this.closeWiki(); };
+    }
+    openWiki() {
+        const text = this.app.readerRuntime.getSnapshot().selection?.text.trim();
+        if (!text) return;
+        const book = this.app.reader.getCurrentBook();
+        this.wikiBookId = book?.id || '';
+        this.app.readerRuntime.selection.pinSelectionTooltip(true);
+        this.app.readerRuntime.selection.clearSelection();
+        this.wiki.open(text, initialWikiSite(book?.language || book?.languages?.[0], navigator.language));
+    }
+    closeWiki() {
+        this.app.readerRuntime.selection.pinSelectionTooltip(false);
+        this.wiki.close();
+        if (!this.app.readerRuntime.getSnapshot().selection) this.app.readerRuntime.selection.hideSelectionTooltip();
     }
     private async refreshBooks() {
         this.books = (await getAllBooksFromDB()).map(({ id, title }) => ({ id, title }));

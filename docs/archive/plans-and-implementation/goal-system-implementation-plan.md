@@ -4,7 +4,7 @@
 
 2026-10-26 后续确认：用户选择 Sidebar 与可调宽度，替代下文原定的页边留白呈现。本次只调整展示；书内 Goal 存储、标注和备份规则保持不变，详见 [Sidebar 实现记录](goal-sidebar-implementation.md)。下文保留为首版实现基线。
 
-唯一 UX 基准：[最终效果稿](prototypes/goals.html)。本计划替代此前的探索方案；实现时按该稿接入现有 AuraReader，不再重新设计 Goal 的入口、面板或操作流程。
+唯一 UX 基准：[最终效果稿](../../prototypes/goals.html)。本计划替代此前的探索方案；实现时按该稿接入现有 AuraReader，不再重新设计 Goal 的入口、面板或操作流程。
 
 效果稿 SHA-256：`7b5d1c736e7bfdfdd127f833d9c0aeac7e56d38165639dc30b643a02d4a1dc0d`。本次不修改效果稿；后续若用户调整效果稿，再同步修改计划与验收项。
 

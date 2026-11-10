@@ -2,13 +2,13 @@
 
 日常使用入口见 [README](../README.md#get-started)；本页保留完整运行、构建与验收说明。阶段记录描述当时的源码／安装包，不代表最新源码功能已全部进入候选安装包。
 
-2026-10-30：当前源码的产品界面与应用提示已统一英文，首次创建书库按钮为 `Create local library`；本文中文功能名称仍用于说明。书籍与用户内容保留原语言。实现范围、截图与验证见 [英文统一记录](english-ui-verification-2026-10-30.md)。本次未生成新版安装包。
+2026-10-30：当前源码的产品界面与应用提示已统一英文，首次创建书库按钮为 `Create local library`；本文中文功能名称仍用于说明。书籍与用户内容保留原语言。实现范围、截图与验证见 [英文统一记录](archive/verification/english-ui-verification-2026-10-30.md)。本次未生成新版安装包。
 
 ## 安装与启动
 
 Windows x64 桌面候选版使用 `AuraReader-Setup-1.0.0-x64.exe` 安装，安装后从桌面或开始菜单的 AuraReader 快捷方式启动。应用自带 Electron、Node.js 与 SQLite，日常使用无需另装 Node.js、打开浏览器或运行终端。首次启动点击“创建独立桌面书库”，随后导入 EPUB/TXT。候选安装包和 SHA256 校验文件由下方 `npm run dist:win` 生成在 `release/`，未发布到在线下载服务。
 
-桌面默认数据位置为 `%APPDATA%\AuraReader`，其中 `data/aurareader.sqlite` 保存书籍及笔记，`data/fonts/` 保存导入字体；正常升级和卸载保留数据。当前只支持现用 SQLite 和当前书籍备份，不提供旧数据库自动迁移。安装包目前**未签名**；实际 NSIS 静默安装、版本升级、卸载和重装已经验证，安装向导逐页操作、纯净 Windows 虚拟机以及签名后的系统信任流程尚未验收。具体证据与限制见 [阶段 5 记录](electron-desktop-stage5.md)。
+桌面默认数据位置为 `%APPDATA%\AuraReader`，其中 `data/aurareader.sqlite` 保存书籍及笔记，`data/fonts/` 保存导入字体；正常升级和卸载保留数据。当前只支持现用 SQLite 和当前书籍备份，不提供旧数据库自动迁移。安装包目前**未签名**；实际 NSIS 静默安装、版本升级、卸载和重装已经验证，安装向导逐页操作、纯净 Windows 虚拟机以及签名后的系统信任流程尚未验收。具体证据与限制见 [阶段 5 记录](archive/plans-and-implementation/electron-desktop-stage5.md)。
 
 浏览器模式继续提供源码运行方式，已在 Windows 和 Node.js 24.16.0 上验证。此模式要求 **Node.js >= 24.15.0**，使用内置 `node:sqlite`，并建议使用近期版本的 Chrome 或 Edge。本地服务只监听 `127.0.0.1`。
 
@@ -34,7 +34,7 @@ npm start
 
 Electron Windows 桌面迁移已进入阶段 6 的本地验证，保留 Windows x64 NSIS 候选安装包，暂不发布。运行 `npm run desktop` 也可从源码创建独立桌面书库，通过 Windows 原生对话框导入 EPUB/TXT、阅读并保存高亮和笔记；可读取系统字体、导入 TTF/OTF/WOFF2，以及保存 Markdown、章节文件夹和每书 `.aurabackup`，并恢复当前书籍备份。旧阶段记录中的带标注 HTML 与章节 ZIP 属于历史验收能力，当前菜单不再提供这些导出入口。文件取消与保存失败会明确反馈，多书备份显示实际保存数量。桌面资源与 JSZip 随应用提供，离线运行不使用 localhost 服务。
 
-首次创建书库需明确点击；桌面 SQLite 和导入字体位于 `%APPDATA%\AuraReader\data`，不在安装目录内。按当前范围只保证现用 SQLite 的读写、版本/幂等、备份与恢复，不提供旧数据库或 IndexedDB 的桌面迁移；未知或缺失数据库仍阻断启动，不静默清库。浏览器模式继续独立运行，[旧版迁移说明](data-and-backup.md#从旧版本迁移)仅适用于现有浏览器模式。阶段 6 增加实际 SQLite 容量、只读和锁竞争故障、Renderer/主进程终止恢复、大书与持续读写、打包程序及安装生命周期验证，并修复容量错误掩盖与页面关闭漏保存。发布验收仍有未验证项；最新证据与限制见 [阶段 6 记录](electron-desktop-stage6.md)，安装设计见 [阶段 5](electron-desktop-stage5.md)，文件功能见 [阶段 4](electron-desktop-stage4.md)，历史记录见 [阶段 3](electron-desktop-stage3.md)、[审计](electron-desktop-audit.md)和[外壳记录](electron-desktop-stage2.md)。
+首次创建书库需明确点击；桌面 SQLite 和导入字体位于 `%APPDATA%\AuraReader\data`，不在安装目录内。按当前范围只保证现用 SQLite 的读写、版本/幂等、备份与恢复，不提供旧数据库或 IndexedDB 的桌面迁移；未知或缺失数据库仍阻断启动，不静默清库。浏览器模式继续独立运行，[旧版迁移说明](data-and-backup.md#从旧版本迁移)仅适用于现有浏览器模式。阶段 6 增加实际 SQLite 容量、只读和锁竞争故障、Renderer/主进程终止恢复、大书与持续读写、打包程序及安装生命周期验证，并修复容量错误掩盖与页面关闭漏保存。发布验收仍有未验证项；最新证据与限制见 [阶段 6 记录](archive/plans-and-implementation/electron-desktop-stage6.md)，安装设计见 [阶段 5](archive/plans-and-implementation/electron-desktop-stage5.md)，文件功能见 [阶段 4](archive/plans-and-implementation/electron-desktop-stage4.md)，历史记录见 [阶段 3](archive/plans-and-implementation/electron-desktop-stage3.md)、[审计](archive/plans-and-implementation/electron-desktop-audit.md)和[外壳记录](archive/plans-and-implementation/electron-desktop-stage2.md)。
 
 源码位于 `src/client/` 和 `src/server/`。前端使用 React + Vite：`entry.tsx` 先挂载 `WorkbenchShell`，再按运行环境载入浏览器／桌面应用。首页、完整 Goal 页面、阅读 Goal 侧栏、书库列表、选区操作和页边笔记均由 React 展示；偏好和导出面板也由 React 创建，原有 controller 继续执行字体、布局、保存和文件命令。
 
@@ -81,4 +81,4 @@ Electron 此阶段继续通过 `aurareader://app/index.html` 加载 Vite 构建�
 
 ## 后续源码验收
 
-Goal 生命周期已在 2026-10-27 完成源码与真实 Electron 验证，未制作或验证新版安装包。具体范围见 [Goal 生命周期记录](goal-lifecycle-verification-2026-10-27.md)。本次文档整理未重新执行这些历史验收。
+Goal 生命周期已在 2026-10-27 完成源码与真实 Electron 验证，未制作或验证新版安装包。具体范围见 [Goal 生命周期记录](archive/verification/goal-lifecycle-verification-2026-10-27.md)。本次文档整理未重新执行这些历史验收。

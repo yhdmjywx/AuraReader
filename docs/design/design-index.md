@@ -26,10 +26,83 @@ instance inside Reading Interface / At rest**, not the entire reading screen.
 
 ## Product Interfaces
 
+### Wiki Sidebar — independent component, 2026-11-05
+
+Owner-supplied design, updated from the owner's browser comments on 2026-11-05:
+[Wiki Sidebar, 236:1614](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=236-1614),
+an independent main component on **02 - Components**. The owner rejected embedding
+Wiki in a Screen: [Reading Interface, 15:129](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-129)
+has been restored, with only the original Reader Paper instance in viewport `15:263`.
+Original Wiki Frame `194:1665` was converted into component `236:1614`; its runtime
+placement is still the right notes area, covering notes while open. The component's
+reference size was subsequently redesigned by the owner to **337 × 341**, verified
+when adding separate state frames. Earlier 300 × 917.14 and 300 × 370 dimensions
+are historical. Existing child IDs remain: Search term `198:1683`,
+Language selector `200:869`, body Frame `198:1694`, Body text `198:1692`, and
+Original link ↗ `210:821`. The earlier `198:1694` link covers the body only.
+The nested Local Library instance `194:1595` supplies presentation, not library behavior.
+
+New scoped details: persistent gray query underline `198:1690`; six-choice language
+dropdown `231:1619`, reusing Menu Item `4:182`. Selector `200:869` and the menu rows
+have prototype variable actions for opening, selecting and closing. The independent
+component displays the expanded menu state. At the owner's subsequent request,
+five separate state Frames were added on 02 - Components, each containing an
+instance of the unchanged main component. They are independent sidebar states,
+not full reading Screens or new Figma Pages:
+
+| State | Frame |
+| --- | --- |
+| Default | [240:1654](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=240-1654) |
+| Language menu open | [240:1697](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=240-1697) |
+| Loading | [240:1740](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=240-1740) |
+| Not found | [240:1783](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=240-1783) |
+| Request failed | [240:1826](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=240-1826) |
+
+All five are 337 × 341. Only per-instance menu visibility and status feedback
+differ. The source component's geometry, text, fonts and fills were checked
+unchanged during creation; all five state frames passed visual review.
+The sidebar is editable layers, not a screenshot. Restored-screen and standalone
+component visual QA plus structural/variable checks passed; live prototype clicking
+was not verified.
+
+Status (2026-11-06): source implementation follows the 337 × 341 sidebar design,
+underlined query and six-language radio menu. Runtime positioning reuses the margin
+notes' horizontal geometry. Built-in browser verification confirmed that actual
+book scrolling leaves the sidebar coordinates unchanged. Existing checks also cover
+literal lookup, linked-language switching, original links, independent body scrolling,
+Enter submission and entry-point exit. Desktop exit and package limitations remain.
+See [Wiki implementation and validation](../product/wiki/implementation.md),
+[Wiki specification](../product/wiki/feature-spec.md) and
+[scope decision](../product/decisions/2026-11-05-wiki-mvp.md).
+
+### Other product interfaces
+
 Design status describes design availability, not code completion. “Approved
 Design” below identifies the product visuals supplied by the owner as the current
 design basis; it is not a blanket approval of every extracted value or component.
 The owner describes the main interface design as basically complete.
+
+On 2026-11-09 the owner confirmed the
+[Goal user input and Response MVP](../product/goals/user-input-response/feature-spec.md):
+remove the separate Linked group marker, retain Highlight/Note Link components,
+and offer a unified content area with an optional Response label. The owner
+clarified that content retains the former Link group's position below child
+Goals, with newly added content first. A separate
+[User input static Frame](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=265-1744)
+now sits left of the original component on 02 - Components. It applies the owner's
+selected scheme 02: branch and stacked-document region icons, horizontal divider,
+document-plus entry and text-type icon, with original Figma typography and no
+parent target icon. On 2026-11-10 the owner requested integration into the original
+Sidebar component. Its five variant IDs and overall dimensions are retained;
+Collapsed is now Empty content. The selected frame remains a reference, while
+the original component now includes the module. A reusable
+[Goal User Input component](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=284-1877)
+provides seven states, shown in the
+[UX review](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=288-1835).
+Region icons are passive; records are independent, multiline and owned by their
+creating Goal. The review is visually checked and has local record-state
+connections, not working text entry or persistence. Scope and evidence:
+[interaction record](../product/goals/user-input-response/interaction.md).
 
 | Interface | Exact screen entry | Classification | Design status | Code implementation status |
 | --- | --- | --- | --- | --- |
@@ -60,13 +133,14 @@ These are sidebar/component states, not full Goal workspace screens.
 | Exact variant name | Component node |
 | --- | --- |
 | State=Expanded | [14:241](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-241) |
-| State=Collapsed | [14:316](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-316) |
+| State=Empty content | [14:316](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-316) |
 | State=Root | [14:380](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-380) |
 | State=Editing parent | [14:431](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-431) |
 | State=Editing child | [14:506](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-506) |
 
-“Collapsed” is the actual variant name; do not assume it means the entire
-application sidebar is hidden. Read the relevant instance and existing command.
+The former Collapsed node retains its ID but is now Empty content, following
+removal of Linked grouping and the owner's passive-region-icon decision. Root
+still represents navigation without a current Goal, not an empty selected Goal.
 For Goal-row work, inspect these contextual variants alongside the base Goal Row:
 approved root/parent typography and row-height overrides are recorded in
 [Existing Goal editing](design-system.md#existing-goal-editing).
@@ -123,7 +197,8 @@ Code Connect binding or identical code/design state.
 | [Goal Action Menu](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=13-189) | [Ongoing](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=13-173), [Completed](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=13-181) | [features/goals/goalActions.tsx](../../src/client/features/goals/goalActions.tsx) |
 | [Margin Note](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=13-371) | Note, Focused, Editing, Highlight, Linked, Disabled | [features/workbench/ReadingWorkbench.tsx](../../src/client/features/workbench/ReadingWorkbench.tsx) |
 | [Selection Actions](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=13-372) | Selection toolbar | [features/workbench/ReadingWorkbench.tsx](../../src/client/features/workbench/ReadingWorkbench.tsx) |
-| [Goal Sidebar](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-581) | Expanded, Collapsed, Root, Editing parent, Editing child; links below | [features/goals/goalUI.tsx](../../src/client/features/goals/goalUI.tsx) |
+| [Goal Sidebar](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-581) | Expanded, Empty content, Root, Editing parent, Editing child; links below | [features/goals/goalUI.tsx](../../src/client/features/goals/goalUI.tsx); new input behavior not yet implemented |
+| [Goal User Input](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=284-1877) | Default, Hover, New, Editing, Disabled, Error, Deleted; Text property | Figma-only module; [interaction contract](../product/goals/user-input-response/interaction.md), application implementation pending |
 | [Workspace Brand Header](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-224) | Shared header | [features/workbench/WorkbenchShell.tsx](../../src/client/features/workbench/WorkbenchShell.tsx) |
 | [Workspace Settings Entry](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-236) | Shared Settings entry | [features/workbench/WorkbenchShell.tsx](../../src/client/features/workbench/WorkbenchShell.tsx) |
 | [Reader Paper / current column](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-582) | Current visible reading column specimen | [features/reader/readerRuntime.ts](../../src/client/features/reader/readerRuntime.ts) |

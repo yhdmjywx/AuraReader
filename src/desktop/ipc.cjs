@@ -1,7 +1,52 @@
-const { ipcMain } = require('electron');
+const { ipcMain, shell } = require('electron');
 const { randomUUID } = require('node:crypto');
 const { StorageError } = require('../server/dataStore.js');
 const { APP_URL } = require('./assets.cjs');
+const { createWikiService, validateWikiRequest } = require('../server/wikiService.js');
+const { wikiExternalUrl } = require('../shared/wikiSites.js');
+
+/** @param {import('electron').BrowserWindow} window */
+function registerWikiIpc(window) {
+    const wiki = createWikiService();
+    /** @type {Map<string, AbortController>} */
+    const requests = new Map();
+    const actions = ['read', 'cancel', 'openExternal'];
+    for (const action of actions) ipcMain.handle('aura:wiki:' + action, async (event, ...args) => {
+        try {
+            assertSender(event, window);
+            if (args.length !== 1) throw new Error('Invalid Wikipedia argument count.');
+            if (action === 'openExternal') {
+                await shell.openExternal(wikiExternalUrl(args[0]));
+                return { ok: true, value: undefined };
+            }
+            if (action === 'cancel') {
+                if (typeof args[0] !== 'string') throw new Error('Invalid Wikipedia request identifier.');
+                requests.get(args[0])?.abort();
+                return { ok: true, value: undefined };
+            }
+            const input = validateWikiRequest(args[0]);
+            if (requests.has(input.id)) throw new Error('Duplicate Wikipedia request.');
+            const controller = new AbortController();
+            requests.set(input.id, controller);
+            try {
+                const value = await wiki.read(input, controller.signal);
+                assertSender(event, window);
+                return { ok: true, value };
+            } finally { requests.delete(input.id); }
+        } catch (error) {
+            return { ok: false, error: { status: 502, message: error instanceof Error ? error.message : 'Wikipedia is unavailable.' } };
+        }
+    });
+    const cancelAll = () => { requests.forEach(controller => controller.abort()); requests.clear(); };
+    window.webContents.on('did-start-navigation', cancelAll);
+    window.webContents.on('render-process-gone', cancelAll);
+    return () => {
+        cancelAll();
+        actions.forEach(action => ipcMain.removeHandler('aura:wiki:' + action));
+        window.webContents.removeListener('did-start-navigation', cancelAll);
+        window.webContents.removeListener('render-process-gone', cancelAll);
+    };
+}
 
 /** @param {import('electron').IpcMainInvokeEvent} event @param {import('electron').BrowserWindow} window */
 function assertSender(event, window) {
@@ -124,4 +169,4 @@ function coordinateClose(window, storage) {
     };
 }
 
-module.exports = { assertSender, registerStorageIpc, registerFileIpc, coordinateClose };
+module.exports = { assertSender, registerStorageIpc, registerFileIpc, registerWikiIpc, coordinateClose };

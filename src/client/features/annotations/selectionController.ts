@@ -27,12 +27,15 @@ export class SelectionController {
     private bindings?: AbortController;
     private selectionTimer?: ReturnType<typeof setTimeout>;
     private listeners = new Set<() => void>();
+    private tooltipPinned = false;
+    pinSelectionTooltip(pinned: boolean) { this.tooltipPinned = pinned; }
     subscribe(listener: () => void) {
         this.listeners.add(listener);
         return () => { this.listeners.delete(listener); };
     }
     private changed() { for (const listener of this.listeners) listener(); }
     destroy() {
+        this.tooltipPinned = false;
         this.bindings?.abort(); this.bindings = undefined;
         clearTimeout(this.selectionTimer);
         this.hideSelectionTooltip(); this.clearAnnotationContext();
@@ -117,6 +120,7 @@ export class SelectionController {
     }
 
     hideSelectionTooltip() {
+        if (this.tooltipPinned) return;
         if (this.elements) {
             hideSelectionTooltip(this.elements);
         }

@@ -1,6 +1,6 @@
 # AuraReader · Friendship
 
-39 秒产品动画预览工程。1920 × 1080，30 fps，1170 帧。按 [最终分镜](../../docs/remotion/friendship-final-plan.md) 制作。
+39 秒产品动画预览工程。1920 × 1080，30 fps，1170 帧。按 [最终分镜](../../docs/archive/plans-and-implementation/friendship-final-plan.md) 制作。
 
 ## 预览
 

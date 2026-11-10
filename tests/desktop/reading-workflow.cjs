@@ -36,6 +36,9 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await capture('library-setup');
     await run(`document.getElementById('desktop-create-library').click()`);
     await waitFor(`document.documentElement.dataset.reactWorkbench === 'true'`);
+    assert.equal((await run(`auraDesktop.wiki.read({id:'invalid-wiki',kind:'article',site:'en.evil.test',title:'Test'})`)).ok, false);
+    assert.equal((await run(`auraDesktop.wiki.openExternal('file:///C:/Windows')`)).ok, false);
+    assert.equal((await run(`auraDesktop.wiki.cancel('unknown-request')`)).ok, true);
     const files = await fs.readdir(path.resolve('dist/renderer/assets'));
     const mainUrl = 'aurareader://app/assets/' + files.find(file => /^main-.*\.js$/.test(file));
     await capture('home-welcome');

@@ -35,13 +35,13 @@ DOM 测试通过 jsdom 执行真实产品事件和模块，只为不可用的几
 
 `npm run test:desktop:native` 是单独的交互验收，不能在无人桌面上自动通过。它不注入对话框替身，依次要求用真实系统对话框选择项目 `test.epub`、`literata.woff2`，将 Markdown 保存到终端打印的隔离输出目录，然后取消 ZIP 保存；完成后检查实际文件、SQLite 完整性和 UI 反馈，生成 `.commandcode/desktop-native/run-*/results.json` 与截图。失败或十分钟超时返回非零，不得改为跳过通过。本次已通过实际 Windows 操作完成该检查。
 
-上述桌面文件测试使用本地源码和未打包 Electron；不能单独证明安装包验收通过。旧数据库桌面迁移已按用户要求移出范围，原浏览器测试保留。文件操作边界见 [阶段 4 记录](../docs/electron-desktop-stage4.md)。
+上述桌面文件测试使用本地源码和未打包 Electron；不能单独证明安装包验收通过。旧数据库桌面迁移已按用户要求移出范围，原浏览器测试保留。文件操作边界见 [阶段 4 记录](../docs/archive/plans-and-implementation/electron-desktop-stage4.md)。
 
 阶段 5 增加 `npm run dist:win` / `npm run verify:package`：检查实际 app.asar 的 16 项必需资源、生产依赖、许可证、安全 fuses 和私有数据/测试/HTTP Server 排除，生成 SHA256 与 package-verification.json。安装验收使用 `npm run test:install`，它构建 1.0.0 候选包及仅供本地测试的 1.0.1 包，调用真实 NSIS 执行当前用户安装、升级、卸载、重装。脚本按稳定安装 GUID 检查 HKCU/HKLM；发现已有 AuraReader 安装就停止，不覆盖用户安装。递归卸载前核对注册路径精确属于本轮 `.commandcode/install-tests/run-*/AuraReader`，保留隔离 profile。
 
 `tests/desktop/packaged.cjs` 从已安装的真实 exe 启动 Renderer，PATH 只保留 Windows 系统目录，验证包内运行时、字体/资源、IPC、SQLite 读写、幂等、在线备份、关闭前编辑保存、新进程重启，以及升级/重装后的完整对象、字体和偏好。字体文件是测试主进程写入当前测试 profile 的有效 WOFF2 素材，后续由实际打包 Renderer 加载，不将这项测试声称为原生字体选择操作。正常卸载前后比较全部 data 文件哈希。测试没有向安装包加入专用 IPC 或测试模块；外部 CDP 仅通过验收启动参数开启，不能视为产品依赖 localhost HTTP。结果和截图位于 `.commandcode/install-tests/run-*/`，完整 `npm test` 不包含这项另行运行的系统安装验收。
 
-实际 NSIS 静默生命周期和已安装 GUI 程序通过不等于逐页点击安装向导或纯净无 Node 虚拟机已通过。额外普通窗口观察遇到 Computer Use 应用授权超时，仍记为未验证；签名、文件关联、系统强制关机与最终发布检查留待后续。最新证据见 [阶段 5 记录](../docs/electron-desktop-stage5.md)。
+实际 NSIS 静默生命周期和已安装 GUI 程序通过不等于逐页点击安装向导或纯净无 Node 虚拟机已通过。额外普通窗口观察遇到 Computer Use 应用授权超时，仍记为未验证；签名、文件关联、系统强制关机与最终发布检查留待后续。最新证据见 [阶段 5 记录](../docs/archive/plans-and-implementation/electron-desktop-stage5.md)。
 
 阶段 6 的 `test_sqlite_faults.js` 用真实 SQLite 的 `max_page_count`、`query_only` 和第二写连接产生 SQLITE_FULL、SQLITE_READONLY、SQLITE_BUSY，验证原错误、完整对象、版本与操作数量、同命令恢复及在线备份。它不是物理磁盘满或 Windows ACL 验收。
 
@@ -49,7 +49,7 @@ DOM 测试通过 jsdom 执行真实产品事件和模块，只为不可用的几
 
 `npm run test:packaged:stability` 验证已有 `release/win-unpacked` 的实际 hardened exe（先构建 dist:win），也可直接向 `node tests/desktop/packaged-stability.cjs` 传入安装目录。PATH 排除宿主 Node、模拟断网，以外部第二 SQLite 写连接检查保存失败/拒绝关闭和恢复；40 次已确认 Repository 写入后杀主进程并重开，检查完整数据、页面关闭末次原始输入、当前 SQLite 在线备份在新 profile 恢复，以及损坏库不重置。证据在 `.commandcode/packaged-stability/run-*/`。CDP 仅由测试启动参数开启，首屏仅重试导航引起的 execution-context 销毁，其他错误和超时仍失败；未加入通用 IPC 或产品测试入口。
 
-阶段 6 实际结果、性能界限与尚未通过的发布条件见 [验证记录](../docs/electron-desktop-stage6.md)。本轮仅验证和修复，不上传、推送、创建 Release 或发布安装包。
+阶段 6 实际结果、性能界限与尚未通过的发布条件见 [验证记录](../docs/archive/plans-and-implementation/electron-desktop-stage6.md)。本轮仅验证和修复，不上传、推送、创建 Release 或发布安装包。
 
 源码静态检查只用于明确的资源/结构约束（例如无独立笔记弹窗、红色 caret CSS、入口 DOM 引用），不要用函数名、源码片段或测试自写的算法代替行为验证。
 

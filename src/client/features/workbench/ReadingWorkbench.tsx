@@ -5,6 +5,7 @@ import type { Annotation } from '../../domain/annotation.js';
 import { positionMarginNotes } from '../layout/marginNotesLayout.js';
 import { attachNoteCaret } from '../annotations/noteCaret.js';
 import { WorkbenchStore, type ReadingApplication, type WorkbenchSnapshot } from './workbenchStore.js';
+import { WikiLookup } from '../wiki/WikiLookup.js';
 
 function NoteEditor({ note, store }: { note: Annotation; store: WorkbenchStore }) {
     const input = useRef<HTMLTextAreaElement>(null), shell = useRef<HTMLDivElement>(null);
@@ -104,6 +105,7 @@ export function ReadingWorkbench({ application }: { application: ReadingApplicat
     return <>
         {createPortal(<Notes state={state} store={store} />, doc.getElementById('react-notes')!)}
         {createPortal(<>
+            <WikiLookup state={state.wiki} store={store} />
             <Button type="button" className="tooltip-btn" onMouseDown={event => event.preventDefault()}
                 onClick={() => { void store.createFromSelection('highlight'); }}><i className="ri-mark-pen-line" aria-hidden="true" />Highlight</Button>
             <Button type="button" className="tooltip-btn" aria-label="Add note" onMouseDown={event => event.preventDefault()}

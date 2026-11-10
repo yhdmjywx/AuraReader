@@ -1,6 +1,6 @@
 # Goal 模块实现记录
 
-2026-10-26。依据 [已确认实现计划](goal-system-implementation-plan.md) 与 [最终效果稿](prototypes/goals.html)。效果稿保持原样，SHA-256 为 `7b5d1c736e7bfdfdd127f833d9c0aeac7e56d38165639dc30b643a02d4a1dc0d`。
+2026-10-26。依据 [已确认实现计划](goal-system-implementation-plan.md) 与 [最终效果稿](../../prototypes/goals.html)。效果稿保持原样，SHA-256 为 `7b5d1c736e7bfdfdd127f833d9c0aeac7e56d38165639dc30b643a02d4a1dc0d`。
 
 首版已提交为 `de72df0`。后续经用户确认，展示改为可调宽度的 Sidebar；该调整及验证见 [Sidebar 实现记录](goal-sidebar-implementation.md)。本页保留首版实现证据。
 

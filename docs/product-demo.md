@@ -12,11 +12,11 @@ README 复用现有 **AuraReader · Friendship** Remotion 作品，展示从建�
 4. 回看跨书材料，将同一个 Goal 改写为 `Find a friend I can talk about books with.`。
 5. 平等展示不同后续方向；不替读者选择，也不承诺交友结果。
 
-本片展示的是阅读目的的发展。完成、归档、最近删除等当前源码能力另见 [生命周期验证](goal-lifecycle-verification-2026-10-27.md)，不应暗示它们都出现在这支影片中。README 与演示周围的产品文字必须明确 **Goal 完全可选**，未建立 Goal 时仍可自由阅读、高亮和记笔记。
+本片展示的是阅读目的的发展。完成、归档、最近删除等当前源码能力另见 [生命周期验证](archive/verification/goal-lifecycle-verification-2026-10-27.md)，不应暗示它们都出现在这支影片中。README 与演示周围的产品文字必须明确 **Goal 完全可选**，未建立 Goal 时仍可自由阅读、高亮和记笔记。
 
 ## 素材与更新
 
-- [最终分镜](remotion/friendship-final-plan.md)、[制作说明](remotion/friendship-production.md)。
+- [最终分镜](archive/plans-and-implementation/friendship-final-plan.md)、[制作说明](archive/plans-and-implementation/friendship-production.md)。
 - [Remotion 工程与导出方法](../videos/aurareader-friendship/README.md)。
 - [书籍、摘录、虚构笔记与许可来源](remotion/friendship/README.md)。笔记是为影片创作的用户内容；原书、封面和字体沿用各自的来源与许可，不一并改为项目代码许可。
 

@@ -116,9 +116,80 @@ Other shadcn styles and previously explored libraries remain historical referenc
 - The ongoing Goal menu retains `complete`, `Archive`, and `Delete`;
   Delete opens the existing confirmation. Preserve menu keyboard behavior.
 
+## Wiki Sidebar
+
+- Use the independent [Wiki Sidebar component](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=236-1614)
+  on 02 - Components. Maintain it separately from reading Screen frames; the owner
+  requested restoration of the original Reading Interface on 2026-11-05.
+  Preserve the owner's revised visual design. Default, menu-open, loading,
+  not-found and request-failed states are shown as separate sidebar Frames on
+  02 - Components, using instances of the unchanged main component.
+  Runtime placement remains the reading interface's
+  right notes area; while open, it covers notes in that area. Use the component's
+  337 × 341 size and the margin notes' horizontal offset from book text; keep its
+  position fixed while the book scrolls. Retain the query text, body, language selector and top-right
+  diagonal original-article arrow. Exit stays at the entry point, not the top right.
+- Query text is editable and submitted with Enter; no separate Search button.
+  Use unboxed text with a persistent gray bottom line, not an outlined input.
+  Body content scrolls independently of the top controls. Indent each paragraph's
+  first line by two character widths with scoped `text-indent: 2em`, not stored spaces.
+- The dropdown's language range is Simplified Chinese, English, Traditional Chinese,
+  French, German and Spanish. Reuse the project's neutral radio-menu treatment,
+  13px text and roughly 34.2px item rows. Available editions still come from the
+  current article's language links; the Chinese choices are display variants of
+  the same Chinese Wikipedia site, not separate encyclopedia sites.
+  Do not add candidate search, entity discovery, automatic translation, a separate
+  source-language selector, or extra persistent feature panels. Status feedback uses the body.
+- Placeholder text and the nested Local Library surface instance do not supply business
+  behavior. The independent component contains the six-option dropdown;
+  source implementation adopted the sidebar design, with built-in browser
+  scroll-position verification recorded on 2026-11-06.
+  See the [current specification](../product/wiki/feature-spec.md),
+  [design index](design-index.md), and [owner clarification](../product/decisions/2026-11-05-wiki-mvp.md).
+
 ## Goal Hierarchy and Materials
 
 Applies to the shared reading sidebar and full Goal workspace unless distinguished.
+
+- On 2026-11-09 the owner confirmed the
+  [Goal user input and Response MVP](../product/goals/user-input-response/feature-spec.md).
+  The target design removes the separate Linked group and its group marker,
+  presenting direct user input with Highlight and Note content. Preserve their
+  existing Link components, source relationships and actions, and distinguish
+  child-Goal navigation, unlinking and deleting user-authored content. The MVP
+  supplies only an optional, Goal-specific Response label; it neither completes
+  a Goal nor creates a separate group. The unified content area retains the
+  former Link group's layout position below child Goals; newly added content
+  appears first within that area. Response pinning remains undecided.
+  These are approved requirements awaiting interaction design and implementation.
+
+- The owner selected scheme 02, region icons with a horizontal divider, from the
+  [HTML comparison](../prototypes/goal-content-identifiers.html). Retain original
+  Figma typography and the parent Goal's medium weight, without a target icon.
+  A branch icon identifies child Goals; a stacked-document icon identifies the
+  content area, with a document-plus add entry on its right. This supersedes the
+  earlier text-entry choice for this MVP. Omit module-title text and the hierarchy
+  guide spanning the content area; preserve existing quote rules and material
+  components. The separate
+  [static design Frame](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=265-1744)
+  applies the selected arrangement using existing styles and tokens. It remains
+  a retained layout reference. On 2026-11-10 the owner requested integration
+  into the original Sidebar; its component and variant IDs are retained while
+  its content area is updated. See the
+  [design record](../product/goals/user-input-response/design.md).
+
+- User-input integration (2026-11-10): branch and stacked-document region icons
+  are identifiers only. Records are independent, multiline and owned by the Goal
+  that creates them. Reuse inline Goal editing: Enter inserts a newline; blur,
+  Escape and Ctrl/Meta+Enter finish and autosave, without a Save/Cancel bar.
+  Discard new empty drafts; clearing an existing record does not implicitly
+  delete it. Reveal edit/delete actions on hover or keyboard focus, keep access
+  without hover, and hide them during editing. Use the existing note-style
+  explicit delete action for the record, preserving source annotations. Retain
+  text on save failure; show retry and dismissible feedback. The former Sidebar
+  Collapsed variant now represents Empty content, with the add entry available.
+  Scope, state references and prototype limitations:
+  [interaction contract](../product/goals/user-input-response/interaction.md).
 
 - On 2026-11-04 the owner requested a Git rollback of breadcrumb navigation.
   The current interface uses the original Home and Up one level controls, with
@@ -142,10 +213,10 @@ Applies to the shared reading sidebar and full Goal workspace unless distinguish
   has focus. Edit and more occupy separate slots.
 - Keep material type icons inside rows before their text, clear of the hierarchy
   guide; source labels align with material text. Omit counts and “linked items”
-  headings. The disclosure combines a links icon and separate expansion caret,
-  with tooltip/accessibility name; a caret alone is insufficient identification.
-- The disclosure stays transparent at rest even when expanded, with neutral
-  hover/focus feedback. Preserve its expand/collapse behavior.
+  headings. The existing separate Linked disclosure uses a links icon and an
+  expansion caret. The approved MVP above supersedes that grouping requirement;
+  it does not authorize changes to Highlight/Note Link components. Whether the
+  unified content area supports overall collapse remains undecided.
 - In Home, the sidebar, and the full Goal workspace, show the saved source quote
   before the comment, distinguished with neutral styling and a vertical rule;
   no quote heading. Omit empty blocks and preserve source line breaks.

@@ -30,13 +30,13 @@
 - 真实 Electron 生命周期专项通过，含真实右键与鼠标、完成和撤销、归档、恢复确认、最近删除、Renderer 重载、永久删除及原始数据逐项比对。
 - `npm run test:desktop`：最终完整套件通过，退出码 0。主流程、进程重启、批注交互、Goal 交互与可见性、首页、先导入书籍流程和生命周期专项共 8 份报告的 `passed` 均为 `true`。最终证据目录为 `.commandcode/desktop-tests/run-nMeHcE/`。
 
-代码回归日志：[goal-lifecycle-regression.log](../.commandcode/goal-lifecycle-regression.log)。
+代码回归日志：[goal-lifecycle-regression.log](../../../.commandcode/goal-lifecycle-regression.log)。
 
-完整桌面日志：[goal-lifecycle-desktop.log](../.commandcode/goal-lifecycle-desktop.log)。
+完整桌面日志：[goal-lifecycle-desktop.log](../../../.commandcode/goal-lifecycle-desktop.log)。
 
-最终生命周期报告：[lifecycle-results.json](../.commandcode/desktop-tests/run-nMeHcE/lifecycle-results.json)。
+最终生命周期报告：[lifecycle-results.json](../../../.commandcode/desktop-tests/run-nMeHcE/lifecycle-results.json)。
 
-生命周期专项报告及截图：[lifecycle-results.json](../.commandcode/desktop-tests/run-AXzipY/lifecycle-results.json)、[窄窗暗色 200% 菜单](../.commandcode/desktop-tests/run-AXzipY/lifecycle-menu-narrow-dark-200.png)、[删除确认框](../.commandcode/desktop-tests/run-AXzipY/lifecycle-confirm-narrow-dark-200.png)。截图已人工检查。
+生命周期专项报告及截图：[lifecycle-results.json](../../../.commandcode/desktop-tests/run-AXzipY/lifecycle-results.json)、[窄窗暗色 200% 菜单](../../../.commandcode/desktop-tests/run-AXzipY/lifecycle-menu-narrow-dark-200.png)、[删除确认框](../../../.commandcode/desktop-tests/run-AXzipY/lifecycle-confirm-narrow-dark-200.png)。截图已人工检查。
 
 ## 当前交付边界
 

@@ -65,7 +65,7 @@ Goal 承载读者自主定义、持续发展的阅读目的，并与高亮、页
 4. **关联由读者建立**：由读者决定哪些材料与自己的目的有关；材料的位置或主题不替读者决定这种关系。
 5. **核心但可选**：Goal 的核心地位服务于读者自主性。读者可以完全不设置 Goal，仍能自由阅读、高亮和记笔记。
 
-本节描述产品定位与原则。现有源码已支持独立 Goal、自由文字编辑、子 Goal、跨书材料关联与不设置 Goal 的阅读，也支持完成／重新开启、归档／恢复、最近删除及逐条恢复或永久删除。最近删除的批量清空尚未实现；本轮生命周期实现未制作或验证新版安装包。具体范围见 [书籍模块实现记录](goal-books-implementation.md) 和 [生命周期验证](goal-lifecycle-verification-2026-10-27.md)。
+本节描述产品定位与原则。现有源码已支持独立 Goal、自由文字编辑、子 Goal、跨书材料关联与不设置 Goal 的阅读，也支持完成／重新开启、归档／恢复、最近删除及逐条恢复或永久删除。最近删除的批量清空尚未实现；本轮生命周期实现未制作或验证新版安装包。具体范围见 [书籍模块实现记录](archive/plans-and-implementation/goal-books-implementation.md) 和 [生命周期验证](archive/verification/goal-lifecycle-verification-2026-10-27.md)。
 
 ### 1.5 当前交付形态
 
@@ -148,7 +148,7 @@ README 先回答“是什么、为什么需要、能做什么、怎么开始”�
 - **阅读侧栏与材料**：单页左侧 Goal 侧栏宽 220–640px，支持拖拽、方向键、Home／End、双击复位和偏好保存；放大进入独立 Goal 页面，收起回到原阅读位置。高亮浮条和笔记原操作区的 Goal 按钮由读者主动关联材料，归入或重新进入后展开摘录。跨书材料显示书名，点击回到原文；`×` 只解除关联。不恢复顶部 Goals 按钮或 All goals／Current goal 切换。
 - **生命周期**：父 Goal 完成向下覆盖全部后代，子 Goal 完成不改变父级，重新开启只作用于自身；完成与归档独立。归档分支及恢复保留层级，删除进入最近删除，可按原路径（含必要祖先）或根层级恢复，也可永久删除分支。永久删除只清除 Goal 与关联，不删除书籍、高亮或笔记；归档／删除当前意图保留当前书籍及位置，恢复不自动选择意图。菜单、确认框与筛选操作不得触发正文翻页。
 
-当前实现与验收边界见 [书籍模块](goal-books-implementation.md)、[跨书实现](goal-cross-book-implementation.md) 和 [生命周期记录](goal-lifecycle-verification-2026-10-27.md)。
+当前实现与验收边界见 [书籍模块](archive/plans-and-implementation/goal-books-implementation.md)、[跨书实现](archive/plans-and-implementation/goal-cross-book-implementation.md) 和 [生命周期记录](archive/verification/goal-lifecycle-verification-2026-10-27.md)。
 
 ---
 
@@ -230,7 +230,7 @@ README 先回答“是什么、为什么需要、能做什么、怎么开始”�
   - `annotations`：通过 `book_id` 关联书籍，完整保存标注 JSON，包括 ID、类型 `kind`、引用 `quote`、笔记 `comment`、页码、章节、选区位置与偏移等；保留未知字段。另存版本与删除状态。
   - `operations`：记录操作 ID、请求哈希及结果，用于提交成功但响应丢失后的安全重试；版本和删除记录防止旧请求覆盖或复活记录。
   - `migrations`：记录来源、快照及校验清单，支持迁移重复执行的识别。
-  - `goal_library`：保存全局 Goal JSON、层级、材料关联、主动书籍关联及生命周期状态，并保留 revision、幂等和事务约束；不是每书独立复制一份 Goal。SQLite v4 的已有迁移、每书备份图与删除清理规则见 [跨书实现](goal-cross-book-implementation.md)、[书籍模块](goal-books-implementation.md) 和 [生命周期验证](goal-lifecycle-verification-2026-10-27.md)。无书籍来源或关联的独立 Goal 需由 SQLite 一致性备份覆盖。
+  - `goal_library`：保存全局 Goal JSON、层级、材料关联、主动书籍关联及生命周期状态，并保留 revision、幂等和事务约束；不是每书独立复制一份 Goal。SQLite v4 的已有迁移、每书备份图与删除清理规则见 [跨书实现](archive/plans-and-implementation/goal-cross-book-implementation.md)、[书籍模块](archive/plans-and-implementation/goal-books-implementation.md) 和 [生命周期验证](archive/verification/goal-lifecycle-verification-2026-10-27.md)。无书籍来源或关联的独立 Goal 需由 SQLite 一致性备份覆盖。
   - 日常业务不再使用 IndexedDB；浏览器仅在一次性迁移流程中只读旧 `AuraReaderDB`，不得自动删除原数据。
 - **localStorage 客户端偏好与短期恢复**：
   - 保留阅读模式（`aura_layout_mode`：`single` / `double` / `scroll`）、缩进、阅读背景、界面明暗等现有偏好。

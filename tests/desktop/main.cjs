@@ -71,7 +71,7 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     assert.equal(state.ready, 'library');
     assert.equal(state.require, 'undefined'); assert.equal(state.process, 'undefined'); assert.equal(state.Buffer, 'undefined');
     assert.equal(state.bridgeFrozen, true);
-    assert.deepEqual(state.bridge.keys.sort(), ['files', 'fonts', 'lifecycle', 'platform', 'stage', 'storage', 'versions', 'window']);
+    assert.deepEqual(state.bridge.keys.sort(), ['files', 'fonts', 'lifecycle', 'platform', 'stage', 'storage', 'versions', 'wiki', 'window']);
     assert.equal(state.bridge.stage, 4);
     assert.equal(state.zip, 'function');
     assert.equal(await run(`document.querySelector('button[title="Original book fonts are not available yet"]').disabled`), true);

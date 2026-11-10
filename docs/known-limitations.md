@@ -1,6 +1,6 @@
 # 当前状态与已知限制
 
-当前交付为 Windows x64 Electron 候选版与本地服务／浏览器源码模式，尚未公开发布安装包。桌面候选包未签名，安装向导逐页操作、纯净 Windows 虚拟机及签名后的系统信任流程仍未验收，详见 [安装阶段](electron-desktop-stage5.md) 与 [稳定性阶段](electron-desktop-stage6.md)。
+当前交付为 Windows x64 Electron 候选版与本地服务／浏览器源码模式，尚未公开发布安装包。桌面候选包未签名，安装向导逐页操作、纯净 Windows 虚拟机及签名后的系统信任流程仍未验收，详见 [安装阶段](archive/plans-and-implementation/electron-desktop-stage5.md) 与 [稳定性阶段](archive/plans-and-implementation/electron-desktop-stage6.md)。
 
 ## 阅读、资源与许可边界
 
@@ -16,6 +16,6 @@
 
 ## 源码与安装包的范围
 
-源码已支持统一首页导航及 Goal 完成、归档与最近删除；批量清空最近删除未实现，现有安装包未据此重新制作和验收。见 [生命周期交付边界](goal-lifecycle-verification-2026-10-27.md#当前交付边界)。
+源码已支持统一首页导航及 Goal 完成、归档与最近删除；批量清空最近删除未实现，现有安装包未据此重新制作和验收。见 [生命周期交付边界](archive/verification/goal-lifecycle-verification-2026-10-27.md#当前交付边界)。
 
 浏览器不支持文件夹保存能力时，多章 Markdown 导出提示使用桌面版，不自动回退 ZIP。`.aurabackup` 不含全局阅读设置、字体文件或原始 EPUB，也不覆盖无书籍来源的独立 Goal；见 [数据与备份](data-and-backup.md)。

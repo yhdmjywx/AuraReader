@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Goal 区 · 三种标识方案</title>
+  <style>
+    :root { color-scheme: light; --paper:#f7f7f8; --selected:#f0f0f2; --ink:#25252d; --soft:#64646f; --edge:#e4e4e7; --quote:#d4d4db; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:36px 28px; color:var(--ink); background:#fff; font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif; }
+    main { max-width:1120px; margin:auto; }
+    h1 { margin:0 0 8px; font-size:22px; font-weight:600; }
+    .intro,footer { margin:0; color:var(--soft); font-size:13px; line-height:1.8; }
+    .comparisons { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:28px; margin-top:28px; }
+    .proposal > header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .number { font-size:11px; color:var(--soft); font-variant-numeric:tabular-nums; }
+    .proposal h2 { margin:0; font-size:14px; font-weight:500; }
+    .sidebar { min-height:620px; padding:12px 20px 24px; background:var(--paper); border-radius:12px; }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+    .toolbar-group { display:flex; gap:4px; }
+    .control { width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+    .icon { width:20px; height:20px; fill:currentColor; display:block; flex:none; }
+    .icon.small { width:16px; height:16px; }
+    .parent { display:flex; align-items:center; gap:10px; min-height:48px; padding:10px; background:var(--selected); border-radius:8px; }
+    .parent h3 { margin:0; font-size:16px; font-weight:500; line-height:1.7; overflow-wrap:anywhere; }
+    .children { padding:0; margin:16px 0 0 16px; list-style:none; }
+    .child { position:relative; display:flex; align-items:center; gap:8px; min-height:44px; padding:8px 10px; font-size:14px; line-height:1.8; }
+    .child .icon { color:var(--soft); }
+    .region-head { display:none; color:var(--soft); }
+    .content { margin:16px 0 0 16px; border-top:1px solid var(--edge); padding-top:8px; }
+    .content-tools { display:flex; align-items:center; justify-content:space-between; min-height:40px; margin-bottom:8px; padding-left:10px; }
+    .content-type { visibility:hidden; color:var(--soft); }
+    .item { display:grid; grid-template-columns:16px minmax(0,1fr); align-items:start; gap:8px; padding:4px 10px; margin-bottom:12px; font-size:13px; line-height:1.85; }
+    .item > .icon { margin-top:5px; color:var(--soft); }
+    .item p { margin:0; overflow-wrap:anywhere; }
+    .item blockquote { margin:0; padding-left:10px; border-left:2px solid var(--quote); color:var(--soft); }
+    .item .comment { margin-top:6px; padding-left:12px; }
+    .caption { margin:12px 0 0; color:var(--soft); font-size:12px; line-height:1.8; }
+    footer { margin-top:24px; }
+    /* 01: branching lines connect only the Goal hierarchy. */
+    .tree .children { margin-left:20px; border-left:1px solid var(--quote); padding-left:16px; }
+    .tree .child::before { content:""; position:absolute; width:16px; left:-16px; top:22px; border-top:1px solid var(--quote); }
+    .tree .child:last-child::after { content:""; position:absolute; left:-17px; top:23px; bottom:0; width:2px; background:var(--paper); }
+    /* 02: one icon identifies each region, without per-child icon repetition. */
+    .regions .parent { min-height:40px; padding:0 10px; }
+    .regions .parent h3 { font-weight:500; line-height:1.85; }
+    .regions .region-head { display:flex; height:28px; align-items:center; margin:12px 0 0 26px; }
+    .regions .children { margin-top:0; }
+    .regions .child > .icon { display:none; }
+    .regions .content-type { visibility:visible; }
+    /* 03: a bracket contains parent and children, ending before content. */
+    .bracket .goal-family { position:relative; padding-left:16px; }
+    .bracket .goal-family::before { content:""; position:absolute; left:0; top:10px; bottom:8px; width:7px; border:1px solid var(--quote); border-right:0; border-radius:3px 0 0 3px; }
+    .bracket .children { margin-left:0; }
+    .bracket .child { padding-left:10px; }
+    .bracket .child > .icon { display:none; }
+    @media(max-width:900px) {
+      body { padding:24px 16px; }
+      .comparisons { grid-template-columns:minmax(0,360px); justify-content:center; gap:28px; }
+      .sidebar { min-height:0; }
+    }
+  </style>
+</head>
+<body>
+  <!-- SVG paths reused from the installed Remix Icon package (Apache-2.0). -->
+  <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true" style="position:absolute">
+    <defs>
+      <symbol id="home" viewBox="0 0 24 24"><path d="M19 21H5C4.44772 21 4 20.5523 4 20V11L1 11L11.3273 1.6115C11.7087 1.26475 12.2913 1.26475 12.6727 1.6115L23 11L20 11V20C20 20.5523 19.5523 21 19 21ZM13 19H18V9.15745L12 3.7029L6 9.15745V19H11V13H13V19Z"/></symbol>
+      <symbol id="up" viewBox="0 0 24 24"><path d="M13.0001 7.82843V20H11.0001V7.82843L5.63614 13.1924L4.22192 11.7782L12.0001 4L19.7783 11.7782L18.3641 13.1924L13.0001 7.82843Z"/></symbol>
+      <symbol id="plus" viewBox="0 0 24 24"><path d="M11 11V5H13V11H19V13H13V19H11V13H5V11H11Z"/></symbol>
+      <symbol id="expand" viewBox="0 0 24 24"><path d="M17.5858 5H14V3H21V10H19V6.41421L14.7071 10.7071L13.2929 9.29289L17.5858 5ZM3 14H5V17.5858L9.29289 13.2929L10.7071 14.7071L6.41421 19H10V21H3V14Z"/></symbol>
+      <symbol id="goal" viewBox="0 0 24 24"><path d="M13 1L13.001 4.06201C16.6192 4.51365 19.4869 7.38163 19.9381 11L23 11V13L19.938 13.001C19.4864 16.6189 16.6189 19.4864 13.001 19.938L13 23H11L11 19.9381C7.38163 19.4869 4.51365 16.6192 4.06201 13.001L1 13V11L4.06189 11C4.51312 7.38129 7.38129 4.51312 11 4.06189L11 1H13ZM12 6C8.68629 6 6 8.68629 6 12C6 15.3137 8.68629 18 12 18C15.3137 18 18 15.3137 18 12C18 8.68629 15.3137 6 12 6ZM12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8954 14 10 13.1046 10 12C10 10.8954 10.8954 10 12 10Z"/></symbol>
+      <symbol id="branch" viewBox="0 0 24 24"><path d="M10 2C10.5523 2 11 2.44772 11 3V7C11 7.55228 10.5523 8 10 8H8V10H13V9C13 8.44772 13.4477 8 14 8H20C20.5523 8 21 8.44772 21 9V13C21 13.5523 20.5523 14 20 14H14C13.4477 14 13 13.5523 13 13V12H8V18H13V17C13 16.4477 13.4477 16 14 16H20C20.5523 16 21 16.4477 21 17V21C21 21.5523 20.5523 22 20 22H14C13.4477 22 13 21.5523 13 21V20H7C6.44772 20 6 19.5523 6 19V8H4C3.44772 8 3 7.55228 3 7V3C3 2.44772 3.44772 2 4 2H10ZM19 18H15V20H19V18ZM19 10H15V12H19V10ZM9 4H5V6H9V4Z"/></symbol>
+      <symbol id="content" viewBox="0 0 24 24"><path d="M6.9998 6V3C6.9998 2.44772 7.44752 2 7.9998 2H19.9998C20.5521 2 20.9998 2.44772 20.9998 3V17C20.9998 17.5523 20.5521 18 19.9998 18H16.9998V20.9991C16.9998 21.5519 16.5499 22 15.993 22H4.00666C3.45059 22 3 21.5554 3 20.9991L3.0026 7.00087C3.0027 6.44811 3.45264 6 4.00942 6H6.9998ZM5.00242 8L5.00019 20H14.9998V8H5.00242ZM8.9998 6H16.9998V16H18.9998V4H8.9998V6ZM7 11H13V13H7V11ZM7 15H13V17H7V15Z"/></symbol>
+      <symbol id="add-text" viewBox="0 0 24 24"><path d="M15 4H5V20H19V8H15V4ZM3 2.9918C3 2.44405 3.44749 2 3.9985 2H16L20.9997 7L21 20.9925C21 21.5489 20.5551 22 20.0066 22H3.9934C3.44476 22 3 21.5447 3 21.0082V2.9918ZM11 11V8H13V11H16V13H13V16H11V13H8V11H11Z"/></symbol>
+      <symbol id="text" viewBox="0 0 24 24"><path d="M13 6V21H11V6H5V4H19V6H13Z"/></symbol>
+      <symbol id="note" viewBox="0 0 24 24"><path d="M21 15L15 20.996L4.00221 21C3.4487 21 3 20.5551 3 20.0066V3.9934C3 3.44476 3.44495 3 3.9934 3H20.0066C20.5552 3 21 3.45576 21 4.00247V15ZM19 5H5V19H13V14C13 13.4872 13.386 13.0645 13.8834 13.0067L14 13L19 12.999V5ZM18.171 14.999L15 15V18.169L18.171 14.999Z"/></symbol>
+      <symbol id="highlight" viewBox="0 0 24 24"><path d="M15.2427 4.51149L8.50547 11.2487L7.79836 13.37L6.7574 14.411L9.58583 17.2394L10.6268 16.1985L12.7481 15.4913L19.4853 8.75413L15.2427 4.51149ZM21.6066 8.04702C21.9972 8.43755 21.9972 9.07071 21.6066 9.46124L13.8285 17.2394L11.7071 17.9465L10.2929 19.3607C9.90241 19.7513 9.26925 19.7513 8.87872 19.3607L4.63608 15.1181C4.24556 14.7276 4.24556 14.0944 4.63608 13.7039L6.0503 12.2897L6.7574 10.1683L14.5356 2.39017C14.9261 1.99964 15.5593 1.99964 15.9498 2.39017L21.6066 8.04702ZM15.2427 7.33992L16.6569 8.75413L11.7071 13.7039L10.2929 12.2897L15.2427 7.33992ZM4.28253 16.8859L7.11096 19.7143L5.69674 21.1285L1.4541 19.7143L4.28253 16.8859Z"/></symbol>
+    </defs>
+  </svg>
+  <main>
+    <h1>Goal 区的三种标识方案</h1>
+    <p class="intro">相同内容、相同配色，只比较图标与线条。面板内不使用模块标题文字。</p>
+    <div class="comparisons" id="comparisons"></div>
+    <footer>静态样稿，无新增、编辑或导航交互。示例文字仅用于比较，不代表已确认设计。</footer>
+  </main>
+  <script>
+    const icon = (name, small = false) => `<svg class="icon${small ? ' small' : ''}" aria-hidden="true"><use href="#${name}"></use></svg>`;
+    const control = (name, label) => `<span class="control" role="img" aria-label="${label}" title="${label}">${icon(name)}</span>`;
+    const schemes = [
+      { kind:'tree', number:'01', name:'树枝连线＋类型图标', caption:'连线只连接父子 Goal，到最后一个子 Goal 结束。' },
+      { kind:'regions', number:'02', name:'区域图标＋分界线', caption:'用分支与文档叠层图标识别区域，减少重复图标。' },
+      { kind:'bracket', number:'03', name:'左侧括线＋独立内容区', caption:'括线包围意图及其展开，内容保留在括线之外。' }
+    ];
+    document.querySelector('#comparisons').innerHTML = schemes.map(scheme => `
+      <section class="proposal" aria-label="${scheme.name}">
+        <header><span class="number">${scheme.number}</span><h2>${scheme.name}</h2></header>
+        <div class="sidebar ${scheme.kind}">
+          <div class="toolbar" aria-label="Goal navigation (static)">
+            <div class="toolbar-group">${control('home','Goal root')}${control('up','Up one level')}</div>
+            <div class="toolbar-group">${control('plus','New child goal')}${control('expand','Open full Goal workspace')}</div>
+          </div>
+          <div class="goal-family" role="group" aria-label="Goal and its sub-goals">
+            <div class="parent">${scheme.kind === 'regions' ? '' : icon('goal')}<h3>企业家精神是什么？</h3></div>
+            <div class="region-head" role="img" aria-label="Sub-goals" title="Sub-goals">${icon('branch')}</div>
+            <ul class="children" aria-label="Sub-goals">
+              <li class="child">${icon('goal',true)}<span>企业家与经营者有什么区别？</span></li>
+              <li class="child">${icon('goal',true)}<span>创新一定是技术创新吗？</span></li>
+            </ul>
+          </div>
+          <section class="content" aria-label="Content for this Goal">
+            <div class="content-tools">
+              <span class="content-type" role="img" aria-label="Goal content" title="Goal content">${icon('content')}</span>
+              ${control('add-text','Add text')}
+            </div>
+            <article class="item" aria-label="User-authored text">
+              ${icon('text',true)}<p>我更关注的是：企业家如何改变原有的价值创造方式。</p>
+            </article>
+            <article class="item" aria-label="Linked note">
+              ${icon('note',true)}
+              <div><blockquote>企业家精神表现为对变化的回应，以及对新机会的持续探索。</blockquote><p class="comment">这段话值得与前面的定义对照。</p></div>
+            </article>
+            <article class="item" aria-label="Linked highlight">
+              ${icon('highlight',true)}<blockquote>创新也可以发生在组织方式和价值创造方式中。</blockquote>
+            </article>
+          </section>
+        </div>
+        <p class="caption">${scheme.caption}</p>
+      </section>`).join('');
+  </script>
+</body>
+</html>

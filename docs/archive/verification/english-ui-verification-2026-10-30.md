@@ -62,14 +62,14 @@
 
 | 界面 | 修改前 | 修改后 |
 |---|---|---|
-| 首次使用 | [截图](../.commandcode/desktop-tests/run-J3RTdQ/home-welcome.png) | [截图](../.commandcode/desktop-tests/run-nxu32y/home-welcome.png) |
-| Goal 与书库首页 | [截图](../.commandcode/desktop-tests/run-J3RTdQ/home-library.png) | [截图](../.commandcode/desktop-tests/run-nxu32y/home-library.png) |
-| 阅读设置 | [截图](../.commandcode/desktop-tests/run-J3RTdQ/reader-settings.png) | [截图](../.commandcode/desktop-tests/run-nxu32y/reader-settings.png) |
-| 字体菜单 | [截图](../.commandcode/desktop-tests/run-J3RTdQ/reader-font-menu.png) | [截图](../.commandcode/desktop-tests/run-nxu32y/reader-font-menu.png) |
-| 全局设置 | [截图](../.commandcode/desktop-tests/run-J3RTdQ/workspace-settings.png) | [截图](../.commandcode/desktop-tests/run-nxu32y/workspace-settings.png) |
-| 书库浮层 | [截图](../.commandcode/desktop-tests/run-J3RTdQ/shelf.png) | [截图](../.commandcode/desktop-tests/run-nxu32y/shelf.png) |
-| 备份选择 | [截图](../.commandcode/desktop-tests/run-J3RTdQ/backup-selection.png) | [截图](../.commandcode/desktop-tests/run-nxu32y/backup-selection.png) |
-| 完整 Goal | [截图](../.commandcode/desktop-tests/run-J3RTdQ/goal-workspace.png) | [截图](../.commandcode/desktop-tests/run-nxu32y/goal-workspace.png) |
+| 首次使用 | [截图](../../../.commandcode/desktop-tests/run-J3RTdQ/home-welcome.png) | [截图](../../../.commandcode/desktop-tests/run-nxu32y/home-welcome.png) |
+| Goal 与书库首页 | [截图](../../../.commandcode/desktop-tests/run-J3RTdQ/home-library.png) | [截图](../../../.commandcode/desktop-tests/run-nxu32y/home-library.png) |
+| 阅读设置 | [截图](../../../.commandcode/desktop-tests/run-J3RTdQ/reader-settings.png) | [截图](../../../.commandcode/desktop-tests/run-nxu32y/reader-settings.png) |
+| 字体菜单 | [截图](../../../.commandcode/desktop-tests/run-J3RTdQ/reader-font-menu.png) | [截图](../../../.commandcode/desktop-tests/run-nxu32y/reader-font-menu.png) |
+| 全局设置 | [截图](../../../.commandcode/desktop-tests/run-J3RTdQ/workspace-settings.png) | [截图](../../../.commandcode/desktop-tests/run-nxu32y/workspace-settings.png) |
+| 书库浮层 | [截图](../../../.commandcode/desktop-tests/run-J3RTdQ/shelf.png) | [截图](../../../.commandcode/desktop-tests/run-nxu32y/shelf.png) |
+| 备份选择 | [截图](../../../.commandcode/desktop-tests/run-J3RTdQ/backup-selection.png) | [截图](../../../.commandcode/desktop-tests/run-nxu32y/backup-selection.png) |
+| 完整 Goal | [截图](../../../.commandcode/desktop-tests/run-J3RTdQ/goal-workspace.png) | [截图](../../../.commandcode/desktop-tests/run-nxu32y/goal-workspace.png) |
 
 已检查截图中的英文排版和用户内容保留。基线与修改后截图中，章节导出展开区域都没有可见呈现，虽然脚本能够操作其选择节点；这是既有可见性问题，本次保持布局和行为，不据此宣称该区域的可视交互已验收。
 

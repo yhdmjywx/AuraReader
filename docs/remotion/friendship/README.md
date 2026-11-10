@@ -1,6 +1,6 @@
 # 交友主题素材包
 
-对应 [最终制作计划](../friendship-final-plan.md) 和 [Remotion 工程](../../../videos/aurareader-friendship/README.md)。
+对应 [最终制作计划](../../archive/plans-and-implementation/friendship-final-plan.md) 和 [Remotion 工程](../../../videos/aurareader-friendship/README.md)。
 
 ## 书籍与内容
 
