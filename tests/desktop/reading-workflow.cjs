@@ -229,7 +229,33 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
         editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
     })()`);
     await waitFor(`document.querySelector('#goal-panel .goal-child')?.textContent === 'Explore the evidence together'`);
-    assert.equal(await run(`document.querySelector('#goal-panel .goal-items-toggle').textContent.trim()`), '', 'material disclosure has no visible count or heading');
+    assert.equal(await run(`document.querySelector('#goal-panel .goal-items-toggle')===null && !!document.querySelector('#goal-panel .goal-content-region')`), true, 'unified content uses passive region icons without a disclosure');
+    await run(`document.getElementById('goal-add-text').click()`);
+    await waitFor(`document.activeElement?.getAttribute('aria-label') === 'New goal text'`);
+    await run(`(() => {
+        const input = document.querySelector('.goal-input-editor textarea');
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, 'My understanding\\nIndependent goal text');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, isComposing: true, bubbles: true }));
+    })()`);
+    assert.equal(await run(`!!document.querySelector('.goal-input-editor textarea')`), true, 'IME does not prematurely finish');
+    await run(`document.querySelector('.goal-input-editor textarea').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }))`);
+    await waitFor(`document.querySelector('.goal-input-text')?.textContent.includes('Independent goal text')`);
+    await run(`(async () => { const a = await import(${JSON.stringify(mainUrl)}); await a.goals.assertWritesSaved(); })()`);
+    assert.equal(await run(`document.querySelector('.goal-items').firstElementChild.className`), 'goal-user-input', 'new owned text precedes linked material');
+    const ownedInput = await run(`(async () => { const record = (await auraDesktop.storage.queryGoalLibrary()).value; return record.value.inputs[0]; })()`);
+    assert.equal(ownedInput.text, 'My understanding\nIndependent goal text');
+    await run(`document.querySelector('.goal-input-actions [aria-label="Edit text"]').click()`);
+    await waitFor(`document.activeElement?.getAttribute('aria-label') === 'Edit goal text'`);
+    await run(`(() => {
+        const input = document.querySelector('.goal-input-editor textarea');
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, '');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    })()`);
+    await waitFor(`document.querySelector('.goal-input-text')?.textContent === 'My understanding\\nIndependent goal text'`);
+    assert.equal(await run(`document.querySelectorAll('.goal-item').length`), 1, 'owned editing preserves material rows');
+    await capture('goal-user-input');
     assert.equal(await run(`(() => {
         const icon = document.querySelector('#goal-panel .goal-material-icon');
         return icon.getBoundingClientRect().left >= icon.closest('.goal-item').getBoundingClientRect().left;
@@ -354,6 +380,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     })()`);
     assert.equal(reloaded.comment, noteText);
     assert.equal(reloaded.goal, 'A shared React workbench');
+    assert.equal(await run(`document.querySelector('.goal-input-text')?.textContent`), 'My understanding\nIndependent goal text', 'owned goal text survives desktop IPC saving and reload');
     await run(`(async () => {
         const a = await import(${JSON.stringify(mainUrl)});
         a.appShell.showToast('Saved', { anchor: document.querySelector('#goal-panel .goal-edit') });

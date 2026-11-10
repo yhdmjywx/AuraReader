@@ -14,7 +14,7 @@ const { ui, click } = require('../helpers/react-workbench.cjs');
         });
         assert.equal(goals.selected, child);
         assert.equal(document.querySelectorAll('.goal-item').length, 2);
-        assert.match(document.querySelector('.goal-items').textContent, /Thought from a.*Book a.*Thought from b/);
+        assert.match(document.querySelector('.goal-items').textContent, /Thought from b.*Thought from a.*Book a/, 'newly linked material appears first');
         await click('[data-annotation-id="n-a"]');
         assert.equal(c.jumps[0].bookId, 'a', 'cross-book navigation carries its source');
         const panel = elements.goalPanel;

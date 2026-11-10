@@ -54,7 +54,7 @@ function createDataStore(directory) {
         throw new StorageError("The SQLite file is missing or empty. Preserve the data directory and restore a verified backup. An empty library will not be created automatically.", 500);
     }
     const db = new DatabaseSync(filename, { timeout: 5000 });
-    if (db.prepare('PRAGMA user_version').get().user_version > 4) {
+    if (db.prepare('PRAGMA user_version').get().user_version > 5) {
         db.close(); throw new StorageError("The database version is newer than this application. Downgrade overwrite is not allowed.", 409);
     }
     try { db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;

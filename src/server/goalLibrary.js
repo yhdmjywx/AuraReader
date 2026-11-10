@@ -1,6 +1,17 @@
 const { createHash } = require('node:crypto');
 const { validateGoalState } = require('./goalValidation');
 const legacyGoalId = (bookId, id) => 'legacy-' + createHash('sha256').update(JSON.stringify([bookId, id])).digest('hex');
+function upgradeContent(state, previous = state) {
+    let sequence = Math.max(previous.contentSequence || 0, state.contentSequence || 0);
+    const links = state.links.map((link, index) => {
+        if (link.order !== undefined) { sequence = Math.max(sequence, link.order); return link; }
+        const prior = previous.links.find(l => l.goalId === link.goalId && l.annotationId === link.annotationId && l.bookId === link.bookId);
+        const order = prior?.order ?? (previous.formatVersion === 2 ? ++sequence : state.links.length - index);
+        sequence = Math.max(sequence, order);
+        return { ...link, order, ...(prior?.response ? { response: prior.response } : {}) };
+    });
+    return { ...state, formatVersion: 2, contentSequence: sequence, links, inputs: state.inputs ?? previous.inputs ?? [] };
+}
 function validateLibrary(state, sourceExists = () => true, fail = message => { throw new Error(message); }, bookExists = () => true) {
     if (!state || !Array.isArray(state.goals) || !Array.isArray(state.links)) return fail("Invalid goal library.");
     // Reuse the existing tree/field/cycle validation without inventing a book owner.
@@ -26,6 +37,26 @@ function validateLibrary(state, sourceExists = () => true, fail = message => { t
             if (pairs.has(pair)) return fail("Duplicate goal book link."); pairs.add(pair);
         }
     }
+    if (state.formatVersion !== undefined && state.formatVersion !== 2) return fail('Unsupported goal content version.');
+    const validSequence = n => Number.isSafeInteger(n) && n > 0;
+    if (state.contentSequence !== undefined && (!Number.isSafeInteger(state.contentSequence) || state.contentSequence < 0)) return fail('Invalid goal content sequence.');
+    const metadata = item => {
+        if (item.order !== undefined && (!validSequence(item.order) || item.order > state.contentSequence)) return false;
+        return item.response === undefined || (item.response && validSequence(item.response.sequence)
+            && item.response.sequence <= state.contentSequence && typeof item.response.markedAt === 'string' && Number.isFinite(Date.parse(item.response.markedAt)));
+    };
+    if (state.links.some(l => !metadata(l))) return fail('Invalid goal content order or response.');
+    if (state.inputs !== undefined) {
+        if (!Array.isArray(state.inputs)) return fail('Invalid goal text records.');
+        const inputIds = new Set();
+        for (const input of state.inputs) {
+            if (!input || typeof input.id !== 'string' || !input.id || input.id.length > 4096 || inputIds.has(input.id)
+                || !ids.has(input.goalId) || typeof input.text !== 'string' || !input.text.trim()
+                || !validSequence(input.order) || !metadata(input)
+                || ![input.createdAt, input.updatedAt].every(t => typeof t === 'string' && Number.isFinite(Date.parse(t)))) return fail('Invalid goal text record.');
+            inputIds.add(input.id);
+        }
+    }
     return state;
 }
 function convertLegacy(state, generation) {
@@ -47,7 +78,24 @@ function createGoalLibrary(store, fail, canonical) {
     const write = state => {
         // Old frozen commands keep their original hash and must not erase new relations.
         if (state.bookLinks === undefined) state = { ...state, bookLinks: read().value.bookLinks || [] };
-        validate(state); const revision = read().revision + 1; run('UPDATE goal_library SET payload=?,revision=? WHERE id=1', JSON.stringify(state), revision); return read();
+        const previous = read().value;
+        // Do not rewrite frozen commands or allow old snapshots to erase owned text.
+        validate(state); state = upgradeContent(state, previous); validate(state);
+        const active = (library, id) => {
+            const nodes = new Map(library.goals.map(g => [g.id, g]));
+            let goal = nodes.get(id);
+            if (!goal) return false;
+            while (goal) { if (goal.archivedAt || goal.deletedAt) return false; goal = nodes.get(goal.parentId); }
+            return true;
+        };
+        for (const input of state.inputs) {
+            const prior = previous.inputs?.find(i => i.id === input.id);
+            if (prior && prior.goalId !== input.goalId) fail('Goal text cannot be moved to another goal.');
+            if ((!prior || canonical(prior) !== canonical(input)) && !active(state, input.goalId)) fail('Restore the goal before editing its text.');
+        }
+        for (const input of previous.inputs || []) if (!state.inputs.some(i => i.id === input.id)
+            && state.goals.some(g => g.id === input.goalId) && !active(state, input.goalId)) fail('Restore the goal before deleting its text.');
+        const revision = read().revision + 1; run('UPDATE goal_library SET payload=?,revision=? WHERE id=1', JSON.stringify(state), revision); return read();
     };
     function legacy(state, previous, generation, restoring = false) {
         const incoming = convertLegacy(state, generation), before = convertLegacy(previous || { bookId: state.bookId, goals: [], links: [] }, generation), current = read().value;
@@ -64,7 +112,8 @@ function createGoalLibrary(store, fail, canonical) {
         if (!restoring) {
             const beforeIds = new Set(before.goals.map(g => g.id));
             const scoped = current.links.filter(l => beforeIds.has(l.goalId) && l.bookId === state.bookId);
-            if (canonical(scoped) !== canonical(before.links)) fail("The legacy goal link conflicts with the global library.");
+            const sourceIdentity = links => links.map(({ goalId, annotationId, bookId, generation }) => ({ goalId, annotationId, bookId, generation }));
+            if (canonical(sourceIdentity(scoped)) !== canonical(sourceIdentity(before.links))) fail("The legacy goal link conflicts with the global library.");
         }
         current.links = current.links.filter(l => !ids.has(l.goalId) || l.bookId !== state.bookId).concat(incoming.links);
         return write(current);
@@ -90,6 +139,8 @@ function createGoalLibrary(store, fail, canonical) {
             current.bookLinks = (current.bookLinks || []).filter(l => !ids.has(l.goalId) || !bookIds.has(l.bookId))
                 .concat(graph.bookLinks.map(l => ({ ...l, generation: one('SELECT generation FROM books WHERE id=?', l.bookId)?.generation })));
         }
+        // A foreign backup may carry larger ordering metadata, but never owned text.
+        current.contentSequence = Math.max(current.contentSequence || 0, ...current.links.map(l => Math.max(l.order || 0, l.response?.sequence || 0)));
         return write(current);
     }
     function initialize() {
@@ -110,7 +161,9 @@ function createGoalLibrary(store, fail, canonical) {
             }
             validate(state); run('INSERT INTO goal_library VALUES(1,?,0)', JSON.stringify(state));
         } else validate(read().value);
-        run('PRAGMA user_version=4');
+        const state = upgradeContent(read().value);
+        validate(state); run('UPDATE goal_library SET payload=? WHERE id=1', JSON.stringify(state));
+        run('PRAGMA user_version=5');
     }
     return { initialize, read, write, validate, legacy, prune, restore };
 }

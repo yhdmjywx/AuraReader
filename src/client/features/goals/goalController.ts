@@ -1,5 +1,7 @@
 import type { Annotation } from '../../domain/annotation.js';
-import type { Goal, GoalDraft, GoalLibraryState, GoalSourceLink } from '../../domain/goal.js';
+import type { Goal, GoalDraft, GoalLibraryState, GoalSourceLink, GoalInputDraft } from '../../domain/goal.js';
+import { addGoalInput, changeGoalInput, deleteGoalInput, addGoalSource, normalizeGoalContent } from '../../domain/goalContentEngine.js';
+import { inputDrafts, storeInputDraft, discardInputDraft } from '../../infrastructure/goalLibraryRepository.js';
 import type { AppElements } from '../../app/elements.js';
 import type { ShowToast } from '../../app/contracts.js';
 import type { ReadingLocation } from '../../domain/book.js';
@@ -20,6 +22,7 @@ export interface GoalCallbacks {
     onActionsChanged?(): void; onBeforeSidebarResize?(): void; onSurfaceChanged?(): void; chooseBook?(): void;
     openCollection?(area: GoalArea): void;
 }
+export type InputEdit = ({ mode: 'input-new' } | { mode: 'input-edit' }) & { draft: GoalInputDraft; lastNonempty: string };
 export class GoalController {
     private listeners = new Set<() => void>();
     subscribe(listener: () => void) {
@@ -27,8 +30,10 @@ export class GoalController {
         return () => { this.listeners.delete(listener); };
     }
     state: GoalLibraryState = { goals: [], links: [] };
-    selected: string | null = null; allGoals = true; itemsOpen = true;
-    edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft; lastNonempty: string; previousTree: boolean } | null = null;
+    selected: string | null = null; allGoals = true;
+    edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft; lastNonempty: string; previousTree: boolean } | InputEdit | null = null;
+    private changedInputs = new Set<string>();
+    private errorDismissed = false;
     disabled = true; visible = false;
     get page() { return this.navigation.surface === 'goal'; }
     elements: AppElements | null = null; ui: GoalUI | null = null; sidebar: GoalSidebar | null = null;
@@ -46,8 +51,8 @@ export class GoalController {
         navigation.subscribe(() => { this.updateReadingContext(); this.callbacks.onSurfaceChanged?.(); });
         onGoalLibraryChanged(record => {
             if (record.deleted) return;
-            if (this.dirty || pendingLibrary().length) { this.disabled = true; this.fail(Object.assign(new Error("Goal data has changed. Unsaved content is preserved. Reload to resolve the conflict."), { status: 409 })); }
-            else { this.state = record.value; this.ensureSelection(); this.refreshMaterials(); }
+            if (this.dirty || this.edit || pendingLibrary().length || inputDrafts().length) { this.disabled = true; this.fail(Object.assign(new Error("Goal data has changed. Unsaved content is preserved. Reload to resolve the conflict."), { status: 409 })); }
+            else { this.state = normalizeGoalContent(record.value); this.ensureSelection(); this.refreshMaterials(); }
             this.render();
         });
     }
@@ -71,8 +76,11 @@ export class GoalController {
             select: id => this.selectGoal(id), home: () => this.goHome(), up: () => this.goUp(), create: () => this.beginNew(),
             menu: (id, anchor, point) => this.actions.open(id, anchor, point),
             expand: () => { this.openPage().catch(() => {}); },
-            items: () => { this.itemsOpen = !this.itemsOpen; this.render(); }, edit: (mode, id) => this.beginEdit(mode, id), input: text => this.updateDraft(text),
+            edit: (mode, id) => this.beginEdit(mode, id), input: text => this.updateDraft(text),
             finish: () => { this.finishInlineEdit().catch(() => {}); },
+            addInput: () => this.beginInput(), editInput: id => this.beginInput(id), deleteInput: id => this.removeInput(id),
+            retry: () => { this.finishInlineEdit().then(() => this.render()).catch(() => this.render()); },
+            dismissError: () => { this.errorDismissed = true; this.render(); },
             unlink: id => { if (!goalEditable(this.state, this.selected) || this.lifecycleBusy) return; this.endEdit(); this.persist({ ...this.state, links: this.state.links.filter(l => l.goalId !== this.selected || l.annotationId !== id) }); this.render(); this.ui?.announce('Item unlinked from goal'); },
             jump: id => { this.endEdit(); const source = this.state.links.find(l => l.goalId === this.selected && l.annotationId === id); Promise.resolve(this.callbacks.jump(id, source)).catch(error => this.fail(error)); }
         });
@@ -99,7 +107,7 @@ export class GoalController {
     }
     useReadingSurface() { this.navigation.show(this.callbacks.getLocation().bookId ? 'reader' : 'home'); }
     async bookChanged() { this.updateReadingContext(); await this.refreshMaterials(); }
-    selectGoal(id: string) { if (!goalEditable(this.state, id)) return; this.endEdit(); this.selected = id; this.rememberSelection(); this.allGoals = false; this.itemsOpen = true; this.render(); }
+    selectGoal(id: string) { if (!goalEditable(this.state, id)) return; this.endEdit(); this.selected = id; this.rememberSelection(); this.allGoals = false; this.render(); }
     goHome() { this.endEdit(); this.selected = null; this.allGoals = true; this.rememberSelection(); this.render(); }
     goUp() { const parent = this.state.goals.find(g => g.id === this.selected)?.parentId; if (parent) this.selectGoal(parent); else this.goHome(); }
     beginNew() {
@@ -116,17 +124,40 @@ export class GoalController {
     }
     updateDraft(text: string) {
         const edit = this.edit; if (!edit) return; edit.draft.text = text; if (text.trim()) edit.lastNonempty = text;
+        if (edit.mode === 'input-new' || edit.mode === 'input-edit') {
+            try {
+                storeInputDraft({ ...edit.draft, text: text.trim() ? text : edit.mode === 'input-edit' ? edit.lastNonempty : '' });
+                if (edit.mode === 'input-edit' && text.trim()) { this.changedInputs.add(edit.draft.id); this.persist(changeGoalInput(this.state, edit.draft.goalId, edit.draft.id, text)); }
+            } catch (error) { this.changedInputs.add(edit.draft.id); this.fail(error); }
+            return;
+        }
         if (edit.mode === 'edit') { if (text.trim()) this.persist(changeGoal(this.state, edit.draft.id, text)); }
         else try { storeLibraryDraft({ ...(libraryDrafts().find(d => d.draft.id === edit.draft.id) || {}), draft: edit.draft }); } catch (error) { this.fail(error); }
     }
     private endEdit() {
         const edit = this.edit; if (!edit) return; if (this.ui?.editingText !== undefined) this.updateDraft(this.ui.editingText); this.edit = null; this.ui?.releaseEditorFocus();
+        if (edit.mode === 'input-new' || edit.mode === 'input-edit') {
+            const text = edit.draft.text.trim() ? edit.draft.text : edit.mode === 'input-edit' ? edit.lastNonempty : '';
+            if (text.trim()) {
+                this.changedInputs.add(edit.draft.id);
+                this.persist(edit.mode === 'input-new' ? addGoalInput(this.state, { ...edit.draft, text }) : changeGoalInput(this.state, edit.draft.goalId, edit.draft.id, text));
+            } else discardInputDraft(edit.draft.id);
+            this.render(); return;
+        }
         if (edit.mode === 'edit') this.persist(changeGoal(this.state, edit.draft.id, edit.draft.text.trim() ? edit.draft.text : edit.lastNonempty));
-        else if (edit.draft.text.trim()) { this.persist(addGoal(this.state, edit.draft)); this.selected = edit.draft.parentId; this.rememberSelection(); this.allGoals = !this.selected; this.itemsOpen = true; }
+        else if (edit.draft.text.trim()) { this.persist(addGoal(this.state, edit.draft)); this.selected = edit.draft.parentId; this.rememberSelection(); this.allGoals = !this.selected; }
         else { discardLibraryDraft(edit.draft.id); this.allGoals = edit.previousTree; } this.render();
     }
     private resumeDraft() {
         if (this.edit) return;
+        for (const draft of inputDrafts()) {
+            const existing = this.state.inputs?.find(i => i.id === draft.id);
+            if (existing && existing.goalId !== draft.goalId) throw new Error('The recovered text belongs to another goal.');
+            if (existing?.text === draft.text) continue; // Keep the draft until its matching ACK.
+            if (!goalEditable(this.state, draft.goalId)) throw new Error('Restore the goal before recovering its text. The draft is preserved.');
+            this.edit = { mode: existing ? 'input-edit' : 'input-new', draft, lastNonempty: draft.text };
+            this.selected = draft.goalId; this.allGoals = false; return;
+        }
         for (const item of libraryDrafts()) {
             const existing = this.state.goals.find(g => g.id === item.draft.id);
             if (existing) { if (existing.text === item.draft.text) { discardLibraryDraft(existing.id); continue; } throw new Error("The recovered goal draft conflicts with existing content."); }
@@ -142,8 +173,8 @@ export class GoalController {
     }
     async flush() {
         if (this.timer) { clearTimeout(this.timer); this.timer = null; } const serial = this.serial;
-        if (this.disabled && this.failure && (this.dirty || pendingLibrary().length || libraryDrafts().length)) throw this.failure;
-        try { if (this.dirty && this.stagedSerial !== serial) { stageLibrary(this.state); this.stagedSerial = serial; } if (pendingLibrary().length) await flushLibrary(); if (this.serial === serial) { this.dirty = false; this.failure = undefined; } }
+        if (this.disabled && this.failure && (this.dirty || pendingLibrary().length || libraryDrafts().length || inputDrafts().length)) throw this.failure;
+        try { if (this.dirty && this.stagedSerial !== serial) { stageLibrary(this.state); this.stagedSerial = serial; } if (pendingLibrary().length) await flushLibrary(); if (this.serial === serial) { this.dirty = false; this.failure = undefined; this.changedInputs.clear(); } this.render(); }
         catch (error) { this.fail(error); throw error; }
     }
     async assertWritesSaved() { do { await this.finishInlineEdit(); } while (this.edit); if (this.failure) throw this.failure; }
@@ -176,7 +207,21 @@ export class GoalController {
         this.persist({ ...this.state, bookLinks: (this.state.bookLinks || []).filter(l => l.goalId !== goalId || l.bookId !== bookId) });
         await this.flush(); this.render();
     }
-    private fail(error: unknown) { if (this.failure !== error) this.callbacks.showToast(error instanceof Error ? error.message : "Goals are not confirmed saved. Keep this window open.", { kind: 'error' }); this.failure = error; }
+    private fail(error: unknown) { if (this.failure !== error) this.callbacks.showToast(error instanceof Error ? error.message : "Goals are not confirmed saved. Keep this window open.", { kind: 'error' }); this.failure = error; this.errorDismissed = false; this.render(); }
+    beginInput(id?: string) {
+        if (this.disabled || this.lifecycleBusy || !goalEditable(this.state, this.selected)) return;
+        this.endEdit(); const goalId = this.selected!;
+        const input = id ? this.state.inputs?.find(i => i.id === id && i.goalId === goalId) : undefined;
+        if (id && !input) return;
+        const draft = input ? { id: input.id, goalId, text: input.text } : { id: operationId(), goalId, text: '' };
+        this.edit = { mode: input ? 'input-edit' : 'input-new', draft, lastNonempty: draft.text }; this.render(); this.ui?.focusEditor();
+    }
+    removeInput(id: string) {
+        const goalId = this.selected;
+        if (this.disabled || this.lifecycleBusy || !goalId || !goalEditable(this.state, goalId)) return;
+        this.endEdit(); discardInputDraft(id); this.changedInputs.add(id);
+        this.persist(deleteGoalInput(this.state, goalId, id)); this.render(); this.ui?.announce('Text deleted');
+    }
     canLink(id: string) { return !this.lifecycleBusy && !this.page && !this.allGoals && this.visible && !this.disabled && goalEditable(this.state, this.selected) && this.callbacks.getAnnotations().some(n => n.id === id); }
     linked(id: string) { return this.state.links.some(l => l.goalId === this.selected && l.annotationId === id); }
     linkAnnotation(id: string): Promise<void> { const task = this.performLink(id); this.linksInFlight.add(task); task.finally(() => this.linksInFlight.delete(task)).catch(() => {}); return task; }
@@ -184,8 +229,8 @@ export class GoalController {
         if (!this.canLink(id)) return; this.endEdit(); const goalId = this.selected, bookId = this.callbacks.getLocation().bookId;
         const version = await bookVersion(bookId); await this.callbacks.finishAnnotations(); await this.callbacks.annotationsSaved();
         if (!goalId || !goalEditable(this.state, goalId) || !version.generation || !this.callbacks.getAnnotations().some(n => n.id === id && n.bookId === bookId)) return;
-        if (!this.state.links.some(l => l.goalId === goalId && l.annotationId === id)) this.persist({ ...this.state, links: [...this.state.links, { goalId, annotationId: id, bookId, generation: version.generation }] });
-        if (this.selected === goalId) { this.allGoals = false; this.itemsOpen = true; } this.refreshAnnotations(); await this.flush(); await this.refreshMaterials(); this.ui?.announce('Item linked to goal');
+        this.persist(addGoalSource(this.state, { goalId, annotationId: id, bookId, generation: version.generation }));
+        if (this.selected === goalId) { this.allGoals = false; } this.refreshAnnotations(); await this.flush(); await this.refreshMaterials(); this.ui?.announce('Item linked to goal');
     }
     async refreshMaterials() {
         const request = ++this.materialRequest; this.materialStatus = 'loading'; this.render();
@@ -252,7 +297,9 @@ export class GoalController {
     render() {
         this.actionUI?.refresh();
         const annotations = new Map(this.materials.map(n => [n.id, n])); this.callbacks.getAnnotations().forEach(n => annotations.set(n.id, n));
-        this.ui?.render({ state: this.state, selected: this.selected, allGoals: this.allGoals, itemsOpen: this.itemsOpen, edit: this.edit,
+        const inputEdit = this.edit?.mode === 'input-new' || this.edit?.mode === 'input-edit' ? this.edit : null;
+        this.ui?.render({ state: this.state, selected: this.selected, allGoals: this.allGoals, edit: inputEdit ? null : this.edit as Exclude<typeof this.edit, InputEdit>, inputEdit,
+            saveError: !!this.failure && !this.errorDismissed, failedInputs: this.changedInputs,
             sourcePage: this.callbacks.getLocation().page, sourceBook: this.callbacks.getLocation().bookId, annotations: [...annotations.values()], disabled: this.disabled || this.lifecycleBusy,
             fullPage: this.page, titles: this.titles, materialStatus: this.materialStatus }); this.callbacks.onActionsChanged?.();
         for (const listener of this.listeners) listener();

@@ -88,7 +88,12 @@ verified: 2026-10-30 · owner rules: AGENTS.md
   icons and independent multiline records owned by their creating Goal. The
   original Figma Sidebar now integrates the module; UX states and inherited
   editing behavior: docs/product/goals/user-input-response/interaction.md.
-  Application implementation and Response control design remain outstanding.
+  On 2026-11-10, source implementation added owned records, unified content order,
+  passive region icons, inline editing and recovery. Owner confirmed records follow
+  Goal archive/delete/restore and are removed on purge; per-book backups exclude
+  them. SQLite schema is now v5. Home workspace entry remains deferred by explicit
+  owner choice, as do Response controls. Validation and delivery boundaries:
+  docs/product/goals/user-input-response/implementation.md.
 - Goal behavior contract: docs/archive/plans-and-implementation/goal-system-implementation-plan.md
 - cross-book Goal and shared editor:
   docs/archive/plans-and-implementation/goal-cross-book-sidebar-plan.md

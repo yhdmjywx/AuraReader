@@ -160,8 +160,10 @@ Applies to the shared reading sidebar and full Goal workspace unless distinguish
   supplies only an optional, Goal-specific Response label; it neither completes
   a Goal nor creates a separate group. The unified content area retains the
   former Link group's layout position below child Goals; newly added content
-  appears first within that area. Response pinning remains undecided.
-  These are approved requirements awaiting interaction design and implementation.
+  appears first within that area. MVP Response does not pin; approved future
+  priority rules are recorded in the feature spec. Owned input and region UI
+  are integrated in source; Response controls and visuals remain pending.
+  See the [implementation record](../product/goals/user-input-response/implementation.md).
 
 - The owner selected scheme 02, region icons with a horizontal divider, from the
   [HTML comparison](../prototypes/goal-content-identifiers.html). Retain original
@@ -200,9 +202,10 @@ Applies to the shared reading sidebar and full Goal workspace unless distinguish
   previews and a last-reading Goal shortcut remain unimplemented proposals.
   See the [design status](design-index.md#goal-breadcrumbs-design).
 
-- Indent child Goals, child drafts, and linked materials together under the parent;
-  root Goals stay unindented. Do not indent the material list again. Use the
-  vertical guide rather than “Current goal” or “Child goals” labels. Root navigation
+- Indent child Goals, child drafts, and unified content together under the parent;
+  root Goals stay unindented. Do not indent the material list again. The approved
+  scheme 02 removes the spanning vertical guide and uses passive region icons
+  and a horizontal divider without module-title text. Root navigation
   and creation tooltips describe their actual scope.
 - The current Goal's neutral background covers its whole title/action row and
   stays stable during editing. Child-row hover/focus/open-menu feedback covers
@@ -215,8 +218,8 @@ Applies to the shared reading sidebar and full Goal workspace unless distinguish
   guide; source labels align with material text. Omit counts and “linked items”
   headings. The existing separate Linked disclosure uses a links icon and an
   expansion caret. The approved MVP above supersedes that grouping requirement;
-  it does not authorize changes to Highlight/Note Link components. Whether the
-  unified content area supports overall collapse remains undecided.
+  it does not authorize changes to Highlight/Note Link components. The passive
+  region icons do not collapse content in this implementation.
 - In Home, the sidebar, and the full Goal workspace, show the saved source quote
   before the comment, distinguished with neutral styling and a vertical rule;
   no quote heading. Omit empty blocks and preserve source line breaks.

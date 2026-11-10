@@ -17,7 +17,7 @@ const { backupDatabase, verifyDatabase } = require('../../src/server/storageMain
     const old = s.goalLibrary(); const oldBooks = s.books(); s.close();
     const raw = new DatabaseSync(path.join(dir, 'aurareader.sqlite'));
     raw.exec('PRAGMA user_version=3'); raw.close(); s = createDataStore(dir);
-    assert.equal(s.one('PRAGMA user_version').user_version, 4); assert.deepEqual(s.goalLibrary(), old); assert.deepEqual(s.books(), oldBooks);
+    assert.equal(s.one('PRAGMA user_version').user_version, 5); assert.deepEqual(s.goalLibrary(), old); assert.deepEqual(s.books(), oldBooks);
     const links = [{ goalId: 'parent', bookId: 'a', generation: versions[0].generation }, { goalId: 'parent', bookId: 'b', generation: versions[1].generation }, { goalId: 'other', bookId: 'a', generation: versions[0].generation }];
     s.saveGoalLibrary({ opId: randomUUID(), expected: old.revision, state: { ...state, bookLinks: links } });
     let current = s.goalLibrary();

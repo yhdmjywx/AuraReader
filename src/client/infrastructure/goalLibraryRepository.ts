@@ -1,4 +1,5 @@
-import type { GoalDraft, GoalGraphBackup, GoalLibraryState, GoalBookLink } from '../domain/goal.js';
+import type { GoalDraft, GoalGraphBackup, GoalLibraryState, GoalBookLink, GoalInputDraft } from '../domain/goal.js';
+import { normalizeGoalContent } from '../domain/goalContentEngine.js';
 import type { SaveGoalLibraryCommand } from '../../shared/storage.js';
 import { acknowledgeGoals, attachGoalCommand, pendingGoals, readGoalDraft, clearGoalDraft } from './goalRecovery.js';
 import { acceptGoalLibrary, bookVersion, cachedGoalLibrary, enqueue, operationId, readBooks, readGoalLibrary, readNotes, storageRequest } from './storageClient.js';
@@ -6,6 +7,7 @@ import { getNotesForBooks } from './annotationRepository.js';
 
 const PENDING = 'aura_goal_library_pending', DRAFTS = 'aura_goal_library_drafts';
 const BOOK_INTENTS = 'aura_goal_book_pending';
+const INPUT_DRAFTS = 'aura_goal_input_drafts';
 interface Entry { version: string; expected: number; state: GoalLibraryState; command?: SaveGoalLibraryCommand }
 export interface LibraryDraft { draft: GoalDraft; legacyBookId?: string }
 function read<T>(key: string, fallback: T): T {
@@ -48,6 +50,17 @@ function clearDraft(id: string) {
     storeLibraryDraft({ draft: { id, text: '', parentId: null, origin: null } });
 }
 export function discardLibraryDraft(id: string) { clearDraft(id); }
+export function inputDrafts(): GoalInputDraft[] {
+    const drafts = read<GoalInputDraft[]>(INPUT_DRAFTS, []);
+    if (!Array.isArray(drafts) || drafts.some(d => !d?.id || !d.goalId || typeof d.text !== 'string')) throw new Error('Invalid goal text recovery buffer. Preserve site data.');
+    return drafts;
+}
+export function storeInputDraft(draft: GoalInputDraft) {
+    const drafts = inputDrafts().filter(d => d.id !== draft.id);
+    if (draft.text.trim()) drafts.push({ ...draft });
+    if (drafts.length) localStorage.setItem(INPUT_DRAFTS, JSON.stringify(drafts)); else localStorage.removeItem(INPUT_DRAFTS);
+}
+export function discardInputDraft(id: string) { storeInputDraft({ id, goalId: '', text: '' }); }
 export function stageLibrary(state: GoalLibraryState) {
     const entries = pendingLibrary(), last = entries.at(-1);
     if (last && !last.command) entries.pop();
@@ -61,11 +74,12 @@ export function flushLibrary(): Promise<void> {
             const command = entry.command || { opId: entry.version, expected: entry.expected, state: entry.state };
             if (!entry.command) { const entries = pendingLibrary(); entries[0].command = command; writePending(entries); }
             const result = await storageRequest('goals/library/save', command);
-            if (command.state.bookLinks === undefined) await readGoalLibrary();
+            if (command.state.bookLinks === undefined || command.state.formatVersion !== 2) await readGoalLibrary();
             else acceptGoalLibrary({ id: 'reader-goals', revision: result.revision, deleted: false, value: command.state });
             const remaining = pendingLibrary().filter(e => e.version !== entry.version);
             remaining.forEach(e => { if (!e.command) e.expected = result.revision; }); writePending(remaining);
             for (const item of libraryDrafts()) if (command.state.goals.some(g => g.id === item.draft.id && g.text === item.draft.text)) clearDraft(item.draft.id);
+            for (const draft of inputDrafts()) if (command.state.inputs?.some(i => i.id === draft.id && i.goalId === draft.goalId && i.text === draft.text)) discardInputDraft(draft.id);
             for (const link of pendingBookIntents()) if (command.state.bookLinks?.some(l => l.goalId === link.goalId && l.bookId === link.bookId && l.generation === link.generation)) acknowledgeBookIntent(link);
         }
     });
@@ -108,7 +122,7 @@ export async function loadGoalLibrary() {
         await recoverLegacy(); await flushLibrary();
     } catch (cause) { error = cause; }
     const record = await readGoalLibrary(), pending = pendingLibrary();
-    return { state: pending.at(-1)?.state || (!record.deleted ? record.value : { goals: [], links: [] }), drafts: libraryDrafts(), pending: pending.length > 0, error };
+    return { state: normalizeGoalContent(pending.at(-1)?.state || (!record.deleted ? record.value : { goals: [], links: [] })), drafts: libraryDrafts(), pending: pending.length > 0, error };
 }
 export async function loadGoalMaterials(state: GoalLibraryState) {
     const ids = [...new Set(state.links.map(l => l.bookId))];
@@ -116,11 +130,11 @@ export async function loadGoalMaterials(state: GoalLibraryState) {
     return { annotations: notes.flatMap(n => n.deleted ? [] : [n.value]), titles: new Map(books.filter(b => !b.deleted).map(b => [b.id, b.deleted ? '' : b.value.title])) };
 }
 export function assertNoLibraryRecovery() {
-    if (pendingLibrary().length || libraryDrafts().length || pendingBookIntents().length) throw new Error("Some goals are not confirmed saved. This window remains open.");
+    if (pendingLibrary().length || libraryDrafts().length || inputDrafts().length || pendingBookIntents().length) throw new Error("Some goals are not confirmed saved. This window remains open.");
 }
 export async function goalGraphsForBooks(bookIds: string[]): Promise<Map<string, GoalGraphBackup>> {
     const loaded = await loadGoalLibrary(); if (loaded.error) throw loaded.error;
-    if (loaded.drafts.length || pendingBookIntents().length) throw new Error("Finish goal drafts and pending book links before exporting.");
+    if (loaded.drafts.length || inputDrafts().length || pendingBookIntents().length) throw new Error("Finish goal drafts and pending book links before exporting.");
     const state = loaded.state, result = new Map<string, GoalGraphBackup>();
     for (const bookId of bookIds) {
         const seeds = new Set([...state.links.filter(l => l.bookId === bookId).map(l => l.goalId), ...(state.bookLinks || []).filter(l => l.bookId === bookId).map(l => l.goalId), ...state.goals.filter(g => g.origin?.bookId === bookId).map(g => g.id)]);

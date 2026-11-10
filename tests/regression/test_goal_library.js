@@ -8,7 +8,7 @@ const {backupDatabase,verifyDatabase}=require('../../src/server/storageMaintenan
  const books=['a','b'].map(id=>({id,title:id,pages:['<p>Source</p>']}));const versions={};const legacyCommands=[];
  for(const book of books){versions[book.id]=s.saveBook({opId:randomUUID(),expected:0,book});s.saveNote({opId:randomUUID(),expected:0,generation:versions[book.id].generation,note:{id:'n-'+book.id,bookId:book.id,kind:'note',quote:'Source',comment:book.id}});const c={opId:randomUUID(),expected:0,generation:versions[book.id].generation,state:{bookId:book.id,goals:[goal('same'),goal('child','same')],links:[{goalId:'child',annotationId:'n-'+book.id}]}};s.saveGoals(c);legacyCommands.push(c);}
  const oldBooks=s.books(),oldNotes=s.notes();s.close();const raw=new DatabaseSync(path.join(dir,'aurareader.sqlite'));raw.exec('DROP TABLE goal_library;PRAGMA user_version=2');raw.close();
- s=createDataStore(dir);assert.equal(s.one('PRAGMA user_version').user_version,4);assert.deepEqual(s.books(),oldBooks);assert.deepEqual(s.notes(),oldNotes);
+ s=createDataStore(dir);assert.equal(s.one('PRAGMA user_version').user_version,5);assert.deepEqual(s.books(),oldBooks);assert.deepEqual(s.notes(),oldNotes);
  let r=s.goalLibrary();assert.equal(r.value.goals.length,4);assert.equal(new Set(r.value.goals.map(g=>g.id)).size,4);assert.equal(r.value.goals.find(g=>g.id===legacyGoalId('a','same')).origin.sourcePage,null);
  assert.deepEqual(s.saveGoals(legacyCommands[0]),{revision:1},'lost legacy response replays original op without duplicating migrated nodes');
  const selected=legacyGoalId('a','child');let state={...r.value,links:[...r.value.links,{goalId:selected,annotationId:'n-b',bookId:'b',generation:versions.b.generation}]};

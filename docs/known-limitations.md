@@ -16,6 +16,8 @@
 
 ## 源码与安装包的范围
 
+Goal 侧栏与现有完整工作区的自输入及区域 UI 已接入源码；Home 打开该工作区的入口按用户决定留待后续。Response 操作与视觉仍待设计。自写内容不进入逐书 `.aurabackup`，由 SQLite 整库一致性备份覆盖。验证结果和安装包边界见[实现记录](product/goals/user-input-response/implementation.md)。
+
 源码已支持统一首页导航及 Goal 完成、归档与最近删除；批量清空最近删除未实现，现有安装包未据此重新制作和验收。见 [生命周期交付边界](archive/verification/goal-lifecycle-verification-2026-10-27.md#当前交付边界)。
 
 浏览器不支持文件夹保存能力时，多章 Markdown 导出提示使用桌面版，不自动回退 ZIP。`.aurabackup` 不含全局阅读设置、字体文件或原始 EPUB，也不覆盖无书籍来源的独立 Goal；见 [数据与备份](data-and-backup.md)。

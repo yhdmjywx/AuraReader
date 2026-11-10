@@ -19,6 +19,7 @@ async function goalWorkbench(books = [{ id: 'a', title: 'Book A', pages: ['<p>So
     return Object.assign(context, { goals, elements, async close() {
         await ui(async () => {
             await goals.assertWritesSaved();
+            clearTimeout(goals.actionUI?.noticeTimer);
             for (const host of [elements.goalPanel, document.getElementById('goal-home'), ...document.querySelectorAll('[data-react-goal-overlays]')]) renderSurface(host, null);
         });
         await storage.close(); dom.window.close();

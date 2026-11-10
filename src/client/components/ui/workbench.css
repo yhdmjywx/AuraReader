@@ -200,8 +200,36 @@ html[data-app-surface="reader"]:has(#goal-sidebar[hidden]) .workspace-settings >
     border: 0; border-radius: 0; background: transparent; color: inherit;
     font: inherit; line-height: inherit; box-shadow: none; resize: none; overflow: hidden;
 }
-.goal-panel .goal-descendants.is-nested { position: relative; }
-.goal-panel .goal-descendants.is-nested::before { content: ''; position: absolute; top: 0; bottom: 0; left: -8px; width: 1px; background: var(--border-color); pointer-events: none; }
+.goal-panel .goal-descendants.is-nested { position: relative; margin-top: 16px; }
+.goal-panel .goal-children-region { height: 28px; display: flex; align-items: center; padding-left: 10px; color: var(--text-secondary); }
+.goal-panel .goal-children-region svg, .goal-content-region > svg { width: 20px; height: 20px; flex: none; }
+.goal-panel .is-nested > .goal-children { margin-top: 4px; }
+.goal-unified-content { margin-top: 4px; }
+.goal-panel .goal-items { display: flex; flex-direction: column; gap: 4px; }
+.goal-panel .goal-items > .goal-item { margin: 0; }
+.goal-content-divider { padding-top: 12px; padding-bottom: 8px; }
+.goal-content-divider::after { content: ''; display: block; height: 1px; background: var(--appearance-edge, var(--border-color)); }
+.goal-content-region { display: flex; align-items: center; justify-content: space-between; height: 40px; padding-left: 10px; margin-top: 4px; color: var(--text-secondary); }
+.goal-user-input { position: relative; border-radius: 8px; color: var(--text-primary); --goal-input-surface: var(--bg-app); font-size: 13px; line-height: 1.85; }
+.goal-page .goal-user-input { --goal-input-surface: var(--bg-panel); font-size: 16px; }
+.goal-user-input[data-disabled] { opacity: .5; }
+.goal-user-input:not([data-editing]):is(:hover, :focus-within) { --goal-input-surface: var(--goal-hover-bg); background: var(--goal-input-surface); }
+.goal-input-body { display: flex; align-items: flex-start; gap: 8px; padding: 0 10px 8px; }
+.goal-input-type { width: 16px; height: 16px; flex: none; margin-top: 4.5px; color: var(--text-secondary); }
+.goal-input-text, .goal-input-editor { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.goal-input-editor { display: grid; }
+.goal-input-measure { grid-area: 1 / 1; visibility: hidden; pointer-events: none; }
+.goal-input-measure::after { content: '\200b'; }
+.goal-panel .goal-input-editor .ui-textarea { grid-area: 1 / 1; display: block; min-width: 0; width: 100%; height: 100%; min-height: 0; padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; line-height: inherit; resize: none; overflow: hidden; box-shadow: none; }
+.goal-panel .goal-input-editor .ui-textarea:focus-visible { outline: none; box-shadow: none; }
+.goal-input-editor textarea::placeholder { color: var(--text-secondary); opacity: 1; }
+.goal-input-actions { position: absolute; right: 0; top: 0; display: flex; gap: 4px; width: 64px; height: 28px; opacity: 0; pointer-events: none; background: var(--goal-input-surface); }
+.goal-user-input:is(:hover, :focus-within) .goal-input-actions { opacity: 1; pointer-events: auto; }
+.goal-panel :is(.goal-input-actions, .goal-input-error) .vega-action { height: 28px; min-height: 28px; width: 28px; min-width: 28px; border-radius: 8px; padding: 0; }
+.goal-panel :is(.goal-input-actions, .goal-input-error) .vega-action svg { width: 16px; height: 16px; }
+.goal-input-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; padding: 0 10px; font-size: 13px; line-height: 1.4; }
+.goal-input-retry.ui-button { padding: 0; min-height: 28px; text-decoration: underline; color: var(--text-primary); font: inherit; }
+@media (hover: none) { .goal-input-actions { opacity: 1; pointer-events: auto; } }
 .goal-panel .goal-editor.is-inline textarea:focus-visible { outline: none; box-shadow: none; }
 .goal-panel .goal-edit { border-radius: var(--ui-radius); color: var(--text-primary); }
 .goal-panel .goal-icon[aria-haspopup="menu"][aria-expanded="true"] { background: var(--goal-hover-bg); color: var(--text-primary); }

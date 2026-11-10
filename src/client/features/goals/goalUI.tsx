@@ -6,16 +6,19 @@ import { Button } from '../../components/ui/button.js';
 import { ActionIcon } from '../../components/ui/action-icon.js';
 import { Textarea } from '../../components/ui/input.js';
 import { renderSurface } from '../../components/ui/renderSurface.js';
-import { GoalMaterialText } from './GoalMaterialText.js';
+import { GoalContentList } from './GoalContentList.js';
+import type { InputEdit } from './goalController.js';
 
 export interface GoalView {
     state: GoalLibraryState; selected: string | null; allGoals: boolean;
-    itemsOpen: boolean; edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft } | null;
+    edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft } | null;
+    inputEdit: InputEdit | null; saveError: boolean; failedInputs: ReadonlySet<string>;
     sourcePage: number; annotations: Annotation[]; disabled: boolean;
     sourceBook: string; fullPage: boolean; titles: Map<string, string>; materialStatus: 'ready' | 'loading' | 'error';
 }
 interface Actions {
-    select(id: string): void; home(): void; up(): void; create(): void; expand(): void; items(): void;
+    select(id: string): void; home(): void; up(): void; create(): void; expand(): void;
+    addInput(): void; editInput(id: string): void; deleteInput(id: string): void; retry(): void; dismissError(): void;
     edit(mode: 'root' | 'child' | 'edit', id?: string): void; input(text: string): void; finish(): void;
     unlink(id: string): void; jump(id: string): void;
     menu?(id: string, anchor: HTMLElement, point?: { x: number; y: number }): void;
@@ -60,10 +63,8 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
     const { actions } = ui;
     const goal = view.state.goals.find(g => g.id === view.selected);
     const children = areaGoals(view.state, 'library', view.allGoals ? null : goal?.id || null, '', 'ongoing');
-    const materials = view.state.links.filter(link => link.goalId === goal?.id);
-    const annotations = new Map(view.annotations.map(note => [note.id, note]));
     return <div onMouseDown={event => {
-        if (view.edit && (event.target as Element).closest('button')) event.preventDefault();
+        if ((view.edit || view.inputEdit) && (event.target as Element).closest('button')) event.preventDefault();
     }}>
         <div className="goal-header">
             <nav className="goal-navigation" aria-label="Goal navigation">
@@ -88,6 +89,7 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
                 {goal.completedAt && <span className="goal-completion">✓ Completed</span>}
             </div>}
             <div className={`goal-descendants${!view.allGoals && goal ? ' is-nested' : ''}`}>
+            {!view.allGoals && goal && <div className="goal-children-region" aria-hidden="true"><ActionIcon name="goal-branch" /></div>}
             {view.edit && view.edit.mode !== 'edit' && <GoalEditor key={`${view.edit.mode}:${view.edit.draft.id}`} view={view} ui={ui} />}
             <div className="goal-children">
             {children.map(child => <div className="goal-row" key={child.id} data-goal-id={child.id} data-goal-kind={view.allGoals ? 'root' : 'child'} data-disabled={view.disabled ? '' : undefined}>
@@ -100,22 +102,7 @@ function GoalPanel({ view, ui }: { view: GoalView; ui: GoalUI }) {
                     onClick={event => actions.menu?.(child.id, event.currentTarget)}><ActionIcon name="more" /></Button>
             </div>)}</div>
             {!children.length && !goal && !view.edit && <p className="goal-empty">{view.state.goals.length ? "No ongoing goals at this level." : "Start with a question you want to understand."}</p>}
-            {!view.allGoals && goal && materials.length > 0 && <>
-                <Button size="icon-lg" className="goal-items-toggle" aria-label={view.itemsOpen ? 'Hide linked materials' : 'Show linked materials'} title={view.itemsOpen ? 'Hide linked materials' : 'Show linked materials'} aria-expanded={view.itemsOpen} aria-controls="goal-linked-items" onClick={actions.items}><ActionIcon name="links" className="goal-items-icon" /><ActionIcon name="down" className="goal-items-caret" /></Button>
-                {view.itemsOpen && <div className="goal-items" id="goal-linked-items">{materials.map(link => {
-                    const note = annotations.get(link.annotationId);
-                    return <div className="goal-item" key={`${link.bookId}:${link.annotationId}`}>
-                        <ActionIcon name={note?.kind === 'note' ? 'note' : 'highlight'} className="goal-material-icon" />
-                        <div className="goal-item-detail">
-                            <Button className="goal-item-text" data-annotation-id={link.annotationId} disabled={!note} onClick={() => actions.jump(link.annotationId)}>
-                                {note ? <GoalMaterialText annotation={note} /> : view.materialStatus === 'loading' ? "Loading…" : "Source unavailable"}
-                            </Button>
-                            {(view.fullPage || link.bookId !== view.sourceBook) && <div className="goal-item-source">{view.titles.get(link.bookId) || link.bookId}</div>}
-                        </div>
-                        <Button size="icon-lg" className="goal-icon" aria-label="Unlink" title="Unlink" disabled={view.disabled} onClick={() => actions.unlink(link.annotationId)}><ActionIcon name="close" /></Button>
-                    </div>;
-                })}</div>}
-            </>}
+            {!view.allGoals && goal && <GoalContentList view={view} ui={ui} goalId={goal.id} />}
             </div>
         </div>
         <span className="goal-status" role="status" aria-live="polite">{ui.message}</span>
