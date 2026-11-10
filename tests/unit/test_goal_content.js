@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 (async () => {
-    const { addGoalInput, changeGoalInput, deleteGoalInput, addGoalSource, goalContent, normalizeGoalContent } = await import('../../dist/client/domain/goalContentEngine.js');
+    const { addGoalInput, changeGoalInput, deleteGoalInput, addGoalSource, goalContent, normalizeGoalContent, setGoalResponse } = await import('../../dist/client/domain/goalContentEngine.js');
     const { operateGoal } = await import('../../dist/client/domain/goalLifecycle.js');
     const now = new Date().toISOString();
     const goal = (id, parentId = null) => ({ id, parentId, text: id, origin: null, createdAt: now, updatedAt: now });
@@ -27,5 +27,14 @@ const assert = require('node:assert/strict');
     assert.deepEqual(operateGoal(trashed, 'g', 'restore').inputs, state.inputs);
     assert.equal(operateGoal(trashed, 'g', 'purge').inputs.length, 0);
     assert.equal(deleteGoalInput(state, 'g', 'a').inputs.length, 1);
+    const target = { kind: 'input', goalId: 'g', id: 'b' };
+    const marked = setGoalResponse(state, target, true, now);
+    assert.ok(marked.inputs.find(i => i.id === 'b').response);
+    assert.equal(setGoalResponse(marked, target, true), marked, 'marking twice is idempotent');
+    const unmarked = setGoalResponse(marked, target, false);
+    assert.equal(Object.hasOwn(unmarked.inputs.find(i => i.id === 'b'), 'response'), false);
+    assert.deepEqual(ids(marked), ids(unmarked));
+    assert.equal(marked.goals, state.goals, 'Response does not complete the goal');
+    assert.throws(() => setGoalResponse(archived, target, true));
     console.log('PASS: owned multiline content, shared LIFO order, edit stability, Response separation and Goal lifecycle');
 })().catch(error => { console.error(error); process.exitCode = 1; });

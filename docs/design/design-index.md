@@ -104,6 +104,28 @@ creating Goal. The review is visually checked and has local record-state
 connections, not working text entry or persistence. Scope and evidence:
 [interaction record](../product/goals/user-input-response/interaction.md).
 
+On 2026-11-10 the owner chose the light content block with a stronger Response
+label and authorized initial independent components and composition. The
+[Response composition review](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=302-2181)
+uses the new [Goal Content Panel](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=302-2180),
+[Goal Content List](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=299-2118),
+[Goal Content Item](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=299-2117)
+and [Response Label](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=299-2106).
+The original Sidebar's five variants and User input property remain valid;
+the new panel is an independent composition, not a replacement of that Sidebar.
+The existing User input UX review now nests its content in item/list instances.
+The icon-only entry and left-opening, single-option Response menu interaction
+are now specified in the [interaction contract](../product/goals/user-input-response/interaction.md#5-response-标签入口与菜单需求补充);
+menu components are partially authored: [Tag Control](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=312-2418),
+[Menu](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=312-2443) and
+[Save Feedback](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=312-2461).
+MCP Starter quota stopped the work before property fixes, three-type UX
+composition and visual/prototype QA. These assets are not a completed UX review;
+application integration is now implemented and verified as recorded in
+[Response implementation](../product/goals/user-input-response/response-implementation.md).
+Preservation checks from the earlier phase,
+instance-ID changes and visual evidence: [design record](../product/goals/user-input-response/design.md#response独立组件与初步组合2026-11-10).
+
 | Interface | Exact screen entry | Classification | Design status | Code implementation status |
 | --- | --- | --- | --- | --- |
 | Reading Interface | [Reading Interface](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-129) — Frame on 01 - Screens | Approved Design | Basically complete; states below | Not reverified in this task; see existing verification record |

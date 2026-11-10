@@ -7,18 +7,21 @@ import { ActionIcon } from '../../components/ui/action-icon.js';
 import { Textarea } from '../../components/ui/input.js';
 import { renderSurface } from '../../components/ui/renderSurface.js';
 import { GoalContentList } from './GoalContentList.js';
-import type { InputEdit } from './goalController.js';
+import type { InputEdit, ResponseSaveState } from './goalController.js';
+import type { GoalResponseTarget } from '../../domain/goalContentEngine.js';
 
 export interface GoalView {
     state: GoalLibraryState; selected: string | null; allGoals: boolean;
     edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft } | null;
     inputEdit: InputEdit | null; saveError: boolean; failedInputs: ReadonlySet<string>;
+    responseWrites: ReadonlyMap<string, ResponseSaveState>;
     sourcePage: number; annotations: Annotation[]; disabled: boolean;
     sourceBook: string; fullPage: boolean; titles: Map<string, string>; materialStatus: 'ready' | 'loading' | 'error';
 }
 interface Actions {
     select(id: string): void; home(): void; up(): void; create(): void; expand(): void;
     addInput(): void; editInput(id: string): void; deleteInput(id: string): void; retry(): void; dismissError(): void;
+    setResponse(target: GoalResponseTarget, marked: boolean): void; retryResponse(target: GoalResponseTarget): void; dismissResponseError(target: GoalResponseTarget): void;
     edit(mode: 'root' | 'child' | 'edit', id?: string): void; input(text: string): void; finish(): void;
     unlink(id: string): void; jump(id: string): void;
     menu?(id: string, anchor: HTMLElement, point?: { x: number; y: number }): void;

@@ -1,5 +1,6 @@
 import type { GoalDraft, GoalGraphBackup, GoalLibraryState, GoalBookLink, GoalInputDraft } from '../domain/goal.js';
 import { normalizeGoalContent } from '../domain/goalContentEngine.js';
+import { responseTargetKey, type GoalResponseTarget } from '../domain/goalContentEngine.js';
 import type { SaveGoalLibraryCommand } from '../../shared/storage.js';
 import { acknowledgeGoals, attachGoalCommand, pendingGoals, readGoalDraft, clearGoalDraft } from './goalRecovery.js';
 import { acceptGoalLibrary, bookVersion, cachedGoalLibrary, enqueue, operationId, readBooks, readGoalLibrary, readNotes, storageRequest } from './storageClient.js';
@@ -8,7 +9,12 @@ import { getNotesForBooks } from './annotationRepository.js';
 const PENDING = 'aura_goal_library_pending', DRAFTS = 'aura_goal_library_drafts';
 const BOOK_INTENTS = 'aura_goal_book_pending';
 const INPUT_DRAFTS = 'aura_goal_input_drafts';
-interface Entry { version: string; expected: number; state: GoalLibraryState; command?: SaveGoalLibraryCommand }
+export interface ResponseWriteIntent { id: string; target: GoalResponseTarget }
+interface Entry { version: string; expected: number; state: GoalLibraryState; command?: SaveGoalLibraryCommand; responseIntents?: ResponseWriteIntent[] }
+const responseListeners = new Set<(intents: ResponseWriteIntent[], error?: unknown) => void>();
+export function onResponseWrite(listener: (intents: ResponseWriteIntent[], error?: unknown) => void) {
+    responseListeners.add(listener); return () => { responseListeners.delete(listener); };
+}
 export interface LibraryDraft { draft: GoalDraft; legacyBookId?: string }
 function read<T>(key: string, fallback: T): T {
     const value = localStorage.getItem(key);
@@ -61,10 +67,12 @@ export function storeInputDraft(draft: GoalInputDraft) {
     if (drafts.length) localStorage.setItem(INPUT_DRAFTS, JSON.stringify(drafts)); else localStorage.removeItem(INPUT_DRAFTS);
 }
 export function discardInputDraft(id: string) { storeInputDraft({ id, goalId: '', text: '' }); }
-export function stageLibrary(state: GoalLibraryState) {
+export function stageLibrary(state: GoalLibraryState, responseIntents: ResponseWriteIntent[] = []) {
     const entries = pendingLibrary(), last = entries.at(-1);
     if (last && !last.command) entries.pop();
-    entries.push({ version: operationId(), expected: last && !last.command ? last.expected : cachedGoalLibrary()?.revision || 0, state: structuredClone(state) });
+    const intents = new Map((last && !last.command ? last.responseIntents || [] : []).map(i => [responseTargetKey(i.target), i]));
+    responseIntents.forEach(i => intents.set(responseTargetKey(i.target), i));
+    entries.push({ version: operationId(), expected: last && !last.command ? last.expected : cachedGoalLibrary()?.revision || 0, state: structuredClone(state), responseIntents: [...intents.values()] });
     writePending(entries);
 }
 export function flushLibrary(): Promise<void> {
@@ -73,11 +81,14 @@ export function flushLibrary(): Promise<void> {
             const entry = pendingLibrary()[0]; if (!entry) return;
             const command = entry.command || { opId: entry.version, expected: entry.expected, state: entry.state };
             if (!entry.command) { const entries = pendingLibrary(); entries[0].command = command; writePending(entries); }
-            const result = await storageRequest('goals/library/save', command);
+            let result;
+            try { result = await storageRequest('goals/library/save', command); }
+            catch (error) { responseListeners.forEach(listener => listener(entry.responseIntents || [], error)); throw error; }
             if (command.state.bookLinks === undefined || command.state.formatVersion !== 2) await readGoalLibrary();
             else acceptGoalLibrary({ id: 'reader-goals', revision: result.revision, deleted: false, value: command.state });
             const remaining = pendingLibrary().filter(e => e.version !== entry.version);
             remaining.forEach(e => { if (!e.command) e.expected = result.revision; }); writePending(remaining);
+            responseListeners.forEach(listener => listener(entry.responseIntents || []));
             for (const item of libraryDrafts()) if (command.state.goals.some(g => g.id === item.draft.id && g.text === item.draft.text)) clearDraft(item.draft.id);
             for (const draft of inputDrafts()) if (command.state.inputs?.some(i => i.id === draft.id && i.goalId === draft.goalId && i.text === draft.text)) discardInputDraft(draft.id);
             for (const link of pendingBookIntents()) if (command.state.bookLinks?.some(l => l.goalId === link.goalId && l.bookId === link.bookId && l.generation === link.generation)) acknowledgeBookIntent(link);

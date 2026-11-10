@@ -162,7 +162,23 @@ Applies to the shared reading sidebar and full Goal workspace unless distinguish
   former Link group's layout position below child Goals; newly added content
   appears first within that area. MVP Response does not pin; approved future
   priority rules are recorded in the feature spec. Owned input and region UI
-  are integrated in source; Response controls and visuals remain pending.
+  and Response controls are integrated in source; see the scoped
+  [Response implementation record](../product/goals/user-input-response/response-implementation.md).
+  On 2026-11-10 the owner selected a light neutral content block with a stronger
+  Response label and authorized an initial component composition. Independent
+  label, item, list and panel components now exist in Figma; the original Sidebar
+  retains its property contract and has not been replaced by the new panel.
+  See the scoped [Response design record](../product/goals/user-input-response/design.md#response独立组件与初步组合2026-11-10).
+  The owner subsequently chose an icon-only tag entry that opens a compact menu
+  to its left, containing one checkable Response option. Opening the menu does
+  not toggle the label; selecting the option adds or removes it. Retain the
+  display-only Response Label. Local spacing, existing motion, focus and save
+  feedback requirements are specified in the
+  [Response interaction contract](../product/goals/user-input-response/interaction.md#5-response-标签入口与菜单需求补充).
+  Figma menu/control/feedback components are partially authored; property fixes,
+  integrated states and prototype/visual QA remain pending after an MCP quota
+  interruption. Source implementation now follows the requirements and the owner's
+  supplied screenshot; Figma itself was not changed during implementation.
   See the [implementation record](../product/goals/user-input-response/implementation.md).
 
 - The owner selected scheme 02, region icons with a horizontal divider, from the

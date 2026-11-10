@@ -1,6 +1,8 @@
 import type { Annotation } from '../../domain/annotation.js';
 import type { Goal, GoalDraft, GoalLibraryState, GoalSourceLink, GoalInputDraft } from '../../domain/goal.js';
 import { addGoalInput, changeGoalInput, deleteGoalInput, addGoalSource, normalizeGoalContent } from '../../domain/goalContentEngine.js';
+import { responseContent, responseTargetKey, setGoalResponse, type GoalResponseTarget } from '../../domain/goalContentEngine.js';
+import { onResponseWrite, type ResponseWriteIntent } from '../../infrastructure/goalLibraryRepository.js';
 import { inputDrafts, storeInputDraft, discardInputDraft } from '../../infrastructure/goalLibraryRepository.js';
 import type { AppElements } from '../../app/elements.js';
 import type { ShowToast } from '../../app/contracts.js';
@@ -23,6 +25,7 @@ export interface GoalCallbacks {
     openCollection?(area: GoalArea): void;
 }
 export type InputEdit = ({ mode: 'input-new' } | { mode: 'input-edit' }) & { draft: GoalInputDraft; lastNonempty: string };
+export interface ResponseSaveState extends ResponseWriteIntent { status: 'saving' | 'error'; dismissed: boolean }
 export class GoalController {
     private listeners = new Set<() => void>();
     subscribe(listener: () => void) {
@@ -34,6 +37,7 @@ export class GoalController {
     edit: { mode: 'root' | 'child' | 'edit'; draft: GoalDraft; lastNonempty: string; previousTree: boolean } | InputEdit | null = null;
     private changedInputs = new Set<string>();
     private errorDismissed = false;
+    private responseWrites = new Map<string, ResponseSaveState>();
     disabled = true; visible = false;
     get page() { return this.navigation.surface === 'goal'; }
     elements: AppElements | null = null; ui: GoalUI | null = null; sidebar: GoalSidebar | null = null;
@@ -48,6 +52,15 @@ export class GoalController {
     private actionUI: GoalActions | null = null;
     get actions() { return this.actionUI ||= new GoalActions(this); }
     constructor(readonly callbacks: GoalCallbacks, readonly navigation = new AppNavigation()) {
+        onResponseWrite((intents, error) => {
+            for (const intent of intents) {
+                const key = responseTargetKey(intent.target), latest = this.responseWrites.get(key);
+                if (latest?.id !== intent.id) continue;
+                if (error) this.responseWrites.set(key, { ...latest, status: 'error', dismissed: false });
+                else this.responseWrites.delete(key);
+            }
+            this.render();
+        });
         navigation.subscribe(() => { this.updateReadingContext(); this.callbacks.onSurfaceChanged?.(); });
         onGoalLibraryChanged(record => {
             if (record.deleted) return;
@@ -61,6 +74,9 @@ export class GoalController {
         this.ready = (async () => {
             const loaded = await loadGoalLibrary();
             this.state = loaded.state; this.dirty = loaded.pending; this.disabled = !!loaded.error; this.failure = undefined;
+            this.responseWrites.clear();
+            for (const entry of pendingLibrary()) for (const intent of entry.responseIntents || [])
+                this.responseWrites.set(responseTargetKey(intent.target), { ...intent, status: loaded.error ? 'error' : 'saving', dismissed: false });
             try { this.selected = localStorage.getItem('aura_selected_goal'); } catch { /* Optional selection. */ }
             this.ensureSelection(); this.resumeDraft();
             if (loaded.error) throw loaded.error;
@@ -81,6 +97,12 @@ export class GoalController {
             addInput: () => this.beginInput(), editInput: id => this.beginInput(id), deleteInput: id => this.removeInput(id),
             retry: () => { this.finishInlineEdit().then(() => this.render()).catch(() => this.render()); },
             dismissError: () => { this.errorDismissed = true; this.render(); },
+            setResponse: (target, marked) => this.setResponse(target, marked),
+            retryResponse: target => { this.retryResponse(target).catch(() => {}); },
+            dismissResponseError: target => {
+                const key = responseTargetKey(target), current = this.responseWrites.get(key);
+                if (current) this.responseWrites.set(key, { ...current, dismissed: true }); this.render();
+            },
             unlink: id => { if (!goalEditable(this.state, this.selected) || this.lifecycleBusy) return; this.endEdit(); this.persist({ ...this.state, links: this.state.links.filter(l => l.goalId !== this.selected || l.annotationId !== id) }); this.render(); this.ui?.announce('Item unlinked from goal'); },
             jump: id => { this.endEdit(); const source = this.state.links.find(l => l.goalId === this.selected && l.annotationId === id); Promise.resolve(this.callbacks.jump(id, source)).catch(error => this.fail(error)); }
         });
@@ -168,14 +190,30 @@ export class GoalController {
     async finishInlineEdit(): Promise<void> { this.endEdit(); await this.flush(); await Promise.all([...this.linksInFlight]); this.resumeDraft(); this.render(); }
     private persist(state: GoalLibraryState) {
         if (state === this.state) return; this.undoChange = null; this.state = state; this.dirty = true; this.serial++;
-        try { stageLibrary(state); this.stagedSerial = this.serial; } catch (error) { this.fail(error); }
+        try { stageLibrary(state, [...this.responseWrites.values()]); this.stagedSerial = this.serial; } catch (error) { this.fail(error); }
         if (this.timer) clearTimeout(this.timer); this.timer = setTimeout(() => { this.flush().catch(() => {}); }, 250); this.callbacks.onActionsChanged?.();
     }
     async flush() {
         if (this.timer) { clearTimeout(this.timer); this.timer = null; } const serial = this.serial;
         if (this.disabled && this.failure && (this.dirty || pendingLibrary().length || libraryDrafts().length || inputDrafts().length)) throw this.failure;
-        try { if (this.dirty && this.stagedSerial !== serial) { stageLibrary(this.state); this.stagedSerial = serial; } if (pendingLibrary().length) await flushLibrary(); if (this.serial === serial) { this.dirty = false; this.failure = undefined; this.changedInputs.clear(); } this.render(); }
+        try { if (this.dirty && this.stagedSerial !== serial) { stageLibrary(this.state, [...this.responseWrites.values()]); this.stagedSerial = serial; } if (pendingLibrary().length) await flushLibrary(); if (this.serial === serial) { this.dirty = false; this.failure = undefined; this.changedInputs.clear(); } this.render(); }
         catch (error) { this.fail(error); throw error; }
+    }
+    setResponse(target: GoalResponseTarget, marked: boolean) {
+        if (this.disabled || this.lifecycleBusy || this.edit || !goalEditable(this.state, target.goalId)) return;
+        if (target.kind === 'annotation' && ![...this.materials, ...this.callbacks.getAnnotations()].some(n => n.id === target.annotationId && n.bookId === target.bookId)) return;
+        const next = setGoalResponse(this.state, target, marked);
+        if (next === this.state) return;
+        this.responseWrites.set(responseTargetKey(target), { id: operationId(), target, status: 'saving', dismissed: false });
+        this.persist(next); this.render();
+    }
+    async retryResponse(target: GoalResponseTarget) {
+        const key = responseTargetKey(target), write = this.responseWrites.get(key);
+        if (!write || !responseContent(this.state, target)) return;
+        if (this.disabled) { await this.initialize(); return; }
+        // Retry the exact frozen command first, then any newer desired snapshot.
+        for (const [id, pending] of this.responseWrites) this.responseWrites.set(id, { ...pending, status: 'saving', dismissed: false });
+        this.render(); await this.flush();
     }
     async assertWritesSaved() { do { await this.finishInlineEdit(); } while (this.edit); if (this.failure) throw this.failure; }
     async createRoot(text: string, id = operationId()): Promise<string> {
@@ -207,7 +245,11 @@ export class GoalController {
         this.persist({ ...this.state, bookLinks: (this.state.bookLinks || []).filter(l => l.goalId !== goalId || l.bookId !== bookId) });
         await this.flush(); this.render();
     }
-    private fail(error: unknown) { if (this.failure !== error) this.callbacks.showToast(error instanceof Error ? error.message : "Goals are not confirmed saved. Keep this window open.", { kind: 'error' }); this.failure = error; this.errorDismissed = false; this.render(); }
+    private fail(error: unknown) {
+        if (this.failure !== error && (!this.responseWrites.size || this.changedInputs.size)) this.callbacks.showToast(error instanceof Error ? error.message : "Goals are not confirmed saved. Keep this window open.", { kind: 'error' });
+        for (const [key, write] of this.responseWrites) this.responseWrites.set(key, { ...write, status: 'error', dismissed: false });
+        this.failure = error; this.errorDismissed = false; this.render();
+    }
     beginInput(id?: string) {
         if (this.disabled || this.lifecycleBusy || !goalEditable(this.state, this.selected)) return;
         this.endEdit(); const goalId = this.selected!;
@@ -299,7 +341,7 @@ export class GoalController {
         const annotations = new Map(this.materials.map(n => [n.id, n])); this.callbacks.getAnnotations().forEach(n => annotations.set(n.id, n));
         const inputEdit = this.edit?.mode === 'input-new' || this.edit?.mode === 'input-edit' ? this.edit : null;
         this.ui?.render({ state: this.state, selected: this.selected, allGoals: this.allGoals, edit: inputEdit ? null : this.edit as Exclude<typeof this.edit, InputEdit>, inputEdit,
-            saveError: !!this.failure && !this.errorDismissed, failedInputs: this.changedInputs,
+            saveError: !!this.failure && !this.errorDismissed && (!this.responseWrites.size || !!this.changedInputs.size), failedInputs: this.changedInputs, responseWrites: this.responseWrites,
             sourcePage: this.callbacks.getLocation().page, sourceBook: this.callbacks.getLocation().bookId, annotations: [...annotations.values()], disabled: this.disabled || this.lifecycleBusy,
             fullPage: this.page, titles: this.titles, materialStatus: this.materialStatus }); this.callbacks.onActionsChanged?.();
         for (const listener of this.listeners) listener();

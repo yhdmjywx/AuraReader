@@ -75,7 +75,7 @@ function createGoalLibrary(store, fail, canonical) {
         return book && !book.deleted && book.generation === link.generation;
     });
     const read = () => { const row = one('SELECT * FROM goal_library WHERE id=1'); return { id: 'reader-goals', revision: row.revision, deleted: false, value: JSON.parse(row.payload) }; };
-    const write = state => {
+    const write = (state, restoring = false) => {
         // Old frozen commands keep their original hash and must not erase new relations.
         if (state.bookLinks === undefined) state = { ...state, bookLinks: read().value.bookLinks || [] };
         const previous = read().value;
@@ -95,6 +95,12 @@ function createGoalLibrary(store, fail, canonical) {
         }
         for (const input of previous.inputs || []) if (!state.inputs.some(i => i.id === input.id)
             && state.goals.some(g => g.id === input.goalId) && !active(state, input.goalId)) fail('Restore the goal before deleting its text.');
+        for (const link of state.links) {
+            const prior = previous.links.find(l => l.goalId === link.goalId && l.bookId === link.bookId
+                && l.annotationId === link.annotationId && l.generation === link.generation && l.order === link.order);
+            if (!restoring && canonical(prior?.response ?? null) !== canonical(link.response ?? null) && !active(state, link.goalId))
+                fail('Restore the goal before changing Response.');
+        }
         const revision = read().revision + 1; run('UPDATE goal_library SET payload=?,revision=? WHERE id=1', JSON.stringify(state), revision); return read();
     };
     function legacy(state, previous, generation, restoring = false) {
@@ -116,7 +122,7 @@ function createGoalLibrary(store, fail, canonical) {
             if (canonical(sourceIdentity(scoped)) !== canonical(sourceIdentity(before.links))) fail("The legacy goal link conflicts with the global library.");
         }
         current.links = current.links.filter(l => !ids.has(l.goalId) || l.bookId !== state.bookId).concat(incoming.links);
-        return write(current);
+        return write(current, restoring);
     }
     function prune(bookId, annotationId) {
         const record = read(), links = record.value.links.filter(l => l.bookId !== bookId || (annotationId && l.annotationId !== annotationId));
@@ -141,7 +147,7 @@ function createGoalLibrary(store, fail, canonical) {
         }
         // A foreign backup may carry larger ordering metadata, but never owned text.
         current.contentSequence = Math.max(current.contentSequence || 0, ...current.links.map(l => Math.max(l.order || 0, l.response?.sequence || 0)));
-        return write(current);
+        return write(current, true);
     }
     function initialize() {
         run('CREATE TABLE IF NOT EXISTS goal_library(id INTEGER PRIMARY KEY CHECK(id=1),payload TEXT NOT NULL,revision INTEGER NOT NULL)');

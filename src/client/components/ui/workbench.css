@@ -230,6 +230,30 @@ html[data-app-surface="reader"]:has(#goal-sidebar[hidden]) .workspace-settings >
 .goal-input-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; padding: 0 10px; font-size: 13px; line-height: 1.4; }
 .goal-input-retry.ui-button { padding: 0; min-height: 28px; text-decoration: underline; color: var(--text-primary); font: inherit; }
 @media (hover: none) { .goal-input-actions { opacity: 1; pointer-events: auto; } }
+/* Response presentation composes around the existing content/editor. */
+.goal-response-item { border-radius: 8px; }
+.goal-response-item[data-response] { padding-block: 8px; background: #ececef; }
+.goal-response-header { display: flex; padding-inline: 10px; margin-bottom: 6px; }
+.goal-response-label { display: inline-block; border-radius: 4px; padding-inline: 6px; background: #dcdce2; color: var(--text-primary); font-family: 'Inter Variable', Inter, sans-serif; font-size: 12px; font-weight: 500; line-height: 20px; }
+.goal-response-item[data-response] .goal-user-input { --goal-input-surface: #ececef; }
+.goal-response-item[data-response] .goal-user-input:is(:hover, :focus-within) { background: transparent; }
+.goal-response-item[data-response] .goal-input-body { padding-bottom: 0; }
+.goal-panel .goal-response-item > .goal-item { margin: 0; }
+.goal-input-actions[data-response-actions] { width: 96px; }
+.goal-response-item[data-menu-open] .goal-input-actions { opacity: 1; pointer-events: auto; }
+.goal-material-actions { display: flex; gap: 4px; position: absolute; right: 4px; top: 6px; opacity: 0; pointer-events: none; background: var(--goal-row-surface); box-shadow: -6px 0 6px var(--goal-row-surface); }
+.goal-response-item[data-response] .goal-item { --goal-row-surface: #ececef; }
+.goal-response-item:is(:hover, :focus-within, [data-menu-open]) .goal-material-actions { opacity: 1; pointer-events: auto; }
+.goal-panel :is(.goal-material-actions, .goal-response-feedback) .vega-action { width: 28px; min-width: 28px; height: 28px; min-height: 28px; border-radius: 8px; padding: 0; }
+.goal-panel :is(.goal-material-actions, .goal-response-feedback) .vega-action svg { width: 16px; height: 16px; }
+.goal-response-feedback { display: flex; align-items: center; gap: 8px; padding: 0 10px; min-height: 28px; color: var(--text-secondary); font-size: 12px; line-height: 1.4; }
+.goal-response-feedback > span { flex: 1; min-width: 0; }
+.goal-response-menu.ui-menu { min-width: 128px; width: 128px; }
+.goal-response-menu [role=menuitemcheckbox] { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 5px; font-size: 13px; font-weight: 400; line-height: 1.4; outline: 0; cursor: default; }
+.goal-response-menu [role=menuitemcheckbox][data-highlighted] { background: var(--goal-hover-bg); }
+.goal-response-check { display: flex; align-items: center; width: 16px; height: 16px; }
+.goal-response-check svg { display: block; width: 16px; height: 16px; }
+@media (hover: none) { .goal-material-actions { opacity: 1; pointer-events: auto; } }
 .goal-panel .goal-editor.is-inline textarea:focus-visible { outline: none; box-shadow: none; }
 .goal-panel .goal-edit { border-radius: var(--ui-radius); color: var(--text-primary); }
 .goal-panel .goal-icon[aria-haspopup="menu"][aria-expanded="true"] { background: var(--goal-hover-bg); color: var(--text-primary); }

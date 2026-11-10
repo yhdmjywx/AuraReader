@@ -92,8 +92,31 @@ verified: 2026-10-30 · owner rules: AGENTS.md
   passive region icons, inline editing and recovery. Owner confirmed records follow
   Goal archive/delete/restore and are removed on purge; per-book backups exclude
   them. SQLite schema is now v5. Home workspace entry remains deferred by explicit
-  owner choice, as do Response controls. Validation and delivery boundaries:
+  owner choice; that initial delivery reserved Response metadata only. Validation and delivery boundaries:
   docs/product/goals/user-input-response/implementation.md.
+- Response design composition (owner-approved, 2026-11-10): selected light neutral
+  content blocks with a stronger Response label. Figma now has independent Label,
+  Item, List and Panel components on 02 - Components; review `302:2181` in
+  `eib6b1sDBsFa7hTzY2Zmsi`. Existing User input review `288:1835` uses the item/list
+  composition. Original Sidebar `14:581` retains its five variants and User input
+  property; the new Panel does not replace it. Structure, preserved content,
+  changed nested instance IDs and validation: docs/product/goals/user-input-response/design.md.
+  The owner subsequently chose a Readwise Reader-style icon-only tag entry that
+  opens a compact menu to the left, with one checkable Response option for both
+  marking and removal. Functional requirements and local interaction defaults
+  are recorded in feature-spec.md sections 5.6-5.9 and interaction.md section 5 in
+  that directory. Subsequent Figma UX work created Tag Control `312:2418`, Menu
+  `312:2443`, Save Feedback `312:2461` and six Item interaction variants, but hit
+  the MCP Starter tool-call quota before integration and visual QA. Feedback
+  property bindings and closed-menu transitions still need correction; the new
+  UX review has not been created. Resume evidence: .local-materials/response-ux-state.json.
+  Current partial delivery and limitations: design.md in that feature directory.
+  Response source integration is now implemented in the reader sidebar and existing
+  full Goal workspace. The owner confirmed that Response follows the current Goal's
+  association: restoring the original retains it; a fresh association starts unmarked.
+  Persistence uses the existing outbox and optional intent metadata, with no schema
+  change. Validation and delivery limits:
+  docs/product/goals/user-input-response/response-implementation.md.
 - Goal behavior contract: docs/archive/plans-and-implementation/goal-system-implementation-plan.md
 - cross-book Goal and shared editor:
   docs/archive/plans-and-implementation/goal-cross-book-sidebar-plan.md

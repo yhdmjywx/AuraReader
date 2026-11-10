@@ -40,7 +40,17 @@ const { backupDatabase } = require('../../src/server/storageMaintenance');
         store.saveGoalLibrary({ opId: randomUUID(), expected: record.revision, state: { ...record.value, goals: record.value.goals.map(g => g.id === 'g' ? { ...g, archivedAt: now } : g) } });
         record = store.goalLibrary();
         assert.throws(() => store.saveGoalLibrary({ opId: randomUUID(), expected: record.revision, state: { ...record.value, inputs: [{ ...text, text: 'Cannot edit archive' }] } }));
-        store.deleteBook({ opId: randomUUID(), expected: 1, id: 'book' });
+        assert.throws(() => store.saveGoalLibrary({ opId: randomUUID(), expected: record.revision, state: { ...record.value,
+            links: record.value.links.map(l => ({ ...l, response: { markedAt: now, sequence: 2 } })) } }), /Restore the goal before changing Response/);
+        const restoredResponse = { markedAt: now, sequence: 2 };
+        store.restore({ opId: randomUUID(), books: [store.books().find(b => b.id === 'book').value],
+            notes: [{ id: 'n', bookId: 'book', quote: 'Source', comment: 'Comment' }],
+            goalGraph: { goals: record.value.goals, links: record.value.links.map(l => ({ ...l, response: restoredResponse })) } });
+        assert.deepEqual(store.goalLibrary().value.links[0].response, restoredResponse, 'trusted restore retains the archived association mark');
+        record = store.goalLibrary();
+        assert.throws(() => store.saveGoalLibrary({ opId: randomUUID(), expected: record.revision, state: { ...record.value,
+            links: record.value.links.map(({ response, ...link }) => link) } }), /Restore the goal before changing Response/);
+        store.deleteBook({ opId: randomUUID(), expected: store.books().find(b => b.id === 'book').revision, id: 'book' });
         assert.deepEqual(store.goalLibrary().value.inputs, [text], 'source deletion retains owned text even when archived');
         const backup = await backupDatabase(directory);
         const copy = new DatabaseSync(backup.filename, { readOnly: true });

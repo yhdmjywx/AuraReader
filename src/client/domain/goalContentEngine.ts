@@ -39,7 +39,30 @@ export function addGoalSource(state: GoalLibraryState, link: GoalSourceLink): Go
     editable(state, link.goalId);
     if (state.links.some(l => l.goalId === link.goalId && l.annotationId === link.annotationId && l.bookId === link.bookId)) return state;
     const normalized = normalizeGoalContent(state), order = nextSequence(normalized);
-    return { ...normalized, contentSequence: order, links: [...normalized.links, { ...link, order }] };
+    // A new association starts without the previous association's Response.
+    const { response: _response, ...source } = link;
+    return { ...normalized, contentSequence: order, links: [...normalized.links, { ...source, order }] };
+}
+export type GoalResponseTarget = { kind: 'input'; goalId: string; id: string }
+    | { kind: 'annotation'; goalId: string; annotationId: string; bookId: string; generation: string; associationOrder: number };
+export const responseTargetKey = (target: GoalResponseTarget) => target.kind === 'input'
+    ? JSON.stringify([target.kind, target.goalId, target.id])
+    : JSON.stringify([target.kind, target.goalId, target.bookId, target.generation, target.annotationId, target.associationOrder]);
+export function responseContent(state: GoalLibraryState, target: GoalResponseTarget) {
+    return target.kind === 'input' ? state.inputs?.find(i => i.goalId === target.goalId && i.id === target.id)
+        : state.links.find(l => l.goalId === target.goalId && l.annotationId === target.annotationId && l.bookId === target.bookId
+            && l.generation === target.generation && l.order === target.associationOrder);
+}
+export function setGoalResponse(state: GoalLibraryState, target: GoalResponseTarget, marked: boolean, now = new Date().toISOString()): GoalLibraryState {
+    editable(state, target.goalId);
+    const item = responseContent(state, target);
+    if (!item || !!item.response === marked) return state;
+    const sequence = marked ? nextSequence(state) : state.contentSequence;
+    const { response: _response, ...rest } = item;
+    const replacement = marked ? { ...rest, response: { markedAt: now, sequence: sequence! } } : rest;
+    return { ...state, contentSequence: sequence,
+        ...(target.kind === 'input' ? { inputs: state.inputs!.map(i => i === item ? replacement as typeof i : i) }
+            : { links: state.links.map(l => l === item ? replacement as typeof l : l) }) };
 }
 export function goalContent(state: GoalLibraryState, goalId: string) {
     const normalized = normalizeGoalContent(state);

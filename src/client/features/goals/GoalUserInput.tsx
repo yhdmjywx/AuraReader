@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { GoalInput } from '../../domain/goal.js';
 import type { GoalUI, GoalView } from './goalUI.js';
 import { ActionIcon } from '../../components/ui/action-icon.js';
@@ -28,14 +29,15 @@ function InputEditor({ view, ui }: { view: GoalView; ui: GoalUI }) {
             }} onBlur={() => { if (!ui.releasingFocus) ui.actions.finish(); }} />
     </div>;
 }
-export function GoalUserInput({ input, view, ui }: { input?: GoalInput; view: GoalView; ui: GoalUI }) {
+export function GoalUserInput({ input, view, ui, actionsBefore }: { input?: GoalInput; view: GoalView; ui: GoalUI; actionsBefore?: ReactNode }) {
     const editing = !!view.inputEdit && (input ? view.inputEdit.draft.id === input.id : view.inputEdit.mode === 'input-new');
     const id = input?.id || view.inputEdit!.draft.id;
     return <article className="goal-user-input" data-input-id={id} data-editing={editing ? '' : undefined} data-disabled={view.disabled ? '' : undefined}>
         <div className="goal-input-body"><ActionIcon name="goal-text" className="goal-input-type" />
             {editing ? <InputEditor key={id} view={view} ui={ui} /> : <div className="goal-input-text">{input!.text}</div>}
         </div>
-        {!editing && <div className="goal-input-actions">
+        {!editing && <div className="goal-input-actions" data-response-actions={actionsBefore ? '' : undefined}>
+            {actionsBefore}
             <Button size="icon-lg" aria-label="Edit text" title="Edit text" disabled={view.disabled} onClick={() => ui.actions.editInput(id)}><ActionIcon name="edit" /></Button>
             <Button size="icon-lg" aria-label="Delete text" title="Delete text" disabled={view.disabled} onClick={() => ui.actions.deleteInput(id)}><ActionIcon name="delete" /></Button>
         </div>}
