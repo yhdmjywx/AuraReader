@@ -3,6 +3,7 @@ const path = require('node:path');
 const { createDataStore, StorageError, bookRecord, noteRecord, goalRecord, goalBackupRecord, validateLibrary } = require('../server/dataStore.js');
 const { createMigration } = require('../server/migration.js');
 const { backupDatabase } = require('../server/storageMaintenance.js');
+const { createPublicationResources } = require('../server/publicationResources.js');
 
 const MAX_JSON_BYTES = 256 * 1024 * 1024;
 const DESKTOP_SOURCE = 'aurareader-desktop-v1';
@@ -106,17 +107,29 @@ function createDesktopStorage(directory) {
         })();
         try { return await creating; } finally { creating = null; }
     }
+    const publications = createPublicationResources(readyStore);
     return {
+        /** @param {{url: string, method: string}} request */
+        async publicationResource(request) {
+            const operation = publications.respond(request);
+            active.add(operation);
+            try { return await operation; } finally { active.delete(operation); }
+        },
         /** @param {string} action @param {unknown} [body] */
         async call(action, body) {
             // This dispatcher is main-process-only; no renderer-controlled action channel is registered.
             const operation = (async () => {
-                if (['status', 'createLibrary', 'listBooks', 'backup', 'queryGoalLibrary'].includes(action) && body !== undefined) throw new StorageError("This request does not accept arguments.");
+                if (['status', 'createLibrary', 'listBooks', 'listBookSummaries', 'backup', 'queryGoalLibrary'].includes(action) && body !== undefined) throw new StorageError("This request does not accept arguments.");
                 if (action === 'status') return status();
                 if (action === 'createLibrary') return initialize();
                 const current = readyStore();
                 switch (action) {
                     case 'listBooks': return { records: current.books() };
+                    case 'listBookSummaries': return { records: current.bookSummaries() };
+                    case 'getBook': {
+                        const query = command(body, ['id']);
+                        return { record: current.book(identifier(query.id)) };
+                    }
                     case 'saveBook': {
                         const c = command(body, ['opId', 'expected', 'book']);
                         return current.saveBook({ ...writeVersion(c), book: bookRecord(c.book) });
@@ -171,7 +184,7 @@ function createDesktopStorage(directory) {
             try { return await operation; } finally { active.delete(operation); }
         },
         async settle() { await Promise.all([...active]); },
-        close() { closed = true; store?.close(); store = null; }
+        close() { closed = true; publications.clear(); store?.close(); store = null; }
     };
 }
 

@@ -1,6 +1,7 @@
 export type BuiltinFontId = 'sarasa' | 'literata';
 export type FontChoice =
     | { kind: 'auto' }
+    | { kind: 'original' }
     | { kind: 'builtin'; id: BuiltinFontId }
     | { kind: 'system'; family: string; name?: string }
     | { kind: 'imported'; id: string; name: string };

@@ -1,5 +1,10 @@
 import { eventElement } from '../../app/dom.js';
 import { readerAbortController, readerViewport } from './readerDom.js';
+import { syncReaderDocumentSize } from './readerDocument.js';
+import { preparePublicationContent } from './publicationContent.js';
+import { layoutFixedDocument, preparePublicationDocument, publicationDocument, refreshReadiumStyles } from './publicationDocument.js';
+import { resolveEpubUrl } from '../../infrastructure/epubPaths.js';
+import { readingAxis, readingViewport, setReadingOffset } from './readingAxis.js';
 import type { Book, ReadingLocation, TocEntry } from '../../domain/book.js';
 import type { Annotation } from '../../domain/annotation.js';
 import type { BookStructure } from '../../domain/bookStructure.js';
@@ -27,6 +32,7 @@ import {
 } from './paperRenderer.js';
 import {
     layoutChapterStrip,
+    fitChapterImages,
     readTopLeftSentence,
     placeSentenceAtTopLeft,
     placeAnchorIdAtTopLeft,
@@ -46,6 +52,7 @@ import {
 
 export class ReaderController {
     private bindings?: AbortController;
+    private documentBindings?: AbortController;
     private listeners = new Set<(event: 'render' | 'viewport' | 'location') => void>();
     private cancelViewport?: () => void;
     private cancelLayout?: () => void;
@@ -61,6 +68,7 @@ export class ReaderController {
     destroy() {
         this.rememberAnchor();
         this.bindings?.abort(); this.bindings = undefined;
+        this.documentBindings?.abort(); this.documentBindings = undefined;
         clearTimeout(this._anchorTimer);
         this.cancelViewport?.(); this.cancelLayout?.(); this.cancelAnchor?.();
         this.cancelViewport = this.cancelLayout = undefined;
@@ -75,6 +83,7 @@ export class ReaderController {
     layoutController: LayoutController | null;
     callbacks: ReaderCallbacks;
     fontSize: number;
+    fontSizeOverride = false;
     fontFamily: string;
     textIndent: string;
     paperTheme: string;
@@ -112,11 +121,12 @@ export class ReaderController {
         this.bookStructure = null;
         this.fonts = new FontController({
             getBook: () => this.getCurrentBook(),
+            getDocument: () => this.elements?.bookPaper?.ownerDocument || globalThis.document,
             beforeChange: () => this.rememberAnchor(),
             onChange: () => { this.applyTypography(); this.refitAfterTypography(); },
             onReady: () => {
                 if (this.isChapterFlow() && !this._flowPage) { this.applyTypography(); return; }
-                this.rememberAnchor(); this.applyTypography(); this.refitAfterTypography();
+                this.applyTypography(); this.refitAfterTypography();
             },
             notify: (message, options) => this.callbacks.showToast?.(message, options)
         });
@@ -153,6 +163,7 @@ export class ReaderController {
     getCurrentPage() {
         return this.currentPage;
     }
+    getFirstPage() { return this.getCurrentBook()?.epub?.documents.find(document => document.linear !== false)?.page || 1; }
 
     clearBook() {
         clearTimeout(this._anchorTimer);
@@ -273,7 +284,7 @@ export class ReaderController {
         const elements = this.elements;
         if (!elements) return;
         const viewport = readerViewport(elements);
-        const surfaces = [viewport, elements.bookPaper].filter((node): node is HTMLElement => !!node);
+        const surfaces = [viewport, elements.bookPaper, elements.bookPaper ? readingViewport(elements.bookPaper) : null].filter((node): node is HTMLElement => !!node);
         const positions = surfaces.map(node => ({ node, left: node.scrollLeft, top: node.scrollTop }));
         if (elements.bookPaper) {
             applyHighlightsToPaper(elements.bookPaper, this.currentPage, notes);
@@ -309,8 +320,10 @@ export class ReaderController {
     handleInTextLinkClick(href: string, notes: Annotation[] = []) {
         const currentBookObj = this.engine.getCurrentBook();
         const map = currentBookObj ? (currentBookObj.hrefToPageMap || {}) : {};
-        const targetPage = resolveTargetPage(href, map, this.currentPage);
-        const [, anchor] = String(href || '').split('#');
+        const resolved = resolveEpubUrl(href);
+        const targetPage = currentBookObj?.epub ? (resolved && map[resolved.path]) : resolveTargetPage(href, map, this.currentPage);
+        if (!targetPage) return;
+        const anchor = resolved?.fragment || '';
 
         if (this.isChapterFlow()) {
             this.flowAnchorText = '';
@@ -354,6 +367,7 @@ export class ReaderController {
         if (!this.elements) return;
         const items = ensureTocHierarchy(tocItems);
         domRenderTOC(items, this.elements, (item) => {
+            if (item.navigable === false) return;
             const notes = this.callbacks.getNotes ? this.callbacks.getNotes() : [];
             if (this.isChapterFlow()) {
                 this.flowAnchorText = '';
@@ -380,9 +394,37 @@ export class ReaderController {
         this.destroy();
         this.elements = elements;
         if (!elements || typeof globalThis.document === 'undefined') return;
-        const document = elements.bookPaper?.ownerDocument || globalThis.document;
+        const document = elements.readerPanel?.ownerDocument || elements.bookPaper?.ownerDocument || globalThis.document;
         this.bindings = readerAbortController(document);
         const signal = this.bindings.signal;
+        const contentDocument = elements.bookPaper?.ownerDocument || document;
+        this.documentBindings = readerAbortController(contentDocument);
+        const contentSignal = this.documentBindings.signal;
+        if (contentDocument !== document) {
+            // App keyboard shortcuts stay in their original command handler.
+            contentDocument.addEventListener('keydown', event => {
+                if (event.defaultPrevented || event.isComposing || eventElement(event)?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+                const forwarded = new document.defaultView!.KeyboardEvent('keydown', {
+                    key: event.key, code: event.code, ctrlKey: event.ctrlKey, metaKey: event.metaKey,
+                    altKey: event.altKey, shiftKey: event.shiftKey, bubbles: true, cancelable: true
+                });
+                if (!document.dispatchEvent(forwarded)) event.preventDefault();
+            }, { signal: contentSignal });
+            contentDocument.addEventListener('click', () => domCloseTOC(elements), { signal: contentSignal });
+            contentDocument.addEventListener('scroll', () => {
+                this.scheduleViewportChange();
+                if (!this.isChapterFlow() || this.effectiveReaderMode() !== 'scroll') return;
+                this.syncChapterChrome();
+                clearTimeout(this._anchorTimer);
+                this._anchorTimer = setTimeout(() => this.rememberAnchor(), 120);
+            }, { capture: true, signal: contentSignal });
+            contentDocument.addEventListener('load', event => {
+                if (eventElement(event)?.tagName === 'IMG' && this.isChapterFlow()) {
+                    this.refitChapter(this.callbacks.getNotes?.() || []);
+                }
+                syncReaderDocumentSize(elements); this.scheduleViewportChange();
+            }, { capture: true, signal: contentSignal });
+        }
 
         // Navigation Buttons
         if (elements.btnPrevPage) {
@@ -406,6 +448,7 @@ export class ReaderController {
                 if (this.fontSize > 13) {
                     this.rememberAnchor();
                     this.fontSize -= 1;
+                    this.fontSizeOverride = true;
                     if (elements.fontSizeLabel) elements.fontSizeLabel.textContent = `${this.fontSize}px`;
                     this.applyTypography();
                     this.refitAfterTypography();
@@ -418,6 +461,7 @@ export class ReaderController {
                 if (this.fontSize < 32) {
                     this.rememberAnchor();
                     this.fontSize += 1;
+                    this.fontSizeOverride = true;
                     if (elements.fontSizeLabel) elements.fontSizeLabel.textContent = `${this.fontSize}px`;
                     this.applyTypography();
                     this.refitAfterTypography();
@@ -445,11 +489,17 @@ export class ReaderController {
         const viewport = readerViewport(this.elements);
         if (viewport) {
             let lastWheelTurn = -Infinity;
-            viewport.addEventListener('wheel', event => {
-                if (event.defaultPrevented || !this.getCurrentBook() || this.effectiveReaderMode() !== 'single') return;
+            const onWheel = (event: WheelEvent) => {
+                if (event.defaultPrevented || !this.getCurrentBook()) return;
                 if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
                 if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
                 if (eventElement(event)?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+                const paper = elements.bookPaper!;
+                if (this.effectiveReaderMode() === 'scroll') {
+                    const axis = readingAxis(paper);
+                    if (axis.vertical) { event.preventDefault(); setReadingOffset(paper, axis.position + event.deltaY); this.scheduleViewportChange(); }
+                    return;
+                }
                 event.preventDefault();
                 // A wheel gesture may emit many events; limit repeated page turns.
                 const now = Date.now();
@@ -458,7 +508,9 @@ export class ReaderController {
                 const notes = this.callbacks.getNotes?.() || [];
                 if (event.deltaY > 0) this.nextPage(notes);
                 else this.prevPage(notes);
-            }, { passive: false, signal });
+            };
+            viewport.addEventListener('wheel', onWheel, { passive: false, signal });
+            if (contentDocument !== document) contentDocument.addEventListener('wheel', onWheel, { passive: false, signal: contentSignal });
             // Capture scrolls from both the vertical viewport and its paged
             // chapter strip (horizontal scroll events do not bubble).
             viewport.addEventListener('scroll', () => this.scheduleViewportChange(), { capture: true, passive: true, signal });
@@ -478,6 +530,7 @@ export class ReaderController {
                     elements.paperBtns?.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     this.paperTheme = btn.getAttribute('data-paper') || 'white';
+                    if (elements.bookPaper) elements.bookPaper.ownerDocument.documentElement.dataset.userPaper = this.paperTheme;
                     if (elements.readerPanel) {
                         elements.readerPanel.className = `reader-panel paper-${this.paperTheme}`;
                     }
@@ -512,17 +565,23 @@ export class ReaderController {
         if (this.elements?.bookPaper) {
             const book = this.getCurrentBook();
             // The English application language must not override source-book language.
-            this.elements.bookPaper.lang = String(book?.language || book?.languages?.[0] || '').replace(/_/g, '-');
+            this.elements.bookPaper.lang = String(publicationDocument(book, this.currentPage)?.language || book?.language || book?.languages?.[0] || '').replace(/_/g, '-');
         }
         const elements = this.elements;
         if (!elements) return;
         const papers = [elements.bookPaper];
         papers.forEach(paper => {
             if (!paper) return;
-            paper.style.fontSize = `${this.fontSize}px`;
             this.fonts.apply(paper);
             this.fontFamily = this.fonts.resolved().family;
+            if (paper.dataset.layout === 'pre-paginated') return;
+            if (paper.dataset.authored === 'true' && !this.fontSizeOverride) {
+                paper.style.removeProperty('font-size');
+                this.fontSize = parseFloat(paper.ownerDocument.defaultView!.getComputedStyle(paper).fontSize) || 18;
+                if (elements.fontSizeLabel) elements.fontSizeLabel.textContent = `${this.fontSize}px`;
+            } else paper.style.setProperty('font-size', `${this.fontSize}px`, 'important');
             paper.style.setProperty('--book-text-indent', this.textIndent);
+            paper.classList.toggle('reader-user-indent', !!globalThis.localStorage?.getItem('aura_text_indent'));
         });
     }
 
@@ -555,7 +614,8 @@ export class ReaderController {
     renderChapterPage(pageNum: number, preserveScroll = false, notes: Annotation[] = [], options: ChapterRenderOptions = {}): ReadingLocation {
         if (!preserveScroll) notes = this.callbacks.beforeNavigate?.() || notes;
         const sourcePage = Number(pageNum);
-        const flow = readingUnitForPage(this.bookStructure, sourcePage);
+        const source = publicationDocument(this.getCurrentBook(), sourcePage);
+        const flow = source?.layout === 'pre-paginated' ? { page: sourcePage, prefixPages: [] } : readingUnitForPage(this.bookStructure, sourcePage);
         const loc = this.engine.goToPage(flow.page);
         this._volumeTitlePages = flow.prefixPages;
         this.currentPage = loc.page;
@@ -581,17 +641,23 @@ export class ReaderController {
     paintChapter(page: number, notes: Annotation[]) {
         const elements = this.elements;
         if (!elements || !elements.bookPaper) return;
+        preparePublicationDocument(elements.bookPaper, this.getCurrentBook(), page, () => {
+            if (this.elements && this._flowPage === page) this.refitChapter(this.callbacks.getNotes?.() || []);
+        });
         elements.bookPaper.innerHTML = this.engine.getPageContent(page);
+        preparePublicationContent(elements.bookPaper, this.getCurrentBook(), page);
         elements.bookPaper.dataset.flowPage = String(page);
         this._flowPage = page;
         this.applyTypography();
         applyHighlightsToPaper(elements.bookPaper, page, notes);
+        const document = elements.bookPaper.ownerDocument;
         const prefixes = document.createDocumentFragment();
         for (const titlePage of this._volumeTitlePages) {
             const title = document.createElement('div');
             title.dataset.volumeTitlePage = String(titlePage);
             title.style.display = 'contents';
             title.innerHTML = this.engine.getPageContent(titlePage);
+            preparePublicationContent(title, this.getCurrentBook(), titlePage);
             applyHighlightsToPaper(title, titlePage, notes);
             prefixes.appendChild(title);
         }
@@ -605,7 +671,21 @@ export class ReaderController {
         const elements = this.elements;
         if (!elements) return;
         const mode = this.effectiveReaderMode();
+        const source = publicationDocument(this.getCurrentBook(), this.currentPage);
+        if (source?.layout === 'pre-paginated') {
+            layoutFixedDocument(elements, source);
+            this.syncChapterChrome();
+            return;
+        }
+        refreshReadiumStyles(elements.bookPaper!);
+        elements.bookPaper?.classList.remove('fixed-layout');
+        const frame = elements.bookPaper?.ownerDocument.defaultView?.frameElement as HTMLIFrameElement | null;
+        if (frame) { frame.style.transform = ''; frame.style.transformOrigin = ''; frame.style.marginLeft = ''; frame.style.width = '100%'; }
+        if (elements.paperContainer) { elements.paperContainer.style.height = ''; elements.paperContainer.style.position = ''; }
         const laid = layoutChapterStrip(elements, mode);
+        syncReaderDocumentSize(elements);
+        fitChapterImages(elements, mode);
+        if (mode === 'scroll') syncReaderDocumentSize(elements);
         if (laid && laid.mode !== 'scroll' && laid.hostHeight < 40 && !options.retried) {
             const view = elements.bookPaper!.ownerDocument.defaultView!;
             this.cancelLayout?.();
@@ -636,14 +716,17 @@ export class ReaderController {
     stepChapter(direction: number, notes: Annotation[] = []): ReadingLocation {
         notes = this.callbacks.beforeNavigate?.() || notes;
         const mode = this.effectiveReaderMode();
-        const moved = shiftStrip(this.elements, mode, direction);
+        const fixed = publicationDocument(this.getCurrentBook(), this.currentPage)?.layout === 'pre-paginated';
+        const moved = fixed ? 'edge' : shiftStrip(this.elements, mode, direction);
         if (moved === 'moved') {
             this.syncChapterChrome();
             clearTimeout(this._anchorTimer);
             this._anchorTimer = setTimeout(() => this.rememberAnchor(), 60);
             return this.getLocation();
         }
-        const target = (direction < 0 ? (this._volumeTitlePages[0] || this.currentPage) : this.currentPage) + direction;
+        let target = (direction < 0 ? (this._volumeTitlePages[0] || this.currentPage) : this.currentPage) + direction;
+        const documents = this.getCurrentBook()?.epub?.documents;
+        while (documents?.some(document => document.page === target && document.linear === false)) target += direction;
         if (target < 1 || target > this.totalPages) {
             this.syncChapterChrome();
             return this.getLocation();
@@ -656,11 +739,19 @@ export class ReaderController {
         const elements = this.elements;
         if (!elements || !this.isChapterFlow()) return;
         const mode = this.effectiveReaderMode();
-        writeChapterIndicator(elements, mode);
-        const atStart = atStripStart(elements, mode);
-        const atEnd = atStripEnd(elements, mode);
-        if (elements.btnPrevPage) elements.btnPrevPage.disabled = (this._volumeTitlePages[0] || this.currentPage) <= 1 && atStart;
-        if (elements.btnNextPage) elements.btnNextPage.disabled = this.currentPage >= this.totalPages && atEnd;
+        const fixed = publicationDocument(this.getCurrentBook(), this.currentPage)?.layout === 'pre-paginated';
+        if (fixed) {
+            if (elements.currentPageSpan) elements.currentPageSpan.textContent = String(this.currentPage);
+            if (elements.totalPagesSpan) elements.totalPagesSpan.textContent = String(this.totalPages);
+            if (elements.pageUnit) elements.pageUnit.textContent = ' pages';
+        } else writeChapterIndicator(elements, mode);
+        const atStart = fixed || atStripStart(elements, mode);
+        const atEnd = fixed || atStripEnd(elements, mode);
+        const documents = this.getCurrentBook()?.epub?.documents;
+        const hasPrevious = documents ? documents.some(document => document.linear !== false && document.page < (this._volumeTitlePages[0] || this.currentPage)) : this.currentPage > 1;
+        const hasNext = documents ? documents.some(document => document.linear !== false && document.page > this.currentPage) : this.currentPage < this.totalPages;
+        if (elements.btnPrevPage) elements.btnPrevPage.disabled = !hasPrevious && atStart;
+        if (elements.btnNextPage) elements.btnNextPage.disabled = !hasNext && atEnd;
         if (this.layoutController && typeof this.layoutController.updateLayoutClasses === 'function') {
             this.layoutController.updateLayoutClasses(elements);
         }

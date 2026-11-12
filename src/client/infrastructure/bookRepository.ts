@@ -1,8 +1,8 @@
 import { clearBookGoals } from './goalRecovery.js';
 import { forgetGoals } from './storageClient.js';
-import type { Book } from '../domain/book.js';
+import type { Book, BookSummary } from '../domain/book.js';
 import { clearStoredBookNotes } from './annotationRecovery.js';
-import { initializeStorage, readBooks, enqueue, bookVersion, storageRequest, operationId, acceptBook } from './storageClient.js';
+import { initializeStorage, readBooks, readBook, readBookSummaries, enqueue, bookVersion, storageRequest, operationId, acceptBook } from './storageClient.js';
 export { demoBooks, seedNotes, getSeedNotes } from './demoData.js';
 
 export function initDB() { return initializeStorage(); }
@@ -18,8 +18,10 @@ export function saveBookToDB(book: Book) {
 }
 export async function loadBookFromDB(bookId: string): Promise<Book | null> {
     if (!bookId) return null;
-    return (await readBooks()).find(row => row.id === bookId && !row.deleted)?.value || null;
+    const row = await readBook(bookId);
+    return row && !row.deleted ? row.value : null;
 }
+export async function getBookSummariesFromDB(): Promise<BookSummary[]> { return (await readBookSummaries()).flatMap(row => row.deleted ? [] : [row.value]); }
 export async function getAllBooksFromDB(): Promise<Book[]> { return (await readBooks()).flatMap(row => row.deleted ? [] : [row.value]); }
 export function deleteBookFromDB(bookId: string) {
     if (!bookId) return Promise.resolve();

@@ -1,3 +1,5 @@
+import { readingAxis, readingViewportRect, setReadingOffset } from './readingAxis.js';
+import { readerRect } from './readerDocument.js';
 import { readerViewport } from './readerDom.js';
 /* ==========================================================================
    Chapter column view - DOM layout for one EPUB chapter strip.
@@ -6,14 +8,12 @@ import { readerViewport } from './readerDom.js';
 
 import {
     columnMetrics,
-    countColumns,
     columnFromScroll,
-    sentenceSlice,
-    screenStep,
-    screenStartForColumn
+    sentenceSlice
 } from '../../domain/chapterFlow.js';
 
 const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, figcaption';
+const imageHeightStyles = new WeakMap();
 
 export function clearChapterFlow(elements) {
     if (!elements) return;
@@ -25,8 +25,8 @@ export function clearChapterFlow(elements) {
         elements.bookPaper.style.columnWidth = '';
         elements.bookPaper.style.columnGap = '';
         elements.bookPaper.style.columnFill = '';
-        elements.bookPaper.style.height = '';
-        elements.bookPaper.style.overflow = '';
+        elements.bookPaper.style.height = elements.bookPaper.tagName === 'BODY' ? 'auto' : '';
+        elements.bookPaper.style.overflow = elements.bookPaper.tagName === 'BODY' ? 'visible' : '';
         elements.bookPaper.style.width = '';
     }
     if (elements.pageUnit) elements.pageUnit.textContent = ' page';
@@ -34,46 +34,111 @@ export function clearChapterFlow(elements) {
 
 export function layoutChapterStrip(elements, mode) {
     const viewport = readerViewport(elements);
-    const paper = elements && elements.bookPaper;
-    const container = elements && elements.paperContainer;
+    const paper = elements?.bookPaper;
+    const container = elements?.paperContainer;
     if (!viewport || !paper || !container) return null;
-
-    viewport.classList.remove('chapter-paged', 'chapter-scroll');
+    const axis = readingAxis(paper);
+    const scroller = axis.scroller;
+    paper.dataset.axis = axis.vertical ? 'vertical' : 'horizontal';
+    const continuous = mode === 'scroll' && !axis.vertical;
+    viewport.classList.toggle('chapter-scroll', continuous);
+    viewport.classList.toggle('chapter-paged', !continuous);
     container.classList.add('chapter-flow');
     paper.classList.add('chapter-flow');
-    paper.classList.remove('mode-scroll', 'mode-single');
-
-    if (mode === 'scroll') {
-        viewport.classList.add('chapter-scroll');
-        paper.classList.add('mode-scroll');
-        paper.style.columnWidth = '';
-        paper.style.columnGap = '';
-        paper.style.columnFill = '';
-        paper.style.height = 'auto';
-        paper.style.overflow = 'visible';
-        paper.style.width = '100%';
+    paper.classList.toggle('mode-scroll', mode === 'scroll');
+    paper.classList.toggle('mode-single', mode !== 'scroll');
+    paper.style.columnCount = 'auto';
+    if (continuous) {
+        paper.style.columnWidth = 'auto'; paper.style.columnGap = '0px'; paper.style.columnFill = '';
+        paper.style.height = 'auto'; paper.style.overflow = 'visible'; paper.style.width = '100%';
+        scroller.style.setProperty('columns', 'auto', 'important');
+        scroller.style.setProperty('height', 'auto', 'important');
+        scroller.style.setProperty('padding', '0', 'important');
+        scroller.style.setProperty('--RS__maxMediaHeight', 'none');
+        setReadingOffset(paper, 0);
         return { mode, metrics: null };
     }
-
-    viewport.classList.add('chapter-paged');
-    paper.classList.add('mode-single');
     const hostHeight = container.clientHeight || viewport.clientHeight;
     const hostWidth = container.clientWidth || viewport.clientWidth;
+    scroller.style.removeProperty('--RS__maxMediaHeight');
     paper.style.boxSizing = 'border-box';
     paper.style.width = `${Math.max(1, hostWidth)}px`;
-    paper.style.height = `${Math.max(1, hostHeight)}px`;
+    paper.style.height = paper === scroller ? `${Math.max(1, hostHeight)}px` : 'auto';
+    scroller.style.setProperty('height', `${Math.max(1, hostHeight)}px`, 'important');
     paper.style.padding = '28px 0 32px';
-    paper.style.overflow = 'hidden';
+    scroller.style.setProperty('padding', '0', 'important');
+    paper.style.overflow = paper === scroller ? (axis.vertical && mode === 'scroll' ? 'auto' : 'hidden') : 'visible';
+    scroller.style.setProperty('overflow', axis.vertical && mode === 'scroll' ? 'auto' : 'hidden', 'important');
+    if (axis.vertical) {
+        paper.style.height = `${Math.max(1, hostHeight)}px`;
+        paper.style.columnWidth = 'auto'; paper.style.columnGap = '0px';
+        scroller.style.setProperty('columns', 'auto', 'important');
+        return { mode, metrics: null, hostWidth, hostHeight };
+    }
     const metrics = columnMetrics(paper.clientWidth || hostWidth, mode);
-    paper.style.columnFill = 'auto';
-    paper.style.columnWidth = `${metrics.colWidth}px`;
-    paper.style.columnGap = `${metrics.gap}px`;
+    if (scroller !== paper) {
+        // Root padding belongs to each viewport, rather than fragmenting with BODY.
+        scroller.style.setProperty('box-sizing', 'border-box');
+        scroller.style.setProperty('padding', '28px 0 32px', 'important');
+        paper.style.padding = '0';
+    }
+    paper.style.columnWidth = 'auto'; paper.style.columnGap = '0px';
+    scroller.style.setProperty('columns', `${metrics.colWidth}px auto`, 'important');
+    scroller.style.setProperty('column-fill', 'auto');
+    scroller.style.setProperty('column-gap', `${metrics.gap}px`, 'important');
     return { mode, metrics, hostWidth, hostHeight };
+}
+
+/** Fit replaced images inside the content area, including their surrounding spacing. */
+export function fitChapterImages(elements, mode) {
+    const paper = elements?.bookPaper;
+    if (!paper) return;
+    const axis = readingAxis(paper);
+    const view = paper.ownerDocument.defaultView;
+    const rootStyle = view.getComputedStyle(axis.scroller);
+    const number = value => parseFloat(value) || 0;
+    const contentHeight = axis.scroller.clientHeight - number(rootStyle.paddingTop) - number(rootStyle.paddingBottom);
+    for (const image of paper.querySelectorAll('img')) {
+        if (!imageHeightStyles.has(image)) imageHeightStyles.set(image, {
+            value: image.style.getPropertyValue('max-height'), priority: image.style.getPropertyPriority('max-height')
+        });
+        const original = imageHeightStyles.get(image);
+        if (original.value) image.style.setProperty('max-height', original.value, original.priority);
+        else image.style.removeProperty('max-height');
+        const paragraph = image.closest('p');
+        if (paragraph && !paragraph.textContent.trim()) paragraph.style.setProperty('text-indent', '0', 'important');
+        if (mode === 'scroll' || axis.vertical) continue;
+        const style = view.getComputedStyle(image);
+        let spacing = number(style.marginTop) + number(style.marginBottom);
+        if (style.display.startsWith('inline')) spacing += number(view.getComputedStyle(image.parentElement).lineHeight);
+        let parent = image.parentElement;
+        while (parent && parent !== axis.scroller) {
+            const parentStyle = view.getComputedStyle(parent);
+            spacing += number(parentStyle.marginTop) + number(parentStyle.marginBottom)
+                + number(parentStyle.paddingTop) + number(parentStyle.paddingBottom)
+                + number(parentStyle.borderTopWidth) + number(parentStyle.borderBottomWidth);
+            parent = parent.parentElement;
+        }
+        const authorLimit = style.maxHeight.endsWith('px') ? number(style.maxHeight) : Infinity;
+        const limit = Math.max(1, Math.min(authorLimit, contentHeight - spacing));
+        image.style.setProperty('max-height', `${limit}px`, 'important');
+    }
 }
 
 export function readTopLeftSentence(root, viewport) {
     if (!root || typeof document === 'undefined') return '';
-    const view = root.getBoundingClientRect();
+    let view = readingViewportRect(root);
+    if (viewport && viewport.ownerDocument !== root.ownerDocument) {
+        const host = readerRect(view, root.ownerDocument);
+        const clip = viewport.getBoundingClientRect();
+        const scaleX = view.width ? host.width / view.width : 1;
+        const scaleY = view.height ? host.height / view.height : 1;
+        view = { left: view.left + Math.max(0, clip.left - host.left) / scaleX,
+            top: view.top + Math.max(0, clip.top - host.top) / scaleY,
+            right: view.right - Math.max(0, host.right - clip.right) / scaleX,
+            bottom: view.bottom - Math.max(0, host.bottom - clip.bottom) / scaleY,
+            width: view.width, height: view.height };
+    }
     if (!view.width || !view.height) {
         if (!viewport) return '';
     }
@@ -84,7 +149,7 @@ export function readTopLeftSentence(root, viewport) {
         [120, 40]
     ];
     for (const [dx, dy] of probes) {
-        const x = Math.min(view.right - 4, view.left + dx);
+        const x = readingAxis(root).reversed ? Math.max(view.left + 4, view.right - dx) : Math.min(view.right - 4, view.left + dx);
         const y = Math.min(view.bottom - 4, view.top + dy);
         const hit = caretAt(x, y, root.ownerDocument);
         if (!hit || !root.contains(hit.node)) continue;
@@ -99,16 +164,24 @@ export function placeSentenceAtTopLeft(root, viewport, sentence, mode) {
     removeFlowBreak(root);
     const pos = locateSnippet(root, sentence);
     if (!pos) return false;
-    if (mode === 'scroll') {
+    if (mode === 'scroll' && !readingAxis(root).vertical) {
         const range = rangeAt(pos.node, pos.offset);
         if (!range || !viewport) return false;
-        const rect = range.getBoundingClientRect();
+        const rect = readerRect(range.getBoundingClientRect(), root.ownerDocument);
         const view = viewport.getBoundingClientRect();
         viewport.scrollTop += rect.top - view.top;
         return true;
     }
     if (isDocumentStart(root, pos.node, pos.offset)) {
-        root.scrollLeft = 0;
+        setReadingOffset(root, 0);
+        return true;
+    }
+    const axis = readingAxis(root);
+    if (axis.vertical || axis.reversed) {
+        const range = rangeAt(pos.node, pos.offset);
+        if (!range) return false;
+        const rect = range.getBoundingClientRect(), host = readingViewportRect(root);
+        setReadingOffset(root, axis.position + (axis.reversed ? host.right - rect.right : rect.left - host.left));
         return true;
     }
     const block = insertColumnBreak(root, pos.node, pos.offset);
@@ -131,6 +204,14 @@ export function placeAnchorIdAtTopLeft(root, viewport, anchor, mode, sourcePage 
     if (!target) return false;
     const text = target.textContent || '';
     const sentence = sentenceSlice(text, 0) || text.trim().slice(0, 40);
+    if (!sentence) {
+        const block = target.closest(BLOCK_SELECTOR) || target.nextElementSibling || target;
+        if (mode === 'scroll' && viewport && !readingAxis(root).vertical) {
+            const rect = readerRect(block.getBoundingClientRect(), root.ownerDocument);
+            viewport.scrollTop += rect.top - viewport.getBoundingClientRect().top;
+        } else snapBlockToScreen(root, block, mode);
+        return true;
+    }
     return placeSentenceAtTopLeft(root, viewport, sentence, mode);
 }
 
@@ -138,7 +219,7 @@ export function shiftStrip(elements, mode, direction) {
     const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (!viewport || !paper) return 'edge';
-    if (mode === 'scroll') {
+    if (mode === 'scroll' && (!paper || !readingAxis(paper).vertical)) {
         const max = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
         if (direction > 0) {
             if (viewport.scrollTop >= max - 2) return 'edge';
@@ -150,57 +231,58 @@ export function shiftStrip(elements, mode, direction) {
         return 'moved';
     }
     const frame = pagedFrame(paper, mode);
-    const index = Math.round(paper.scrollLeft / frame.step);
-    const lastIndex = Math.round(frame.maxStart / frame.step);
+    const axis = readingAxis(paper);
+    const lastIndex = Math.ceil(frame.maxStart / frame.step);
+    const index = axis.position >= axis.max - 2 ? lastIndex : Math.round(axis.position / frame.step);
     if (direction > 0) {
         if (index >= lastIndex) return 'edge';
-        paper.scrollLeft = (index + 1) * frame.step;
+        setReadingOffset(paper, (index + 1) * frame.step);
         return 'moved';
     }
     if (index <= 0) return 'edge';
-    paper.scrollLeft = (index - 1) * frame.step;
+    setReadingOffset(paper, (index - 1) * frame.step);
     return 'moved';
 }
 
 export function scrollStripToStart(elements, mode) {
     const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
-    if (mode === 'scroll') {
+    if (mode === 'scroll' && (!paper || !readingAxis(paper).vertical)) {
         if (viewport) viewport.scrollTop = 0;
         return;
     }
-    if (paper) paper.scrollLeft = 0;
+    if (paper) setReadingOffset(paper, 0);
 }
 
 export function scrollStripToEnd(elements, mode) {
     const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
-    if (mode === 'scroll') {
+    if (mode === 'scroll' && (!paper || !readingAxis(paper).vertical)) {
         if (!viewport) return;
         viewport.scrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
         return;
     }
     if (!paper) return;
-    paper.scrollLeft = pagedFrame(paper, mode).maxStart;
+    setReadingOffset(paper, readingAxis(paper).max);
 }
 
 export function atStripStart(elements, mode) {
     const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
-    if (mode === 'scroll') return !viewport || viewport.scrollTop <= 2;
-    return !paper || paper.scrollLeft <= 2;
+    if (mode === 'scroll' && (!paper || !readingAxis(paper).vertical)) return !viewport || viewport.scrollTop <= 2;
+    return !paper || readingAxis(paper).position <= 2;
 }
 
 export function atStripEnd(elements, mode) {
     const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
-    if (mode === 'scroll') {
+    if (mode === 'scroll' && (!paper || !readingAxis(paper).vertical)) {
         if (!viewport) return true;
         return viewport.scrollTop >= viewport.scrollHeight - viewport.clientHeight - 2;
     }
     if (!paper) return true;
-    const frame = pagedFrame(paper, mode);
-    return Math.round(paper.scrollLeft / frame.step) >= Math.round(frame.maxStart / frame.step);
+    const axis = readingAxis(paper);
+    return axis.position >= axis.max - 2;
 }
 
 export function writeChapterIndicator(elements, mode) {
@@ -210,19 +292,20 @@ export function writeChapterIndicator(elements, mode) {
     let current = 1;
     let total = 1;
     let label = '1';
-    if (mode === 'scroll') {
+    if (mode === 'scroll' && (!paper || !readingAxis(paper).vertical)) {
         const height = viewport ? viewport.clientHeight : 1;
         const scrollHeight = viewport ? viewport.scrollHeight : 1;
         const scrollTop = viewport ? viewport.scrollTop : 0;
         total = Math.max(1, Math.ceil(scrollHeight / Math.max(1, height)));
         current = Math.min(total, Math.floor(scrollTop / Math.max(1, height)) + 1);
+        if (scrollTop > 0 && scrollTop >= scrollHeight - height - 2) current = total;
         label = String(current);
         if (elements.pageUnit) elements.pageUnit.textContent = total === 1 ? ' screen' : ' screens';
     } else if (paper) {
-        const metrics = columnMetrics(paper.clientWidth, mode);
-        const contentTotal = contentColumnCount(paper, metrics);
+        const axis = readingAxis(paper);
+        const contentTotal = Math.max(1, Math.ceil(axis.max / axis.step) + 1);
         total = contentTotal;
-        current = columnFromScroll(paper.scrollLeft, metrics.stride, contentTotal);
+        current = axis.position >= axis.max - 2 ? contentTotal : columnFromScroll(axis.position, axis.step, contentTotal);
         if (current > contentTotal) current = contentTotal;
         label = String(current);
         if (elements.pageUnit) elements.pageUnit.textContent = total === 1 ? ' column' : ' columns';
@@ -330,17 +413,9 @@ function isDocumentStart(root, node, offset) {
     return false;
 }
 
-function contentColumnCount(paper, metrics) {
-    let total = countColumns(paper.scrollWidth, metrics.stride);
-    return Math.max(1, total);
-}
-
 function pagedFrame(paper, mode) {
-    const metrics = columnMetrics(paper.clientWidth, mode);
-    const step = screenStep(metrics);
-    const contentTotal = contentColumnCount(paper, metrics);
-    const maxStart = screenStartForColumn(contentTotal, metrics);
-    return { metrics, step, contentTotal, maxStart };
+    const axis = readingAxis(paper);
+    return { step: axis.step, maxStart: axis.max };
 }
 
 function insertColumnBreak(paper, node, offset) {
@@ -389,13 +464,10 @@ function liftToColumnChild(paper, textNode) {
 }
 
 function snapBlockToScreen(paper, block, mode) {
-    const metrics = columnMetrics(paper.clientWidth, mode);
-    const stride = Math.max(1, metrics.stride);
-    const rect = block.getBoundingClientRect();
-    const host = paper.getBoundingClientRect();
-    const contentX = paper.scrollLeft + rect.left - host.left;
-    const columnNumber = Math.max(1, Math.round(contentX / stride) + 1);
-    paper.scrollLeft = screenStartForColumn(columnNumber, metrics);
+    const axis = readingAxis(paper);
+    const rect = block.getBoundingClientRect(), host = readingViewportRect(paper);
+    const position = axis.position + (axis.reversed ? host.right - rect.right : rect.left - host.left);
+    setReadingOffset(paper, Math.max(0, Math.round(position / axis.step)) * axis.step);
 }
 
 function removeFlowBreak(root) {

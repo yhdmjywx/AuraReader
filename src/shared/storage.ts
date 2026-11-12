@@ -1,5 +1,5 @@
 import type { BookGoalState, GoalBackupState, GoalLibraryState, GoalGraphBackup } from '../client/domain/goal.js';
-import type { Book } from '../client/domain/book.js';
+import type { Book, BookSummary } from '../client/domain/book.js';
 import type { AnnotationInput } from '../client/domain/annotation.js';
 
 // Wire records deliberately preserve legacy fields; the annotation domain
@@ -9,6 +9,7 @@ export type StoredRecord<T> = { id: string; revision: number } & (
     { deleted: false; value: T } | { deleted: true; value: null }
 );
 export type BookRecord = StoredRecord<Book> & { generation: string };
+export type BookSummaryRecord = StoredRecord<BookSummary> & { generation: string };
 export type NoteRecord = StoredRecord<StoredAnnotation> & { bookId: string };
 export type GoalStateRecord = StoredRecord<BookGoalState> & { bookId: string };
 export interface SaveGoalsCommand { opId: string; expected: number; generation: string; state: BookGoalState }
@@ -33,6 +34,8 @@ export interface MigrationManifest {
 export interface MigrationStatus { completed: boolean; snapshotId?: string; manifest?: MigrationManifest }
 export interface StorageRoutes {
     books: { request: undefined; response: { records: BookRecord[] } };
+    'books/summary': { request: undefined; response: { records: BookSummaryRecord[] } };
+    'books/get': { request: { id: string }; response: { record: BookRecord | null } };
     'books/save': { request: SaveBookCommand; response: BookRevision };
     'books/delete': { request: DeleteBookCommand; response: Revision };
     'notes/query': { request: { bookIds: string[] }; response: { records: NoteRecord[] } };

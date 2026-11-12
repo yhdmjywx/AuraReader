@@ -1,3 +1,4 @@
+import { readerRect } from '../reader/readerDocument.js';
 /* ==========================================================================
    SelectionTooltipUI - Floating Tooltip & Annotation Context Menu
    Positions the selection bubble and the shared highlight-action tooltip.
@@ -5,9 +6,9 @@
 
 export function showSelectionTooltip(elements, rect) {
     if (!elements || !elements.selectionTooltip || !elements.readerPanel || !rect) return;
-    const readerRect = elements.readerPanel.getBoundingClientRect();
-    elements.selectionTooltip.style.left = `${rect.left + rect.width / 2 - readerRect.left}px`;
-    elements.selectionTooltip.style.top = `${rect.top - readerRect.top}px`;
+    const panelRect = elements.readerPanel.getBoundingClientRect();
+    elements.selectionTooltip.style.left = `${rect.left + rect.width / 2 - panelRect.left}px`;
+    elements.selectionTooltip.style.top = `${rect.top - panelRect.top}px`;
     elements.selectionTooltip.style.display = 'flex';
 }
 
@@ -34,10 +35,10 @@ export function showHighlightActionTooltip(elements, targetEl, context) {
         noteButton.querySelector('span').textContent = noteCount > 1 ? `Delete notes (${noteCount})` : "Delete note";
     }
 
-    const markRect = targetEl.getBoundingClientRect();
-    const readerRect = elements.readerPanel.getBoundingClientRect();
-    tooltip.style.left = `${markRect.left + markRect.width / 2 - readerRect.left}px`;
-    tooltip.style.top = `${markRect.top - readerRect.top}px`;
+    const markRect = readerRect(targetEl.getBoundingClientRect(), targetEl.ownerDocument);
+    const panelRect = elements.readerPanel.getBoundingClientRect();
+    tooltip.style.left = `${markRect.left + markRect.width / 2 - panelRect.left}px`;
+    tooltip.style.top = `${markRect.top - panelRect.top}px`;
     tooltip.style.display = 'flex';
 }
 

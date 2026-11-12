@@ -5,7 +5,7 @@ import type { AppSurface } from '../../app/navigation.js';
 import type { ReaderSnapshot } from '../reader/readerRuntime.js';
 import { areaGoals } from '../../domain/goalLifecycle.js';
 import { findChapterForPage } from '../../domain/readingLocation.js';
-import { getAllBooksFromDB } from '../../infrastructure/bookRepository.js';
+import { getBookSummariesFromDB } from '../../infrastructure/bookRepository.js';
 import { initialWikiSite } from '../../../shared/wiki.js';
 import { WikiController, type WikiState } from '../wiki/wikiController.js';
 
@@ -95,7 +95,7 @@ export class WorkbenchStore {
         if (!this.app.readerRuntime.getSnapshot().selection) this.app.readerRuntime.selection.hideSelectionTooltip();
     }
     private async refreshBooks() {
-        this.books = (await getAllBooksFromDB()).map(({ id, title }) => ({ id, title }));
+        this.books = (await getBookSummariesFromDB()).map(({ id, title }) => ({ id, title }));
         this.publish();
     }
     run(action: () => unknown | Promise<unknown>) {

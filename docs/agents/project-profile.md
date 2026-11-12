@@ -55,6 +55,26 @@ verified: 2026-10-30 · owner rules: AGENTS.md
 - workbench presentation: src/client/features/workbench/
 - shared Goal presentation: src/client/features/goals/goalUI.tsx
 - reader runtime boundary: src/client/features/reader/readerRuntime.ts
+- EPUB P0 integration uses an isolated reader document, per-book HTTP/custom-
+  protocol resources, and a versioned original-archive/package field on Book.
+  Legacy source-page coordinates are retained through checked reimport mapping.
+  Scope, storage tradeoffs and validation limits, including desktop exit checks,
+  are recorded in docs/epub-engine/p0-integration-2026-11-12.md.
+- EPUB P1 adds worker-based ZIP/XML import, publication CSS/font restoration,
+  font deobfuscation, single-viewport fixed layout, logical RTL/vertical axes,
+  on-demand binary resources, and summary/single-book reads. Scope, dependencies,
+  implementation choices and verification states are recorded in
+  docs/epub-engine/p1-implementation-2026-11-12.md. The owner restricted functional
+  validation for this conversation to ChatGPT's built-in browser on 2026-11-12.
+  Desktop execution and package verification remain unverified for P1.
+- Font behavior confirmed by the owner on 2026-11-12: Auto selects application
+  fonts by publication language. The existing Book font menu item now selects
+  publisher fonts through a persisted original-font preference, including fixed
+  layout. Browser verification is recorded in the P1 implementation document.
+- Reflowable image pagination places page gutters on the reading root and fits
+  images within the remaining content height. Scroll mode clears paged offsets
+  and restores flowing media height. Real-book verification and related height
+  cleanup are recorded in the P1 implementation document.
 - client persistence adapters: src/client/infrastructure/
 - local server and data store: src/server/
 - Electron entry and integration: src/desktop/

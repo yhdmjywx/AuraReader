@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import type { AppElements } from '../../app/elements.js';
-import type { Book } from '../../domain/book.js';
+import type { BookSummary } from '../../domain/book.js';
 import { Button } from '../../components/ui/button.js';
 import { Input } from '../../components/ui/input.js';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog.js';
 import { renderSurface } from '../../components/ui/renderSurface.js';
 
 interface ShelfProps {
-    elements: AppElements; books: Book[];
-    onOpenBook?: (id: string) => unknown; onDeleteBook?: (book: Book) => Promise<void>;
+    elements: AppElements; books: BookSummary[];
+    onOpenBook?: (id: string) => unknown; onDeleteBook?: (book: BookSummary) => Promise<void>;
 }
 function ShelfBooks({ elements, books, onOpenBook, onDeleteBook }: ShelfProps) {
-    const [query, setQuery] = useState(''), [removing, setRemoving] = useState<Book | null>(null);
+    const [query, setQuery] = useState(''), [removing, setRemoving] = useState<BookSummary | null>(null);
     const [busy, setBusy] = useState(false), [error, setError] = useState('');
     const visible = books.filter(book => book.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
     return <>

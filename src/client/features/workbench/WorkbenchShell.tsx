@@ -34,9 +34,8 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                         <div id="font-current-custom" hidden></div>
                         <p className="font-group-label">{"Basic"}</p>
                         <Button className="font-option" type="button" role="menuitemradio" aria-checked="true" data-font-choice="auto">{"Auto"}</Button>
-                        <Button className="font-option" type="button" role="menuitemradio" aria-checked="false" disabled title="Original book fonts are not available yet">
+                        <Button className="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="original">
                             {"Book font"}
-                            <span className="font-option-note">{"Not yet"}</span>
                         </Button>
                         <p className="font-group-label">{"Chinese"}</p>
                         <Button className="font-option" type="button" role="menuitemradio" aria-checked="false" data-font-choice="sarasa">{"Sarasa Gothic SC"}</Button>

@@ -5,8 +5,8 @@ const APP_URL = 'aurareader://app/index.html';
 const CSP = [
     "default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:", "font-src 'self'", "connect-src 'self'",
-    "object-src 'none'", "frame-src 'none'", "frame-ancestors 'none'",
-    "base-uri 'none'", "form-action 'none'", "worker-src 'none'"
+    "object-src 'none'", "frame-src 'self'", "frame-ancestors 'none'",
+    "base-uri 'none'", "form-action 'none'", "worker-src 'self'"
 ].join('; ');
 
 /** @param {string} raw */
@@ -22,8 +22,10 @@ function resourcePath(raw) {
     return decoded === '/' ? '/index.html' : decoded;
 }
 
-/** @param {string} root @param {(name: string) => Promise<{bytes: Uint8Array, type: string} | null>} [fontResource] */
-async function createAssetHandler(root, fontResource) {
+/** @param {string} root
+ * @param {(name: string) => Promise<{bytes: Uint8Array, type: string} | null>} [fontResource]
+ * @param {(request: {url: string, method: string}) => Promise<Response>} [publicationResource] */
+async function createAssetHandler(root, fontResource, publicationResource) {
     /** @type {Map<string, {filename: string, root: string, type: string}>} */
     const files = new Map();
     /** @param {string} url @param {string} directory @param {string} filename @param {string} type */
@@ -58,6 +60,7 @@ async function createAssetHandler(root, fontResource) {
         let name;
         try { name = resourcePath(request.url); }
         catch { return new Response('Forbidden', { status: 403, headers }); }
+        if (name.startsWith('/api/publications/') && publicationResource) return publicationResource(request);
         if (name.startsWith('/user-fonts/') && fontResource) {
             try {
                 const font = await fontResource(name.slice('/user-fonts/'.length));

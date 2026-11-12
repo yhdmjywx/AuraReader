@@ -1,3 +1,5 @@
+import { readerRect } from './readerDocument.js';
+import { readingViewportRect } from './readingAxis.js';
 // Read the rendered fragments, not chapter numbers or bounding-box unions:
 // one annotation can span multiple lines, columns, or screens.
 const RECT_EPSILON = 0.01;
@@ -17,12 +19,12 @@ export function collectVisibleAnnotationIds(papers = [], viewport = null) {
 
     for (const paper of papers) {
         if (!paper || paper.hidden || paper.style.display === 'none') continue;
-        const clip = intersectVisibleRects(view, paper.getBoundingClientRect());
+        const clip = intersectVisibleRects(view, readerRect(readingViewportRect(paper), paper.ownerDocument));
         if (!clip) continue;
         for (const token of paper.querySelectorAll('.annotation-token')) {
             if (!token.textContent.trim()) continue;
-            const visible = [...token.getClientRects()].some(rect => intersectVisibleRects(clip, rect));
-            if (!visible || win?.getComputedStyle(token).visibility === 'hidden') continue;
+            const visible = [...token.getClientRects()].some(rect => intersectVisibleRects(clip, readerRect(rect, token.ownerDocument)));
+            if (!visible || token.ownerDocument.defaultView?.getComputedStyle(token).visibility === 'hidden') continue;
             for (const attribute of ['data-note-ids', 'data-highlight-ids']) {
                 (token.getAttribute(attribute) || '').split(/\s+/).filter(Boolean).forEach(id => ids.add(id));
             }

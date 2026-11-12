@@ -21,7 +21,8 @@ export function renderTOC(tocItems = [], elements, onSelectChapter = null) {
         const li = document.createElement('li');
         li.className = `toc-item toc-level-${level}${item.hasChildren ? ' toc-branch' : ''}`;
         li.setAttribute('aria-level', String(level + 1));
-        li.innerHTML = `<span class="toc-title">${escapeHtml(title)}</span><small class="toc-page">P.${item.page || 1}</small>`;
+        li.innerHTML = `<span class="toc-title">${escapeHtml(title)}</span>${item.navigable === false ? '' : `<small class="toc-page">P.${item.page || 1}</small>`}`;
+        if (item.navigable === false) { li.setAttribute('role', 'heading'); li.style.cursor = 'default'; elements.tocList.appendChild(li); return; }
 
         li.addEventListener('click', () => {
             if (typeof onSelectChapter === 'function') {

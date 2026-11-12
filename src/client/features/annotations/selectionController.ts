@@ -1,3 +1,4 @@
+import { readerRect } from '../reader/readerDocument.js';
 import { readerAbortController } from '../reader/readerDom.js';
 import { eventElement } from '../../app/dom.js';
 import type { Annotation, AnnotationLocation } from '../../domain/annotation.js';
@@ -25,6 +26,7 @@ const DRAG_THRESHOLD = 5;
 
 export class SelectionController {
     private bindings?: AbortController;
+    private hostBindings?: AbortController;
     private selectionTimer?: ReturnType<typeof setTimeout>;
     private listeners = new Set<() => void>();
     private tooltipPinned = false;
@@ -37,6 +39,7 @@ export class SelectionController {
     destroy() {
         this.tooltipPinned = false;
         this.bindings?.abort(); this.bindings = undefined;
+        this.hostBindings?.abort(); this.hostBindings = undefined;
         clearTimeout(this.selectionTimer);
         this.hideSelectionTooltip(); this.clearAnnotationContext();
         this.pendingSelection = null;
@@ -283,7 +286,7 @@ export class SelectionController {
         };
 
         if (this.elements) {
-            showSelectionTooltip(this.elements, rect);
+            showSelectionTooltip(this.elements, readerRect(rect, root.ownerDocument));
         }
         this.changed();
     }
@@ -309,6 +312,9 @@ export class SelectionController {
         const document = elements.bookPaper?.ownerDocument || globalThis.document;
         this.bindings = readerAbortController(document);
         const signal = this.bindings.signal;
+        const hostDocument = elements.readerPanel?.ownerDocument || document;
+        this.hostBindings = readerAbortController(hostDocument);
+        const hostSignal = this.hostBindings.signal;
         const scheduleSelection = () => {
             clearTimeout(this.selectionTimer);
             this.selectionTimer = setTimeout(() => this.handleSelection(), 30);
@@ -349,7 +355,7 @@ export class SelectionController {
                 }
                 this.hideSelectionTooltip();
                 this.clearSelection();
-            }, { signal });
+            }, { signal: hostSignal });
         });
 
         if (elements.btnAddNote) {
@@ -368,7 +374,7 @@ export class SelectionController {
                 } else if (this.callbacks.onOpenNoteModal) {
                     this.callbacks.onOpenNoteModal(text, null, page);
                 }
-            }, { signal });
+            }, { signal: hostSignal });
         }
 
         elements.btnAnnotationGoal?.addEventListener('click', event => {
@@ -379,7 +385,7 @@ export class SelectionController {
             const result = this.callbacks.onLinkGoal?.(ids[0]!);
             this.clearAnnotationContext();
             Promise.resolve(result).catch(error => console.error("Could not add to goal", error));
-        }, { signal });
+        }, { signal: hostSignal });
         if (elements.btnHlRemove) {
             elements.btnHlRemove.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -388,7 +394,7 @@ export class SelectionController {
                 const ids = ctx.highlightIds.slice();
                 this.clearAnnotationContext();
                 if (this.callbacks.onDeleteHighlight) this.callbacks.onDeleteHighlight(ids);
-            }, { signal });
+            }, { signal: hostSignal });
         }
 
         if (elements.btnNoteRemove) {
@@ -399,10 +405,10 @@ export class SelectionController {
                 const ids = ctx.noteIds.slice();
                 this.clearAnnotationContext();
                 this.callbacks.onDeleteNotes?.(ids);
-            }, { signal });
+            }, { signal: hostSignal });
         }
 
-        document.addEventListener('click', (e) => {
+        const dismiss = (e: Event) => {
             const selection = document.getSelection();
             const hasActiveSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
 
@@ -414,7 +420,9 @@ export class SelectionController {
             if (eventElement(e)?.closest('#highlight-action-tooltip') || eventElement(e)?.closest('.annotation-token')) return;
             if (eventElement(e)?.closest('#notes-panel')) return;
             this.hideHighlightAction();
-        }, { signal });
+        };
+        document.addEventListener('click', dismiss, { signal });
+        if (hostDocument !== document) hostDocument.addEventListener('click', dismiss, { signal: hostSignal });
     }
 }
 

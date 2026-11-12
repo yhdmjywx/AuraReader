@@ -9,7 +9,7 @@ import type { ShowToast } from '../../app/contracts.js';
 import type { ReadingLocation } from '../../domain/book.js';
 import { addGoal, changeGoal, goalOrigin } from '../../domain/goalEngine.js';
 import { normalizeAnnotation } from '../../domain/annotationEngine.js';
-import { bookVersion, readBooks, onGoalLibraryChanged, operationId } from '../../infrastructure/storageClient.js';
+import { bookVersion, readBookSummaries, onGoalLibraryChanged, operationId } from '../../infrastructure/storageClient.js';
 import { stageLibrary, flushLibrary, loadGoalLibrary, loadGoalMaterials, pendingLibrary, libraryDrafts, storeLibraryDraft, discardLibraryDraft } from '../../infrastructure/goalLibraryRepository.js';
 import { pendingBookIntents, stageBookIntent, acknowledgeBookIntent } from '../../infrastructure/goalLibraryRepository.js';
 import { GoalUI } from './goalUI.js';
@@ -227,7 +227,7 @@ export class GoalController {
     }
     async addBook(goalId: string, bookId: string, expectedGeneration?: string) {
         if (this.lifecycleBusy || !goalEditable(this.state, goalId)) throw new Error('Restore this goal before adding books');
-        const version = (await readBooks()).find(b => b.id === bookId);
+        const version = (await readBookSummaries()).find(b => b.id === bookId);
         if (!version || version.deleted || (expectedGeneration && version.generation !== expectedGeneration)) throw new Error('This book is no longer available or has changed');
         const intent = { goalId, bookId, generation: version.generation }; stageBookIntent(intent);
         await this.assertWritesSaved(); if (this.disabled) throw this.failure || new Error('Goals are unavailable');

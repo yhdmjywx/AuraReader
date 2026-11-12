@@ -796,6 +796,8 @@ body.theme-dark .export-backup-action i {
 }
 
 /* Reader Viewport & Book Paper Canvas */
+.reader-document-host { width: 100%; min-width: 0; }
+.reader-document { display: block; width: 100%; border: 0; }
 .reader-viewport {
     flex: 1;
     min-height: 0;

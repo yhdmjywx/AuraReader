@@ -1,4 +1,7 @@
 import { readerViewport } from './readerDom.js';
+import { readerRect, syncReaderDocumentSize } from './readerDocument.js';
+import { preparePublicationContent } from './publicationContent.js';
+import { preparePublicationDocument } from './publicationDocument.js';
 /* ==========================================================================
    PaperRenderer - Canvas DOM Renderer for Reader (Feature Layer)
    Handles the reading page, highlight mounting,
@@ -34,7 +37,9 @@ export function renderPaper({
     const htmlContent = readerEngine.getPageContent(currentPage);
 
     if (elements.bookPaper) {
+        preparePublicationDocument(elements.bookPaper, readerEngine.getCurrentBook(), currentPage, () => syncReaderDocumentSize(elements));
         elements.bookPaper.innerHTML = htmlContent;
+        preparePublicationContent(elements.bookPaper, readerEngine.getCurrentBook(), currentPage);
         elements.bookPaper.style.setProperty('--book-text-indent', textIndent);
         applyHighlightsToPaper(elements.bookPaper, currentPage, notes);
     }
@@ -43,6 +48,7 @@ export function renderPaper({
     if (elements.btnNextPage) elements.btnNextPage.disabled = (currentPage >= totalPages);
 
     interceptInTextLinks(elements, readerEngine.getCurrentBook(), onLinkClick);
+    syncReaderDocumentSize(elements);
 
     if (viewport) {
         viewport.scrollTop = savedScrollTop;
@@ -66,11 +72,11 @@ export function applyHighlightsToPaper(targetPaper, targetPage, notes = []) {
 export function showHighlightActionTooltip(markEl, note, elements) {
     if (!elements || !elements.highlightActionTooltip || !markEl) return;
 
-    const markRect = markEl.getBoundingClientRect();
-    const readerRect = elements.readerPanel.getBoundingClientRect();
+    const markRect = readerRect(markEl.getBoundingClientRect(), markEl.ownerDocument);
+    const panelRect = elements.readerPanel.getBoundingClientRect();
 
-    elements.highlightActionTooltip.style.left = `${markRect.left + markRect.width / 2 - readerRect.left}px`;
-    elements.highlightActionTooltip.style.top = `${markRect.top - readerRect.top}px`;
+    elements.highlightActionTooltip.style.left = `${markRect.left + markRect.width / 2 - panelRect.left}px`;
+    elements.highlightActionTooltip.style.top = `${markRect.top - panelRect.top}px`;
     elements.highlightActionTooltip.style.display = 'flex';
 }
 
@@ -88,16 +94,16 @@ export function interceptInTextLinks(elements, currentBookObj, onLinkClick) {
         const href = a.getAttribute('href');
         if (!href) return;
 
-        if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('mailto:')) {
-            a.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                if (typeof onLinkClick === 'function') {
-                    onLinkClick(href);
-                }
-            });
-        }
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (/^(?:https?:|mailto:)|^\/\//i.test(href)) {
+                const hostDocument = elements.readerPanel?.ownerDocument || elements.bookPaper.ownerDocument;
+                hostDocument.defaultView?.open(href, '_blank', 'noopener,noreferrer');
+            } else if (!/^[a-z][a-z\d+.-]*:/i.test(href) && typeof onLinkClick === 'function') {
+                onLinkClick(href);
+            }
+        });
     });
 }
 

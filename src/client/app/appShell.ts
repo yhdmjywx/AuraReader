@@ -288,10 +288,12 @@ export class AppShell {
 
             if (e.key === 'ArrowLeft') {
                 e.preventDefault();
-                if (this.callbacks.onPrevPage) this.callbacks.onPrevPage();
+                if (elements.bookPaper?.dataset.progression === 'rtl') this.callbacks.onNextPage?.();
+                else this.callbacks.onPrevPage?.();
             } else if (e.key === 'ArrowRight') {
                 e.preventDefault();
-                if (this.callbacks.onNextPage) this.callbacks.onNextPage();
+                if (elements.bookPaper?.dataset.progression === 'rtl') this.callbacks.onPrevPage?.();
+                else this.callbacks.onNextPage?.();
             }
         });
 

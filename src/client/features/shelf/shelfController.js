@@ -4,7 +4,7 @@
    ========================================================================== */
 
 import {
-    getAllBooksFromDB,
+    getBookSummariesFromDB,
     deleteBookFromDB
 } from '../../infrastructure/bookRepository.js';
 
@@ -26,7 +26,7 @@ export class ShelfController {
     }
 
     async refreshShelf() {
-        this.books = await getAllBooksFromDB();
+        this.books = await getBookSummariesFromDB();
         if (this.elements) {
             domRenderShelf({
                 elements: this.elements,

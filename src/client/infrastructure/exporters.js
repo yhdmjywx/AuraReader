@@ -11,6 +11,7 @@ import { buildBookStructure, structureSummary } from './bookStructure.js';
 import { unwrapDesktop } from './storageClient.js';
 import { saveMarkdownFolder } from './folderExport.js';
 import { countLabel, exportTimestamp } from '../domain/format.js';
+import { withExportImages } from './epubExport.js';
 
 export function downloadFile(filename, data, type) {
     if (typeof window === 'undefined') return;
@@ -177,7 +178,8 @@ export async function exportChapters(book, notes = [], options = {}) {
     // Browser pickers must start during the click, before expensive conversion.
     const destination = count > 1 && !window.auraDesktop ? await saveMarkdownFolder.pick() : null;
     if (count > 1 && !window.auraDesktop && !destination) return { status: 'canceled' };
-    const documents = buildChapterDocuments(book, notes, options);
+    const selectedPages = new Set(structure.units.filter(unit => !selection || selection.has(unit.id)).flatMap(unit => unit.sourcePages));
+    const documents = buildChapterDocuments(await withExportImages(book, selectedPages), notes, options);
     if (documents.chapterFiles.length === 1) {
         const chapter = documents.chapterFiles[0];
         let text = chapter.text;
@@ -196,7 +198,7 @@ export async function exportChapters(book, notes = [], options = {}) {
 // Compatibility adapter for legacy consumers; the product UI exports .md/folders.
 export async function exportChapterZip(book, notes = [], jszipLib, options = {}) {
     if (!jszipLib) throw new Error("JSZip is not ready. Check that application resources are available.");
-    const { folderName, files } = buildChapterDocuments(book, notes, options);
+    const { folderName, files } = buildChapterDocuments(await withExportImages(book), notes, options);
     const zip = new jszipLib();
     const folder = zip.folder(folderName);
     files.forEach(file => folder.file(file.filename, file.text));

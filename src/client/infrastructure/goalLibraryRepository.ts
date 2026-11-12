@@ -3,7 +3,7 @@ import { normalizeGoalContent } from '../domain/goalContentEngine.js';
 import { responseTargetKey, type GoalResponseTarget } from '../domain/goalContentEngine.js';
 import type { SaveGoalLibraryCommand } from '../../shared/storage.js';
 import { acknowledgeGoals, attachGoalCommand, pendingGoals, readGoalDraft, clearGoalDraft } from './goalRecovery.js';
-import { acceptGoalLibrary, bookVersion, cachedGoalLibrary, enqueue, operationId, readBooks, readGoalLibrary, readNotes, storageRequest } from './storageClient.js';
+import { acceptGoalLibrary, bookVersion, cachedGoalLibrary, enqueue, operationId, readBookSummaries, readGoalLibrary, readNotes, storageRequest } from './storageClient.js';
 import { getNotesForBooks } from './annotationRepository.js';
 
 const PENDING = 'aura_goal_library_pending', DRAFTS = 'aura_goal_library_drafts';
@@ -101,7 +101,7 @@ async function legacyId(book: string, id: string) {
 }
 async function recoverLegacy() {
     const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) || '');
-    if (keys.some(k => k.startsWith('aura_goals_'))) await readBooks();
+    if (keys.some(k => k.startsWith('aura_goals_'))) await readBookSummaries();
     for (const key of keys.filter(k => k.startsWith('aura_goals_pending_'))) {
         const bookId = key.slice('aura_goals_pending_'.length);
         for (;;) {
@@ -137,7 +137,7 @@ export async function loadGoalLibrary() {
 }
 export async function loadGoalMaterials(state: GoalLibraryState) {
     const ids = [...new Set(state.links.map(l => l.bookId))];
-    const [notes, books] = await Promise.all([ids.length ? readNotes(ids) : Promise.resolve([]), readBooks()]);
+    const [notes, books] = await Promise.all([ids.length ? readNotes(ids) : Promise.resolve([]), readBookSummaries()]);
     return { annotations: notes.flatMap(n => n.deleted ? [] : [n.value]), titles: new Map(books.filter(b => !b.deleted).map(b => [b.id, b.deleted ? '' : b.value.title])) };
 }
 export function assertNoLibraryRecovery() {

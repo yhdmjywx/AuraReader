@@ -1,7 +1,7 @@
-import type { Book } from '../../domain/book.js';
+import type { BookSummary } from '../../domain/book.js';
 import type { GoalController } from './goalController.js';
 import type { AppCoordinator } from '../../app/appCoordinator.js';
-import { getAllBooksFromDB } from '../../infrastructure/bookRepository.js';
+import { getBookSummariesFromDB } from '../../infrastructure/bookRepository.js';
 import { chooseDesktopFile } from '../../infrastructure/desktopFiles.js';
 import { operationId } from '../../infrastructure/storageClient.js';
 import { areaGoals, goalArea, goalAncestors, goalPath, type GoalArea, type GoalFilter } from '../../domain/goalLifecycle.js';
@@ -134,7 +134,7 @@ function HomeView({ home }: { home: GoalHome }) {
 /** Home state and commands; React owns every node of the home view. */
 export class GoalHome {
     get active() { return this.deps.goals.navigation.surface === 'home'; }
-    books: Book[] = []; chosen: string | null = null; picking: string | null = null;
+    books: BookSummary[] = []; chosen: string | null = null; picking: string | null = null;
     busy = false; creating = false; status = ''; fileTarget?: string;
     area: GoalArea = 'library'; filter: GoalFilter = 'all'; query = '';
     draftId = operationId(); draftText = ''; private draftParent: string | null = null;
@@ -189,7 +189,7 @@ export class GoalHome {
     leave() { if (this.active && this.deps.currentBookId()) this.deps.goals.navigation.show('reader'); }
     async refresh() {
         const request = ++this.request;
-        const books = await getAllBooksFromDB(); if (request !== this.request) return;
+        const books = await getBookSummariesFromDB(); if (request !== this.request) return;
         this.books = books; this.render();
     }
     changed() { if (this.active) this.render(); }
@@ -201,7 +201,7 @@ export class GoalHome {
             priority.push(...state.links.filter(l => l.goalId === goal.id).map(l => l.bookId));
             if (goal.origin?.bookId) priority.push(goal.origin.bookId);
         }
-        return [...new Set([...priority, ...this.books.map(b => b.id)])].map(id => this.books.find(b => b.id === id)).filter((b): b is Book => !!b);
+        return [...new Set([...priority, ...this.books.map(b => b.id)])].map(id => this.books.find(b => b.id === id)).filter((b): b is BookSummary => !!b);
     }
     render() {
         if (this.chosen && (!this.deps.goals.state.goals.some(g => g.id === this.chosen) || goalArea(this.deps.goals.state, this.chosen) !== this.area)) this.chosen = null;

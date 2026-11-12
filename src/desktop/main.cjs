@@ -60,8 +60,8 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
             [path.resolve(__dirname, '..'), path.resolve(__dirname, '../../dist')])],
         dialogs: dialogs || { open: options => dialog.showOpenDialog(owner, options), save: options => dialog.showSaveDialog(owner, options) }
     });
-    desktopSession.protocol.handle('aurareader', await createAssetHandler(path.resolve(__dirname, '../..'), files.fontResource));
     const storage = createDesktopStorage(dataDirectory);
+    desktopSession.protocol.handle('aurareader', await createAssetHandler(path.resolve(__dirname, '../..'), files.fontResource, storage.publicationResource));
     const removeStorageHandlers = registerStorageIpc(window, storage);
     const removeFileHandlers = registerFileIpc(window, files);
     const removeWikiHandlers = registerWikiIpc(window);

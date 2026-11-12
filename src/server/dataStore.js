@@ -148,9 +148,26 @@ function createDataStore(directory) {
         run('UPDATE goal_states SET payload=?, revision=? WHERE book_id=?', JSON.stringify(record.value), record.revision, bookId);
         return record;
     }
+    const summaryCache = new Map();
     const store = {
         filename, root, db, transaction, one, all, run,
         books() { return all('SELECT * FROM books ORDER BY id').map(r => ({ id: r.id, revision: r.revision, generation: r.generation, deleted: !!r.deleted, value: r.deleted ? null : JSON.parse(r.payload) })); },
+        book(bookId) {
+            const row = one('SELECT * FROM books WHERE id=?', id(bookId, 'bookId'));
+            return row ? { id: row.id, revision: row.revision, generation: row.generation, deleted: !!row.deleted, value: row.deleted ? null : JSON.parse(row.payload) } : null;
+        },
+        bookSummaries() {
+            return all('SELECT id, revision, generation, deleted FROM books ORDER BY id').map(row => {
+                const cached = summaryCache.get(row.id);
+                if (cached?.revision === row.revision) return cached;
+                const value = row.deleted ? null : one(`SELECT id, json_extract(payload,'$.title') AS title,
+                    json_extract(payload,'$.format') AS format, json_extract(payload,'$.language') AS language,
+                    json_extract(payload,'$.updatedAt') AS updatedAt, json_array_length(payload,'$.pages') AS pageCount
+                    FROM books WHERE id=?`, row.id);
+                const result = { ...row, deleted: !!row.deleted, value };
+                summaryCache.set(row.id, result); return result;
+            });
+        },
         notes(bookIds = []) {
             if (!Array.isArray(bookIds)) throw new StorageError("Invalid book list.");
             bookIds.forEach(b => id(b));

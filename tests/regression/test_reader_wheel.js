@@ -14,8 +14,8 @@ const { JSDOM } = require('jsdom');
         runtime = new ReaderRuntime();
         const host = document.querySelector('section');
         const viewport = document.querySelector('.reader-viewport');
-        const paper = document.querySelector('.book-paper');
         runtime.mount(host);
+        let paper = runtime.reader.elements.bookPaper;
         let now = 0;
         Date.now = () => now;
         const wheel = (deltaY, options = {}, target = paper, elapsed = 300) => {
@@ -56,6 +56,7 @@ const { JSDOM } = require('jsdom');
         assert.equal(wheel(-100).defaultPrevented, false, 'destroy removes wheel listener');
         assert.equal(runtime.reader.getCurrentPage(), 3);
         runtime.mount(host); runtime.mount(host);
+        paper = runtime.reader.elements.bookPaper;
         wheel(-100);
         assert.equal(runtime.getSnapshot().location.page, 2, 'remount binds exactly one wheel listener');
         console.log('PASS: wheel direction, burst limiting, boundaries, reader scope, native scroll/zoom, and listener lifecycle');

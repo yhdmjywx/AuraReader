@@ -5,6 +5,7 @@ import type { GoalLibraryState } from '../client/domain/goal.js';
 import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import type { Book } from '../client/domain/book.js';
 import type { BookRecord, BookRevision, DeleteBookCommand, DeleteNoteCommand, NoteRecord, RestoreCommand, Revision, SaveBookCommand, SaveNoteCommand, StoredAnnotation } from '../shared/storage.js';
+import type { BookSummaryRecord } from '../shared/storage.js';
 
 export class StorageError extends Error {
     constructor(message: string, status?: number, details?: unknown);
@@ -20,6 +21,8 @@ export interface DataStore {
     all(sql: string, ...args: SQLInputValue[]): Record<string, unknown>[];
     run(sql: string, ...args: SQLInputValue[]): unknown;
     books(): BookRecord[];
+    book(bookId: string): BookRecord | null;
+    bookSummaries(): BookSummaryRecord[];
     notes(bookIds?: string[]): NoteRecord[];
     goals(bookIds?: string[]): GoalStateRecord[];
     saveGoals(command: SaveGoalsCommand): Revision;

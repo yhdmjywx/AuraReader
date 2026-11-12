@@ -41,6 +41,11 @@ async function desktopRequest<R extends keyof StorageRoutes>(bridge: DesktopStor
     let result: unknown;
     switch (route) {
         case 'books': result = unwrapDesktop(await bridge.listBooks()); break;
+        case 'books/summary': result = bridge.listBookSummaries ? unwrapDesktop(await bridge.listBookSummaries())
+            : { records: unwrapDesktop(await bridge.listBooks()).records.map(row => ({ ...row, value: row.deleted ? null : {
+                id: row.id, title: row.value.title, format: row.value.format, language: row.value.language, updatedAt: row.value.updatedAt, pageCount: row.value.pages.length } })) }; break;
+        case 'books/get': result = bridge.getBook ? unwrapDesktop(await bridge.getBook(body as { id: string }))
+            : { record: unwrapDesktop(await bridge.listBooks()).records.find(row => row.id === (body as { id: string }).id) || null }; break;
         case 'books/save': result = unwrapDesktop(await bridge.saveBook(body as StorageRoutes['books/save']['request'])); break;
         case 'books/delete': result = unwrapDesktop(await bridge.deleteBook(body as StorageRoutes['books/delete']['request'])); break;
         case 'goals/query': result = unwrapDesktop(await bridge.queryGoals(body as StorageRoutes['goals/query']['request'])); break;
@@ -122,8 +127,25 @@ export function initializeStorage() {
 export async function readBooks() {
     await initializeStorage();
     const { records } = await storageRequest('books', undefined);
-    records.forEach(row => { if ((bookVersions.get(row.id)?.revision || 0) <= row.revision) bookVersions.set(row.id, row); });
+    records.forEach(rememberBookVersion);
     return records;
+}
+function rememberBookVersion(row: BookRecord) {
+    if ((bookVersions.get(row.id)?.revision || 0) <= row.revision) bookVersions.set(row.id, { revision: row.revision, generation: row.generation, deleted: row.deleted });
+}
+export async function readBookSummaries() {
+    await initializeStorage();
+    const { records } = await storageRequest('books/summary', undefined);
+    records.forEach(row => {
+        if ((bookVersions.get(row.id)?.revision || 0) <= row.revision) bookVersions.set(row.id, { revision: row.revision, generation: row.generation, deleted: row.deleted });
+    });
+    return records;
+}
+export async function readBook(id: string) {
+    await initializeStorage();
+    const { record } = await storageRequest('books/get', { id });
+    if (record) rememberBookVersion(record);
+    return record;
 }
 export async function readNotes(bookIds: string[] = []) {
     await initializeStorage();
@@ -140,7 +162,7 @@ export function enqueue<T>(bookId: string, task: () => T | PromiseLike<T>): Prom
 }
 export async function drainStorage() { await Promise.all([...queues.values()]); }
 export async function bookVersion(id: string): Promise<BookRevision> {
-    if (!bookVersions.has(id)) await readBooks();
+    if (!bookVersions.has(id)) await readBookSummaries();
     return bookVersions.get(id) || { revision: 0 };
 }
 export async function noteVersion(id: string, bookId: string): Promise<Revision> {
@@ -186,7 +208,7 @@ export async function readGoalLibrary() {
 export async function restoreRecords(books: Book[], notes: StoredAnnotation[], opId = operationId(), goalStates?: GoalBackupState[], goalGraph?: GoalGraphBackup) {
     await initializeStorage(); await drainStorage();
     const result = await storageRequest('restore', { opId, books, notes, ...(goalStates !== undefined ? { goalStates } : {}), ...(goalGraph !== undefined ? { goalGraph } : {}) });
-    await readBooks(); await readNotes(); if (goalStates !== undefined) await readGoals();
+    await readBookSummaries(); await readNotes(); if (goalStates !== undefined) await readGoals();
     if (goalGraph !== undefined || goalStates !== undefined) acceptGoalLibrary(await readGoalLibrary(), true);
     return result;
 }

@@ -1,7 +1,7 @@
 import type { GoalController } from '../features/goals/goalController.js';
 import type { GoalSourceLink } from '../domain/goal.js';
 import type { StoredAnnotation } from '../../shared/storage.js';
-import { bookVersion, readBooks } from '../infrastructure/storageClient.js';
+import { bookVersion, readBookSummaries } from '../infrastructure/storageClient.js';
 import { stageBookIntent } from '../infrastructure/goalLibraryRepository.js';
 import type { Session } from './session.js';
 import type { ReaderController } from '../features/reader/readerController.js';
@@ -47,6 +47,7 @@ import {
 
 import { parseEpub, parseTxt } from '../infrastructure/epubParser.js';
 import { loadNotesForBook, saveNoteToDB } from '../infrastructure/annotationRepository.js';
+import { retainEpubLocations, upgradeEpubBook } from '../infrastructure/epubCompatibility.js';
 import { isNote } from '../domain/annotationEngine.js';
 
 const demos: Record<string, (typeof demoBooks)[keyof typeof demoBooks]> = demoBooks;
@@ -62,6 +63,7 @@ export class AppCoordinator {
     shell?: AppShell;
     goals?: GoalController;
     private openBookRequestId: number;
+    private importRequest?: AbortController;
     onBookOpened?: () => void;
     onBookRemoved?: () => Promise<void>;
     navigation: AppNavigation;
@@ -91,6 +93,7 @@ export class AppCoordinator {
     }
 
     async openBook(bookId: string, sourceRequestId?: number, options: OpenBookOptions = {}): Promise<OpenBookResult> {
+        if (options.navigationRequest === undefined) this.importRequest?.abort();
         if (!bookId) return { status: 'failed', message: "Choose a book" };
         if (options.navigationRequest !== undefined && !this.navigation.isCurrent(options.navigationRequest)) return { status: 'superseded' };
         if (sourceRequestId === undefined) this.sourceRequest++;
@@ -122,6 +125,13 @@ export class AppCoordinator {
             if (!book) {
                 throw new Error("Could not load this book. Please import it again.");
             }
+            if (book.epub?.archive && !book.epub.metadata) {
+                try {
+                    const upgraded = await upgradeEpubBook(book);
+                    if (!current()) return { status: 'superseded' };
+                    await saveBookToDB(upgraded); book = upgraded;
+                } catch (error) { console.warn('EPUB source upgrade deferred to preserve existing locations.', error); }
+            }
 
             const notes = await loadNotesForBook(bookId);
             if (!current()) return { status: 'superseded' };
@@ -141,7 +151,7 @@ export class AppCoordinator {
             this.session.setCurrentBookId(bookId);
             this.navigation.commit('reader', navigationRequest);
             this.onBookOpened?.();
-            this.reader.renderPage(1, false, this.annotations.getNotes());
+            this.reader.renderPage(this.reader.getFirstPage(), false, this.annotations.getNotes());
             this.annotations.refreshVisibleNotes();
             this.goals?.bookChanged();
 
@@ -166,6 +176,9 @@ export class AppCoordinator {
 
     async importBook(file: File, targetGoalId?: string): Promise<string | undefined> {
         if (!file) return;
+        this.importRequest?.abort();
+        const importRequest = new AbortController();
+        this.importRequest = importRequest;
         const navigationRequest = this.navigation.begin();
 
         if (this.shell) {
@@ -178,19 +191,21 @@ export class AppCoordinator {
 
             if (ext === 'epub' || ext === 'equb' || ext === 'zip') {
                 const arrayBuffer = await file.arrayBuffer();
-                bookObj = await parseEpub(arrayBuffer, file.name, JSZip);
+                bookObj = await parseEpub(arrayBuffer, file.name, JSZip, { signal: importRequest.signal });
             } else {
                 const text = await file.text();
                 if (text.startsWith('PK')) {
                     const arrayBuffer = await file.arrayBuffer();
-                    bookObj = await parseEpub(arrayBuffer, file.name, JSZip);
+                    bookObj = await parseEpub(arrayBuffer, file.name, JSZip, { signal: importRequest.signal });
                 } else {
                     bookObj = parseTxt(text, file.name);
                 }
             }
 
             if (!bookObj) throw new Error("This file format could not be read.");
+            if (bookObj.epub) bookObj = retainEpubLocations(bookObj, await loadBookFromDB(bookObj.id));
 
+            importRequest.signal.throwIfAborted();
             const saved = await saveBookToDB(bookObj);
             if (targetGoalId) {
                 try {
@@ -209,11 +224,14 @@ export class AppCoordinator {
             }
             return bookObj.id;
         } catch (err) {
+            if (importRequest.signal.aborted) return;
             console.error("Book import failed:", err);
             if (this.shell) {
                 this.shell.showToast(`Book import failed: ${errorMessage(err, "This file format could not be read.")}`, { kind: 'error' });
             }
             if (targetGoalId) throw err;
+        } finally {
+            if (this.importRequest === importRequest) this.importRequest = undefined;
         }
     }
 
@@ -262,7 +280,7 @@ export class AppCoordinator {
         await this.goals?.finishInlineEdit();
         await this.annotations.finishInlineEdit(); await this.annotations.assertInlineWritesSaved();
         await this.goals?.assertWritesSaved();
-        await readBooks();
+        await readBookSummaries();
         const book = await bookVersion(source.bookId);
         if (request !== this.sourceRequest || !this.navigation.isCurrent(navigationRequest)) return;
         if (book.generation !== source.generation) { this.shell?.showToast("The source has been deleted or changed.", { kind: 'error' }); return; }

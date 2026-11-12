@@ -11,6 +11,7 @@ export const quoteFamily = (family: unknown) => `"${String(family).replace(/[\\"
 export function normalizeFontChoice(input: unknown): FontChoice {
     const choice = input && typeof input === 'object' ? input as Record<string, unknown> : null;
     if (!choice || typeof choice !== 'object') return { kind: 'auto' };
+    if (choice.kind === 'original') return { kind: 'original' };
     if (choice.kind === 'builtin' && CURATED_FONTS.some(font => font.id === choice.id)) return { kind: 'builtin', id: choice.id as BuiltinFontId };
     if (choice.kind === 'system' && typeof choice.family === 'string' && choice.family.trim() && choice.family.length <= 160) {
         return { kind: 'system', family: choice.family, name: choice.family };
@@ -30,6 +31,7 @@ export function automaticFont(book: Book | null | undefined): BuiltinFontId | nu
 
 export function resolveFont(input: unknown, book: Book | null | undefined, imported: ImportedFont[] = []): ResolvedFont {
     const choice = normalizeFontChoice(input);
+    if (choice.kind === 'original') return { family: '', name: 'Book font', loadFamilies: [] };
     const id = choice.kind === 'auto' ? automaticFont(book) : choice.kind === 'system' ? null : choice.id;
     const curated = CURATED_FONTS.find(font => font.id === id);
     if (choice.kind === 'auto' || choice.kind === 'builtin') {

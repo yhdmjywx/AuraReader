@@ -10,6 +10,8 @@ if (process.isMainFrame) {
             status: () => ipcRenderer.invoke('aura:storage:status', undefined),
             createLibrary: () => ipcRenderer.invoke('aura:storage:createLibrary', undefined),
             listBooks: () => ipcRenderer.invoke('aura:storage:listBooks', undefined),
+            listBookSummaries: () => ipcRenderer.invoke('aura:storage:listBookSummaries', undefined),
+            getBook: query => ipcRenderer.invoke('aura:storage:getBook', query),
             saveBook: command => ipcRenderer.invoke('aura:storage:saveBook', command),
             deleteBook: command => ipcRenderer.invoke('aura:storage:deleteBook', command),
             queryNotes: query => ipcRenderer.invoke('aura:storage:queryNotes', query),

@@ -79,7 +79,7 @@ export function ReadingWorkbench({ application }: { application: ReadingApplicat
     const store = useMemo(() => new WorkbenchStore(application), [application]);
     const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
     const [ready, setReady] = useState(false);
-    const doc = application.elements.bookPaper!.ownerDocument;
+    const doc = application.elements.notesList!.ownerDocument;
     useLayoutEffect(() => {
         const notes = application.elements.notesList!;
         const host = doc.getElementById('react-notes')!;

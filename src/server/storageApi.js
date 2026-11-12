@@ -46,10 +46,12 @@ function createStorageApi(store) {
             if (req.method === 'POST' && url.pathname === '/api/storage/migration/commit') return reply(200, migration.commit(source, (await readJson(req)).snapshotId));
             if (!migration.status(source).completed) throw new StorageError("Legacy data has not been migrated. Complete migration validation first.", 423);
             if (req.method === 'GET' && url.pathname === '/api/storage/books') return reply(200, { records: store.books() });
+            if (req.method === 'GET' && url.pathname === '/api/storage/books/summary') return reply(200, { records: store.bookSummaries() });
             if (req.method === 'GET' && url.pathname === '/api/storage/goals/library') return reply(200, store.goalLibrary());
             if (req.method === 'POST') {
                 const body = await readJson(req);
                 const actions = {
+                    '/api/storage/books/get': () => ({ record: store.book(body.id) }),
                     '/api/storage/books/save': () => store.saveBook(body),
                     '/api/storage/books/delete': () => store.deleteBook(body),
                     '/api/storage/goals/query': () => ({ records: store.goals(body.bookIds) }),

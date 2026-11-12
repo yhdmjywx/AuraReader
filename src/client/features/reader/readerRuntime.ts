@@ -4,6 +4,7 @@ import type { Book, ReaderMode, ReadingLocation } from '../../domain/book.js';
 import { SelectionController } from '../annotations/selectionController.js';
 import { LayoutController } from '../layout/layoutController.js';
 import { ReaderController } from './readerController.js';
+import { mountReaderDocument } from './readerDocument.js';
 
 export interface ReaderSnapshot {
     mounted: boolean;
@@ -23,6 +24,7 @@ export class ReaderRuntime {
     private detach: (() => void)[] = [];
     private observer?: ResizeObserver;
     private resizeTimer?: ReturnType<typeof setTimeout>;
+    private unmountDocument?: () => void;
     private snapshot: ReaderSnapshot;
 
     constructor(
@@ -75,6 +77,10 @@ export class ReaderRuntime {
             throw new Error("The reader requires viewport, container, and paper elements.");
         }
         this.root = root;
+        this.unmountDocument = mountReaderDocument(elements, () => {
+            if (this.root) this.reader.refitAfterTypography();
+        });
+        Object.assign(controls, elements);
         this.reader.initUI(elements);
         this.selection.initUI(elements);
         this.detach = [this.reader.subscribe(this.publish), this.selection.subscribe(this.publish)];
@@ -102,7 +108,7 @@ export class ReaderRuntime {
     setBook(book: Book, annotations: Annotation[] = []) {
         this.annotations = annotations;
         this.reader.setBook(book.id, book);
-        this.reader.renderPage(1, false, annotations);
+        this.reader.renderPage(this.reader.getFirstPage(), false, annotations);
         this.publish();
     }
     setAnnotations(annotations: Annotation[]) {
@@ -113,7 +119,7 @@ export class ReaderRuntime {
     setLayout(options: { mode?: ReaderMode; fontSize?: number; textIndent?: string }) {
         this.reader.rememberAnchor();
         if (options.mode) this.reader.layoutController?.setPageMode(options.mode);
-        if (options.fontSize !== undefined) this.reader.fontSize = options.fontSize;
+        if (options.fontSize !== undefined) { this.reader.fontSize = options.fontSize; this.reader.fontSizeOverride = true; }
         if (options.textIndent !== undefined) this.reader.textIndent = options.textIndent;
         this.relayout();
     }
@@ -122,6 +128,7 @@ export class ReaderRuntime {
     goToPage(page: number) { return this.reader.goToPage(page, 0, this.reader.callbacks.getNotes?.() || []); }
     relayout() {
         if (!this.root || !this.reader.getCurrentBook()) return;
+        this.reader.rememberAnchor();
         this.reader.layoutController?.updateLayoutClasses(this.reader.elements);
         const notes = this.reader.callbacks.getNotes?.() || [];
         if (this.reader.isChapterFlow()) this.reader.refitChapter(notes);
@@ -134,6 +141,7 @@ export class ReaderRuntime {
         this.detach.splice(0).forEach(unsubscribe => unsubscribe());
         this.selection.destroy();
         this.reader.destroy();
+        this.unmountDocument?.(); this.unmountDocument = undefined;
         this.root = null;
         this.publish();
     }

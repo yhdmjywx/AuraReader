@@ -38,6 +38,14 @@ export class FontController {
 
     apply(paper) {
         if (!paper) return;
+        if (this.choice.kind === 'original') {
+            paper.classList.remove('reader-font-override');
+            if (paper.dataset.publisherFontFamily) {
+                paper.style.setProperty('font-family', paper.dataset.publisherFontFamily, paper.dataset.publisherFontPriority || '');
+            } else paper.style.removeProperty('font-family');
+            paper.style.removeProperty('--reader-font-family');
+            return;
+        }
         paper.classList.add('reader-font-override');
         const font = this.resolved();
         paper.style.setProperty('--reader-font-family', font.family);
@@ -45,7 +53,11 @@ export class FontController {
     }
 
     async ensure(font) {
+        const document = this.callbacks.getDocument?.() || globalThis.document;
         if (typeof document === 'undefined' || !document.fonts) return;
+        if (this.choice.kind === 'original') return;
+        // EPUB Auto lets CSS request only faces and weights used by the current document.
+        if (this.choice.kind === 'auto' && this.callbacks.getBook?.()?.epub) return;
         if (font.missing) throw new Error("The imported font file is missing.");
         if (font.systemFamily) {
             const key = `system:${font.systemFamily}`;
@@ -57,7 +69,7 @@ export class FontController {
                 this.loadedFaces.set(key, promise);
                 promise.catch(() => this.loadedFaces.delete(key));
             }
-            try { await this.loadedFaces.get(key); }
+            try { document.fonts.add(await this.loadedFaces.get(key)); }
             catch (_) { /* Some local fonts only expose a full face name; the native family stack still works. */ }
         }
         if (font.importedFont) {
@@ -72,7 +84,7 @@ export class FontController {
                 this.loadedFaces.set(item.id, promise);
                 promise.catch(() => this.loadedFaces.delete(item.id));
             }
-            await this.loadedFaces.get(item.id);
+            document.fonts.add(await this.loadedFaces.get(item.id));
         }
         await Promise.all(font.loadFamilies.flatMap(family => [
             document.fonts.load(`18px "${family}"`),
@@ -137,7 +149,7 @@ export class FontController {
             const option = event.target.closest('[data-font-choice]');
             if (option) {
                 const id = option.dataset.fontChoice;
-                this.choose(id === 'auto' ? { kind: 'auto' } : { kind: 'builtin', id });
+                this.choose(id === 'auto' || id === 'original' ? { kind: id } : { kind: 'builtin', id });
             }
             const system = event.target.closest('[data-system-family]');
             if (system) this.choose({ kind: 'system', family: system.dataset.systemFamily });
@@ -208,7 +220,7 @@ export class FontController {
         const current = this.elements.fontMenu.querySelector('#font-current-custom');
         if (current) renderCurrentFont(current, this.choice, font);
         this.elements.fontMenu.querySelectorAll('[data-font-choice]').forEach(button => {
-            const selected = button.dataset.fontChoice === (this.choice.kind === 'auto' ? 'auto' : this.choice.kind === 'builtin' ? this.choice.id : '');
+            const selected = button.dataset.fontChoice === (this.choice.kind === 'auto' || this.choice.kind === 'original' ? this.choice.kind : this.choice.kind === 'builtin' ? this.choice.id : '');
             button.setAttribute('aria-checked', String(selected));
         });
     }

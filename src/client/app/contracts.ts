@@ -69,6 +69,7 @@ export interface LayoutCallbacks {
     onLayoutChange?: (change: LayoutChange) => void;
 }
 export interface FontCallbacks {
+    getDocument?: () => Document;
     getBook?: () => Book | null;
     beforeChange?: () => void;
     onChange?: () => void;

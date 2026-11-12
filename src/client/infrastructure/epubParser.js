@@ -1,69 +1,38 @@
+import { importEpubBytes } from './epubImport.js';
 /* ==========================================================================
    EpubParser - EPUB & TXT Document Format Parsing Adapter (Infrastructure Layer)
    Extracts chapters, cleans styles, converts internal images to Base64 data URLs,
    parses NCX/NAV tables of contents, and produces standardized book objects.
    ========================================================================== */
 
+import { resolveEpubUrl } from './epubPaths.js';
 import { ensureTocHierarchy } from '../domain/readingLocation.js';
 
 export function findZipFile(zip, targetPath) {
     if (!zip || !targetPath) return null;
-    const normalized = targetPath.replace(/^\/+/, '').replace(/\/\//g, '/');
-    let decoded = normalized;
-    try {
-        decoded = decodeURIComponent(normalized);
-    } catch (e) {
-        // ignore
-    }
-
-    if (zip.file(normalized)) return zip.file(normalized);
-    if (zip.file(decoded)) return zip.file(decoded);
-
-    // Fuzzy case-insensitive search
-    const keys = Object.keys(zip.files);
-    const matchedKey = keys.find(k => {
-        const kLower = k.toLowerCase();
-        const normLower = normalized.toLowerCase();
-        const decLower = decoded.toLowerCase();
-        return kLower === normLower || kLower === decLower || kLower.endsWith('/' + normLower) || kLower.endsWith('/' + decLower);
-    });
-    return matchedKey ? zip.file(matchedKey) : null;
+    const resolved = resolveEpubUrl(targetPath);
+    return resolved ? zip.file(resolved.path) : null;
 }
 
-export async function processChapterImages(zip, chapterPath, chapDoc) {
+const IMAGE_TYPES = { png: 'image/png', gif: 'image/gif', svg: 'image/svg+xml',
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', avif: 'image/avif', bmp: 'image/bmp' };
+
+export async function processChapterImages(zip, chapterPath, chapDoc, manifest = []) {
     if (!chapDoc) return;
-    const images = chapDoc.querySelectorAll("img, image, [*|href]");
-    if (images.length === 0) return;
-
-    const chapDir = chapterPath.includes('/') ? chapterPath.substring(0, chapterPath.lastIndexOf('/') + 1) : '';
-
-    for (const img of images) {
-        const rawSrc = img.getAttribute("src") || img.getAttribute("xlink:href") || img.getAttribute("href");
-        if (!rawSrc || rawSrc.startsWith('data:') || rawSrc.startsWith('http')) continue;
-
-        let imgPath = chapDir + rawSrc;
-        const parts = imgPath.split('/');
-        const stack = [];
-        for (const p of parts) {
-            if (p === '..') stack.pop();
-            else if (p !== '.' && p !== '') stack.push(p);
-        }
-        imgPath = stack.join('/');
-
-        const imgFile = findZipFile(zip, imgPath) || findZipFile(zip, rawSrc) || findZipFile(zip, rawSrc.split('/').pop());
-        if (imgFile) {
-            try {
-                const base64 = await imgFile.async("base64");
-                const ext = rawSrc.split('.').pop().toLowerCase();
-                const mime = (ext === 'png') ? 'image/png' : (ext === 'gif') ? 'image/gif' : (ext === 'svg') ? 'image/svg+xml' : 'image/jpeg';
-                const dataUrl = `data:${mime};base64,${base64}`;
-
-                if (img.hasAttribute("src")) img.setAttribute("src", dataUrl);
-                if (img.hasAttribute("xlink:href")) img.setAttribute("xlink:href", dataUrl);
-                if (img.hasAttribute("href")) img.setAttribute("href", dataUrl);
-            } catch (e) {
-                console.warn("Could not convert image:", rawSrc, e);
-            }
+    for (const image of chapDoc.querySelectorAll('img, svg image')) {
+        for (const attribute of ['src', 'href', 'xlink:href']) {
+            const raw = image.getAttribute(attribute);
+            if (!raw || raw.startsWith('#')) continue;
+            const resolved = resolveEpubUrl(raw, chapterPath);
+            const file = resolved && zip.file(resolved.path);
+            if (!file) continue;
+            const type = manifest.find(item => item.path === resolved.path)?.mediaType
+                || IMAGE_TYPES[resolved.path.split('.').pop().toLowerCase()];
+            if (!type?.startsWith('image/')) continue;
+            const base64 = await file.async('base64');
+            // Keep the export/backup projection self-contained and retain the source URL.
+            image.setAttribute(`data-epub-${attribute.replace(':', '-')}`, raw);
+            image.setAttribute(attribute, `data:${type};base64,${base64}`);
         }
     }
 }
@@ -102,16 +71,7 @@ function dirOf(filePath) {
 }
 
 export function resolveRelativePath(baseDir, rel) {
-    if (!rel) return '';
-    const raw = String(rel).trim().replace(/\\/g, '/');
-    if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) return raw;
-    const rooted = raw.startsWith('/') ? raw.slice(1) : `${baseDir || ''}${raw}`;
-    const stack = [];
-    for (const part of rooted.split('/')) {
-        if (part === '..') stack.pop();
-        else if (part !== '.' && part !== '') stack.push(part);
-    }
-    return stack.join('/');
+    return resolveEpubUrl(String(rel || '').trim(), `${baseDir || ''}__base__`)?.path || '';
 }
 
 export function locateTocTarget(href, anchor, baseDir, opfDir, hrefToPageMap) {
@@ -127,13 +87,12 @@ export function locateTocTarget(href, anchor, baseDir, opfDir, hrefToPageMap) {
     const resolved = resolveRelativePath(baseDir, path);
     let normalized = resolved || path.replace(/^\/+/, '');
     if (opfDir && normalized.startsWith(opfDir)) normalized = normalized.slice(opfDir.length);
-    const baseName = normalized.split('/').pop();
     const map = hrefToPageMap || {};
-    const page = map[resolved] || map[normalized] || map[path] || map[(opfDir || '') + normalized] || map[baseName] || 1;
+    const page = map[resolved] || map[normalized] || map[path] || map[(opfDir || '') + normalized] || 1;
     return {
         page,
         href: normalized,
-        anchor: frag || ''
+        anchor: resolveEpubUrl(`#${frag}`)?.fragment || frag || ''
     };
 }
 
@@ -300,7 +259,7 @@ function findNavZipFile(zip, opfDoc, opfDir) {
     });
     if (navItem) {
         const href = navItem.getAttribute('href');
-        const navFile = href ? findZipFile(zip, opfDir + href) || findZipFile(zip, href) : null;
+        const navFile = href ? zip.file(resolveRelativePath(opfDir, href)) : null;
         if (navFile) return navFile;
     }
     const navKey = Object.keys(zip.files).find(file => {
@@ -315,8 +274,8 @@ export async function extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap) {
     let navItems = [];
 
     const ncxItem = opfDoc.querySelector("manifest > item[media-type*='ncx']") || opfDoc.querySelector("manifest > item[id='ncx']");
-    const ncxPath = ncxItem ? opfDir + ncxItem.getAttribute('href') : null;
-    let ncxFile = ncxPath ? findZipFile(zip, ncxPath) : null;
+    const ncxPath = ncxItem ? resolveRelativePath(opfDir, ncxItem.getAttribute('href')) : null;
+    let ncxFile = ncxPath ? zip.file(ncxPath) : null;
     if (!ncxFile) {
         const ncxKey = Object.keys(zip.files).find(file => file.toLowerCase().endsWith('.ncx') && !zip.files[file].dir);
         if (ncxKey) ncxFile = zip.file(ncxKey);
@@ -353,106 +312,34 @@ export async function extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap) {
 }
 
 /** @returns {Promise<import('../domain/book.js').Book>} */
-export async function parseEpub(arrayBuffer, fileName, jszipLib) {
-    if (!jszipLib) {
-        throw new Error("JSZip is not loaded. Reload and try again.");
-    }
-
-    const zip = await jszipLib.loadAsync(arrayBuffer);
-
-    // 1. Read container.xml to locate rootfile full-path
-    const containerFile = findZipFile(zip, "META-INF/container.xml");
-    if (!containerFile) throw new Error("Invalid EPUB: container.xml not found.");
-
-    const containerXmlText = await containerFile.async("string");
+export async function parseEpub(arrayBuffer, fileName, jszipLib, { signal } = {}) {
+    const input = arrayBuffer instanceof ArrayBuffer ? arrayBuffer : new Uint8Array(arrayBuffer).buffer;
+    const result = await importEpubBytes(input, signal);
     const parser = new DOMParser();
-    const containerDoc = parser.parseFromString(containerXmlText, "text/xml");
-    const rootfilePath = containerDoc.querySelector("rootfile")?.getAttribute("full-path");
-
-    if (!rootfilePath) throw new Error("Could not locate EPUB package metadata (rootfile).");
-
-    // 2. Read OPF file
-    const opfFile = findZipFile(zip, rootfilePath);
-    if (!opfFile) throw new Error("OPF package file not found: " + rootfilePath);
-
-    const opfXmlText = await opfFile.async("string");
-    const opfDoc = parser.parseFromString(opfXmlText, "text/xml");
-    const opfDir = rootfilePath.includes('/') ? rootfilePath.substring(0, rootfilePath.lastIndexOf('/') + 1) : '';
-    let language = opfDoc.getElementsByTagNameNS('*', 'language')[0]?.textContent.trim() || '';
-
-    // 3. Build href to page mapping
-    const manifestItems = {};
-    opfDoc.querySelectorAll("manifest > item").forEach(item => {
-        manifestItems[item.getAttribute("id")] = item.getAttribute("href");
-    });
-
-    const spineItemrefs = opfDoc.querySelectorAll("spine > itemref");
+    // Native HTML normalization preserves the existing annotation text coordinate system.
+    // Binary resources stay in the original archive and load on demand.
     const pages = [];
-    const hrefToPageMap = {};
-    let pageNum = 1;
-
-    for (const itemref of spineItemrefs) {
-        const idref = itemref.getAttribute("idref");
-        const href = manifestItems[idref];
-        if (!href) continue;
-
-        const htmlPath = opfDir + href;
-        const chapterFile = findZipFile(zip, htmlPath);
-        if (chapterFile) {
-            const chapterHtmlText = await chapterFile.async("string");
-            const chapDoc = parser.parseFromString(chapterHtmlText, "text/html");
-            if (!language) {
-                const tagged = chapDoc.querySelector('[lang], [xml\\:lang]');
-                language = tagged?.getAttribute('lang') || tagged?.getAttribute('xml:lang') || '';
-            }
-
-            chapDoc.querySelectorAll("script, style, link").forEach(el => el.remove());
-            chapDoc.querySelectorAll("[style]").forEach(el => el.removeAttribute("style"));
-
-            await processChapterImages(zip, htmlPath, chapDoc);
-
-            const bodyContent = chapDoc.body ? chapDoc.body.innerHTML : chapterHtmlText;
-            pages.push(bodyContent);
-
-            const cleanHref = href.replace(/^\/+/, '');
-            hrefToPageMap[cleanHref] = pageNum;
-            hrefToPageMap[opfDir + cleanHref] = pageNum;
-            hrefToPageMap[cleanHref.split('/').pop()] = pageNum;
-
-            pageNum++;
+    for (const [index, chapter] of result.chapters.entries()) {
+        signal?.throwIfAborted();
+        if (chapter.mediaType === 'image/svg+xml') {
+            pages.push(chapter.text.replace(/<\?xml[^>]*\?>/i, ''));
+        } else {
+            const document = parser.parseFromString(chapter.text, 'text/html');
+            document.querySelectorAll('script, style, link').forEach(element => element.remove());
+            pages.push(document.body.innerHTML);
         }
+        // Yield between native document projections so import remains interruptible.
+        if (index % 8 === 7) await new Promise(resolve => setTimeout(resolve, 0));
     }
-
-    if (pages.length === 0) throw new Error("Could not extract valid chapter text.");
-
-    // 4. Extract TOC
-    let toc = await extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap);
-
-    // Fallback headings extraction if TOC empty
-    if (toc.length === 0) {
-        pages.forEach((pageHtml, idx) => {
-            const pDoc = parser.parseFromString(pageHtml, "text/html");
-            const heading = pDoc.querySelector("h1, h2, h3, title");
-            const title = heading?.textContent.trim() || `Section ${idx + 1}`;
-            const tag = heading ? heading.tagName.toLowerCase() : '';
-            const level = tag === 'h2' ? 1 : tag === 'h3' ? 2 : 0;
-            toc.push({ title, page: idx + 1, level });
-        });
-    }
-    toc = ensureTocHierarchy(toc);
-
-    const bookId = 'book_' + encodeURIComponent(fileName);
-    return {
-        id: bookId,
-        title: fileName.replace(/\.(epub|equb)$/i, ''),
-        format: 'EPUB',
-        language,
-        readerFlow: 'chapter',
-        toc,
-        pages,
-        hrefToPageMap,
-        updatedAt: new Date().toISOString()
-    };
+    let toc = result.toc;
+    if (!toc.length) toc = pages.map((page, index) => {
+        const document = parser.parseFromString(page, 'text/html');
+        return { title: document.querySelector('h1, h2, h3, title')?.textContent.trim() || `Section ${index + 1}`, page: index + 1, level: 0 };
+    });
+    return { id: 'book_' + encodeURIComponent(fileName), title: result.title || fileName.replace(/\.(epub|equb)$/i, ''),
+        format: 'EPUB', language: result.languages[0] || result.epub.documents.find(document => document.language)?.language || '',
+        languages: result.languages, readerFlow: 'chapter', toc, pages, hrefToPageMap: result.hrefToPageMap,
+        epub: result.epub, updatedAt: new Date().toISOString() };
 }
 
 /** @returns {import('../domain/book.js').Book} */

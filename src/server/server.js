@@ -4,7 +4,8 @@ const path = require('path');
 const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
 if (nodeMajor < 24 || (nodeMajor === 24 && nodeMinor < 15)) throw new Error("AuraReader requires Node.js >= 24.15.0.");
 const { createDataStore } = require('./dataStore');
-const { createStorageApi } = require('./storageApi');
+const { createStorageApi, localRequest } = require('./storageApi');
+const { RESOURCE_PREFIX, createPublicationResources } = require('./publicationResources');
 const { handleWikiRequest } = require('./wikiApi');
 const { createFontStore, listSystemFonts, MAX_FONT_BYTES } = require('./fontStore');
 const fontStore = createFontStore(path.resolve(__dirname, '../../data/fonts'));
@@ -32,6 +33,7 @@ const MIME_TYPES = {
 function createServer({ dataDirectory = path.resolve(__dirname, '../../data') } = {}) {
 const store = createDataStore(dataDirectory);
 const storageApi = createStorageApi(store);
+const publications = createPublicationResources(() => store);
 const server = http.createServer((req, res) => {
     // CORS Headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -46,6 +48,16 @@ const server = http.createServer((req, res) => {
 
     const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = parsedUrl.pathname;
+
+    if (pathname.startsWith(RESOURCE_PREFIX)) {
+        res.removeHeader('Access-Control-Allow-Origin');
+        if (!localRequest(req)) { res.writeHead(403); res.end(); return; }
+        publications.respond({ url: parsedUrl.href, method: req.method }).then(async response => {
+            res.writeHead(response.status, Object.fromEntries(response.headers));
+            res.end(Buffer.from(await response.arrayBuffer()));
+        }).catch(() => { if (!res.headersSent) res.writeHead(500); res.end(); });
+        return;
+    }
 
     if (pathname.startsWith('/api/storage/')) {
         storageApi(req, res, parsedUrl);
@@ -106,7 +118,7 @@ const server = http.createServer((req, res) => {
         stream.pipe(res);
     });
 });
-server.on('close', () => store.close());
+server.on('close', () => { publications.clear(); store.close(); });
 return server;
 }
 

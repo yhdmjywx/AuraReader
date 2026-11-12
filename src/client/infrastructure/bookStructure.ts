@@ -23,11 +23,12 @@ export function buildBookStructure(book: Book | null | undefined): BookStructure
     });
     const documents: SourceDocument[] = pages.map((html, index) => {
         const page = index + 1;
-        const root = typeof document === 'undefined' ? null : document.createElement('div');
-        if (root) root.innerHTML = html;
+        const template = typeof document === 'undefined' ? null : document.createElement('template');
+        if (template) template.innerHTML = html;
+        const root = template?.content || null;
         const entries = nodes.filter(node => node.page === page);
         const heading = root?.querySelector('h1, h2, h3, h4, h5, h6');
-        const legacy = toc[index]?.page == null ? toc[index] : null;
+        const legacy = toc[index]?.page == null && toc[index]?.navigable !== false ? toc[index] : null;
         const title = entries[0]?.title || legacy?.title || heading?.textContent?.trim() || `Content ${page}`;
         const media = root?.querySelector('img, svg, math, video, audio, table, iframe, object, canvas, hr');
         // Hierarchy and an exact, content-only title are required in addition

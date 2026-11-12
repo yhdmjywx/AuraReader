@@ -1,3 +1,5 @@
+import { readerRect } from '../reader/readerDocument.js';
+import { readingViewportRect } from '../reader/readingAxis.js';
 // Presentation geometry only. Annotation contents, ranges and persistence stay
 // with the existing controllers and repositories.
 import { intersectVisibleRects } from '../reader/visibleAnnotations.js';
@@ -70,7 +72,7 @@ export function positionMarginNotes(elements) {
     const win = workspace.ownerDocument.defaultView;
     const paper = elements.bookPaper;
     if (elements.notesPanel && paper && win) {
-        const paperStyle = win.getComputedStyle(paper);
+        const paperStyle = paper.ownerDocument.defaultView.getComputedStyle(paper);
         // Use the destination theme token, not an intermediate animated color.
         elements.notesPanel.style.setProperty('--margin-note-color', paperStyle.getPropertyValue('--bg-paper-text').trim() || paperStyle.color);
     }
@@ -122,12 +124,12 @@ function annotationAnchors(elements, view) {
     const anchors = new Map();
     for (const paper of [elements.bookPaper]) {
         if (!paper || paper.hidden || paper.style.display === 'none') continue;
-        const paperRect = paper.getBoundingClientRect();
+        const paperRect = readerRect(readingViewportRect(paper), paper.ownerDocument);
         const clip = intersectVisibleRects(view, paperRect);
         if (!clip) continue;
         for (const token of paper.querySelectorAll('.annotation-token')) {
             for (const rect of token.getClientRects()) {
-                const visible = intersectVisibleRects(clip, rect);
+                const visible = intersectVisibleRects(clip, readerRect(rect, token.ownerDocument));
                 if (!visible) continue;
                 const ids = `${token.getAttribute('data-note-ids') || ''} ${token.getAttribute('data-highlight-ids') || ''}`.trim().split(/\s+/);
                 ids.filter(Boolean).forEach(id => {

@@ -40,7 +40,7 @@ async function verifyFiles(window, output, queues, checks) {
     select(txt);
     await run(`document.getElementById('btn-import-book').click()`);
     await waitFor(`document.getElementById('current-book-title').textContent.includes('桌面文字')`);
-    assert.match(await run(`document.getElementById('book-paper').textContent`), /当前 SQLite 正文/);
+    assert.match(await run(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').textContent`), /当前 SQLite 正文/);
     queues.open.push({ canceled: true, filePaths: [] });
     await run(`(async () => { const f = await import('./infrastructure/desktopFiles.js'); if (await f.chooseDesktopFile('book') !== null) throw new Error('Cancel failed'); })()`);
 

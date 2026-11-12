@@ -74,9 +74,9 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`(() => { const row = [...document.querySelectorAll('.ui-book-picker li')].find(row => row.textContent.includes('workflow A')); row.querySelector('button').click(); })()`);
     await waitFor(`!document.querySelector('.ui-dialog[data-open]') && document.querySelector('#home-books .goal-home-book')`);
     await run(`document.querySelector('#home-books .goal-home-book').click()`);
-    await waitFor(`document.documentElement.dataset.appSurface === 'reader' && document.getElementById('book-paper').textContent.includes('Alpha evidence') && document.querySelector('#goal-panel .goal-title')`);
+    await waitFor(`document.documentElement.dataset.appSurface === 'reader' && document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').textContent.includes('Alpha evidence') && document.querySelector('#goal-panel .goal-title')`);
     assert.equal(await run(`document.documentElement.lang`), 'en');
-    assert.equal(await run(`document.getElementById('book-paper').lang`), 'en', 'reader keeps the source book language independently of UI copy');
+    assert.equal(await run(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').lang`), 'en', 'reader keeps the source book language independently of UI copy');
     assert.equal(await run(`!!document.querySelector('#goal-panel select, #goal-panel .goal-collections, #react-reading-book select')`), false, 'reader omits redundant filters, collections and book picker');
     assert.equal(await run(`document.getElementById('btn-fullscreen') === null && document.getElementById('goal-expand') !== null`), true, 'EPUB fullscreen is removed and Goal expansion remains');
     assert.equal(await run(`['btn-toc', 'btn-shelf', 'btn-appearance', 'btn-export-menu'].every(id => !!document.getElementById(id).closest('.reader-toolbar'))`), true, 'book actions belong to the reading surface');
@@ -164,9 +164,9 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`document.getElementById('goal-resizer').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); goalCaretCheck.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));`);
     await waitFor(`!document.querySelector('#goal-panel textarea')`);
     await run(`(() => {
-        const paper = document.getElementById('book-paper'), text = paper.querySelector('p').firstChild;
-        const range = document.createRange(); range.setStart(text, 0); range.setEnd(text, 16);
-        getSelection().removeAllRanges(); getSelection().addRange(range);
+        const paper = document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper'), text = paper.querySelector('p').firstChild;
+        const range = paper.ownerDocument.createRange(); range.setStart(text, 0); range.setEnd(text, 16);
+        paper.ownerDocument.getSelection().removeAllRanges(); paper.ownerDocument.getSelection().addRange(range);
         paper.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     })()`);
     await waitFor(`document.getElementById('selection-tooltip').style.display === 'flex'`);
@@ -242,7 +242,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`document.querySelector('.goal-input-editor textarea').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }))`);
     await waitFor(`document.querySelector('.goal-input-text')?.textContent.includes('Independent goal text')`);
     await run(`(async () => { const a = await import(${JSON.stringify(mainUrl)}); await a.goals.assertWritesSaved(); })()`);
-    assert.equal(await run(`document.querySelector('.goal-items').firstElementChild.className`), 'goal-user-input', 'new owned text precedes linked material');
+    assert.equal(await run(`!!document.querySelector('.goal-items').firstElementChild.querySelector('.goal-user-input')`), true, 'new owned text precedes linked material in its Response wrapper');
     const ownedInput = await run(`(async () => { const record = (await auraDesktop.storage.queryGoalLibrary()).value; return record.value.inputs[0]; })()`);
     assert.equal(ownedInput.text, 'My understanding\nIndependent goal text');
     await run(`document.querySelector('.goal-input-actions [aria-label="Edit text"]').click()`);
@@ -281,9 +281,9 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
         const row = [...document.querySelectorAll('#shelf-list .shelf-entry')].find(row => row.textContent.includes('workflow B'));
         row.querySelector('.shelf-book-title').click();
     })()`);
-    await waitFor(`document.getElementById('book-paper').textContent.includes('Second book')`);
+    await waitFor(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').textContent.includes('Second book')`);
     await run(`document.querySelector('#goal-panel .goal-item-text').click()`);
-    await waitFor(`document.getElementById('book-paper').textContent.includes('Alpha evidence') && document.querySelector('.annotation-token.is-active')`);
+    await waitFor(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').textContent.includes('Alpha evidence') && document.querySelector('iframe.reader-document').contentDocument.querySelector('.annotation-token.is-active')`);
     await run(`document.getElementById('btn-shelf').click()`);
     await waitFor(`document.querySelector('#shelf-list [aria-label="Search library"]')`);
     await capture('shelf');
@@ -303,7 +303,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`document.getElementById('btn-font-dec').click()`);
     await waitFor(`document.getElementById('font-size-label').textContent === '18px'`);
     await run(`(() => { const input = document.getElementById('indent-select'); input.value = '3em'; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-    await waitFor(`document.getElementById('book-paper').style.getPropertyValue('--book-text-indent') === '3em'`);
+    await waitFor(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').style.getPropertyValue('--book-text-indent') === '3em'`);
     await run(`(() => { const input = document.getElementById('indent-select'); input.value = '2em'; input.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-paper="sepia"]').click(); })()`);
     await waitFor(`document.getElementById('reader-panel').classList.contains('paper-sepia')`);
     await run(`document.querySelector('[data-paper="white"]').click(); document.getElementById('btn-mode-scroll').click()`);
@@ -371,7 +371,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     assert.equal(await run(`document.querySelector('#home-material-list .goal-material-quote')?.textContent`), 'Alpha evidence 0', 'Home retains linked source text after reloading');
     await capture('home-linked-materials');
     await run(`document.querySelector('#home-books .goal-home-book').click()`);
-    await waitFor(`document.documentElement.dataset.appSurface === 'reader' && document.getElementById('book-paper').textContent.includes('Alpha evidence')`);
+    await waitFor(`document.documentElement.dataset.appSurface === 'reader' && document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').textContent.includes('Alpha evidence')`);
     await waitFor(`document.querySelector('#goal-panel .goal-item-text')?.textContent.includes('A React note')`);
     const reloaded = await run(`(async () => {
         const a = await import(${JSON.stringify(mainUrl)});

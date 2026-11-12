@@ -2,6 +2,7 @@ import type { GoalStateRecord, SaveGoalsCommand, NoteDeleteRevision } from './st
 import type { WikiRequest, WikiResponse } from './wiki.js';
 import type { GoalLibraryRecord, SaveGoalLibraryCommand } from './storage.js';
 import type { BookRecord, BookRevision, DeleteBookCommand, DeleteNoteCommand, NoteRecord, RestoreCommand, Revision, SaveBookCommand, SaveNoteCommand } from './storage.js';
+import type { BookSummaryRecord } from './storage.js';
 
 export type DesktopResult<T> = { ok: true; value: T } | { ok: false; error: { message: string; status: number; details?: unknown } };
 export interface DesktopLibraryStatus { initialized: boolean }
@@ -15,6 +16,8 @@ export interface DesktopStorage {
     status(): Promise<DesktopResult<DesktopLibraryStatus>>;
     createLibrary(): Promise<DesktopResult<DesktopLibraryStatus>>;
     listBooks(): Promise<DesktopResult<{ records: BookRecord[] }>>;
+    listBookSummaries?(): Promise<DesktopResult<{ records: BookSummaryRecord[] }>>;
+    getBook?(query: { id: string }): Promise<DesktopResult<{ record: BookRecord | null }>>;
     saveBook(command: SaveBookCommand): Promise<DesktopResult<BookRevision>>;
     deleteBook(command: DeleteBookCommand): Promise<DesktopResult<Revision>>;
     queryNotes(query: { bookIds: string[] }): Promise<DesktopResult<{ records: NoteRecord[] }>>;
