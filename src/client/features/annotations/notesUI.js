@@ -57,10 +57,10 @@ export function renderNotesList({
     // Update toggle button text & icon
     if (elements.btnToggleShowHighlights) {
         if (showHighlightsInSidebar) {
-            elements.btnToggleShowHighlights.innerHTML = `<i class="ri-eye-off-line"></i> 隐藏划线 (${pureCount})`;
+            elements.btnToggleShowHighlights.innerHTML = `<i class="ri-eye-off-line"></i> Hide highlights (${pureCount})`;
             elements.btnToggleShowHighlights.classList.add('active');
         } else {
-            elements.btnToggleShowHighlights.innerHTML = `<i class="ri-eye-line"></i> 显示划线 (${pureCount})`;
+            elements.btnToggleShowHighlights.innerHTML = `<i class="ri-eye-line"></i> Show highlights (${pureCount})`;
             elements.btnToggleShowHighlights.classList.remove('active');
         }
     }
@@ -70,8 +70,8 @@ export function renderNotesList({
             elements.emptyNotesState.style.display = 'block';
             const emptyText = elements.emptyNotesState.querySelector('p');
             if (emptyText) {
-                const scope = notesScope === 'book' ? '全书' : '当前页';
-                emptyText.textContent = showHighlightsInSidebar ? `${scope}暂无划线与笔记` : `${scope}暂无笔记`;
+                const scope = notesScope === 'book' ? "Book" : "Page";
+                emptyText.textContent = showHighlightsInSidebar ? `${scope}: no highlights or notes` : `${scope}: no notes`;
             }
         }
         positionMarginNotes(elements);
@@ -98,10 +98,10 @@ export function renderNotesList({
         card.setAttribute('data-annotation-id', note.id);
         card._noteRenderKey = keys.get(String(note.id));
 
-        const chapterLabel = note.chapter ? escapeHtml(note.chapter) : '章节选区';
+        const chapterLabel = note.chapter ? escapeHtml(note.chapter) : "Chapter selection";
         const typeBadge = highlight ?
-            `<span class="note-loc-tag" style="background: rgba(245,158,11,0.1); color: #d97706; font-weight: 500;"><i class="ri-sparkling-line"></i> 划线</span>` :
-            `<span class="note-loc-tag" style="background: rgba(16,185,129,0.1); color: var(--accent-color); font-weight: 500;"><i class="ri-chat-1-line"></i> 笔记</span>`;
+            `<span class="note-loc-tag" style="background: rgba(245,158,11,0.1); color: #d97706; font-weight: 500;"><i class="ri-sparkling-line"></i> Highlight</span>` :
+            `<span class="note-loc-tag" style="background: rgba(16,185,129,0.1); color: var(--accent-color); font-weight: 500;"><i class="ri-chat-1-line"></i> Note</span>`;
 
         card.innerHTML = `
             <div class="note-card-header">
@@ -115,7 +115,7 @@ export function renderNotesList({
             ${note.quote ? `<div class="note-quote-text">“${escapeHtml(note.quote)}”</div>` : ''}
             ${noteKind ? `<div class="note-comment-text">${escapeHtml(note.comment || '')}</div>` : ''}
             <div class="note-card-actions">
-                <button class="btn btn-ghost-sm btn-delete-note" data-id="${note.id}" title="${highlight ? '删除高亮' : '删除这条笔记'}">
+                <button class="btn btn-ghost-sm btn-delete-note" data-id="${note.id}" title="${highlight ? "Delete highlight" : "Delete this note"}">
                     <i class="ri-delete-bin-line"></i>
                 </button>
             </div>
@@ -131,11 +131,11 @@ export function renderNotesList({
             else if (highlight) {
                 const label = document.createElement('span');
                 label.className = 'margin-highlight-label';
-                label.textContent = '划线';
+                label.textContent = "Highlight";
                 card.prepend(label);
             }
             card.setAttribute('role', 'group');
-            card.setAttribute('aria-label', highlight ? '高亮操作' : '关联正文的笔记');
+            card.setAttribute('aria-label', highlight ? "Highlight actions" : "Note linked to source text");
         }
 
         card.addEventListener('click', (e) => {
@@ -209,8 +209,8 @@ function startInlineEditor({ card, note, elements, onInput, onFinish }) {
     const text = card.querySelector('.note-comment-text');
     const editor = document.createElement('textarea');
     editor.className = 'note-editor';
-    editor.setAttribute('aria-label', '笔记内容');
-    editor.setAttribute('aria-keyshortcuts', 'Escape Control+Enter Meta+Enter');
+    editor.setAttribute('aria-label', "Note text");
+    editor.setAttribute('aria-keyshortcuts', 'Enter Shift+Enter Escape Control+Enter Meta+Enter');
     editor.rows = 1;
     editor.value = note.comment || '';
     const shell = document.createElement('div');
@@ -239,7 +239,7 @@ function startInlineEditor({ card, note, elements, onInput, onFinish }) {
     editor.addEventListener('keydown', event => {
         event.stopPropagation();
         if (composing || event.isComposing || event.keyCode === 229) return;
-        if (event.key === 'Escape' || (event.key === 'Enter' && (event.ctrlKey || event.metaKey))) {
+        if (event.key === 'Escape' || (event.key === 'Enter' && (!event.shiftKey || event.ctrlKey || event.metaKey))) {
             event.preventDefault();
             onFinish?.();
         }
@@ -260,6 +260,7 @@ function escapeHtml(str) {
 }
 
 export function updateNoteGoalActions(elements, getGoalAction) {
+    if (elements?.notesList?.dataset.renderer === 'react') return;
     for (const control of elements?.notesList?.querySelectorAll('.btn-goal-link') || []) {
         const state = getGoalAction?.(control.dataset.annotationId);
         control.hidden = !state?.visible; control.disabled = !state || state.disabled;

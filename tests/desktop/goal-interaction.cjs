@@ -67,7 +67,8 @@ const timer = setTimeout(() => app.exit(1), 85000);
     const geometry = await run(`(()=>{const p=a.elements.bookPaper,r=p.getBoundingClientRect();return [r.x,r.y,p.clientWidth,p.scrollLeft,document.getElementById('reader-viewport').scrollTop];})()`);
     await click('.btn-goal-link'); await run('a.goals.assertWritesSaved()');
     assert.equal(await run("document.querySelectorAll('.goal-item').length"), 1);
-    await click('.goal-items-toggle'); assert.equal(await run("document.querySelectorAll('.goal-item').length"), 0);
+    assert.equal(await run("document.querySelector('.goal-items-toggle')"), null);
+    assert.equal(await run("document.querySelectorAll('.goal-item').length"), 1);
     await click('.annotation-token.has-highlight'); await wait("document.getElementById('highlight-action-tooltip').style.display==='flex'");
     await click('#btn-annotation-goal'); await run('a.goals.assertWritesSaved()');
     await click('.annotation-token.has-highlight'); await wait("document.getElementById('highlight-action-tooltip').style.display==='flex'");
@@ -120,16 +121,6 @@ const timer = setTimeout(() => app.exit(1), 85000);
     window.setContentSize(800, 700); await wait('document.getElementById("goal-panel").hidden');
     await run('new Promise(resolve=>setTimeout(resolve,300))');
     await fs.writeFile(path.join(output, 'goal-narrow.png'), (await wc.capturePage()).toPNG());
-    window.setContentSize(1700,928);
-    await run("a.layout.setPageMode('double',a.elements.readerPanel.clientWidth)");
-    await wait('a.elements.workspaceContainer.classList.contains("layout-double")');
-    await run('new Promise(resolve=>setTimeout(resolve,300))');
-    await fs.writeFile(path.join(output, 'goal-double.png'), (await wc.capturePage()).toPNG());
-    await run("a.layout.setPageMode('single',a.elements.readerPanel.clientWidth)");
-    window.setContentSize(1613, 928); await wait('!document.getElementById("goal-panel").hidden');
-    await run(`(async()=>{a.layout.setPageMode('double',1613);await new Promise(r=>setTimeout(r,80));})()`);
-    assert.equal(await run('document.getElementById("goal-panel").hidden'), true);
-    await run(`a.layout.setPageMode('single',1613)`); await wait('!document.getElementById("goal-panel").hidden');
     await run('a.appShell.toggleAppTheme()');
     await wait(`getComputedStyle(document.getElementById('goal-panel')).color===getComputedStyle(document.body).color`);
     // Allow the existing paper color transition and responsive refit to settle.
@@ -211,7 +202,7 @@ const timer = setTimeout(() => app.exit(1), 85000);
     assert.equal(await run("getComputedStyle(document.querySelector('.goal-editor textarea')).fontSize"), '26px');
     await run('a.goals.finishInlineEdit()');
     window.setContentSize(800,700); await wait('a.goals.page && !document.getElementById("goal-panel").hidden');
-    await run("a.layout.setPageMode('double',800)");
+    await run("a.layout.setPageMode('scroll')");
     assert.equal(await run('document.getElementById("goal-panel").hidden'), false);
     window.setContentSize(1613,928); await run("a.layout.setPageMode('single',1613)");
     // BrowserWindow resize and the renderer/compositor settle asynchronously on Windows.
@@ -239,9 +230,9 @@ const timer = setTimeout(() => app.exit(1), 85000);
     assert.equal(await run('a.goals.selected===__selectedGoal'), true);
     const report = { passed: true, actualElectron: true, isolatedDataOnly: true,
         checks: ['real pointer events and blur-to-subgoal creation', 'automatic link/select expansion', 'retained note editor before resize and exact reading geometry', 'real sidebar drag retains Goal editor/caret; existing note outside-click finish unchanged', 'saved width and hide/show', '640px sidebar uses original reading geometry with notes visible', '1613px/1440px/narrow/mode layouts', 'application theme independent of paper', 'actual SQLite failure, close refusal and exact retry', 'book switching preserves tree and links'],
-        crossBookChecks: ['same selected Goal and three materials across two books', 'reader annotations remain book scoped', 'one Goal renderer and editor; hidden sidebar and separator occupy zero width', 'source titles and material click return to original book', 'Goal page remains available in narrow window and double mode', 'latest source navigation wins; ordinary book navigation supersedes pending source jump'],
-        surfaceChecks: ['one inset reading and margin-note surface with rounded corners and subtle shadow', 'no full-height sidebar border', 'surface gutters included in reading-space budget', 'light/dark/sepia, 280/640px sidebar, narrow and double layouts'],
-        screenshots: ['goal-single.png', 'goal-default.png', 'goal-wide.png', 'goal-dark.png', 'goal-page.png', 'goal-sepia.png', 'goal-narrow.png', 'goal-double.png'] };
+        crossBookChecks: ['same selected Goal and three materials across two books', 'reader annotations remain book scoped', 'one Goal renderer and editor; hidden sidebar and separator occupy zero width', 'source titles and material click return to original book', 'Goal page remains available in narrow window and scroll mode', 'latest source navigation wins; ordinary book navigation supersedes pending source jump'],
+        surfaceChecks: ['one inset reading and margin-note surface with rounded corners and subtle shadow', 'no full-height sidebar border', 'surface gutters included in reading-space budget', 'light/dark/sepia, 280/640px sidebar, narrow layouts'],
+        screenshots: ['goal-single.png', 'goal-default.png', 'goal-wide.png', 'goal-dark.png', 'goal-page.png', 'goal-sepia.png', 'goal-narrow.png'] };
     await fs.writeFile(path.join(output, 'goal-results.json'), JSON.stringify(report, null, 2));
     await fs.writeFile(path.join(output, 'goal-visibility-results.json'), JSON.stringify({passed:true,visibility}, null, 2));
     console.log('Goal desktop acceptance passed:', output); clearTimeout(timer); window.destroy(); app.exit(0);

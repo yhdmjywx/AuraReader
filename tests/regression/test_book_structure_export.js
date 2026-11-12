@@ -1,14 +1,10 @@
 const assert = require('node:assert/strict');
 const JSZip = require('jszip');
-const { JSDOM } = require('jsdom');
 
 (async () => {
-    const dom = new JSDOM('<body></body>');
-    const keys = ['document', 'NodeFilter', 'window'];
-    const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+    const dom = require('../helpers/react-workbench.cjs').createWorkbench();
     const createURL = URL.createObjectURL, revokeURL = URL.revokeObjectURL;
     try {
-        keys.forEach(key => globalThis[key] = dom.window[key]);
         const { buildBookStructure, readingUnitForPage, structureSummary } = await import('../../dist/client/infrastructure/bookStructure.js');
         const { exportChapterZip } = await import('../../dist/client/infrastructure/exporters.js');
         const { renderShelf } = await import('../../dist/client/features/shelf/shelfUI.js');
@@ -60,7 +56,7 @@ const { JSDOM } = require('jsdom');
         assert.ok(!files.some(name => /_(第一卷|第一部)\.md$/.test(name)), '纯结构标题不单独导出');
         assert.ok(files.some(name => /_第二卷\.md$/.test(name)), '有说明的卷前内容单独保留');
         assert.ok(files.some(name => /_第三卷\.md$/.test(name)), '有插图的卷页单独保留');
-        const index = await zip.file(files.find(name => name.endsWith('00_目录概览.md'))).async('string');
+        const index = await zip.file(files.find(name => name.endsWith('00_contents.md'))).async('string');
         assert.ok(!index.includes('总章节数：11'));
         assert.ok(index.includes(structureSummary(structure)));
         assert.ok(index.includes('- [第一部]') && index.includes('  - [第一卷]') && index.includes('    - [大堂]'));
@@ -73,9 +69,9 @@ const { JSDOM } = require('jsdom');
         assert.equal(markdown.split('卷标题笔记').length - 1, 1);
         assert.equal(markdown.split('历史独立随笔').length - 1, 1);
         assert.ok(markdown.includes('重复句。<mark>重复句。😀</mark>'), '组合前在原文件解析重复文本偏移');
-        assert.ok(markdown.includes('> **原文引用**\n> 重复句。\n>\n> 第二处重复句笔记'));
+        assert.ok(markdown.includes('> **Source quote**\n> 重复句。\n>\n> 第二处重复句笔记'));
         assert.ok(!markdown.includes('错误旧引用') && !markdown.includes('不允许跨书'));
-        assert.ok(markdown.includes('本章划线：2 条 | 笔记：3 条'));
+        assert.ok(markdown.includes('Highlights: 2 | Notes: 3'));
         const illustrationFile = files.find(name => name.endsWith('_第三卷.md'));
         assert.ok((await zip.file(illustrationFile).async('string')).includes('<img src="data:image/png;base64,aW1hZ2U="'), '独立插图卷页的图片内容保留');
         const prefaceFile = files.find(name => name.endsWith('_第二卷.md'));
@@ -84,29 +80,29 @@ const { JSDOM } = require('jsdom');
         await exportChapterZip(book, withUnassigned, JSZip, { selectedUnitIds: ['source-8', 'source-3'] });
         const selectedZip = await JSZip.loadAsync(await blob.arrayBuffer());
         const selectedFiles = Object.keys(selectedZip.files).filter(name => name.endsWith('.md'));
-        assert.deepEqual(selectedFiles.map(name => name.split('/').at(-1)).sort(), ['00_目录概览.md', '03_大堂.md', '06_第三章.md']);
-        const selectedIndex = await selectedZip.file(selectedFiles.find(name => name.endsWith('00_目录概览.md'))).async('string');
-        assert.ok(selectedIndex.includes('导出范围：所选章节') && selectedIndex.includes('导出内容文件：2'));
-        assert.ok(selectedIndex.includes('划线数：2') && selectedIndex.includes('笔记数：3'));
+        assert.deepEqual(selectedFiles.map(name => name.split('/').at(-1)).sort(), ['00_contents.md', '03_大堂.md', '06_第三章.md']);
+        const selectedIndex = await selectedZip.file(selectedFiles.find(name => name.endsWith('00_contents.md'))).async('string');
+        assert.ok(selectedIndex.includes('Export scope: Selected chapters') && selectedIndex.includes('Content files: 2'));
+        assert.ok(selectedIndex.includes('Highlights: 2') && selectedIndex.includes('Notes: 3'));
         assert.ok(!selectedIndex.includes('作者原序') && !selectedIndex.includes('[第二章]') && !selectedIndex.includes('附录]'));
         assert.ok(selectedIndex.includes('  - 第二卷\n'), '保留所选章节的父目录标题，但不链接未导出的卷前文件');
         for (const match of selectedIndex.matchAll(/\]\(\.\/([^\n)]+)\)/g)) {
-            assert.ok(selectedZip.file(`结构测试_所选章节笔记包/${decodeURIComponent(match[1])}`), '每个目录链接均指向包内存在的文件');
+            assert.ok(selectedZip.file(`结构测试_selected-chapter-notes/${decodeURIComponent(match[1])}`), '每个目录链接均指向包内存在的文件');
         }
         const selectedBody = await selectedZip.file(selectedFiles.find(name => name.endsWith('03_大堂.md'))).async('string');
         assert.ok(selectedBody.includes('第一部') && selectedBody.includes('第一卷') && selectedBody.includes('第二处重复句笔记'));
         assert.ok(selectedBody.includes('<mark>重复句。😀</mark>'));
         assert.ok(!selectedBody.includes('卷前笔记') && !selectedBody.includes('不允许跨书'));
-        await assert.rejects(exportChapterZip(book, notes, JSZip, { selectedUnitIds: [] }), /至少选择/);
-        await assert.rejects(exportChapterZip(book, notes, JSZip, { selectedUnitIds: ['missing'] }), /至少选择/);
+        await assert.rejects(exportChapterZip(book, notes, JSZip, { selectedUnitIds: [] }), /Select at least one/);
+        await assert.rejects(exportChapterZip(book, notes, JSZip, { selectedUnitIds: ['missing'] }), /Select at least one/);
         await exportChapterZip(book, withUnassigned, JSZip, { selectedUnitIds: structure.units.map(unit => unit.id) });
         const allSelectedZip = await JSZip.loadAsync(await blob.arrayBuffer());
-        assert.ok(allSelectedZip.file('结构测试_分章节笔记包/未归属笔记.md'), '全选与整书导出一致，继续保留未归属笔记');
+        assert.ok(allSelectedZip.file('结构测试_chapter-notes/unassigned-notes.md'), '全选与整书导出一致，继续保留未归属笔记');
         const list = document.createElement('ul');
-        renderShelf({ elements: { shelfList: list }, books: [book] });
-        assert.equal(list.querySelector('.shelf-book-meta').textContent, `EPUB · ${structureSummary(structure)}`);
+        await require('../helpers/react-workbench.cjs').ui(() => renderShelf({ elements: { shelfList: list }, books: [book] }));
+        assert.equal(list.querySelector('.shelf-book-title').textContent, book.title);
         const backupList = document.createElement('div');
-        renderBackupBookList({ backupBookCheckboxList: backupList }, [book], notes);
+        await require('../helpers/react-workbench.cjs').ui(() => renderBackupBookList({ backupBookCheckboxList: backupList }, [book], notes));
         assert.ok(backupList.textContent.includes(structureSummary(structure)), '备份选择列表复用同一统计');
         assert.equal(JSON.stringify(book), original); assert.equal(JSON.stringify(notes), savedNotes);
         const noToc = { ...book, toc: [] };
@@ -123,14 +119,11 @@ const { JSDOM } = require('jsdom');
             toc: [{ title: '第一卷', page: 1 }, { title: '第一章', page: 2 }] };
         await exportChapterZip(svgBook, [], JSZip);
         const svgZip = await JSZip.loadAsync(await blob.arrayBuffer());
-        const svgMarkdown = await svgZip.file('矢量插图_分章节笔记包/01_第一卷.md').async('string');
+        const svgMarkdown = await svgZip.file('矢量插图_chapter-notes/01_第一卷.md').async('string');
         assert.ok(svgMarkdown.includes('<img src="data:image/svg+xml,'), '独立 SVG 卷页的矢量图不会在 Markdown 中消失');
         console.log('✅ 共享结构：嵌套卷/章、前置/附录/插图、无目录回退、真实 ZIP 解压、目录映射、统计、原文偏移与无损标注通过');
     } finally {
         URL.createObjectURL = createURL; URL.revokeObjectURL = revokeURL;
         dom.window.close();
-        for (const [key, descriptor] of originals) {
-            if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];
-        }
     }
 })().catch(error => { console.error(error); process.exitCode = 1; });

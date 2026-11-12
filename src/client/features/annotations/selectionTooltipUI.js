@@ -31,7 +31,7 @@ export function showHighlightActionTooltip(elements, targetEl, context) {
     if (highlightButton) highlightButton.hidden = !highlightCount;
     if (noteButton) {
         noteButton.hidden = !noteCount;
-        noteButton.querySelector('span').textContent = noteCount > 1 ? `删除笔记（${noteCount}）` : '删除笔记';
+        noteButton.querySelector('span').textContent = noteCount > 1 ? `Delete notes (${noteCount})` : "Delete note";
     }
 
     const markRect = targetEl.getBoundingClientRect();

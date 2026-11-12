@@ -34,19 +34,19 @@ const { JSDOM } = require('jsdom');
         }
         const leaf = { ...book, toc: [{ title: '第一卷', page: 2, level: 0 }, { title: '第二卷', page: 3, level: 0 }] };
         assert.equal(resolveVolumeTitleFlow(leaf, 2).titlePage, null, '不能将两个卷页强行合并');
-        let mode = 'double';
+        let mode = 'single';
         const elements = {
             readerPanel: byId('reader'), bookPaper: byId('paper'), paperContainer: byId('container'),
             btnPrevPage: byId('prev'), btnNextPage: byId('next'), currentPageSpan: byId('current'), totalPagesSpan: byId('total'), selectionTooltip: byId('selection-tooltip')
         };
         for (const node of [elements.bookPaper, elements.paperContainer, byId('reader-viewport')]) {
             Object.defineProperty(node, 'clientHeight', { value: 700 });
-            Object.defineProperty(node, 'clientWidth', { get: () => mode === 'double' ? 1192 : 560 });
+            Object.defineProperty(node, 'clientWidth', { get: () => 560 });
         }
-        Object.defineProperty(elements.bookPaper, 'scrollWidth', { get: () => mode === 'double' ? 1192 : 560 });
+        Object.defineProperty(elements.bookPaper, 'scrollWidth', { get: () => 560 });
         const measure = () => ({ left: 20, top: 30, width: 50, height: 25, right: 70, bottom: 55 });
         dom.window.Range.prototype.getBoundingClientRect = measure;
-        reader = new ReaderController({ layoutController: { getEffectiveReaderMode: () => mode } });
+        reader = new ReaderController({ layoutController: { getLayoutMode: () => mode } });
         reader.setBook(book.id, book);
         await reader.fonts.prepareForBook();
         reader.elements = elements;
@@ -58,7 +58,7 @@ const { JSDOM } = require('jsdom');
         ];
         const selection = new SelectionController({ callbacks: { getReadingContext: () => ({ chapterFlow: true, currentPage: reader.currentPage, sectionId: reader.getLocation().sectionId }) } });
         selection.elements = elements;
-        for (mode of ['double', 'single', 'scroll']) {
+        for (mode of ['single', 'scroll']) {
             reader.renderPage(2, false, notes);
             assert.equal(reader.currentPage, 3);
             assert.ok(elements.bookPaper.textContent.includes('第一卷'));
@@ -95,7 +95,7 @@ const { JSDOM } = require('jsdom');
         }
         assert.equal(JSON.stringify(book), original, '原书、目录、编号和链接映射未改写');
         assert.equal(notes[0].location.start, start);
-        console.log('✅ 纯卷标题衔接、保留说明/插图、单/双页/滚动、前后翻页、同 ID 锚点、原标注和新选区偏移通过');
+        console.log('✅ 纯卷标题衔接、保留说明/插图、单页/滚动、前后翻页、同 ID 锚点、原标注和新选区偏移通过');
     } finally {
         clearTimeout(reader?._anchorTimer); dom.window.close();
         for (const [key, descriptor] of originals) {

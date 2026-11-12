@@ -1,5 +1,7 @@
 import { SYSTEM_FALLBACK, normalizeFontChoice, quoteFamily, resolveFont } from '../../domain/fontCatalog.js';
 import { unwrapDesktop } from '../../infrastructure/storageClient.js';
+import { renderCurrentFont, renderFontBrowser } from './fontPickerUI.js';
+import { countLabel } from '../../domain/format.js';
 
 const PREFERENCE_KEY = 'aura_font_preference';
 const SEARCH_KEY = 'aura_font_search';
@@ -44,7 +46,7 @@ export class FontController {
 
     async ensure(font) {
         if (typeof document === 'undefined' || !document.fonts) return;
-        if (font.missing) throw new Error('已导入字体的文件已缺失');
+        if (font.missing) throw new Error("The imported font file is missing.");
         if (font.systemFamily) {
             const key = `system:${font.systemFamily}`;
             if (!this.loadedFaces.has(key)) {
@@ -87,7 +89,7 @@ export class FontController {
         catch (_) {
             if (revision !== this.revision) return;
             this.failed = true;
-            this.callbacks.notify?.('字体暂不可用，已使用系统字体回退');
+            this.callbacks.notify?.("Font unavailable. Using a system fallback.", { kind: 'error' });
         }
         if (revision === this.revision) this.callbacks.onReady?.();
     }
@@ -109,14 +111,16 @@ export class FontController {
         catch (_) {
             if (revision !== this.revision) return;
             this.failed = true;
-            this.callbacks.notify?.('字体暂不可用，已使用系统字体回退');
+            this.callbacks.notify?.("Font unavailable. Using a system fallback.", { kind: 'error' });
         }
         if (revision === this.revision) this.callbacks.onChange?.();
     }
 
-    initUI(elements) {
+    /** @param {import('../../app/elements.js').AppElements} elements @param {AbortSignal} [signal] */
+    initUI(elements, signal) {
         const trigger = elements.fontFamilySelect;
         if (!trigger || !elements.fontMenu) return;
+        const document = trigger.ownerDocument;
         this.elements = elements;
         const menu = elements.fontMenu;
         trigger.addEventListener('click', () => {
@@ -128,7 +132,7 @@ export class FontController {
                 const selected = menu.querySelector('[aria-checked="true"]');
                 (selected || menu.querySelector('[data-font-choice]'))?.focus();
             }
-        });
+        }, { signal });
         menu.addEventListener('click', event => {
             const option = event.target.closest('[data-font-choice]');
             if (option) {
@@ -142,30 +146,30 @@ export class FontController {
                 const font = this.imported.find(font => font.id === imported.dataset.importedFont);
                 if (font) this.choose({ kind: 'imported', id: font.id, name: font.name });
             }
-        });
-        elements.btnMoreFonts.addEventListener('click', () => this.showMore());
-        elements.btnFontBack.addEventListener('click', () => this.showMain());
+        }, { signal });
+        elements.btnMoreFonts.addEventListener('click', () => this.showMore(), { signal });
+        elements.btnFontBack.addEventListener('click', () => this.showMain(), { signal });
         elements.fontSearch.value = String(readStored(SEARCH_KEY, '')).slice(0, 160);
         elements.fontSearch.addEventListener('input', () => {
             store(SEARCH_KEY, elements.fontSearch.value);
             this.renderBrowser();
-        });
-        elements.btnReadSystemFonts.addEventListener('click', () => this.readSystemFonts());
-        elements.btnImportFont.addEventListener('click', () => window.auraDesktop ? this.importFile() : elements.fontFileInput.click());
+        }, { signal });
+        elements.btnReadSystemFonts.addEventListener('click', () => this.readSystemFonts(), { signal });
+        elements.btnImportFont.addEventListener('click', () => window.auraDesktop ? this.importFile() : elements.fontFileInput.click(), { signal });
         elements.fontFileInput.addEventListener('change', async () => {
             const file = elements.fontFileInput.files[0];
             elements.fontFileInput.value = '';
             if (file) await this.importFile(file);
-        });
+        }, { signal });
         document.addEventListener('click', event => {
             if (!menu.hidden && !event.composedPath().includes(elements.fontPicker)) this.close(false);
-        }, true);
+        }, { capture: true, signal });
         document.addEventListener('keydown', event => {
             if (menu.hidden) return;
             if (event.key === 'Escape') {
                 event.preventDefault(); event.stopImmediatePropagation(); this.close();
             }
-        }, true);
+        }, { capture: true, signal });
         menu.addEventListener('keydown', event => {
             if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) || event.target === elements.fontSearch) return;
             const buttons = [...menu.querySelectorAll('button:not(:disabled)')].filter(button => !button.closest('[hidden]'));
@@ -173,12 +177,19 @@ export class FontController {
             const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
                 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
             event.preventDefault(); buttons[next]?.focus();
-        });
+        }, { signal });
         this.renderLabel();
         this.ready = this.loadImports().then(() => {
+            if (signal?.aborted) return;
             this.renderLabel();
             return this.prepareForBook();
         });
+    }
+
+    destroy() {
+        this.close(false);
+        this.revision++;
+        this.elements = null;
     }
 
     close(focus = true) {
@@ -192,21 +203,10 @@ export class FontController {
         if (!this.elements) return;
         const font = resolveFont(this.choice, this.callbacks.getBook?.(), this.imported);
         this.elements.fontChoiceLabel.textContent = font.name;
-        this.elements.fontFamilySelect.title = `字体：${font.name}`;
-        this.elements.fontFamilySelect.setAttribute('aria-label', `字体：${font.name}`);
+        this.elements.fontFamilySelect.title = `Font: ${font.name}`;
+        this.elements.fontFamilySelect.setAttribute('aria-label', `Font: ${font.name}`);
         const current = this.elements.fontMenu.querySelector('#font-current-custom');
-        if (current) {
-            current.replaceChildren();
-            current.hidden = !['system', 'imported'].includes(this.choice.kind);
-            if (!current.hidden) {
-                const heading = document.createElement('p'); heading.className = 'font-group-label'; heading.textContent = '当前字体';
-                const button = document.createElement('button'); button.type = 'button'; button.className = 'font-option';
-                button.setAttribute('role', 'menuitemradio'); button.setAttribute('aria-checked', 'true'); button.textContent = font.name;
-                if (this.choice.kind === 'system') button.dataset.systemFamily = this.choice.family;
-                else button.dataset.importedFont = this.choice.id;
-                current.append(heading, button);
-            }
-        }
+        if (current) renderCurrentFont(current, this.choice, font);
         this.elements.fontMenu.querySelectorAll('[data-font-choice]').forEach(button => {
             const selected = button.dataset.fontChoice === (this.choice.kind === 'auto' ? 'auto' : this.choice.kind === 'builtin' ? this.choice.id : '');
             button.setAttribute('aria-checked', String(selected));
@@ -247,7 +247,7 @@ export class FontController {
 
     async readSystemFonts() {
         this.elements.btnReadSystemFonts.disabled = true;
-        this.status('正在读取本机字体…');
+        this.status("Reading system fonts…");
         try {
             let data;
             if (window.auraDesktop) data = unwrapDesktop(await window.auraDesktop.fonts.system());
@@ -261,68 +261,47 @@ export class FontController {
                 const fonts = await window.queryLocalFonts();
                 this.systemFamilies = [...new Set(fonts.map(font => font.family))];
             } else {
-                throw new Error('此环境无法读取本机字体，可导入字体文件');
+                throw new Error("System fonts are unavailable here. You can import a font file.");
             }
-            this.status(`已读取 ${this.systemFamilies.length} 款本机字体`);
+            this.status(`Found ${countLabel(this.systemFamilies.length, 'system font')}`);
             this.renderBrowser();
         } catch (error) {
-            this.status(error.name === 'NotAllowedError' ? '未获字体读取权限，可导入字体文件' : (error.message || '本机字体读取失败'));
-        } finally { this.elements.btnReadSystemFonts.disabled = false; }
+            this.status(error.name === 'NotAllowedError' ? "Font access was not granted. You can import a font file." : (error.message || "Could not read system fonts."));
+        } finally { if (this.elements) this.elements.btnReadSystemFonts.disabled = false; }
     }
 
     /** @param {File} [file] */
     async importFile(file) {
         this.elements.btnImportFont.disabled = true;
-        this.status('正在导入字体…');
+        this.status("Importing font…");
         try {
             let data;
             if (window.auraDesktop) {
                 const result = unwrapDesktop(await window.auraDesktop.fonts.importFont());
-                if (result.canceled) { this.status('已取消导入字体'); return; }
+                if (result.canceled) { this.status("Font import canceled"); return; }
                 data = { font: result.font };
             } else {
-                if (!file) throw new Error('请选择字体文件');
-                if (!/\.(ttf|otf|woff2)$/i.test(file.name)) throw new Error('请选择 TTF、OTF 或 WOFF2 文件');
-                if (!file.size || file.size > 64 * 1024 * 1024) throw new Error('字体文件为空或超过 64MB');
+                if (!file) throw new Error("Choose a font file.");
+                if (!/\.(ttf|otf|woff2)$/i.test(file.name)) throw new Error("Choose a TTF, OTF, or WOFF2 file.");
+                if (!file.size || file.size > 64 * 1024 * 1024) throw new Error("The font file is empty or exceeds 64 MB.");
                 const response = await fetch(`/api/fonts/import?name=${encodeURIComponent(file.name)}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file
                 });
                 data = await response.json();
-                if (!response.ok) throw new Error(data.error || '字体导入失败');
+                if (!response.ok) throw new Error(data.error || "Font import failed");
             }
             await this.loadImports();
             this.renderBrowser();
-            this.status(`已导入 ${data.font.name}`);
+            this.status(`Imported ${data.font.name}`);
             await this.choose({ kind: 'imported', id: data.font.id, name: data.font.name });
-        } catch (error) { this.status(error.message || '字体导入失败'); }
-        finally { this.elements.btnImportFont.disabled = false; }
+        } catch (error) { this.status(error.message || "Font import failed"); }
+        finally { if (this.elements) this.elements.btnImportFont.disabled = false; }
     }
 
     renderBrowser() {
-        const list = this.elements.fontBrowserList;
-        list.replaceChildren();
+        if (!this.elements) return;
         const query = this.elements.fontSearch.value.trim().toLocaleLowerCase();
-        const addGroup = (title, fonts, kind) => {
-            if (!fonts.length) return;
-            const heading = document.createElement('p'); heading.className = 'font-group-label'; heading.textContent = title;
-            list.append(heading);
-            for (const font of fonts) {
-                const button = document.createElement('button');
-                button.type = 'button'; button.className = 'font-option'; button.setAttribute('role', 'menuitemradio');
-                button.textContent = font.name;
-                if (kind === 'imported') button.dataset.importedFont = font.id;
-                else button.dataset.systemFamily = font.name;
-                button.setAttribute('aria-checked', String(kind === 'imported' ? this.choice.kind === kind && this.choice.id === font.id
-                    : this.choice.kind === 'system' && this.choice.family === font.name));
-                list.append(button);
-            }
-        };
-        addGroup('已导入', this.imported.filter(font => font.name.toLocaleLowerCase().includes(query)), 'imported');
-        const families = [...new Set([...this.recent, ...this.systemFamilies])].sort((a, b) => a.localeCompare(b));
-        addGroup('本机字体', families.filter(name => name.toLocaleLowerCase().includes(query)).map(name => ({ name })), 'system');
-        if (!list.childNodes.length) {
-            const empty = document.createElement('p'); empty.className = 'font-empty';
-            empty.textContent = query ? '没有匹配的字体' : '读取本机字体，或导入字体文件'; list.append(empty);
-        }
+        renderFontBrowser(this.elements.fontBrowserList, { imported: this.imported, recent: this.recent,
+            systemFamilies: this.systemFamilies, choice: this.choice, query });
     }
 }

@@ -9,7 +9,7 @@ let storage;
 (async () => {
     // 1. 测试 ReadingLocation 模型与转换
     console.log("\n--- [测试 1: ReadingLocation 定位模型] ---");
-    const { clampPage, calcSpreadPages, resolveTargetPage, findChapterForPage, createReadingLocation } = await import(
+    const { clampPage, resolveTargetPage, findChapterForPage, createReadingLocation } = await import(
         '../../dist/client/core/readingLocation.js'
     );
 
@@ -20,20 +20,6 @@ let storage;
     assert.strictEqual(clampPage(0, 10), 1, "clampPage 应该限制下界为 1");
     assert.strictEqual(clampPage(15, 10), 10, "clampPage 应该限制上界为 10");
     assert.strictEqual(clampPage(5, 10), 5, "clampPage 应该保留有效页码");
-
-    const spread1 = calcSpreadPages(1, 10);
-    assert.strictEqual(spread1.leftPage, 1, "第 1 页对开左页应为 1");
-    assert.strictEqual(spread1.rightPage, 2, "第 1 页对开右页应为 2");
-    assert.strictEqual(spread1.label, "1-2");
-
-    const spreadLast = calcSpreadPages(10, 10);
-    assert.strictEqual(spreadLast.leftPage, 9, "偶数页 10 左页应为 9");
-    assert.strictEqual(spreadLast.rightPage, 10, "偶数页 10 右页应为 10");
-
-    const spreadOddEnd = calcSpreadPages(5, 5);
-    assert.strictEqual(spreadOddEnd.leftPage, 5);
-    assert.strictEqual(spreadOddEnd.rightPage, null, "最后一页为奇数时右页应为 null");
-    assert.strictEqual(spreadOddEnd.label, "5");
 
     const map = { 'chapter1.html': 3, 'chapter2.html': 7 };
     assert.strictEqual(resolveTargetPage('chapter1.html#sec1', map, 1), 3);
@@ -70,16 +56,6 @@ let storage;
     assert.strictEqual(engine.getCurrentPage(), 2);
     engine.prevPage(false);
     assert.strictEqual(engine.getCurrentPage(), 1);
-
-    // 双页对开翻页
-    engine.nextPage(true);
-    assert.strictEqual(engine.getCurrentPage(), 3, "双页对开向前翻页应步进 2 页");
-    engine.nextPage(true);
-    assert.strictEqual(engine.getCurrentPage(), 5);
-    engine.nextPage(true);
-    assert.strictEqual(engine.getCurrentPage(), 5, "到达末页不应越界");
-    engine.prevPage(true);
-    assert.strictEqual(engine.getCurrentPage(), 3, "双页对开向后翻页应步退 2 页");
 
     assert.strictEqual(engine.getPageContent(1), '<p>第1页</p>');
 
@@ -189,19 +165,12 @@ let storage;
 
     // 4. Current fixed-column mode state; DOM buttons are exercised by
     // test_page_layout_system.js using the actual controller and jsdom.
-    const { LayoutController, DOUBLE_PAGE_MIN_WIDTH } = await import('../../dist/client/features/layout/layoutController.js');
+    const { LayoutController } = await import('../../dist/client/features/layout/layoutController.js');
     const layout = new LayoutController();
-    layout.setPageMode('double', 1613);
-    assert.strictEqual(layout.getEffectiveReaderMode(), 'double');
-    assert.strictEqual(layout.checkResponsiveLayout(DOUBLE_PAGE_MIN_WIDTH - 1).changed, true);
-    assert.strictEqual(layout.getEffectiveReaderMode(), 'single');
-    assert.strictEqual(layout.getLayoutMode(), 'double', '窄窗口不能覆盖双页偏好');
-    assert.strictEqual(layout.checkResponsiveLayout(1613).changed, true);
-    assert.strictEqual(layout.getEffectiveReaderMode(), 'double');
-    layout.setPageMode('scroll', 1613);
-    assert.strictEqual(layout.getEffectiveReaderMode(), 'scroll');
-    assert.strictEqual(layout.checkResponsiveLayout(600).isAutoDowngraded, false);
-    console.log('✅ 当前模式状态与固定行宽降级恢复通过');
+    layout.setPageMode('scroll');
+    assert.strictEqual(layout.getLayoutMode(), 'scroll');
+    layout.setPageMode('single');
+    assert.strictEqual(layout.getLayoutMode(), 'single');
 
     // 5. 测试核心解耦缺陷排查（验证跨书隔离与多书备份可靠性）
     console.log("\n--- [测试 5: 数据边界隔离与跨书防串线验证] ---");
@@ -294,10 +263,9 @@ let storage;
     assert.strictEqual(notesInAnnot[0].quote, '第2页核心引文');
     assert.strictEqual(notesInAnnot[0].color, 'yellow');
 
-    // 协调单双页布局切换
-    coord.changeReadingLayout('double');
-    assert.strictEqual(testLayout.getLayoutMode(), 'double', "Coordinator 切换阅读布局至 double");
-    assert.ok(toastMessage.includes('双页'), "AppShell 收到对应布局提示通知");
+    // 协调单页与滚动布局切换
+    coord.changeReadingLayout('scroll');
+    assert.strictEqual(testLayout.getLayoutMode(), 'scroll', "Coordinator 切换阅读布局至 scroll");
 
     coord.changeReadingLayout('single');
     assert.strictEqual(testLayout.getLayoutMode(), 'single', "Coordinator 切换阅读布局至 single");
@@ -312,7 +280,7 @@ let storage;
 
     // 验证 Coordinator.jumpToAnnotation 委托至 ReaderController 而无 DOM 依赖侵入
     coord.jumpToAnnotation(notesInAnnot[0].id);
-    assert.ok(toastMessage.includes('跳转至 P.2'), "jumpToAnnotation 提示通知正确触发");
+    assert.ok(toastMessage.includes('Jumped to p.2'), "jumpToAnnotation 提示通知正确触发");
     assert.strictEqual(notesInAnnot[0].kind, 'highlight');
 
     await testAnnotations.saveModalNote({

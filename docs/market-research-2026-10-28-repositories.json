@@ -1,0 +1,87 @@
+{
+  "retrieved": "2026-10-28",
+  "source": "GitHub REST repository metadata through connected GitHub tool",
+  "note": "Stars are not users. pushed_at is not a release date or proof of maintenance quality.",
+  "repositories": [
+    {
+      "repo": "readest/readest",
+      "url": "https://github.com/readest/readest",
+      "stars": 25695,
+      "license": "AGPL-3.0",
+      "archived": false,
+      "pushed_at": "2026-10-28T10:24:56Z"
+    },
+    {
+      "repo": "koodo-reader/koodo-reader",
+      "url": "https://github.com/koodo-reader/koodo-reader",
+      "stars": 28650,
+      "license": "AGPL-3.0",
+      "archived": false,
+      "pushed_at": "2026-10-28T10:37:11Z"
+    },
+    {
+      "repo": "koreader/koreader",
+      "url": "https://github.com/koreader/koreader",
+      "stars": 30677,
+      "license": "AGPL-3.0",
+      "archived": false,
+      "pushed_at": "2026-10-28T08:18:21Z"
+    },
+    {
+      "repo": "kovidgoyal/calibre",
+      "url": "https://github.com/kovidgoyal/calibre",
+      "stars": 26267,
+      "license": "GPL-3.0",
+      "archived": false,
+      "pushed_at": "2026-10-28T09:01:48Z"
+    },
+    {
+      "repo": "zotero/zotero",
+      "url": "https://github.com/zotero/zotero",
+      "stars": 15777,
+      "license": "NOASSERTION",
+      "archived": false,
+      "pushed_at": "2026-10-27T16:53:40Z"
+    },
+    {
+      "repo": "edrlab/thorium-reader",
+      "url": "https://github.com/edrlab/thorium-reader",
+      "stars": 2918,
+      "license": "BSD-3-Clause",
+      "archived": false,
+      "pushed_at": "2026-10-28T00:58:25Z"
+    },
+    {
+      "repo": "johnfactotum/foliate",
+      "url": "https://github.com/johnfactotum/foliate",
+      "stars": 8850,
+      "license": "GPL-3.0",
+      "archived": false,
+      "pushed_at": "2026-04-08T15:11:30Z"
+    },
+    {
+      "repo": "Anxcye/anx-reader",
+      "url": "https://github.com/Anxcye/anx-reader",
+      "stars": 9089,
+      "license": "MIT",
+      "archived": false,
+      "pushed_at": "2026-10-17T12:57:09Z"
+    },
+    {
+      "repo": "johnfactotum/foliate-js",
+      "url": "https://github.com/johnfactotum/foliate-js",
+      "stars": 1147,
+      "license": "MIT",
+      "archived": false,
+      "pushed_at": "2026-05-01T19:24:25Z"
+    },
+    {
+      "repo": "futurepress/epub.js",
+      "url": "https://github.com/futurepress/epub.js",
+      "stars": 6969,
+      "license": "NOASSERTION",
+      "archived": false,
+      "pushed_at": "2026-03-24T04:19:58Z"
+    }
+  ]
+}

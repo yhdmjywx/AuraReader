@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const { JSDOM } = require('jsdom');
 
 (async () => {
-    const dom = new JSDOM(fs.readFileSync('src/client/index.html', 'utf8'), { url: 'http://localhost/' });
+    const dom = require('../helpers/react-workbench.cjs').createWorkbench({ url: 'http://localhost/' });
     const globals = ['window', 'document', 'localStorage', 'NodeFilter'];
     const originals = new Map(globals.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     let storage;
@@ -16,7 +16,7 @@ const { JSDOM } = require('jsdom');
         const { showHighlightActionTooltip } = await import('../../dist/client/features/annotations/selectionTooltipUI.js');
         const byId = id => document.getElementById(id);
         const elements = {
-            readerPanel: byId('reader-panel'), bookPaper: byId('book-paper'), bookPaperRight: byId('book-paper-right'),
+            readerPanel: byId('reader-panel'), bookPaper: byId('book-paper'),
             selectionTooltip: byId('selection-tooltip'), highlightActionTooltip: byId('highlight-action-tooltip'),
             btnAddNote: byId('btn-add-note'), btnHlRemove: byId('btn-hl-remove'), btnNoteRemove: byId('btn-note-remove'),
             notesList: byId('notes-list'), emptyNotesState: byId('empty-notes-state'), workspaceContainer: byId('workspace-container')
@@ -86,7 +86,7 @@ const { JSDOM } = require('jsdom');
         await annotations.saveModalNote({ quote: '同一段正文', comment: '此处第一条笔记', location });
         await annotations.saveModalNote({ quote: '同一段正文', comment: '此处第二条笔记', location });
         selection.activateToken(elements.bookPaper.querySelector('.annotation-token'), 1, { force: true });
-        assert.equal(elements.btnNoteRemove.querySelector('span').textContent, '删除笔记（2）', '多条关联笔记显示明确数量');
+        assert.equal(elements.btnNoteRemove.querySelector('span').textContent, 'Delete notes (2)', '多条关联笔记显示明确数量');
         elements.btnNoteRemove.click(); await deletion;
         assert.deepEqual(annotations.getNotes().map(item => item.id), [remainingHighlight.id], '删除重叠笔记不会连带删除高亮');
         assert.ok(elements.bookPaper.querySelector('.annotation-token').getAttribute('data-highlight-ids'));

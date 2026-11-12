@@ -17,7 +17,7 @@ async function verifyRuntime(directory) {
         const command = { opId: randomUUID(), expected: 0, book };
         const revision = store.saveBook(command);
         assert.deepEqual(store.saveBook(command), revision);
-        assert.throws(() => store.saveBook({ ...command, book: { ...book, title: 'conflict' } }), /操作 ID/);
+        assert.throws(() => store.saveBook({ ...command, book: { ...book, title: 'conflict' } }), /operation ID/);
         assert.throws(() => store.transaction(() => {
             store.run('UPDATE books SET payload=? WHERE id=?', '{}', book.id);
             throw new Error('rollback probe');

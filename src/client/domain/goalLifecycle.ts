@@ -53,6 +53,7 @@ export function operateGoal(state: GoalLibraryState, id: string, operation: Goal
     if (operation === 'purge') {
         if (area !== 'trash') throw new Error('Move this goal to Recently deleted first');
         return { ...state, goals: state.goals.filter(g => !branch.has(g.id)), links: state.links.filter(l => !branch.has(l.goalId)),
+            ...(state.inputs ? { inputs: state.inputs.filter(i => !branch.has(i.goalId)) } : {}),
             bookLinks: (state.bookLinks || []).filter(l => !branch.has(l.goalId)) };
     }
     if (['complete', 'reopen', 'archive'].includes(operation) && area !== 'library') throw new Error('Restore this goal before changing it');

@@ -3,6 +3,8 @@ import type { Annotation, AnnotationLocation } from '../domain/annotation.js';
 import type { Book, ReaderMode } from '../domain/book.js';
 
 export type AsyncAction<T extends unknown[] = []> = (...args: T) => void | Promise<unknown>;
+export interface ToastOptions { kind?: 'success' | 'error'; anchor?: HTMLElement | null }
+export type ShowToast = (message: string, options?: ToastOptions) => void;
 export interface NoteDraft {
     quote?: string; page?: number; chapter?: string | null;
     location?: Partial<AnnotationLocation> | null;
@@ -13,8 +15,6 @@ export interface PendingSelection {
 }
 export interface ReadingContext {
     currentPage: number;
-    currentLeftPage?: number;
-    currentRightPage?: number | null;
     chapterFlow?: boolean;
     sectionId?: string;
     chapter?: string;
@@ -27,7 +27,7 @@ export interface ActiveAnnotationContext {
     page: number; quote: string; location: AnnotationLocation | null;
 }
 export interface ReaderCallbacks {
-    showToast?: (message: string) => void;
+    showToast?: ShowToast;
     getNotes?: () => Annotation[];
     beforeNavigate?: () => Annotation[];
     onPageRendered?: () => void;
@@ -40,7 +40,7 @@ export interface AnnotationCallbacks {
     onLinkGoal?: AsyncAction<[id: string]>;
     beforeDeleteAnnotations?: AsyncAction;
     onAnnotationContentChanged?: (note: Annotation) => void;
-    showToast?: (message: string) => void;
+    showToast?: ShowToast;
     getCurrentBookId?: () => string;
     getVisibleAnnotationIds?: () => Set<string>;
     getPendingSelection?: () => PendingSelection | null;
@@ -63,30 +63,28 @@ export interface SelectionCallbacks {
     onAnnotationActivated?: (context: ActiveAnnotationContext) => void;
     onClearFocus?: () => void;
 }
-export interface LayoutChange { layoutMode: ReaderMode; isAutoDowngraded: boolean; isDoubleEffective: boolean }
-export interface ResponsiveChange { changed: boolean; isAutoDowngraded: boolean; reason?: string }
+export interface LayoutChange { layoutMode: ReaderMode }
 export interface LayoutCallbacks {
     beforeGeometryChange?: () => void;
     onLayoutChange?: (change: LayoutChange) => void;
-    onResponsiveChange?: (change: ResponsiveChange) => void;
 }
 export interface FontCallbacks {
     getBook?: () => Book | null;
     beforeChange?: () => void;
     onChange?: () => void;
     onReady?: () => void;
-    notify?: (message: string) => void;
+    notify?: ShowToast;
 }
 export interface ShelfCallbacks {
     onImportFile?: AsyncAction<[file: File]>;
-    showToast?: (message: string) => void;
+    showToast?: ShowToast;
     onOpen?: () => void;
     onOpenBook?: AsyncAction<[id: string]>;
     onDeleteBook?: AsyncAction<[id: string]>;
 }
 export interface BackupData { books?: Book[]; notes?: import('../../shared/storage.js').StoredAnnotation[]; goalStates?: import('../domain/goal.js').GoalBackupState[]; goalGraph?: import('../domain/goal.js').GoalGraphBackup }
 export interface BackupCallbacks {
-    showToast?: (message: string) => void;
+    showToast?: ShowToast;
     getCurrentBook?: () => Book | null;
     getCurrentNotes?: () => Annotation[];
     getCurrentPage?: () => number;
@@ -100,7 +98,6 @@ export interface ShellCallbacks {
     onOpenPanel?: () => void;
     onPrevPage?: () => void;
     onNextPage?: () => void;
-    onTogglePageMode?: () => void;
     onSwitchDemo?: () => void;
     onImportFile?: AsyncAction<[file: File]>;
     onWindowResize?: (notify: boolean) => void;
@@ -126,10 +123,9 @@ export interface NotesRenderOptions {
     onEdit?: ((note: Annotation) => void) | null;
     onDelete?: ((note: Annotation) => void) | null;
 }
-export interface PaperSpreadOptions {
+export interface PaperOptions {
     elements: import('./elements.js').AppElements;
     readerEngine: import('../domain/readerEngine.js').ReaderEngine;
-    layoutSystem?: import('../features/layout/layoutController.js').LayoutController | null;
     notes?: Annotation[];
     textIndent?: string;
     preserveScroll?: boolean;

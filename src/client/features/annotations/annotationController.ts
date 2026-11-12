@@ -1,3 +1,4 @@
+import { noteTimestamp } from '../../domain/format.js';
 import { eventElement } from '../../app/dom.js';
 import { pendingNoteWrites } from '../../infrastructure/annotationRecovery.js';
 import type { Annotation, AnnotationInput } from '../../domain/annotation.js';
@@ -29,6 +30,16 @@ import {
 } from './notesUI.js';
 
 export class AnnotationController {
+    private listeners = new Set<() => void>();
+    private reactView = false;
+    private pendingWrites = 0;
+    get saveState() { return this.inlineWriteErrors.size ? 'error' : this.pendingWrites ? 'saving' : 'saved'; }
+    subscribe(listener: () => void) {
+        this.listeners.add(listener);
+        return () => { this.listeners.delete(listener); };
+    }
+    private changed() { for (const listener of this.listeners) listener(); }
+    useReactView(enabled: boolean) { this.reactView = enabled; this.renderNotesUI(); }
     callbacks: AnnotationCallbacks;
     notes: Annotation[];
     editingNoteId: string | null;
@@ -71,7 +82,7 @@ export class AnnotationController {
     // This changes presentation only. getNotes() continues to return the full
     // collection for rendering, persistence, and book-wide exports.
     setNotesScope(scope: 'page' | 'book' = 'page') {
-        if (scope !== 'page' && scope !== 'book') throw new Error('笔记范围只能是 page 或 book');
+        if (scope !== 'page' && scope !== 'book') throw new Error("Note scope must be page or book.");
         this.notesScope = scope;
         this.renderNotesUI();
         return scope;
@@ -95,7 +106,7 @@ export class AnnotationController {
 
     requireQuote(quote: string) {
         if (String(quote || '').trim()) return true;
-        this.callbacks.showToast?.('请先在正文中选择需要引用的文字');
+        this.callbacks.showToast?.("Select text in the book to quote first.");
         return false;
     }
 
@@ -148,7 +159,7 @@ export class AnnotationController {
         }
     }
 
-    async createHighlight({ quote, page = 1, chapter = '章节选区', color = 'yellow', location = null }: NoteDraft & { color?: string }) {
+    async createHighlight({ quote, page = 1, chapter = "Chapter selection", color = 'yellow', location = null }: NoteDraft & { color?: string }) {
         const highlightPage = Number(page) || 1;
         const cleanQuote = quote || '';
         const existingHighlight = this.notes.find(n => {
@@ -157,7 +168,7 @@ export class AnnotationController {
 
         if (existingHighlight) {
             if (this.callbacks.onFocusAnnotation) this.callbacks.onFocusAnnotation(existingHighlight);
-            else if (this.callbacks.showToast) this.callbacks.showToast('已定位到相同高亮');
+            else if (this.callbacks.showToast) this.callbacks.showToast("Jumped to existing highlight");
             return existingHighlight;
         }
 
@@ -173,7 +184,7 @@ export class AnnotationController {
         });
         this.notes.unshift(newNote);
         await repoSaveNote(newNote);
-        if (this.callbacks.showToast) this.callbacks.showToast('已成功高亮选中文本');
+        if (this.callbacks.showToast) this.callbacks.showToast("Text highlighted");
 
         this.renderNotesUI();
         if (this.callbacks.onNotesChanged) {
@@ -190,7 +201,7 @@ export class AnnotationController {
         const note = createAnnotationObject({
             kind: 'note', bookId: this.getBookId(), quote: selectedQuote, comment: '', color: 'green',
             page: Number(page || pending?.page) || 1,
-            chapter: chapter || this.callbacks.getCurrentChapter?.() || '章节选区',
+            chapter: chapter || this.callbacks.getCurrentChapter?.() || "Chapter selection",
             location: location || pending?.location || null
         });
         this.beginInlineEdit(note);
@@ -225,8 +236,9 @@ export class AnnotationController {
         const note = this.inlineEdit?.note;
         if (!note || id !== note.id || note.comment === comment) return;
         note.comment = comment;
+        this.changed();
         this.callbacks.onAnnotationContentChanged?.(note);
-        note.timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
+        note.timestamp = noteTimestamp();
         const exists = this.notes.some(item => item.id === id);
         if (!exists && !comment.trim()) return;
         if (!exists) this.notes.unshift(note);
@@ -236,6 +248,8 @@ export class AnnotationController {
     }
 
     writeInlineNote(note: Annotation, remove = false) {
+        this.pendingWrites++;
+        this.changed();
         const snapshot: Annotation = JSON.parse(JSON.stringify(note));
         // Start transactions immediately, in input order. The repository must
         // not mirror an older completed transaction over newer local input.
@@ -246,12 +260,12 @@ export class AnnotationController {
             this.inlineWriteErrors.delete(snapshot.id);
         }).catch(error => {
             this.inlineWriteErrors.set(snapshot.id, { bookId: snapshot.bookId, recoveryAvailable: error.recoveryAvailable === true });
-            console.error('笔记持久化失败', error);
+            console.error("Could not persist notes", error);
             this.callbacks.showToast?.(error.recoveryAvailable === false
-                ? '笔记尚未可靠保存，请暂勿关闭页面'
-                : error.status === 409 ? '笔记保存存在冲突，输入已保留在本机，请勿关闭页面'
-                    : '笔记已保留在本机缓存，数据库暂时无法写入');
-        });
+                ? "Notes are not confirmed saved. Keep this window open."
+                : error.status === 409 ? "Note save conflict. Your input is preserved locally. Keep this window open."
+                    : "Notes are preserved in the local cache. The database is temporarily unavailable for writes.", { kind: 'error' });
+        }).finally(() => { this.pendingWrites--; this.changed(); });
     }
 
     finishInlineEdit() {
@@ -282,10 +296,10 @@ export class AnnotationController {
         for (const [id, failure] of this.inlineWriteErrors) {
             if (failure.recoveryAvailable && !pendingNoteWrites(failure.bookId).some(entry => entry.id === id)) this.inlineWriteErrors.delete(id);
         }
-        if (this.inlineWriteErrors.size) throw new Error('存在保存失败的笔记，窗口已保留；请处理冲突或恢复写入后重试。');
+        if (this.inlineWriteErrors.size) throw new Error("Some notes could not be saved. This window remains open. Resolve conflicts or restore writes, then try again.");
     }
 
-    async saveModalNote({ quote = '', comment = '', page = 1, chapter = '章节选区', location = null }: NoteDraft & { comment?: string } = {}) {
+    async saveModalNote({ quote = '', comment = '', page = 1, chapter = "Chapter selection", location = null }: NoteDraft & { comment?: string } = {}) {
         // Compatibility for programmatic callers; the UI uses inline autosave.
         if (this.inlineEdit) {
             const editor = this.elements?.notesList?.querySelector<HTMLTextAreaElement>('.note-editor');
@@ -316,13 +330,13 @@ export class AnnotationController {
             this.notes[noteIndex].comment = cleanComment;
             this.notes[noteIndex].kind = 'note';
             this.notes[noteIndex].color = this.notes[noteIndex].color || 'green';
-            this.notes[noteIndex].timestamp = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16);
+            this.notes[noteIndex].timestamp = noteTimestamp();
             await repoSaveNote(this.notes[noteIndex]);
-            if (this.callbacks.showToast) this.callbacks.showToast('笔记已更新');
+            if (this.callbacks.showToast) this.callbacks.showToast("Note updated");
         } else {
             if (!this.requireQuote(quote)) return;
             if (!cleanComment) {
-                if (this.callbacks.showToast) this.callbacks.showToast('请输入笔记内容');
+                if (this.callbacks.showToast) this.callbacks.showToast("Enter a note first.");
                 return;
             }
 
@@ -339,7 +353,7 @@ export class AnnotationController {
 
             this.notes.unshift(newNote);
             await repoSaveNote(newNote);
-            if (this.callbacks.showToast) this.callbacks.showToast('笔记已保存');
+            if (this.callbacks.showToast) this.callbacks.showToast("Note saved");
         }
 
         this.closeNoteModal();
@@ -375,7 +389,7 @@ export class AnnotationController {
         }
         this.renderNotesUI();
 
-        if (this.callbacks.showToast) this.callbacks.showToast('已移除高亮');
+        if (this.callbacks.showToast) this.callbacks.showToast("Highlight removed");
         if (this.callbacks.onNotesChanged) {
             this.callbacks.onNotesChanged(this.notes);
         }
@@ -384,10 +398,10 @@ export class AnnotationController {
     async deleteNote(id: string) {
         const target = this.notes.find(n => n.id === id);
         if (!target || !isNote(target)) return;
-        await this.deleteAnnotation(id, '已删除笔记');
+        await this.deleteAnnotation(id, "Note deleted");
     }
 
-    async deleteAnnotation(id: string, toastMessage = '已删除标注') {
+    async deleteAnnotation(id: string, toastMessage = "Annotation deleted") {
         await this.callbacks.beforeDeleteAnnotations?.();
         if (!id) return;
         if (this.editingNoteId === id) await this.finishInlineEdit();
@@ -434,7 +448,7 @@ export class AnnotationController {
         this.showHighlightsInSidebar = !this.showHighlightsInSidebar;
         this.renderNotesUI();
         if (this.callbacks.showToast) {
-            this.callbacks.showToast(this.showHighlightsInSidebar ? '已开启：笔记区同时显示划线' : '已恢复：笔记区仅显示笔记');
+            this.callbacks.showToast(this.showHighlightsInSidebar ? "Highlights are now shown with notes." : "Only notes are now shown.");
         }
     }
 
@@ -499,11 +513,13 @@ export class AnnotationController {
         if (!this.elements) return;
         const sidebarNotes = this.getSidebarNotes();
         this._renderedSidebarIds = JSON.stringify(sidebarNotes.map(note => note.id));
+        this.changed();
+        if (this.reactView) return;
         renderNotesList({
             elements: this.elements,
             notes: sidebarNotes,
             getGoalAction: this.callbacks.getGoalAction,
-            onLinkGoal: this.callbacks.onLinkGoal ? id => { Promise.resolve(this.callbacks.onLinkGoal?.(id)).catch(error => this.callbacks.showToast?.(String(error.message || error))); } : null,
+            onLinkGoal: this.callbacks.onLinkGoal ? id => { Promise.resolve(this.callbacks.onLinkGoal?.(id)).catch(error => this.callbacks.showToast?.(String(error.message || error), { kind: 'error' })); } : null,
             notesScope: this.notesScope,
             showHighlightsInSidebar: this.showHighlightsInSidebar,
             focusedNoteIds: this.focusedNoteIds,

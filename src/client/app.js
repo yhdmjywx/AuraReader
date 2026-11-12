@@ -29,7 +29,7 @@ import {
 } from './infrastructure/annotationRepository.js';
 
 import { readerEngine, ReaderEngine } from './domain/readerEngine.js';
-import { resolveTargetPage, calcSpreadPages, clampPage, findChapterForPage, createReadingLocation, ensureTocHierarchy } from './domain/readingLocation.js';
+import { resolveTargetPage, clampPage, findChapterForPage, createReadingLocation, ensureTocHierarchy } from './domain/readingLocation.js';
 import {
     filterNotes,
     findOverlappingNote,
@@ -38,7 +38,7 @@ import {
     applyAllHighlightsToHtml
 } from './domain/annotationEngine.js';
 
-import { DOUBLE_PAGE_MIN_WIDTH, LayoutController } from './features/layout/layoutController.js';
+import { LayoutController } from './features/layout/layoutController.js';
 import { ReaderController } from './features/reader/readerController.js';
 import { AnnotationController } from './features/annotations/annotationController.js';
 import { SelectionController } from './features/annotations/selectionController.js';
@@ -69,11 +69,9 @@ import {
 export {
     demoBooks,
     seedNotes,
-    DOUBLE_PAGE_MIN_WIDTH,
     readerEngine,
     ReaderEngine,
     resolveTargetPage,
-    calcSpreadPages,
     clampPage,
     findChapterForPage,
     createReadingLocation,
@@ -118,10 +116,6 @@ export const state = {
     // Reader state
     get currentPage() { return readerController.getCurrentPage(); },
     set currentPage(val) { readerController.currentPage = val; },
-    get currentLeftPage() { return readerController.getCurrentLeftPage(); },
-    set currentLeftPage(val) { readerController.currentLeftPage = val; },
-    get currentRightPage() { return readerController.getCurrentRightPage(); },
-    set currentRightPage(val) { readerController.currentRightPage = val; },
     get totalPages() { return readerController.getTotalPages(); },
     set totalPages(val) { readerController.totalPages = val; },
     get fontSize() { return readerController.fontSize; },
@@ -136,8 +130,6 @@ export const state = {
     // Layout state
     get layoutMode() { return layoutController.getLayoutMode(); },
     set layoutMode(val) { layoutController.layoutMode = val; },
-    get isAutoDowngraded() { return layoutController.getIsAutoDowngraded(); },
-    set isAutoDowngraded(val) { layoutController.isAutoDowngraded = val; },
 
     // Annotations state
     get notes() { return annotationController.getNotes(); },
@@ -202,49 +194,8 @@ export async function loadNotesFromDB(bookId) {
 // --------------------------------------------------------------------------
 // 3. Layout Facade
 // --------------------------------------------------------------------------
-export function isDoublePageEffective() {
-    return layoutController.isDoublePageEffective();
-}
-
-export function checkResponsiveLayout() {
-    const notify = arguments.length > 0 ? arguments[0] : true;
-    const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
-        ? elements.readerPanel.clientWidth
-        : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
-    const res = layoutController.checkResponsiveLayout(availWidth);
-    if (res.changed && (!layoutController.callbacks || !layoutController.callbacks.onResponsiveChange)) {
-        if (notify) {
-            if (res.isAutoDowngraded) {
-                showToast('可用空间不足，已自适应降级为单页展示');
-            } else {
-                showToast('可用空间充足，已自动恢复双页展开模式');
-            }
-        }
-        updateLayoutClasses();
-        renderPage(state.currentPage, true);
-    }
-}
-
-export function togglePageMode() {
-    const nextMode = (state.layoutMode === 'double') ? 'single' : 'double';
-    setPageMode(nextMode);
-}
-
 export function setPageMode(mode) {
-    const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
-        ? elements.readerPanel.clientWidth
-        : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
-    const res = layoutController.setPageMode(mode, availWidth);
-    if (!layoutController.callbacks || !layoutController.callbacks.onLayoutChange) {
-        if (mode === 'double' && res.isAutoDowngraded) {
-            showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
-        } else {
-            showToast(mode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
-        }
-        updateLayoutClasses();
-        renderPage(state.currentPage, true);
-    }
-    return res;
+    return layoutController.setPageMode(mode);
 }
 
 export function updateLayoutClasses() {

@@ -7,4 +7,22 @@ data/
 deploy_vps_runner.js
 *.log
 .commandcode/
-docs/architecture_analysis_report.html
+.local-materials/
+.document-backups/
+
+# Local research retained from the public main history
+/docs/archive/market-research/2026-10-27/README.md
+/docs/archive/market-research/2026-10-27/goal-intention-market-check-2026-10-25.md
+/docs/archive/market-research/2026-10-27/goal-system-market-research-2026-10-25.md
+/docs/archive/market-research/2026-10-27/manifest.json
+/docs/archive/market-research/2026-10-27/market-research-2026-10-25.md
+/docs/archive/market-research/2026-10-27/market-research-aurareader-purpose-reading-2026-10-25.md
+/docs/archive/market-research/2026-10-27/market-research-reader-goals-2026-10-25.md
+/docs/build-market-report-2026-10-27.cjs
+/docs/canto-product-audit-2026-10-27.md
+/docs/market-research-2026-10-27-correction.md
+/docs/market-research-2026-10-27-repositories.json
+/docs/market-research-2026-10-27-sources.json
+/docs/market-research-2026-10-27-v2.md
+/docs/market-research-2026-10-27-verification.md
+/docs/market-research-2026-10-27.html

@@ -1,6 +1,7 @@
+import { readerViewport } from './readerDom.js';
 /* ==========================================================================
    Chapter column view - DOM layout for one EPUB chapter strip.
-   scroll: vertical strip. single: 1 column. double: 2 columns.
+   scroll: vertical strip. single: one column per screen.
    ========================================================================== */
 
 import {
@@ -16,11 +17,11 @@ const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, figcapti
 
 export function clearChapterFlow(elements) {
     if (!elements) return;
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     if (viewport) viewport.classList.remove('chapter-paged', 'chapter-scroll');
     if (elements.paperContainer) elements.paperContainer.classList.remove('chapter-flow');
     if (elements.bookPaper) {
-        elements.bookPaper.classList.remove('chapter-flow', 'mode-scroll', 'mode-single', 'mode-double');
+        elements.bookPaper.classList.remove('chapter-flow', 'mode-scroll', 'mode-single');
         elements.bookPaper.style.columnWidth = '';
         elements.bookPaper.style.columnGap = '';
         elements.bookPaper.style.columnFill = '';
@@ -28,22 +29,19 @@ export function clearChapterFlow(elements) {
         elements.bookPaper.style.overflow = '';
         elements.bookPaper.style.width = '';
     }
-    if (elements.pageUnit) elements.pageUnit.textContent = '页';
+    if (elements.pageUnit) elements.pageUnit.textContent = ' page';
 }
 
 export function layoutChapterStrip(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     const container = elements && elements.paperContainer;
     if (!viewport || !paper || !container) return null;
 
     viewport.classList.remove('chapter-paged', 'chapter-scroll');
     container.classList.add('chapter-flow');
-    container.classList.remove('spread-active');
     paper.classList.add('chapter-flow');
-    paper.classList.remove('mode-scroll', 'mode-single', 'mode-double');
-    if (elements.bookPaperRight) elements.bookPaperRight.style.display = 'none';
-    if (elements.spreadSpine) elements.spreadSpine.style.display = 'none';
+    paper.classList.remove('mode-scroll', 'mode-single');
 
     if (mode === 'scroll') {
         viewport.classList.add('chapter-scroll');
@@ -58,7 +56,7 @@ export function layoutChapterStrip(elements, mode) {
     }
 
     viewport.classList.add('chapter-paged');
-    paper.classList.add(mode === 'double' ? 'mode-double' : 'mode-single');
+    paper.classList.add('mode-single');
     const hostHeight = container.clientHeight || viewport.clientHeight;
     const hostWidth = container.clientWidth || viewport.clientWidth;
     paper.style.boxSizing = 'border-box';
@@ -70,7 +68,6 @@ export function layoutChapterStrip(elements, mode) {
     paper.style.columnFill = 'auto';
     paper.style.columnWidth = `${metrics.colWidth}px`;
     paper.style.columnGap = `${metrics.gap}px`;
-    balanceDoubleTail(paper, mode);
     return { mode, metrics, hostWidth, hostHeight };
 }
 
@@ -89,7 +86,7 @@ export function readTopLeftSentence(root, viewport) {
     for (const [dx, dy] of probes) {
         const x = Math.min(view.right - 4, view.left + dx);
         const y = Math.min(view.bottom - 4, view.top + dy);
-        const hit = caretAt(x, y);
+        const hit = caretAt(x, y, root.ownerDocument);
         if (!hit || !root.contains(hit.node)) continue;
         const sentence = sentenceFromHit(root, hit.node, hit.offset);
         if (sentence) return sentence;
@@ -111,14 +108,11 @@ export function placeSentenceAtTopLeft(root, viewport, sentence, mode) {
         return true;
     }
     if (isDocumentStart(root, pos.node, pos.offset)) {
-        balanceDoubleTail(root, mode);
         root.scrollLeft = 0;
         return true;
     }
     const block = insertColumnBreak(root, pos.node, pos.offset);
     if (!block) return false;
-    pushSentenceToLeftColumn(root, block, mode);
-    balanceDoubleTail(root, mode);
     snapBlockToScreen(root, block, mode);
     return true;
 }
@@ -141,7 +135,7 @@ export function placeAnchorIdAtTopLeft(root, viewport, anchor, mode, sourcePage 
 }
 
 export function shiftStrip(elements, mode, direction) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (!viewport || !paper) return 'edge';
     if (mode === 'scroll') {
@@ -169,7 +163,7 @@ export function shiftStrip(elements, mode, direction) {
 }
 
 export function scrollStripToStart(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (mode === 'scroll') {
         if (viewport) viewport.scrollTop = 0;
@@ -179,7 +173,7 @@ export function scrollStripToStart(elements, mode) {
 }
 
 export function scrollStripToEnd(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (mode === 'scroll') {
         if (!viewport) return;
@@ -191,14 +185,14 @@ export function scrollStripToEnd(elements, mode) {
 }
 
 export function atStripStart(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (mode === 'scroll') return !viewport || viewport.scrollTop <= 2;
     return !paper || paper.scrollLeft <= 2;
 }
 
 export function atStripEnd(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (mode === 'scroll') {
         if (!viewport) return true;
@@ -210,7 +204,7 @@ export function atStripEnd(elements, mode) {
 }
 
 export function writeChapterIndicator(elements, mode) {
-    const viewport = document.getElementById('reader-viewport');
+    const viewport = readerViewport(elements);
     const paper = elements && elements.bookPaper;
     if (!elements || !elements.currentPageSpan || !elements.totalPagesSpan) return { current: 1, total: 1 };
     let current = 1;
@@ -223,23 +217,22 @@ export function writeChapterIndicator(elements, mode) {
         total = Math.max(1, Math.ceil(scrollHeight / Math.max(1, height)));
         current = Math.min(total, Math.floor(scrollTop / Math.max(1, height)) + 1);
         label = String(current);
-        if (elements.pageUnit) elements.pageUnit.textContent = '屏';
+        if (elements.pageUnit) elements.pageUnit.textContent = total === 1 ? ' screen' : ' screens';
     } else if (paper) {
         const metrics = columnMetrics(paper.clientWidth, mode);
         const contentTotal = contentColumnCount(paper, metrics);
         total = contentTotal;
         current = columnFromScroll(paper.scrollLeft, metrics.stride, contentTotal);
         if (current > contentTotal) current = contentTotal;
-        const right = current + metrics.columns - 1;
-        label = (mode === 'double' && right > current && right <= contentTotal) ? `${current}–${right}` : String(current);
-        if (elements.pageUnit) elements.pageUnit.textContent = '栏';
+        label = String(current);
+        if (elements.pageUnit) elements.pageUnit.textContent = total === 1 ? ' column' : ' columns';
     }
     elements.currentPageSpan.textContent = label;
     elements.totalPagesSpan.textContent = String(total);
     return { current, total };
 }
 
-function caretAt(x, y) {
+function caretAt(x, y, document) {
     if (document.caretPositionFromPoint) {
         const pos = document.caretPositionFromPoint(x, y);
         if (pos && pos.offsetNode) return { node: pos.offsetNode, offset: pos.offset };
@@ -265,7 +258,7 @@ function sentenceFromHit(root, node, offset) {
 }
 
 function firstText(element) {
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     const node = walker.nextNode();
     if (!node) return null;
     return { node, offset: 0 };
@@ -273,7 +266,7 @@ function firstText(element) {
 
 function offsetInside(block, node, offset) {
     if (!block || !node) return 0;
-    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+    const walker = block.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT);
     let count = 0;
     let current = walker.nextNode();
     while (current) {
@@ -287,7 +280,7 @@ function offsetInside(block, node, offset) {
 function locateSnippet(root, snippet) {
     const needle = String(snippet || '').replace(/\s+/g, '').slice(0, 40);
     if (!needle) return null;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const parts = [];
     let raw = '';
     let compact = '';
@@ -315,7 +308,7 @@ function locateSnippet(root, snippet) {
 }
 
 function rangeAt(node, offset) {
-    const range = document.createRange();
+    const range = node.ownerDocument.createRange();
     const safe = Math.max(0, Math.min(node.textContent.length, offset));
     range.setStart(node, safe);
     range.setEnd(node, safe);
@@ -327,7 +320,7 @@ function isDocumentStart(root, node, offset) {
         const head = node.textContent.slice(0, offset);
         if (head.replace(/\s+/g, '') !== '') return false;
     }
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     let current = walker.nextNode();
     while (current) {
         if (current === node) return true;
@@ -339,7 +332,6 @@ function isDocumentStart(root, node, offset) {
 
 function contentColumnCount(paper, metrics) {
     let total = countColumns(paper.scrollWidth, metrics.stride);
-    if (paper.querySelector('.flow-tail') && total > 1 && total % 2 === 0) total -= 1;
     return Math.max(1, total);
 }
 
@@ -388,28 +380,12 @@ function liftToColumnChild(paper, textNode) {
     }
     if (!node.parentNode) return null;
     if (node.nodeType === Node.TEXT_NODE) {
-        const wrap = document.createElement('div');
+        const wrap = paper.ownerDocument.createElement('div');
         node.parentNode.insertBefore(wrap, node);
         wrap.appendChild(node);
         node = wrap;
     }
     return node;
-}
-
-function pushSentenceToLeftColumn(paper, block, mode) {
-    if (mode !== 'double' || !block || !block.parentNode) return;
-    const metrics = columnMetrics(paper.clientWidth, mode);
-    const stride = Math.max(1, metrics.stride);
-    const rect = block.getBoundingClientRect();
-    const host = paper.getBoundingClientRect();
-    const contentX = paper.scrollLeft + rect.left - host.left;
-    const zeroBased = Math.max(0, Math.round(contentX / stride));
-    if (zeroBased % 2 === 0) return;
-    if (block.previousElementSibling && block.previousElementSibling.classList.contains('flow-pad')) return;
-    const pad = document.createElement('div');
-    pad.className = 'flow-pad';
-    pad.setAttribute('aria-hidden', 'true');
-    block.parentNode.insertBefore(pad, block);
 }
 
 function snapBlockToScreen(paper, block, mode) {
@@ -423,23 +399,5 @@ function snapBlockToScreen(paper, block, mode) {
 }
 
 function removeFlowBreak(root) {
-    root.querySelectorAll('.flow-break, .flow-tail, .flow-pad').forEach(node => node.remove());
     root.querySelectorAll('.flow-start').forEach(node => node.classList.remove('flow-start'));
-}
-
-function balanceDoubleTail(paper, mode) {
-    if (!paper) return;
-    paper.querySelectorAll('.flow-tail').forEach(node => node.remove());
-    if (mode !== 'double') {
-        delete paper.dataset.contentColumns;
-        return;
-    }
-    const metrics = columnMetrics(paper.clientWidth, mode);
-    const total = countColumns(paper.scrollWidth, metrics.stride);
-    paper.dataset.contentColumns = String(total);
-    if (total % 2 === 0) return;
-    const tail = document.createElement('div');
-    tail.className = 'flow-tail';
-    tail.setAttribute('aria-hidden', 'true');
-    paper.appendChild(tail);
 }

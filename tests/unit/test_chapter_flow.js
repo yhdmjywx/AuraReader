@@ -34,38 +34,7 @@ console.log('=== AuraReader 章节纸条计算 ===');
     assert.strictEqual(single.colWidth, 800);
     assert.strictEqual(single.screenWidth, 800);
 
-    const spread = columnMetrics(840, 'double');
-    assert.strictEqual(spread.columns, 2);
-    assert.strictEqual(spread.gap % 2, 0);
-    assert.strictEqual(spread.screenWidth, spread.colWidth * 2 + spread.gap);
-    assert.ok(spread.screenWidth <= 840);
-    assert.strictEqual(screenStep(spread), spread.columns * spread.stride);
-    assert.strictEqual(screenStep(spread), spread.screenWidth + spread.gap);
-    assert.ok(screenStep(spread) > spread.screenWidth, '双页翻页步长必须比可见宽度多一个栏间距');
-    assert.strictEqual(screenStartForColumn(1, spread), 0);
-    assert.strictEqual(screenStartForColumn(2, spread), 0);
-    assert.strictEqual(screenStartForColumn(9, spread), 4 * screenStep(spread));
-    assert.strictEqual(screenStartForColumn(16, spread), 7 * screenStep(spread));
-    assert.strictEqual(screenStep(single), single.screenWidth);
-
-    const focusedSpread = columnMetrics(1192, 'double');
-    assert.strictEqual(focusedSpread.colWidth, 560);
-    assert.strictEqual(focusedSpread.gap, 72);
-    assert.strictEqual(focusedSpread.screenWidth, 1192);
-    assert.strictEqual(focusedSpread.stride, 632);
-    assert.strictEqual(screenStep(focusedSpread), 1264);
-    assert.strictEqual(screenStartForColumn(5, focusedSpread), 2528, '奇数末栏必须落在下一组双页左侧');
-    assert.strictEqual(countColumns(5 * focusedSpread.stride - focusedSpread.gap, focusedSpread.stride), 5);
-
-    const sidebarSpread = columnMetrics(1146, 'double');
-    assert.strictEqual(sidebarSpread.colWidth, 537);
-    assert.strictEqual(sidebarSpread.gap, 72);
-    assert.strictEqual(sidebarSpread.screenWidth, 1146);
-    assert.strictEqual(screenStep(sidebarSpread), 1218);
-    const roundedSpread = columnMetrics(1145, 'double');
-    assert.strictEqual(roundedSpread.colWidth, 536);
-    assert.strictEqual(roundedSpread.screenWidth, 1144, '奇数容器宽度取整后不得溢出');
-
+    assert.strictEqual(screenStartForColumn(3, single), 1600);
     const focusedSingle = columnMetrics(560, 'single');
     assert.strictEqual(focusedSingle.colWidth, 560);
     assert.strictEqual(focusedSingle.gap, 0);
@@ -87,6 +56,7 @@ console.log('=== AuraReader 章节纸条计算 ===');
     assert.strictEqual(rendered, 1, '章节分页渲染后必须触发 UI 分支的标注恢复回调');
 
     const { AppCoordinator } = await import('../../dist/client/app/appCoordinator.js');
+    const { Session } = await import('../../dist/client/app/session.js');
     const activated = [];
     const shown = [];
     const focused = [];
@@ -95,6 +65,7 @@ console.log('=== AuraReader 章节纸条计算 ===');
         { id: 'standalone-note', kind: 'note', page: 2, quote: '', comment: '独立笔记' }
     ];
     const coordinator = new AppCoordinator({
+        session: new Session('chapter-merge-test'),
         readerController: { isChapterFlow: () => true, showQuote: (...args) => shown.push(args) },
         annotationController: { getNotes: () => notes, focusNotes: ids => focused.push(ids) },
         selectionController: { activateAnnotationId: (...args) => activated.push(args) }

@@ -1,4 +1,6 @@
-import type { GoalDraft, GoalGraphBackup, GoalLibraryState, GoalBookLink } from '../domain/goal.js';
+import type { GoalDraft, GoalGraphBackup, GoalLibraryState, GoalBookLink, GoalInputDraft } from '../domain/goal.js';
+import { normalizeGoalContent } from '../domain/goalContentEngine.js';
+import { responseTargetKey, type GoalResponseTarget } from '../domain/goalContentEngine.js';
 import type { SaveGoalLibraryCommand } from '../../shared/storage.js';
 import { acknowledgeGoals, attachGoalCommand, pendingGoals, readGoalDraft, clearGoalDraft } from './goalRecovery.js';
 import { acceptGoalLibrary, bookVersion, cachedGoalLibrary, enqueue, operationId, readBooks, readGoalLibrary, readNotes, storageRequest } from './storageClient.js';
@@ -6,12 +8,18 @@ import { getNotesForBooks } from './annotationRepository.js';
 
 const PENDING = 'aura_goal_library_pending', DRAFTS = 'aura_goal_library_drafts';
 const BOOK_INTENTS = 'aura_goal_book_pending';
-interface Entry { version: string; expected: number; state: GoalLibraryState; command?: SaveGoalLibraryCommand }
+const INPUT_DRAFTS = 'aura_goal_input_drafts';
+export interface ResponseWriteIntent { id: string; target: GoalResponseTarget }
+interface Entry { version: string; expected: number; state: GoalLibraryState; command?: SaveGoalLibraryCommand; responseIntents?: ResponseWriteIntent[] }
+const responseListeners = new Set<(intents: ResponseWriteIntent[], error?: unknown) => void>();
+export function onResponseWrite(listener: (intents: ResponseWriteIntent[], error?: unknown) => void) {
+    responseListeners.add(listener); return () => { responseListeners.delete(listener); };
+}
 export interface LibraryDraft { draft: GoalDraft; legacyBookId?: string }
 function read<T>(key: string, fallback: T): T {
     const value = localStorage.getItem(key);
     if (value === null) return fallback;
-    try { return JSON.parse(value) as T; } catch { throw new Error('Goal 恢复缓冲损坏，请保留站点数据'); }
+    try { return JSON.parse(value) as T; } catch { throw new Error("The goal recovery buffer is damaged. Preserve site data."); }
 }
 export function pendingBookIntents(): GoalBookLink[] {
     const links = read<GoalBookLink[]>(BOOK_INTENTS, []);
@@ -28,13 +36,13 @@ export function acknowledgeBookIntent(link: GoalBookLink) {
 }
 export function pendingLibrary(): Entry[] {
     const entries = read<Entry[]>(PENDING, []);
-    if (!Array.isArray(entries) || entries.some(e => !e.version || !Number.isSafeInteger(e.expected) || !e.state || !Array.isArray(e.state.goals) || !Array.isArray(e.state.links))) throw new Error('无效 Goal 恢复缓冲');
+    if (!Array.isArray(entries) || entries.some(e => !e.version || !Number.isSafeInteger(e.expected) || !e.state || !Array.isArray(e.state.goals) || !Array.isArray(e.state.links))) throw new Error("Invalid goal recovery buffer.");
     return entries;
 }
 function writePending(entries: Entry[]) { if (entries.length) localStorage.setItem(PENDING, JSON.stringify(entries)); else localStorage.removeItem(PENDING); }
 export function libraryDrafts(): LibraryDraft[] {
     const drafts = read<LibraryDraft[]>(DRAFTS, []);
-    if (!Array.isArray(drafts) || drafts.some(e => !e.draft?.id || typeof e.draft.text !== 'string')) throw new Error('无效 Goal 草稿');
+    if (!Array.isArray(drafts) || drafts.some(e => !e.draft?.id || typeof e.draft.text !== 'string')) throw new Error("Invalid goal draft.");
     return drafts;
 }
 export function storeLibraryDraft(draft: LibraryDraft) {
@@ -48,10 +56,23 @@ function clearDraft(id: string) {
     storeLibraryDraft({ draft: { id, text: '', parentId: null, origin: null } });
 }
 export function discardLibraryDraft(id: string) { clearDraft(id); }
-export function stageLibrary(state: GoalLibraryState) {
+export function inputDrafts(): GoalInputDraft[] {
+    const drafts = read<GoalInputDraft[]>(INPUT_DRAFTS, []);
+    if (!Array.isArray(drafts) || drafts.some(d => !d?.id || !d.goalId || typeof d.text !== 'string')) throw new Error('Invalid goal text recovery buffer. Preserve site data.');
+    return drafts;
+}
+export function storeInputDraft(draft: GoalInputDraft) {
+    const drafts = inputDrafts().filter(d => d.id !== draft.id);
+    if (draft.text.trim()) drafts.push({ ...draft });
+    if (drafts.length) localStorage.setItem(INPUT_DRAFTS, JSON.stringify(drafts)); else localStorage.removeItem(INPUT_DRAFTS);
+}
+export function discardInputDraft(id: string) { storeInputDraft({ id, goalId: '', text: '' }); }
+export function stageLibrary(state: GoalLibraryState, responseIntents: ResponseWriteIntent[] = []) {
     const entries = pendingLibrary(), last = entries.at(-1);
     if (last && !last.command) entries.pop();
-    entries.push({ version: operationId(), expected: last && !last.command ? last.expected : cachedGoalLibrary()?.revision || 0, state: structuredClone(state) });
+    const intents = new Map((last && !last.command ? last.responseIntents || [] : []).map(i => [responseTargetKey(i.target), i]));
+    responseIntents.forEach(i => intents.set(responseTargetKey(i.target), i));
+    entries.push({ version: operationId(), expected: last && !last.command ? last.expected : cachedGoalLibrary()?.revision || 0, state: structuredClone(state), responseIntents: [...intents.values()] });
     writePending(entries);
 }
 export function flushLibrary(): Promise<void> {
@@ -60,12 +81,16 @@ export function flushLibrary(): Promise<void> {
             const entry = pendingLibrary()[0]; if (!entry) return;
             const command = entry.command || { opId: entry.version, expected: entry.expected, state: entry.state };
             if (!entry.command) { const entries = pendingLibrary(); entries[0].command = command; writePending(entries); }
-            const result = await storageRequest('goals/library/save', command);
-            if (command.state.bookLinks === undefined) await readGoalLibrary();
+            let result;
+            try { result = await storageRequest('goals/library/save', command); }
+            catch (error) { responseListeners.forEach(listener => listener(entry.responseIntents || [], error)); throw error; }
+            if (command.state.bookLinks === undefined || command.state.formatVersion !== 2) await readGoalLibrary();
             else acceptGoalLibrary({ id: 'reader-goals', revision: result.revision, deleted: false, value: command.state });
             const remaining = pendingLibrary().filter(e => e.version !== entry.version);
             remaining.forEach(e => { if (!e.command) e.expected = result.revision; }); writePending(remaining);
+            responseListeners.forEach(listener => listener(entry.responseIntents || []));
             for (const item of libraryDrafts()) if (command.state.goals.some(g => g.id === item.draft.id && g.text === item.draft.text)) clearDraft(item.draft.id);
+            for (const draft of inputDrafts()) if (command.state.inputs?.some(i => i.id === draft.id && i.goalId === draft.goalId && i.text === draft.text)) discardInputDraft(draft.id);
             for (const link of pendingBookIntents()) if (command.state.bookLinks?.some(l => l.goalId === link.goalId && l.bookId === link.bookId && l.generation === link.generation)) acknowledgeBookIntent(link);
         }
     });
@@ -90,7 +115,7 @@ async function recoverLegacy() {
     for (const key of keys.filter(k => k.startsWith('aura_goals_draft_'))) {
         const bookId = key.slice('aura_goals_draft_'.length), entry = readGoalDraft(bookId); if (!entry) continue;
         const version = await bookVersion(bookId);
-        if (version.generation !== entry.generation) throw new Error('旧 Goal 草稿来源已变化，恢复内容已保留');
+        if (version.generation !== entry.generation) throw new Error("The legacy goal draft source has changed. Recovery content is preserved.");
         const draft = { ...entry.draft, id: await legacyId(bookId, entry.draft.id), parentId: entry.draft.parentId ? await legacyId(bookId, entry.draft.parentId) : null,
             origin: { ...(entry.draft.origin || { sourcePage: null, sectionId: '', chapter: '' }), bookId } };
         if (!libraryDrafts().some(e => e.draft.id === draft.id)) storeLibraryDraft({ draft, legacyBookId: bookId });
@@ -108,7 +133,7 @@ export async function loadGoalLibrary() {
         await recoverLegacy(); await flushLibrary();
     } catch (cause) { error = cause; }
     const record = await readGoalLibrary(), pending = pendingLibrary();
-    return { state: pending.at(-1)?.state || (!record.deleted ? record.value : { goals: [], links: [] }), drafts: libraryDrafts(), pending: pending.length > 0, error };
+    return { state: normalizeGoalContent(pending.at(-1)?.state || (!record.deleted ? record.value : { goals: [], links: [] })), drafts: libraryDrafts(), pending: pending.length > 0, error };
 }
 export async function loadGoalMaterials(state: GoalLibraryState) {
     const ids = [...new Set(state.links.map(l => l.bookId))];
@@ -116,11 +141,11 @@ export async function loadGoalMaterials(state: GoalLibraryState) {
     return { annotations: notes.flatMap(n => n.deleted ? [] : [n.value]), titles: new Map(books.filter(b => !b.deleted).map(b => [b.id, b.deleted ? '' : b.value.title])) };
 }
 export function assertNoLibraryRecovery() {
-    if (pendingLibrary().length || libraryDrafts().length || pendingBookIntents().length) throw new Error('仍有未确认保存的 Goal，窗口已保留');
+    if (pendingLibrary().length || libraryDrafts().length || inputDrafts().length || pendingBookIntents().length) throw new Error("Some goals are not confirmed saved. This window remains open.");
 }
 export async function goalGraphsForBooks(bookIds: string[]): Promise<Map<string, GoalGraphBackup>> {
     const loaded = await loadGoalLibrary(); if (loaded.error) throw loaded.error;
-    if (loaded.drafts.length || pendingBookIntents().length) throw new Error('请先完成 Goal 草稿或待确认书籍关联再导出');
+    if (loaded.drafts.length || inputDrafts().length || pendingBookIntents().length) throw new Error("Finish goal drafts and pending book links before exporting.");
     const state = loaded.state, result = new Map<string, GoalGraphBackup>();
     for (const bookId of bookIds) {
         const seeds = new Set([...state.links.filter(l => l.bookId === bookId).map(l => l.goalId), ...(state.bookLinks || []).filter(l => l.bookId === bookId).map(l => l.goalId), ...state.goals.filter(g => g.origin?.bookId === bookId).map(g => g.id)]);

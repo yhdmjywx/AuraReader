@@ -1,4 +1,5 @@
 import type { GoalStateRecord, SaveGoalsCommand, NoteDeleteRevision } from './storage.js';
+import type { WikiRequest, WikiResponse } from './wiki.js';
 import type { GoalLibraryRecord, SaveGoalLibraryCommand } from './storage.js';
 import type { BookRecord, BookRevision, DeleteBookCommand, DeleteNoteCommand, NoteRecord, RestoreCommand, Revision, SaveBookCommand, SaveNoteCommand } from './storage.js';
 
@@ -43,6 +44,11 @@ export interface DesktopBridge {
         importFont(): Promise<DesktopResult<{ canceled: true } | { canceled: false; font: DesktopFont }>>;
     };
     readonly window: { toggleFullscreen(): Promise<DesktopResult<{ fullscreen: boolean }>> };
+    readonly wiki: {
+        read(input: WikiRequest): Promise<DesktopResult<WikiResponse>>;
+        cancel(id: string): Promise<DesktopResult<void>>;
+        openExternal(url: string): Promise<DesktopResult<void>>;
+    };
     readonly lifecycle: {
         requestClose(): Promise<DesktopResult<{ requested: boolean }>>;
         onPrepareClose(callback: (requestId: string) => void): () => void;

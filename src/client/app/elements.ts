@@ -13,11 +13,10 @@ export interface AppElements {
     appHeader?: HTMLElement | null;
     workspaceContainer?: HTMLElement | null;
     readerPanel?: HTMLElement | null;
+    readerViewport?: HTMLElement | null;
     notesPanel?: HTMLElement | null;
     bookPaper?: HTMLElement | null;
-    bookPaperRight?: HTMLElement | null;
     paperContainer?: HTMLElement | null;
-    spreadSpine?: HTMLElement | null;
     currentBookTitle?: HTMLElement | null;
     currentPageSpan?: HTMLElement | null;
     totalPagesSpan?: HTMLElement | null;
@@ -25,9 +24,7 @@ export interface AppElements {
     btnModeScroll?: HTMLButtonElement | null;
     btnPrevPage?: HTMLButtonElement | null;
     btnNextPage?: HTMLButtonElement | null;
-    btnPageMode?: HTMLButtonElement | null;
-    textPageMode?: HTMLElement | null;
-    iconPageMode?: HTMLElement | null;
+    btnModeSingle?: HTMLButtonElement | null;
     fontFamilySelect?: HTMLButtonElement | null;
     fontPicker?: HTMLElement | null;
     fontMenu?: HTMLElement | null;

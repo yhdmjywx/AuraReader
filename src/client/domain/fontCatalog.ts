@@ -1,8 +1,8 @@
 import type { Book } from './book.js';
 import type { BuiltinFontId, FontChoice, ImportedFont, ResolvedFont } from './font.js';
 export const CURATED_FONTS: { id: BuiltinFontId; name: string; family: string; group: string; fallback: string }[] = [
-    { id: 'sarasa', name: '更纱黑体', family: 'Sarasa Gothic SC', group: '中文', fallback: 'sans-serif' },
-    { id: 'literata', name: 'Literata', family: 'Literata', group: '英文', fallback: 'serif' }
+    { id: 'sarasa', name: "Sarasa Gothic SC", family: 'Sarasa Gothic SC', group: "Chinese", fallback: 'sans-serif' },
+    { id: 'literata', name: 'Literata', family: 'Literata', group: "English", fallback: 'serif' }
 ];
 
 export const SYSTEM_FALLBACK = 'system-ui, "Microsoft YaHei", sans-serif';
@@ -33,10 +33,10 @@ export function resolveFont(input: unknown, book: Book | null | undefined, impor
     const id = choice.kind === 'auto' ? automaticFont(book) : choice.kind === 'system' ? null : choice.id;
     const curated = CURATED_FONTS.find(font => font.id === id);
     if (choice.kind === 'auto' || choice.kind === 'builtin') {
-        if (!curated) return { family: SYSTEM_FALLBACK, name: '自动选择', loadFamilies: [] };
-        const english = curated.group === '英文';
+        if (!curated) return { family: SYSTEM_FALLBACK, name: "Auto", loadFamilies: [] };
+        const english = curated.id === 'literata';
         return { family: `${quoteFamily(curated.family)}, ${english ? '"Sarasa Gothic SC", ' : ''}${curated.fallback}`,
-            name: choice.kind === 'auto' ? '自动选择' : curated.name,
+            name: choice.kind === 'auto' ? "Auto" : curated.name,
             loadFamilies: english ? [curated.family, 'Sarasa Gothic SC'] : [curated.family] };
     }
     if (choice.kind === 'system') {

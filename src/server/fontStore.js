@@ -10,17 +10,17 @@ const FONT_MIME = { ttf: 'font/ttf', otf: 'font/otf', woff2: 'font/woff2' };
 
 function inspectFont(bytes, filename) {
     const extension = path.extname(filename).slice(1).toLowerCase();
-    if (!FONT_MIME[extension]) throw new Error('请选择 TTF、OTF 或 WOFF2 字体文件');
-    if (!bytes.length || bytes.length > MAX_FONT_BYTES) throw new Error('字体文件为空或超过 64MB');
+    if (!FONT_MIME[extension]) throw new Error("Choose a TTF, OTF, or WOFF2 font file.");
+    if (!bytes.length || bytes.length > MAX_FONT_BYTES) throw new Error("The font file is empty or exceeds 64 MB.");
     const signature = bytes.subarray(0, 4).toString('latin1');
     const type = signature === 'wOF2' ? 'woff2' : signature === 'OTTO' ? 'otf'
         : (bytes.length >= 4 && bytes.readUInt32BE(0) === 0x00010000) ? 'ttf' : '';
-    if (type !== extension) throw new Error('文件内容不是所声明的字体格式');
+    if (type !== extension) throw new Error("File content does not match the declared font format.");
     let font;
     try {
         font = fontkit.create(bytes);
         if (!font.familyName || !font.numGlyphs || !font.characterSet.length) throw new Error();
-    } catch (_) { throw new Error('无法读取字体，文件可能损坏'); }
+    } catch (_) { throw new Error("Could not read the font. The file may be damaged."); }
     const id = crypto.createHash('sha256').update(bytes).digest('hex');
     const weightAxis = font.variationAxes && font.variationAxes.wght;
     return {

@@ -3,7 +3,7 @@ const path = require('path');
 
 console.log('=== HTML & DOM 深度审计 ===');
 const clientDir = path.resolve(__dirname, '../../src/client');
-const html = fs.readFileSync(path.join(clientDir, 'index.html'), 'utf8');
+const html = require('../helpers/react-workbench.cjs').shellHtml();
 const js = fs.readFileSync(path.join(clientDir, 'main.ts'), 'utf8');
 
 // 1. HTML Tag Balance Stack

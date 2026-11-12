@@ -10,11 +10,12 @@ module.exports = {
     npmRebuild: false, // All production modules are JS; SQLite is built into Electron.
     files: [
         'package.json', 'LICENSE',
-        'dist/client/**/*.js', 'dist/client/package.json',
-        'src/client/index.html', 'src/client/styles.css', 'src/client/assets/fonts/**/*',
+        'dist/renderer/**/*',
         'src/desktop/**/*.cjs', 'src/desktop/renderer/**/*',
         'src/server/dataStore.js', 'src/server/fontStore.js',
-        'src/server/migration.js', 'src/server/storageMaintenance.js'
+        'src/server/wikiService.js', 'src/shared/wikiSites.js',
+        'src/server/goalLibrary.js', 'src/server/goalValidation.js', 'src/server/migration.js',
+        'src/server/storageMaintenance.js'
     ],
     extraFiles: [{ from: '.commandcode/package-resources/THIRD-PARTY-NOTICES.txt', to: 'THIRD-PARTY-NOTICES.txt' },
         { from: 'LICENSE', to: 'LICENSE-AuraReader.txt' }],

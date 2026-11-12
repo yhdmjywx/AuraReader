@@ -12,17 +12,19 @@
 | [当前状态与已知限制](known-limitations.md) | 平台、格式、离线范围、安装包及资源许可边界 |
 | [产品演示](product-demo.md) | README 动画、Goal 跨书叙事、素材与更新方法 |
 
-## 产品与技术实现
+## 现行产品与设计依据
 
-- [PRD](prd_v0_5.md)：产品定位、Goal 可选性、功能规格与验收要求。
-- [Goal 书籍模块](goal-books-implementation.md)：Library、书籍关联与文件夹式导航。
-- [跨书 Goal](goal-cross-book-implementation.md)：材料关联、数据与历史迁移。
-- [Goal 生命周期验证](goal-lifecycle-verification-2026-10-27.md)：完成、归档、最近删除与当前交付边界。
-- [Goal 侧栏](goal-sidebar-implementation.md)、[界面细化](goal-ui-refinement-guide.md)、[可见性规则](goal-visibility-improvement-plan.md)：交互演进与实现约束。
-- [阅读布局](reader_layout_implementation.md)、[字体设置](font_settings_implementation.md)、[TypeScript 迁移](typescript-migration.md)：具体实现与运行边界。
+- [PRD](prd_v0_5.md)：产品定位、功能规格与验收要求。
+- [Goal 定位](goal-positioning-correction-2026-10-27.md)：读者意图与产品原则。
+- [Goal 用户自输入与 Response MVP](product/goals/user-input-response/feature-spec.md)：统一内容组织、保留 Link 组件、产品提供的可选 Response 标签；需求已确认，交互待设计，尚未实现。
+- [Wiki 功能](product/wiki/README.md)：原词查询与手动切换词条语言版本的 MVP，含用户指定 Figma 设计、API 范围和验收；尚未实现。
+- [设计系统](design/design-system.md)：唯一现行 UI/UX 规范，包含全局原则、局部约束和待确认问题。
+- [设计索引](design/design-index.md)：Figma 入口、组件与交互状态索引、设计完成情况。
+- [设计决策](product/decisions/README.md)：批准范围、变更记录与必要历史原因。
+- [项目概况](agents/project-profile.md)：技术栈、命令、行为契约与文档位置。
 
-## 桌面阶段与历史记录
+## 历史记录
 
-Electron [审计](electron-desktop-audit.md)、[阶段 2](electron-desktop-stage2.md)、[阶段 3](electron-desktop-stage3.md)、[阶段 4](electron-desktop-stage4.md)、[阶段 5](electron-desktop-stage5.md)、[阶段 6](electron-desktop-stage6.md) 保留各阶段设计、检查证据和未验收项。
+历史方案、实施记录和验收记录统一放入 [archive](archive/README.md)，按两类分目录，索引与每月清理规则见该页。
 
-阶段记录、旧规划和 [历史状态记录](status.md) 描述当时版本。旧 HTML／章节 ZIP 导出、旧笔记侧栏和已被替代的首页布局不代表当前入口。阅读中的紧凑书库 Popover 与 Library 首页仍各自保留。当前使用规则见使用文档，源码与安装包的差别见已知限制；本次文档更新不重写历史验收结果。
+历史记录描述当时版本，不代表当前入口或最新验收结果。其中仍被现行规范引用的行为约定、未完成验收的证据继续保留；归档不使这些约定失效。

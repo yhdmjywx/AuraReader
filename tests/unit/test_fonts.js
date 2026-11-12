@@ -38,6 +38,13 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
     const english = resolveFont({ kind: 'builtin', id: 'literata' }, {});
     assert.match(english.family, /Literata.*Sarasa Gothic SC/);
     assert.deepEqual(english.loadFamilies, ['Literata', 'Sarasa Gothic SC']);
+    const originalGroup = CURATED_FONTS[1].group;
+    try {
+        CURATED_FONTS[1].group = 'Renamed display group';
+        assert.equal(resolveFont({ kind: 'builtin', id: 'literata' }, {}).family, english.family);
+        assert.deepEqual(resolveFont({ kind: 'builtin', id: 'literata' }, {}).loadFamilies, english.loadFamilies,
+            'Changing a display label must not change font fallback behavior');
+    } finally { CURATED_FONTS[1].group = originalGroup; }
     assert.match(resolveFont({ kind: 'auto' }, { language: 'zh-CN' }).family, /Sarasa Gothic SC/);
     assert.match(resolveFont({ kind: 'auto' }, { language: 'en' }).family, /Literata/);
     assert.match(resolveFont({ kind: 'auto' }, {}).family, /system-ui/);
@@ -79,8 +86,7 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
         await fs.rm(directory, { recursive: true, force: true });
     }
 
-    const html = await fs.readFile('src/client/index.html', 'utf8');
-    const dom = new JSDOM(html, { url: 'http://localhost:8095/' });
+    const dom = require('../helpers/react-workbench.cjs').createWorkbench({ url: 'http://localhost:8095/' });
     const saved = new Map();
     for (const key of ['window', 'document', 'localStorage', 'DOMParser', 'fetch']) {
         saved.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
@@ -102,7 +108,7 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
         };
         const elements = Object.fromEntries(Object.entries(ids).map(([key, id]) => [key, document.getElementById(id)]));
         const panel = elements.appearancePanel;
-        assert.equal(panel.querySelectorAll('.appearance-row').length, 6, '字体功能不得增加设置行');
+        assert.equal(panel.querySelectorAll('.appearance-row').length, 5, '阅读设置保留五行，应用主题位于全局设置');
         assert.equal(elements.fontMenu.querySelectorAll('[data-font-choice]').length, 3, '一个自动选项与两款精选字体');
         assert.equal(elements.fontMenu.querySelectorAll('button:disabled').length, 1, '原书字体暂缓并标记未启用');
         let applied = 0;
@@ -114,13 +120,12 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
             assert.match(migrated.resolved().family, /Literata/);
         }
         const fonts = new FontController({ getBook: () => ({ language: 'en' }), onChange: () => applied++ });
-        fonts.initUI(elements);
-        await fonts.ready;
-        assert.equal(elements.fontChoiceLabel.textContent, '自动选择');
+        await require('../helpers/react-workbench.cjs').ui(async () => { fonts.initUI(elements); await fonts.ready; });
+        assert.equal(elements.fontChoiceLabel.textContent, 'Auto');
         assert.equal(elements.fontMenu.querySelector('[data-font-choice="auto"]').getAttribute('aria-checked'), 'true');
         elements.fontFamilySelect.click();
         assert.equal(elements.fontMenu.hidden, false);
-        await fonts.choose({ kind: 'builtin', id: 'literata' });
+        await require('../helpers/react-workbench.cjs').ui(() => fonts.choose({ kind: 'builtin', id: 'literata' }));
         assert.equal(elements.fontMenu.hidden, true);
         assert.equal(elements.fontChoiceLabel.textContent, 'Literata');
         assert.ok(applied > 0, '选择字体必须触发正文更新');
@@ -129,11 +134,11 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
         elements.btnMoreFonts.click();
         assert.equal(elements.fontMainView.hidden, true);
         assert.equal(elements.fontMoreView.hidden, false);
-        await fonts.readSystemFonts();
+        await require('../helpers/react-workbench.cjs').ui(() => fonts.readSystemFonts());
         elements.fontSearch.value = 'arial';
-        elements.fontSearch.dispatchEvent(new dom.window.Event('input'));
+        await require('../helpers/react-workbench.cjs').ui(() => elements.fontSearch.dispatchEvent(new dom.window.Event('input', { bubbles: true })));
         assert.equal(elements.fontBrowserList.querySelectorAll('button').length, 1);
-        await fonts.choose({ kind: 'system', family: 'Arial' });
+        await require('../helpers/react-workbench.cjs').ui(() => fonts.choose({ kind: 'system', family: 'Arial' }));
         const restored = new FontController();
         assert.equal(restored.choice.family, 'Arial', '全局字体偏好必须跨控制器实例恢复');
         assert.ok(restored.recent.includes('Arial'));
@@ -142,7 +147,7 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
         assert.match(paper.style.getPropertyValue('--reader-font-family'), /Arial/);
         assert.ok(paper.classList.contains('reader-font-override'));
         fonts.ensure = async () => { throw new Error('missing file'); };
-        await fonts.choose({ kind: 'builtin', id: 'sarasa' });
+        await require('../helpers/react-workbench.cjs').ui(() => fonts.choose({ kind: 'builtin', id: 'sarasa' }));
         assert.match(fonts.resolved().family, /system-ui/, '字体加载失败必须回退并继续阅读');
         assert.ok(applied > 0);
 

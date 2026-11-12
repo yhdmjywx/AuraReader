@@ -1,9 +1,9 @@
 import { GoalController } from './features/goals/goalController.js';
 import { GoalHome } from './features/goals/goalHome.js';
-import { getAllBooksFromDB } from './infrastructure/bookRepository.js';
 import { updateNoteGoalActions } from './features/annotations/notesUI.js';
 import type { AppElements } from './app/elements.js';
 import { errorMessage } from './infrastructure/storageError.js';
+import { countLabel } from './domain/format.js';
 /* ==========================================================================
    AuraReader Workstation - Main Application Bootstrap Layer
    Responsible ONLY for application lifecycle, module wiring, dependency injection,
@@ -18,12 +18,14 @@ import { positionMarginNotes } from './features/layout/marginNotesLayout.js';
 import { ReaderEngine, readerEngine } from './domain/readerEngine.js';
 import { findChapterForPage } from './domain/readingLocation.js';
 import { ReaderController } from './features/reader/readerController.js';
+import { ReaderRuntime } from './features/reader/readerRuntime.js';
 import { AnnotationController } from './features/annotations/annotationController.js';
 import { SelectionController } from './features/annotations/selectionController.js';
 import { ShelfController } from './features/shelf/shelfController.js';
 import { BackupController } from './features/backup/backupController.js';
 import { AppShell } from './app/appShell.js';
 import { AppCoordinator } from './app/appCoordinator.js';
+import { AppNavigation } from './app/navigation.js';
 
 export function queryElements(): AppElements {
     if (typeof document === 'undefined') return {};
@@ -31,6 +33,7 @@ export function queryElements(): AppElements {
         appHeader: document.querySelector<HTMLElement>('.app-header'),
         workspaceContainer: document.getElementById('workspace-container'),
         readerPanel: document.getElementById('reader-panel'),
+        readerViewport: document.getElementById('reader-viewport'),
         notesPanel: document.getElementById('notes-panel'),
         goalPanel: document.getElementById('goal-panel'),
         goalSidebar: document.getElementById('goal-sidebar'),
@@ -43,9 +46,7 @@ export function queryElements(): AppElements {
 
         // Reader Controls
         bookPaper: document.getElementById('book-paper'),
-        bookPaperRight: document.getElementById('book-paper-right'),
         paperContainer: document.getElementById('paper-container'),
-        spreadSpine: document.getElementById('spread-spine'),
         currentBookTitle: document.getElementById('current-book-title'),
         currentPageSpan: document.getElementById('current-page'),
         totalPagesSpan: document.getElementById('total-pages'),
@@ -53,9 +54,7 @@ export function queryElements(): AppElements {
         btnModeScroll: document.getElementById('btn-mode-scroll') as HTMLButtonElement | null,
         btnPrevPage: document.getElementById('btn-prev-page') as HTMLButtonElement | null,
         btnNextPage: document.getElementById('btn-next-page') as HTMLButtonElement | null,
-        btnPageMode: document.getElementById('btn-page-mode') as HTMLButtonElement | null,
-        textPageMode: document.getElementById('text-page-mode'),
-        iconPageMode: document.getElementById('icon-page-mode'),
+        btnModeSingle: document.getElementById('btn-mode-single') as HTMLButtonElement | null,
         fontFamilySelect: document.getElementById('font-family-select') as HTMLButtonElement | null,
         fontPicker: document.getElementById('font-picker'),
         fontMenu: document.getElementById('font-menu'),
@@ -81,7 +80,6 @@ export function queryElements(): AppElements {
         btnExportMenu: document.getElementById('btn-export-menu') as HTMLButtonElement | null,
         exportPanel: document.getElementById('export-panel'),
         exportBookTitle: document.getElementById('export-book-title'),
-        btnFullscreen: document.getElementById('btn-fullscreen') as HTMLButtonElement | null,
         btnSwitchDemo: document.getElementById('btn-switch-demo') as HTMLButtonElement | null,
         fileInput: document.getElementById('file-input') as HTMLInputElement | null,
 
@@ -153,18 +151,19 @@ export function bootstrapApp() {
     const layout = new LayoutController();
     const session = new Session('');
     const appShell = new AppShell();
+    const navigation = new AppNavigation('home');
 
     const reader = new ReaderController({
         readerEngine,
         layoutController: layout,
         callbacks: {
-            showToast: (msg) => appShell.showToast(msg)
+            showToast: (msg, options) => appShell.showToast(msg, options)
         }
     });
 
     const annotations = new AnnotationController({
         callbacks: {
-            showToast: (msg) => appShell.showToast(msg),
+            showToast: (msg, options) => appShell.showToast(msg, options),
             getCurrentBookId: () => session.getCurrentBookId()
         }
     });
@@ -172,8 +171,6 @@ export function bootstrapApp() {
     const selection = new SelectionController({
         callbacks: {
             getReadingContext: () => ({
-                currentLeftPage: reader.getCurrentLeftPage(),
-                currentRightPage: reader.getCurrentRightPage(),
                 currentPage: reader.getCurrentPage(),
                 chapterFlow: reader.isChapterFlow(),
                 sectionId: reader.getLocation().sectionId,
@@ -185,13 +182,15 @@ export function bootstrapApp() {
 
     const shelf = new ShelfController({
         callbacks: {
-            showToast: (msg) => appShell.showToast(msg)
+            showToast: (msg, options) => appShell.showToast(msg, options)
         }
     });
 
+    const readerRuntime = new ReaderRuntime(reader, selection);
+
     const backup = new BackupController({
         callbacks: {
-            showToast: (msg) => appShell.showToast(msg),
+            showToast: (msg, options) => appShell.showToast(msg, options),
             getCurrentBook: () => reader.getCurrentBook(),
             getCurrentNotes: () => annotations.getNotes(),
             getCurrentPage: () => reader.getCurrentPage(),
@@ -201,10 +200,10 @@ export function bootstrapApp() {
 
     const goals: GoalController = new GoalController({
         getAnnotations: () => annotations.getNotes(), getLocation: () => reader.getLocation(),
-        getMode: () => layout.getLayoutMode(), showToast: message => appShell.showToast(message),
+        getMode: () => layout.getLayoutMode(), showToast: (message, options) => appShell.showToast(message, options),
         jump: (id, source) => source ? coordinator.jumpToGoalSource(source) : coordinator.jumpToAnnotation(id),
         finishAnnotations: () => annotations.finishInlineEdit(), annotationsSaved: () => annotations.assertInlineWritesSaved()
-    });
+    }, navigation);
 
     // 2. Create Central Coordinator
     const coordinator: AppCoordinator = new AppCoordinator({
@@ -216,7 +215,8 @@ export function bootstrapApp() {
         layoutController: layout,
         selectionController: selection,
         backupController: backup,
-        appShell
+        appShell,
+        navigation
     });
     const homeHost = typeof document !== 'undefined' ? document.getElementById('goal-home') : null;
     const home = homeHost ? new GoalHome(homeHost, {
@@ -227,13 +227,19 @@ export function bootstrapApp() {
     const brand = typeof document !== 'undefined' ? document.querySelector<HTMLElement>('.brand') : null;
     if (brand && home) {
         brand.setAttribute('role', 'button'); brand.tabIndex = 0; brand.setAttribute('aria-label', 'Open reading home');
-        const openHome = () => { home.open().catch(error => appShell.showToast(errorMessage(error, 'Could not open reading home'))); };
+        const openHome = () => { home.open().catch(error => appShell.showToast(errorMessage(error, 'Could not open reading home'), { kind: 'error' })); };
         brand.addEventListener('click', openHome);
         brand.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openHome(); } });
     }
-    coordinator.onBookOpened = () => home?.leave();
-    goals.callbacks.onEnterGoalPage = () => home?.leave();
-    goals.callbacks.openCollection = area => { if (home) void home.open().then(() => home.showArea(area)).catch(error => appShell.showToast(errorMessage(error, 'Could not open goals'))); };
+    coordinator.onBookRemoved = async () => { await home?.open(); };
+    navigation.subscribe(surface => {
+        shelf.closeShelf(); reader.closeTOC(); appShell.closeAppearance(); appShell.closeExportPanel();
+        selection.hideSelectionTooltip(); selection.hideHighlightAction(); goals.actions.close(false);
+        appShell.setBookLoading(false);
+        if (elements.btnGoalBack) elements.btnGoalBack.setAttribute('aria-label', navigation.returnTarget === 'home' || !session.getCurrentBookId() ? 'Back to home' : 'Back to reading');
+        appShell.presentSurface(surface);
+    });
+    goals.callbacks.openCollection = area => { if (home) void home.open().then(() => home.showArea(area)).catch(error => appShell.showToast(errorMessage(error, 'Could not open goals'), { kind: 'error' })); };
 
     const goalAction = (id: string) => ({ visible: goals.visible, disabled: !goals.canLink(id) || goals.linked(id), linked: goals.linked(id) });
     annotations.callbacks.getGoalAction = goalAction;
@@ -241,13 +247,13 @@ export function bootstrapApp() {
     annotations.callbacks.beforeDeleteAnnotations = () => goals.finishInlineEdit();
     annotations.callbacks.onAnnotationContentChanged = () => goals.refreshAnnotations();
     selection.callbacks.getGoalAction = goalAction;
-    selection.callbacks.onLinkGoal = id => goals.linkAnnotation(id).catch(error => { appShell.showToast(error.message); });
+    selection.callbacks.onLinkGoal = id => goals.linkAnnotation(id).catch(error => { appShell.showToast(error.message, { kind: 'error' }); });
     goals.callbacks.onActionsChanged = () => {
         updateNoteGoalActions(elements, goalAction); selection.refreshGoalAction();
         home?.changed();
     };
     goals.callbacks.onBeforeSidebarResize = () => reader.rememberAnchor();
-    goals.callbacks.chooseBook = () => shelf.openShelf();
+    goals.callbacks.chooseBook = () => { void home?.open().catch(error => appShell.showToast(errorMessage(error, 'Could not open reading home'), { kind: 'error' })); };
     goals.callbacks.onSurfaceChanged = () => requestAnimationFrame(() => appShell.callbacks.onWindowResize?.(false));
 
     // 3. Connect Cross-Module Callbacks
@@ -334,14 +340,10 @@ export function bootstrapApp() {
     };
 
     backup.callbacks.onRestoreBackup = async ({ data, importedBooksCount, importedNotesCount }) => {
-        if (data.books && data.books.length > 0 && data.books[0].id) {
-            await coordinator.openBook(data.books[0].id);
-        } else {
-            await coordinator.openBook('crisis-era');
-        }
+        if (data.books?.some(book => book.id === session.getCurrentBookId())) coordinator.clearReadingSession();
         await shelf.refreshShelf();
-        const activeTitle = reader.getCurrentBook() ? reader.getCurrentBook()?.title : '恢复图书';
-        appShell.showToast(`🎉 成功从备份恢复！已为您自动打开《${activeTitle}》，加载 ${importedBooksCount} 本图书，${importedNotesCount} 条划线随笔`);
+        await home?.open();
+        appShell.showToast(`Restored from backup: ${countLabel(importedBooksCount, 'book')}, ${countLabel(importedNotesCount, 'annotation')}. Choose a book on the home page.`);
     };
     const finishReadingEdits = async () => { await goals.finishInlineEdit(); await annotations.finishInlineEdit(); await annotations.assertInlineWritesSaved(); await goals.assertWritesSaved(); };
     backup.callbacks.beforeRestore = finishReadingEdits;
@@ -350,36 +352,19 @@ export function bootstrapApp() {
     const syncReaderLayout = () => {
         if (goals.page || home?.active) return;
         layout.updateLayoutClasses(elements);
-        const notes = annotations.getNotes();
-        if (reader.isChapterFlow()) reader.refitChapter(notes);
-        else reader.renderPage(reader.getCurrentPage(), true, notes);
+        readerRuntime.relayout();
     };
     layout.callbacks.beforeGeometryChange = () => { goals.finishInlineEdit().catch(() => {}); reader.rememberAnchor(); };
     layout.callbacks.onLayoutChange = (res) => {
         syncReaderLayout();
-        if (appShell) {
-            if (res.layoutMode === 'scroll') {
-                appShell.showToast('已切换为连续滚动');
-            } else if (res.layoutMode === 'double' && res.isAutoDowngraded) {
-                appShell.showToast('已开启双页模式（当前可用宽度受限，临时以单页呈现）');
-            } else {
-                appShell.showToast(res.layoutMode === 'double' ? '已开启双页展开模式' : '已切换为单页阅读模式');
-            }
-        }
-    };
-    layout.callbacks.onResponsiveChange = (res) => {
-        syncReaderLayout();
-        if (res.isAutoDowngraded) {
-            appShell.showToast('可用空间不足，已自适应降级为单页展示');
-        } else {
-            appShell.showToast('可用空间充足，已自动恢复双页展开模式');
-        }
+        appShell.showToast(res.layoutMode === 'scroll' ? "Continuous scroll enabled" : "Single page enabled", {
+            anchor: document.getElementById(res.layoutMode === 'scroll' ? 'btn-mode-scroll' : 'btn-mode-single')
+        });
     };
     // 4. Initialize UI Listeners (Browser DOM only)
     if (typeof document !== 'undefined') {
-        reader.initUI(elements);
+        if (elements.readerPanel) readerRuntime.mount(elements.readerPanel, elements);
         annotations.initUI(elements);
-        selection.initUI(elements);
         shelf.initUI(elements);
         backup.initUI(elements);
         layout.initUI(elements);
@@ -391,13 +376,6 @@ export function bootstrapApp() {
             onOpenPanel: () => shelf.closeShelf(),
             onPrevPage: () => { if (!goals.page && !home?.active) reader.prevPage(annotations.getNotes()); },
             onNextPage: () => { if (!goals.page && !home?.active) reader.nextPage(annotations.getNotes()); },
-            onTogglePageMode: () => {
-                if (goals.page || home?.active) return;
-                const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
-                    ? elements.readerPanel.clientWidth
-                    : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
-                layout.togglePageMode(availWidth);
-            },
             onSwitchDemo: () => {
                 const nextKey = session.getCurrentBookId() === 'crisis-era' ? 'deep-work' : 'crisis-era';
                 coordinator.openBook(nextKey);
@@ -405,43 +383,21 @@ export function bootstrapApp() {
             onImportFile: (file) => coordinator.importBook(file),
             onWindowResize: (notify) => {
                 if (goals.page || home?.active) return;
-                const availWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
-                    ? elements.readerPanel.clientWidth
-                    : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
-                const resp = layout.checkResponsiveLayout(availWidth);
-                if (!resp || !resp.changed) {
-                    syncReaderLayout();
-                }
+
+                syncReaderLayout();
             }
         });
 
-        // Sidebar sizing changes only the available reading viewport. Reuse
-        // the same responsive layout/refit path as a normal window resize.
-        if (elements.workspaceContainer && typeof ResizeObserver !== 'undefined') {
-            let width = elements.workspaceContainer.clientWidth;
-            let resizeTimer: ReturnType<typeof setTimeout>;
-            new ResizeObserver(() => {
-                const next = elements.workspaceContainer!.clientWidth;
-                if (goals.page || home?.active || next === 0) return;
-                if (next === width) return;
-                width = next;
-                clearTimeout(resizeTimer);
-                resizeTimer = setTimeout(() => appShell.callbacks.onWindowResize?.(false), 60);
-            }).observe(elements.workspaceContainer);
-        }
-
         // 5. Initial Execution & Mounting
         layout.updateLayoutClasses(elements);
-        const initWidth = (elements.readerPanel && elements.readerPanel.clientWidth > 0)
-            ? elements.readerPanel.clientWidth
-            : ((typeof window !== 'undefined' && window.innerWidth > 0) ? window.innerWidth : 1200);
-        layout.checkResponsiveLayout(initWidth);
+
     }
 
     return {
         session,
         coordinator,
         reader,
+        readerRuntime,
         annotations,
         selection,
         shelf,
@@ -450,6 +406,7 @@ export function bootstrapApp() {
         appShell,
         goals,
         home,
+        navigation,
         elements
     };
 }
@@ -459,6 +416,7 @@ export const {
     session,
     coordinator,
     reader,
+    readerRuntime,
     annotations,
     selection,
     shelf,
@@ -467,14 +425,19 @@ export const {
     appShell,
     goals,
     home,
+    navigation,
     elements
 } = appInstance;
 
-let isStarted = false;
+let startup: Promise<ReturnType<typeof bootstrapApp>> | null = null;
 
-export async function startApp() {
-    if (isStarted) return appInstance;
-    isStarted = true;
+export function startApp(): Promise<ReturnType<typeof bootstrapApp>> {
+    if (startup) return startup;
+    startup = initializeApp().catch(error => { startup = null; throw error; });
+    return startup;
+}
+
+async function initializeApp() {
 
     try {
         localStorage.removeItem('aura_sync_secret');
@@ -486,21 +449,28 @@ export async function startApp() {
 
     try { await initDB(); }
     catch (error) {
-        isStarted = false;
-        appInstance.appShell.showToast(errorMessage(error, '数据库迁移未完成，旧数据已保留'));
-        console.error('数据库启动／迁移停止', error);
+        appInstance.appShell.showToast(errorMessage(error, "Database migration is incomplete. Legacy data is preserved."), { kind: 'error' });
+        console.error("Database startup or migration stopped", error);
         throw error;
     }
     await appInstance.reader.fonts.ready;
     if (appInstance.elements.goalPanel) await appInstance.goals.initialize();
     if (!appInstance.goals.disabled) {
         try { await appInstance.goals.recoverBookIntents(); }
-        catch (error) { appInstance.appShell.showToast(errorMessage(error, 'Book association needs a retry in reading home')); }
+        catch (error) { appInstance.appShell.showToast(errorMessage(error, 'Book association needs a retry in reading home'), { kind: 'error' }); }
     }
-    const books = await getAllBooksFromDB();
-    if (appInstance.home && !books.length) await appInstance.home.open();
-    else await appInstance.coordinator.openBook(books.find(b => b.id === 'crisis-era')?.id || books[0].id);
+    if (appInstance.home) await appInstance.home.open();
     return appInstance;
+}
+
+function showStartupError(error: unknown) {
+    const host = document.getElementById('app-status');
+    if (!host) return;
+    host.hidden = false;
+    const message = document.createElement('p'); message.textContent = errorMessage(error, "The library is temporarily unavailable. Please try again.");
+    const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = "Retry";
+    retry.addEventListener('click', () => { retry.disabled = true; void startApp().catch(showStartupError); });
+    host.replaceChildren(message, retry);
 }
 
 if (typeof document !== 'undefined') {
@@ -508,10 +478,10 @@ if (typeof document !== 'undefined') {
         window.__AURA_BOOTSTRAPPED__ = true;
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', async () => {
-                await startApp().catch(() => {});
+                await startApp().catch(showStartupError);
             });
         } else {
-            startApp().catch(() => {});
+            startApp().catch(showStartupError);
         }
     }
 }

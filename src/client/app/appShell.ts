@@ -1,7 +1,8 @@
 import { eventElement } from './dom.js';
 import { unwrapDesktop } from '../infrastructure/storageClient.js';
 import type { AppElements } from './elements.js';
-import type { ShellCallbacks } from './contracts.js';
+import type { ShellCallbacks, ToastOptions } from './contracts.js';
+import type { AppSurface } from './navigation.js';
 /* ==========================================================================
    AppShell - Application Shell & Global Presentation / Input Dispatcher
    Authority owner of: appTheme ('light' | 'dark').
@@ -14,6 +15,9 @@ export class AppShell {
     appTheme: 'light' | 'dark';
     elements: AppElements | null;
     resizeDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+    private toastTimer?: ReturnType<typeof setTimeout>;
+    private feedbackAnchor: HTMLElement | null = null;
+    private feedbackRect?: DOMRect;
     constructor(callbacks: ShellCallbacks = {}) {
         this.callbacks = callbacks;
         this.appTheme = 'light';
@@ -21,15 +25,29 @@ export class AppShell {
         this.resizeDebounceTimer = undefined;
     }
 
-    showToast(msg: string) {
+    showToast(msg: string, { kind = 'success', anchor = this.feedbackAnchor }: ToastOptions = {}) {
         if (!this.elements || !this.elements.toastMsg || !msg) return;
-        this.elements.toastMsg.textContent = msg;
-        this.elements.toastMsg.classList.add('show');
-        setTimeout(() => {
-            if (this.elements && this.elements.toastMsg) {
-                this.elements.toastMsg.classList.remove('show');
-            }
-        }, 2600);
+        clearTimeout(this.toastTimer);
+        const toast = this.elements.toastMsg;
+        toast.textContent = msg;
+        toast.dataset.kind = kind;
+        toast.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+        if (kind === 'error') {
+            const close = toast.ownerDocument.createElement('button');
+            close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Dismiss error'); close.title = 'Dismiss error';
+            close.onclick = () => toast.classList.remove('show'); toast.append(close);
+        }
+        toast.style.removeProperty('left'); toast.style.removeProperty('top'); toast.style.removeProperty('bottom');
+        const rect = anchor?.isConnected ? anchor.getBoundingClientRect() : anchor === this.feedbackAnchor ? this.feedbackRect : undefined;
+        toast.classList.toggle('is-local', !!rect?.width);
+        if (rect?.width) {
+            const width = toast.offsetWidth, height = toast.offsetHeight;
+            toast.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`;
+            toast.style.top = `${Math.max(12, rect.bottom + height + 20 <= window.innerHeight ? rect.bottom + 8 : rect.top - height - 8)}px`;
+            toast.style.bottom = 'auto';
+        }
+        toast.classList.add('show');
+        if (kind !== 'error') this.toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
     }
 
     setBookLoading(loading: boolean) {
@@ -39,6 +57,28 @@ export class AppShell {
             panel.inert = loading;
             panel.setAttribute('aria-busy', String(loading));
         }
+    }
+
+    presentSurface(surface: AppSurface) {
+        if (typeof document === 'undefined') return;
+        document.documentElement.dataset.appSurface = surface;
+        const e = this.elements;
+        const home = document.getElementById('goal-home');
+        if (home) home.hidden = surface !== 'home';
+        if (e?.readingWorkspace) e.readingWorkspace.hidden = surface !== 'reader';
+        if (e?.goalPage) e.goalPage.hidden = surface !== 'goal';
+        for (const control of [e?.btnToc, e?.btnShelf]) if (control) control.hidden = surface !== 'reader';
+        for (const control of [e?.btnExportMarkdown, e?.chapterExportEntry]) if (control) control.hidden = surface !== 'reader';
+        const status = document.getElementById('app-status');
+        if (status) { status.hidden = true; status.replaceChildren(); }
+        const back = e?.btnGoalBack;
+        if (back) { back.title = back.getAttribute('aria-label') || "Back"; }
+        requestAnimationFrame(() => {
+            if (document.documentElement.dataset.appSurface !== surface || document.body.inert) return;
+            const target = surface === 'home' ? document.getElementById('home-goal-title')
+                : surface === 'goal' ? e?.goalPanel : e?.readerPanel;
+            if (target) { target.tabIndex = -1; target.focus({ preventScroll: true }); }
+        });
     }
 
     toggleAppTheme() {
@@ -68,7 +108,10 @@ export class AppShell {
             this.callbacks.onOpenPanel?.();
         }
         panel.classList.toggle('open', open);
+        panel.setAttribute('aria-hidden', String(!open));
         if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) requestAnimationFrame(() => { if (panel.classList.contains('open')) panel.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus(); });
+        else if (panel.contains(document.activeElement)) button?.focus({ preventScroll: true });
     }
 
     closeAppearance() {
@@ -86,7 +129,7 @@ export class AppShell {
             if (this.elements?.exportBookTitle) {
                 this.elements.exportBookTitle.textContent = this.elements.currentBookTitle
                     ? this.elements.currentBookTitle.textContent
-                    : '未打开书籍';
+                    : "No book open";
             }
         }
         panel.classList.toggle('open', open);
@@ -94,6 +137,10 @@ export class AppShell {
         if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
         const PanelEvent = panel.ownerDocument?.defaultView?.Event || Event;
         if (!open) panel.dispatchEvent?.(new PanelEvent('exportpanelclose'));
+        if (open) requestAnimationFrame(() => {
+            if (panel.classList.contains('open')) [...panel.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')].find(control => !control.hidden && !control.closest('[hidden]'))?.focus();
+        });
+        else if (panel.contains(document.activeElement)) button?.focus({ preventScroll: true });
     }
 
     closeExportPanel() {
@@ -106,17 +153,17 @@ export class AppShell {
                 const { fullscreen } = unwrapDesktop(result);
                 const icon = this.elements?.btnFullscreen?.querySelector('i');
                 if (icon) icon.className = fullscreen ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
-            }).catch(error => this.showToast(error instanceof Error ? error.message : '全屏切换失败'));
+            }).catch(error => this.showToast(error instanceof Error ? error.message : "Could not toggle fullscreen.", { kind: 'error' }));
             return;
         }
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => {
-                console.warn("全屏模式不可用:", err);
+                console.warn("Fullscreen unavailable:", err);
             });
         } else {
             if (document.exitFullscreen) {
                 document.exitFullscreen().catch(err => {
-                    console.warn("退出全屏异常:", err);
+                    console.warn("Could not exit fullscreen:", err);
                 });
             }
         }
@@ -126,6 +173,10 @@ export class AppShell {
         this.elements = elements;
         this.callbacks = { ...this.callbacks, ...callbacks };
         if (!elements) return;
+        document.addEventListener('click', event => {
+            this.feedbackAnchor = eventElement(event)?.closest<HTMLElement>('button, [role="menuitem"], [role="menuitemradio"]') || null;
+            this.feedbackRect = this.feedbackAnchor?.getBoundingClientRect();
+        }, true);
 
         // Theme Toggle Button
         if (elements.btnThemeToggle) {
@@ -183,7 +234,7 @@ export class AppShell {
                 const icon = button?.querySelector('i');
                 if (!button || !icon) return;
                 icon.className = document.fullscreenElement ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
-                button.title = document.fullscreenElement ? '退出全屏' : '全屏阅读';
+                button.title = document.fullscreenElement ? "Exit fullscreen" : "Fullscreen";
             });
         }
 
@@ -210,6 +261,8 @@ export class AppShell {
 
         // Global Keyboard Shortcuts
         document.addEventListener('keydown', (e) => {
+            if (e.defaultPrevented || e.isComposing) return;
+            if (eventElement(e)?.closest('[role="menu"],[data-slot="dialog-content"]')) return;
             if (e.key === 'Escape' && elements.exportPanel && elements.exportPanel.classList.contains('open')) {
                 e.preventDefault();
                 this.closeExportPanel();
@@ -231,15 +284,14 @@ export class AppShell {
                 return;
             }
 
+            if (document.documentElement.dataset.appSurface && document.documentElement.dataset.appSurface !== 'reader') return;
+
             if (e.key === 'ArrowLeft') {
                 e.preventDefault();
                 if (this.callbacks.onPrevPage) this.callbacks.onPrevPage();
             } else if (e.key === 'ArrowRight') {
                 e.preventDefault();
                 if (this.callbacks.onNextPage) this.callbacks.onNextPage();
-            } else if (e.key === 'd' || e.key === 'D') {
-                e.preventDefault();
-                if (this.callbacks.onTogglePageMode) this.callbacks.onTogglePageMode();
             }
         });
 

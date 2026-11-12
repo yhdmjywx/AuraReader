@@ -45,7 +45,7 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
         })()`);
     };
     await waitFor(`document.documentElement.dataset.desktopReady === 'setup'`);
-    assert.match(await run(`document.getElementById('desktop-status').textContent`), /创建此设备上的阅读书库/);
+    assert.match(await run(`document.getElementById('desktop-status').textContent`), /Create a library on this device/);
     await assert.rejects(fs.access(path.join(profile, 'data/aurareader.sqlite')));
     assert.equal((await run(`auraDesktop.storage.listBooks()`)).error.status, 423);
     await run(`document.getElementById('desktop-create-library').click()`);
@@ -71,13 +71,13 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     assert.equal(state.ready, 'library');
     assert.equal(state.require, 'undefined'); assert.equal(state.process, 'undefined'); assert.equal(state.Buffer, 'undefined');
     assert.equal(state.bridgeFrozen, true);
-    assert.deepEqual(state.bridge.keys.sort(), ['files', 'fonts', 'lifecycle', 'platform', 'stage', 'storage', 'versions', 'window']);
+    assert.deepEqual(state.bridge.keys.sort(), ['files', 'fonts', 'lifecycle', 'platform', 'stage', 'storage', 'versions', 'wiki', 'window']);
     assert.equal(state.bridge.stage, 4);
     assert.equal(state.zip, 'function');
-    assert.equal(await run(`document.querySelector('button[title="原书字体恢复将在后续支持"]').disabled`), true);
+    assert.equal(await run(`document.querySelector('button[title="Original book fonts are not available yet"]').disabled`), true);
     assert.equal(state.bridge.versions.electron, runtime.electron);
     assert.ok(state.controls && state.icons && state.literals && state.chinese);
-    assert.match(state.title, /未打开书籍/);
+    assert.match(state.title, /No book open/);
     assert.equal(await run("document.getElementById('goal-home').hidden"), false);
     // Existing reader checks use the same explicit demo fixture after onboarding.
     await run("(async()=>{const a=await import('./main.js');await a.coordinator.openBook('crisis-era')})()");
@@ -92,7 +92,7 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     const capture = async name => {
         await run(`(async () => {
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-            await Promise.all(document.getAnimations().map(animation => animation.finished));
+            await Promise.allSettled(document.getAnimations().map(animation => animation.finished));
             await new Promise(resolve => requestAnimationFrame(resolve));
         })()`);
         const image = await wc.capturePage(undefined, { stayAwake: true });
@@ -141,7 +141,10 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
         const frame = document.createElement('iframe'); frame.src = location.href; document.body.append(frame);
         const network = await blocked('http://127.0.0.1:8095/api/health');
         const file = await blocked('file:///C:/Windows/win.ini');
-        const permission = await new Promise(resolve => navigator.geolocation.getCurrentPosition(() => resolve('granted'), error => resolve(error.code)));
+        const permission = await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Geolocation denial probe did not settle')), 6000);
+            navigator.geolocation.getCurrentPosition(() => { clearTimeout(timer); resolve('granted'); }, error => { clearTimeout(timer); resolve(error.code); }, { timeout: 4000 });
+        });
         await new Promise(resolve => setTimeout(resolve, 100));
         frame.remove(); inline.remove();
         return { inline: window.__inlineProbe, network, file, permission, csp,
@@ -163,7 +166,8 @@ const watchdog = setTimeout(() => { console.error('Electron checks timed out'); 
     wc.reload(); await loaded;
     await waitFor(`document.documentElement.dataset.desktopReady === 'library'`);
     assert.deepEqual(errors.slice(offlineErrors), []);
-    checks.push('offline reader reload through IPC without HTTP service');
+    assert.equal(await run("(async()=>{const a=await import('./main.js');return a.home.active && a.session.getCurrentBookId()===''})()"), true);
+    checks.push('offline reload opens Home through IPC without automatically selecting a book');
     const closeNoteId = await run(`(async () => {
         const app = await import('./main.js'); await app.coordinator.openBook('desktop-ipc');
         app.annotations.setNotesScope('book');

@@ -34,6 +34,11 @@ if (process.isMainFrame) {
             importFont: () => ipcRenderer.invoke('aura:files:importFont', undefined)
         },
         window: { toggleFullscreen: () => ipcRenderer.invoke('aura:window:fullscreen') },
+        wiki: {
+            read: input => ipcRenderer.invoke('aura:wiki:read', input),
+            cancel: id => ipcRenderer.invoke('aura:wiki:cancel', id),
+            openExternal: url => ipcRenderer.invoke('aura:wiki:openExternal', url)
+        },
         lifecycle: {
             requestClose: () => ipcRenderer.invoke('aura:lifecycle:request-close'),
             onPrepareClose: callback => {

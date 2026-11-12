@@ -38,14 +38,12 @@ export class ShelfController {
                     }
                 },
                 onDeleteBook: async (book) => {
-                    if (confirm(`确定要从本地书库移除《${book.title}》及其划线笔记吗？`)) {
                         if (this.callbacks.onDeleteBook) await this.callbacks.onDeleteBook(book.id);
                         else await deleteBookFromDB(book.id);
                         await this.refreshShelf();
                         if (this.callbacks.showToast) {
-                            this.callbacks.showToast(`已从书库移除：《${book.title}》`);
+                            this.callbacks.showToast(`Removed from library: “${book.title}”`);
                         }
-                    }
                 }
             });
         }
@@ -56,7 +54,7 @@ export class ShelfController {
         if (this.elements) {
             this.callbacks.onOpen?.();
             domOpenShelf(this.elements);
-            this.refreshShelf().catch(error => this.callbacks.showToast?.(error.message || '书库读取失败'));
+            this.refreshShelf().catch(error => this.callbacks.showToast?.(error.message || "Could not load library", { kind: 'error' }));
         }
     }
 
@@ -99,7 +97,7 @@ export class ShelfController {
             try {
                 const file = await chooseDesktopFile('book');
                 if (file) { this.closeShelf(); await this.callbacks.onImportFile?.(file); }
-            } catch (error) { this.callbacks.showToast?.('导入文件失败: ' + error.message); }
+            } catch (error) { this.callbacks.showToast?.("File import failed: " + error.message, { kind: 'error' }); }
         });
         elements.fileInput?.addEventListener('change', () => {
             if (elements.fileInput.files?.length) this.closeShelf();

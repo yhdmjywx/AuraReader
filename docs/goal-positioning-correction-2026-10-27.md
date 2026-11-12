@@ -1,6 +1,6 @@
 # Goal 定位与调研基准校正
 
-日期：2026-10-27。依据本轮用户澄清、[最终设计稿](prototypes/goals.html)、[首版设计行为契约](goal-system-implementation-plan.md)和[书籍模块设计](goal-books-module-design.md)。本文件校正市场报告的理解基准，不修改产品设计或业务实现。
+日期：2026-10-27。依据本轮用户澄清、[最终设计稿](prototypes/goals.html)、[首版设计行为契约](archive/plans-and-implementation/goal-system-implementation-plan.md)和[书籍模块设计](archive/plans-and-implementation/goal-books-module-design.md)。本文件校正市场报告的理解基准，不修改产品设计或业务实现。
 
 ## 定义
 

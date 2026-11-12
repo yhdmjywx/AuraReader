@@ -119,7 +119,7 @@ const { JSDOM } = require('jsdom');
         assert.deepEqual(cards(), []);
         assert.ok(elements.notesList.contains(elements.emptyNotesState), '空状态节点不能在重绘时被移出侧栏');
         assert.equal(elements.emptyNotesState.style.display, 'block');
-        assert.equal(elements.emptyNotesState.querySelector('p').textContent, '当前页暂无划线与笔记');
+        assert.equal(elements.emptyNotesState.querySelector('p').textContent, 'Page: no highlights or notes');
 
         const before = annotations.getNotes().length;
         await annotations.saveQuickNote('不再创建独立随笔');
@@ -127,7 +127,7 @@ const { JSDOM } = require('jsdom');
         await annotations.saveModalNote({ quote: '', comment: '无原文笔记' });
         await annotations.addOrUpdateNote({ id: 'no-quote', kind: 'note', comment: '无原文笔记' });
         assert.equal(annotations.getNotes().length, before, '所有用户创建入口均拒绝无引用笔记');
-        assert.ok(messages.includes('请先在正文中选择需要引用的文字'));
+        assert.ok(messages.includes('Select text in the book to quote first.'));
         await annotations.saveModalNote({ quote: '选中的原文', comment: '合法笔记', page: 1 });
         assert.equal(annotations.getNotes().length, before + 1, '引用笔记仍可保存');
         const saved = annotations.getNotes()[0];
@@ -138,7 +138,7 @@ const { JSDOM } = require('jsdom');
         assert.equal(annotations.getNotes().length, before);
 
         const reader = new ReaderController();
-        reader.elements = { bookPaper: paper, bookPaperRight: right };
+        reader.elements = { bookPaper: paper };
         assert.deepEqual([...reader.getVisibleAnnotationIds()], []);
         let changed = 0;
         reader.callbacks.onViewportChange = () => changed++;
@@ -153,7 +153,7 @@ const { JSDOM } = require('jsdom');
 
         const html = fs.readFileSync(path.join(__dirname, '../../src/client/index.html'), 'utf8');
         assert.ok(!html.includes('id="quick-note-input"') && !html.includes('id="btn-save-quick-note"'), '页面不再提供独立随笔输入框');
-        console.log('✅ 当前屏幕笔记：单双页、跨屏/跨行片段、滚动、范围切换、全书数据保留及引用约束全部通过');
+        console.log('✅ 当前屏幕笔记：单页、跨屏/跨行片段、滚动、范围切换、全书数据保留及引用约束全部通过');
     } finally {
         await storage?.drain();
         await storage?.close();

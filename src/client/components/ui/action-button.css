@@ -1,0 +1,68 @@
+/* Vega Base UI Button recipes, adapted to the existing CSS build.
+   Source: https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/styles/style-vega.css
+   Reuses ghost hover/expanded states, icon-lg/large sizing, and focus/disabled
+   treatment. Approved workbench refinement: 12px corners and 20px SVG icons. */
+.ui-button.vega-action {
+    --action-surface: var(--goal-hover-bg);
+    display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center;
+    height: 40px; min-height: 40px; border: 1px solid transparent; border-radius: 12px;
+    gap: 6px; background: transparent; color: var(--text-primary);
+    font-size: 14px; font-weight: 500; line-height: 1; white-space: nowrap; user-select: none;
+    transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+.ui-button.vega-action-icon { width: 40px; min-width: 40px; padding: 0; }
+.ui-button.vega-action-text { padding: 0 10px; }
+.ui-button.vega-action svg { width: 20px; height: 20px; flex: none; pointer-events: none; }
+.ui-button.vega-action:is(:hover, [aria-expanded="true"], [aria-current="page"], .is-open):not(:disabled):not([data-disabled]) {
+    background: var(--action-surface); color: var(--text-primary);
+}
+.ui-button.vega-action:focus-visible {
+    outline: 0; border-color: var(--goal-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--goal-focus) 50%, transparent);
+}
+.ui-button.vega-action:active:is([aria-haspopup], [aria-controls]) { transform: none; }
+.ui-button.vega-action:is(:disabled, [data-disabled]) { pointer-events: none; opacity: .5; }
+
+/* Scoped adapters for existing controller-owned IDs and selected values. */
+#btn-goal-sidebar.vega-action { width: 40px; min-width: 40px; height: 40px; min-height: 40px; border-radius: 12px; }
+.goal-panel .goal-icon.vega-action { border-radius: 12px; }
+/* Row actions stay quiet until the row is in use; navigation keeps its size. */
+.goal-panel :is(.goal-title-row, .goal-row, .goal-item) > .goal-icon.vega-action {
+    width: 28px; min-width: 28px; height: 28px; min-height: 28px;
+    position: absolute; top: 6px; right: 4px; margin: 0;
+    border-radius: 8px; opacity: 0; pointer-events: none;
+    z-index: 2; background: var(--goal-row-surface); box-shadow: -6px 0 6px var(--goal-row-surface);
+}
+.goal-panel :is(.goal-title-row, .goal-row) > .goal-icon.vega-action:is(.goal-edit, .goal-child-edit) { right: 36px; }
+.goal-panel :is(.goal-title-row, .goal-row, .goal-item) > .goal-icon.vega-action:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--goal-focus) 50%, transparent);
+}
+.goal-panel :is(.goal-title-row, .goal-row, .goal-item) > .goal-icon.vega-action svg { width: 16px; height: 16px; }
+.goal-panel :is(.goal-title-row, .goal-row, .goal-item):is(:hover, :focus-within, :has([aria-expanded="true"])) > .goal-icon.vega-action {
+    opacity: 1; pointer-events: auto;
+}
+.goal-panel :is(.goal-title-row, .goal-row):has(textarea:focus) > .goal-icon.vega-action { opacity: 0; pointer-events: none; }
+.goal-panel :is(.goal-title-row, .goal-row, .goal-item) > .goal-icon.vega-action:is(:disabled, [data-disabled]) { opacity: 0; pointer-events: none; }
+.goal-panel :is(.goal-title-row, .goal-row, .goal-item):is(:hover, :focus-within, :has([aria-expanded="true"])) > .goal-icon.vega-action:is(:disabled, [data-disabled]) { opacity: .5; pointer-events: none; }
+@media (hover: none) {
+    .goal-panel :is(.goal-title-row, .goal-row, .goal-item) > .goal-icon.vega-action { opacity: 1; pointer-events: auto; }
+    .goal-panel :is(.goal-title-row, .goal-row, .goal-item) > .goal-icon.vega-action:is(:disabled, [data-disabled]) { opacity: .5; }
+}
+.goal-panel .goal-items-toggle.vega-action { display: flex; width: 44px; min-width: 44px; height: 28px; min-height: 28px; padding: 0; gap: 4px; margin: 4px 4px 0 auto; border-radius: 8px; color: var(--text-secondary); }
+.goal-panel .goal-items-toggle.vega-action[aria-expanded="true"]:not(:hover):not(:focus-visible) { background: transparent; }
+.goal-panel .goal-items-toggle.vega-action:focus-visible { background: var(--goal-hover-bg); }
+.goal-panel .goal-items-toggle .goal-items-icon { width: 16px; height: 16px; }
+.goal-panel .goal-items-toggle .goal-items-caret { width: 12px; height: 12px; }
+.goal-panel .goal-items-toggle[aria-expanded="true"] .goal-items-caret { transform: rotate(180deg); }
+#btn-appearance.vega-action { width: 40px; height: 40px; min-height: 40px; border-radius: 12px; }
+.reader-toolbar .vega-action { gap: 8px; }
+.reader-toolbar .header-actions { gap: 4px; }
+.reader-toolbar .book-nav-btn.vega-action { padding: 0 10px; border-radius: 12px; }
+.reader-toolbar .book-nav-caret { width: 16px; height: 16px; }
+.workspace-settings.vega-action { gap: 8px; }
+#appearance-panel .vega-action { min-height: 40px; border-radius: 12px; }
+#appearance-panel .appearance-stepper .vega-action,
+#appearance-panel .paper-btn.vega-action { width: 40px; height: 40px; padding: 0; }
+#appearance-panel .font-trigger.vega-action { justify-content: space-between; }
+#appearance-panel .vega-action:is(.active, [aria-pressed="true"]) { background: var(--appearance-soft); color: var(--appearance-ink); }
+#appearance-panel .font-trigger.vega-action, #appearance-panel .paper-btn.vega-action { border-color: var(--appearance-edge); }

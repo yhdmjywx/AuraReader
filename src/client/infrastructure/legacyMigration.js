@@ -14,7 +14,7 @@ function cacheSnapshot() {
 }
 export async function readLegacyDatabase(factory = typeof window === 'undefined' ? null : window.indexedDB) {
     if (!factory) {
-        if (typeof window !== 'undefined') throw new Error('无法检查旧 IndexedDB；为避免遗漏数据，迁移已停止');
+        if (typeof window !== 'undefined') throw new Error("Could not inspect the legacy IndexedDB. Migration stopped to avoid losing data.");
         return { books: [], notes: [] };
     }
     if (typeof factory.databases === 'function') {
@@ -26,8 +26,8 @@ export async function readLegacyDatabase(factory = typeof window === 'undefined'
         let missing = false;
         request.onupgradeneeded = () => { missing = true; request.transaction.abort(); };
         request.onsuccess = () => resolve(request.result);
-        request.onerror = () => missing ? resolve(null) : reject(request.error || new Error('旧数据库无法读取'));
-        request.onblocked = () => reject(new Error('请关闭其他 AuraReader 标签页后重新迁移'));
+        request.onerror = () => missing ? resolve(null) : reject(request.error || new Error("Could not read the legacy database."));
+        request.onblocked = () => reject(new Error("Close other AuraReader tabs and retry migration."));
     });
     if (!db) return { books: [], notes: [] };
     try {
@@ -38,7 +38,7 @@ export async function readLegacyDatabase(factory = typeof window === 'undefined'
             const value = { books: [], notes: [] };
             names.forEach(name => { const request = tx.objectStore(name).getAll(); request.onsuccess = () => { value[name] = request.result; }; });
             tx.oncomplete = () => resolve(value);
-            tx.onerror = tx.onabort = () => reject(tx.error || new Error('旧数据库快照读取失败'));
+            tx.onerror = tx.onabort = () => reject(tx.error || new Error("Could not read the legacy database snapshot."));
         });
     } finally { db.close(); }
 }
@@ -47,7 +47,7 @@ function jsonSafe(value) {
     if (typeof value === 'number' && Number.isFinite(value)) return;
     if (Array.isArray(value)) { value.forEach(jsonSafe); return; }
     if (value && [Object.prototype, null].includes(Object.getPrototypeOf(value))) { Object.values(value).forEach(jsonSafe); return; }
-    throw new Error('旧数据含有无法无损转为 JSON 的字段，迁移已停止；IndexedDB 原始数据仍保留');
+    throw new Error("Legacy data contains fields that cannot be converted to JSON without loss. Migration stopped. Original IndexedDB data is preserved.");
 }
 export async function migrateLegacyStorage() {
     const status = await storageRequest('migration/status');
@@ -63,7 +63,7 @@ export async function migrateLegacyStorage() {
     const perform = async () => {
         const snapshot = await capture(); jsonSafe(snapshot);
         const archived = await storageRequest('migration/snapshot', snapshot);
-        if (JSON.stringify(snapshot) !== JSON.stringify(await capture())) throw new Error('旧书库在迁移中发生变化，请关闭其他标签页后重试；原始快照已保留');
+        if (JSON.stringify(snapshot) !== JSON.stringify(await capture())) throw new Error("The legacy library changed during migration. Close other tabs and retry. The original snapshot is preserved.");
         const result = await storageRequest('migration/commit', archived);
         await cleanupLegacyBuffers(result.manifest);
         return result;

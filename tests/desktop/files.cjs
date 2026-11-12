@@ -14,7 +14,7 @@ async function verifyFiles(window, output, queues, checks) {
     await window.webContents.session.enableNetworkEmulation({ offline: true });
     select(path.resolve(__dirname, '../fixtures/test.epub'));
     await run(`document.getElementById('btn-import-book').click()`);
-    await waitFor(`document.getElementById('toast-msg').textContent.includes('成功解析并入库')`);
+    await waitFor(`document.getElementById('toast-msg').textContent.includes('Imported:')`);
     const imported = await run(`(async () => {
         const a = await import('./main.js'); const b = a.reader.getCurrentBook();
         return { id: b.id, title: b.title, pages: b.pages.length, format: b.format, toc: b.toc.length };
@@ -28,10 +28,10 @@ async function verifyFiles(window, output, queues, checks) {
     select(output);
     await run(`document.getElementById('btn-confirm-chapter-export').click()`);
     await waitFor(`!document.getElementById('export-panel').classList.contains('open')`);
-    const chapterDirectory = path.join(output, 'test_章节导出');
+    const chapterDirectory = path.join(output, 'test_chapters');
     const selectedFiles = (await fs.readdir(chapterDirectory)).filter(file => file.endsWith('.md'));
     assert.equal(selectedFiles.length, 3, 'native folder export contains exactly two selected chapters and index');
-    assert.match(await fs.readFile(path.join(chapterDirectory, '00_目录概览.md'), 'utf8'), /导出范围：所选章节/);
+    assert.match(await fs.readFile(path.join(chapterDirectory, '00_contents.md'), 'utf8'), /Export scope: Selected chapters/);
     checks.push('actual imported EPUB -> inline multi-selection -> native directory chooser -> folder with two Markdown chapters and valid index');
     checks.push('offline EPUB chooser -> unchanged EPUB parser -> coordinator -> current SQLite -> reader; local JSZip and TOC intact');
 
@@ -73,7 +73,7 @@ async function verifyFiles(window, output, queues, checks) {
     ]) {
         save(filename);
         await run(`(async () => { const a = await import('./main.js'); await a.backup.${method}(${args}); })()`);
-        assert.match(await run(`document.getElementById('toast-msg').textContent`), /已保存/);
+        assert.match(await run(`document.getElementById('toast-msg').textContent`), /Saved/);
         assert.ok((await fs.stat(path.join(output, filename))).size > 0);
     }
     assert.match(await fs.readFile(path.join(output, 'notes.md'), 'utf8'), /待写恢复/);
@@ -90,16 +90,16 @@ async function verifyFiles(window, output, queues, checks) {
     select(path.join(output, 'current.aurabackup'));
     await run(`(async () => { const a = await import('./main.js'); const f = await import('./infrastructure/desktopFiles.js');
         await a.backup.importFullBackup(await f.chooseDesktopFile('backup')); })()`);
-    assert.match(await run(`document.getElementById('toast-msg').textContent`), /恢复/);
+    assert.match(await run(`document.getElementById('toast-msg').textContent`), /Restored from backup/);
     const restored = await run(`auraDesktop.storage.queryNotes({bookIds: ['desktop-ipc']})`);
     assert.equal(restored.value.records[0].value.comment, backup.notes[0].comment);
     assert.deepEqual(restored.value.records[0].value.unknown, [1, null]);
     queues.save.push({ canceled: true });
     await run(`(async () => { const a = await import('./main.js'); await a.backup.exportMarkdown('Cancel', []); })()`);
-    assert.equal(await run(`document.getElementById('toast-msg').textContent`), '已取消保存');
+    assert.equal(await run(`document.getElementById('toast-msg').textContent`), 'Save canceled');
     queues.save.push({ canceled: false, filePath: path.join(output, 'missing', 'failed.md') });
     await run(`(async () => { const a = await import('./main.js'); await a.backup.exportMarkdown('Fail', []); })()`);
-    assert.match(await run(`document.getElementById('toast-msg').textContent`), /导出 Markdown 失败/);
+    assert.match(await run(`document.getElementById('toast-msg').textContent`), /Markdown export failed/);
     queues.open.push({ canceled: true, filePaths: [] });
     // The public capability ignores arguments; renderer paths never reach main.
     assert.deepEqual(await run(`auraDesktop.files.chooseBook({path:'C:/arbitrary'})`), { ok: true, value: { canceled: true } });

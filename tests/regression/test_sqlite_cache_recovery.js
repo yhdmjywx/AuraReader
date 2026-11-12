@@ -27,7 +27,7 @@ const { createMigration } = require('../../src/server/migration');
         assert.deepEqual(server.read('annotations'), []);
         store = createDataStore(server.directory);
         const migration = createMigration(store);
-        assert.throws(() => migration.commit('test-source', saved.snapshotId, { cacheRecoveries: [{ ...cacheRecoveries[0], recordHash: 'changed' }] }), /迁移发现冲突/);
+        assert.throws(() => migration.commit('test-source', saved.snapshotId, { cacheRecoveries: [{ ...cacheRecoveries[0], recordHash: 'changed' }] }), /Migration found conflicts/);
         const result = migration.commit('test-source', saved.snapshotId, { cacheRecoveries });
         assert.equal(result.completed, true);
         assert.equal(result.manifest.notes, 4);
@@ -48,7 +48,7 @@ const { createMigration } = require('../../src/server/migration');
         ]) {
             const archived = await server.request('migration/snapshot', changed, { 'X-Aura-Source': source });
             store = createDataStore(server.directory);
-            assert.throws(() => createMigration(store).commit(source, archived.snapshotId, { cacheRecoveries }), /迁移发现冲突/, '涉及删除或其他副本时不能套用原恢复决定');
+            assert.throws(() => createMigration(store).commit(source, archived.snapshotId, { cacheRecoveries }), /Migration found conflicts/, '涉及删除或其他副本时不能套用原恢复决定');
             assert.equal(createMigration(store).status(source).completed, false);
             store.close(); store = null;
         }
