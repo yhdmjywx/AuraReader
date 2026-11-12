@@ -3,6 +3,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 
+function isAllowedWikiLanguageName(file, node) {
+    if (file !== path.join('src', 'client', 'features', 'wiki', 'WikiLookup.tsx') || !ts.isStringLiteral(node)) return false;
+    const label = node.parent;
+    if (!ts.isPropertyAssignment(label) || label.name.getText() !== 'label') return false;
+    const language = label.parent;
+    if (!ts.isObjectLiteralExpression(language) || !ts.isArrayLiteralExpression(language.parent)) return false;
+    const declaration = language.parent.parent;
+    if (!ts.isVariableDeclaration(declaration) || declaration.name.getText() !== 'languages') return false;
+    const value = language.properties.find(property => ts.isPropertyAssignment(property) && property.name.getText() === 'value');
+    if (!value || !ts.isStringLiteral(value.initializer)) return false;
+    return (value.initializer.text === 'zh-hans' && node.text === '简体中文')
+        || (value.initializer.text === 'zh-hant' && node.text === '繁體中文');
+}
+
 (async () => {
     // Book samples and content-recognition regexes remain in their original languages.
     // Scan executable literals and JSX text, excluding comments and those regexes.
@@ -16,7 +30,7 @@ const ts = require('typescript');
             function visit(node) {
                 if ((ts.isStringLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node)
                     || ts.isTemplateTail(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isJsxText(node))
-                    && /\p{Script=Han}/u.test(node.text)) {
+                    && /\p{Script=Han}/u.test(node.text) && !isAllowedWikiLanguageName(file, node)) {
                     leftovers.push(`${file}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}: ${node.text}`);
                 }
                 ts.forEachChild(node, visit);
@@ -26,6 +40,25 @@ const ts = require('typescript');
     }
     scan('src');
     assert.deepEqual(leftovers, [], 'Product copy must be English; source book content is preserved separately');
+    // Only the two native language names in the Wiki language list are exempt.
+    const wikiFile = path.join('src', 'client', 'features', 'wiki', 'WikiLookup.tsx');
+    function allowedInFixture(file, text) {
+        const fixture = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+        let result = false;
+        function visit(node) {
+            if (ts.isStringLiteral(node) && /\p{Script=Han}/u.test(node.text)) result ||= isAllowedWikiLanguageName(file, node);
+            ts.forEachChild(node, visit);
+        }
+        visit(fixture);
+        return result;
+    }
+    assert.equal(allowedInFixture(wikiFile, "const languages = [{ value: 'zh-hans', label: '简体中文' }];"), true);
+    assert.equal(allowedInFixture(wikiFile, "const languages = [{ value: 'zh-hant', label: '繁體中文' }];"), true);
+    assert.equal(allowedInFixture(wikiFile, "const languages = [{ value: 'zh-hans', label: '其他中文' }];"), false);
+    assert.equal(allowedInFixture(wikiFile, "const languages = [{ value: 'zh-hant', label: '简体中文' }];"), false);
+    assert.equal(allowedInFixture(wikiFile, "const notices = [{ value: 'zh-hans', label: '简体中文' }];"), false);
+    assert.equal(allowedInFixture(wikiFile, "const languages = [{ value: 'zh-hans', title: '简体中文' }];"), false);
+    assert.equal(allowedInFixture('src/other.tsx', "const languages = [{ value: 'zh-hans', label: '简体中文' }];"), false);
     const html = fs.readFileSync('src/client/index.html', 'utf8');
     assert.match(html, /<html lang="en"/);
     assert.doesNotMatch(html, /\p{Script=Han}/u);
