@@ -60,6 +60,14 @@ async function sqliteServer({ bootstrap = true } = {}) {
 }
 module.exports = { sqliteServer };
 
+// Browser code may fetch same-origin publication URLs. Keep real HTTP and
+// resource decoding in Node tests while supplying the browser's URL base.
+function browserFetch(base) {
+    const fetcher = globalThis.fetch;
+    return (input, options) => fetcher(typeof input === 'string' ? new URL(input, base) : input, options);
+}
+module.exports.browserFetch = browserFetch;
+
 async function clientStorage(books = [], options = {}) {
     const server = await sqliteServer();
     const client = await import('../../dist/client/infrastructure/storageClient.js');

@@ -67,6 +67,11 @@ verified: 2026-10-30 · owner rules: AGENTS.md
   docs/epub-engine/p1-implementation-2026-11-12.md. The owner restricted functional
   validation for this conversation to ChatGPT's built-in browser on 2026-11-12.
   Desktop execution and package verification remain unverified for P1.
+- Later compatibility checks on 2026-11-12 passed the source desktop core flow,
+  NSIS build and static package verification. Packaged EPUB workers/resources and
+  reload passed, but normal process shutdown still failed; no installation was
+  performed. Evidence and the remaining release blocker are recorded in
+  docs/archive/verification/electron-compatibility-2026-11-12.md.
 - Font behavior confirmed by the owner on 2026-11-12: Auto selects application
   fonts by publication language. The existing Book font menu item now selects
   publisher fonts through a persisted original-font preference, including fixed

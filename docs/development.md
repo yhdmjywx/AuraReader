@@ -40,6 +40,8 @@ Electron Windows 桌面迁移已进入阶段 6 的本地验证，保留 Windows 
 
 `npm start` 会先检查类型并构建，再启动服务。`dist/renderer/` 是浏览器与 Electron 共用的 Vite 产物，包含带 hash 的 JS/CSS、本地图标和字体；`dist/client/` 保留逐模块编译输出，供现有测试导入，不随桌面版发布。依赖安装后，可以运行：
 
+测试模块构建会将 `?raw` 默认导入转换为依赖文件的完整 UTF-8 文本，并将 `new URL(...ts, import.meta.url)` 转为编译后的 `.js` 路径。源码仍交由 Vite 处理，开发页面与生产 renderer 保留原资源导入和 Worker 构建方式。`test_build_assets.js` 核对全部 Readium CSS 原文，并实际执行编译后的 EPUB 导入 Worker。
+
 ```powershell
 npm test                 # 语法、单元和回归检查
 npm run dev              # 启动 API (8095) 和 Vite 开发页面 (5173)，支持 React 热更新
@@ -58,8 +60,13 @@ npm run test:packaged:stability # 复验已有 win-unpacked 的真实 exe；先�
 npm run test:desktop:native # 交互验收真实 Windows 文件对话框，按终端提示选项目测试素材
 npm run dist:win          # 构建 Windows x64 NSIS 候选包，并校验资源、许可和安全 fuses
 npm run verify:package    # 核对已有 win-unpacked，并生成安装包 SHA256 与检查报告
+node tests/desktop/packaged-epub.cjs # 对当前 win-unpacked 执行隔离书库的 EPUB/Worker/资源/重载/退出检查，不安装
 npm run test:install      # 构建候选/升级测试包，真实安装、升级、卸载和重装（需无现有 AuraReader 安装）
 ```
+
+包验证会追踪桌面本地 require、ESM 导入／再导出、动态导入及 Node Worker 入口，并逐字节核对 app.asar 中的全部 renderer 资源与当前 `dist/renderer/`。因此验证旧包前需使用对应构建，不能把不同源码生成的 renderer 当作其验证基准。`packaged-epub.cjs` 从非项目根目录的独立测试工作目录启动真实 exe，移除 PATH 中的 Node，关闭网络并使用独立 profile，覆盖 ASAR 内 ZIP Worker、动态共享模块、Readium CSS、出版物嵌套 CSS／字体／图片及正常退出；不替代安装器生命周期验收。
+
+2026-11-12 本轮兼容性检查中，源码测试、打包与静态校验通过，打包运行的资源／重载阶段通过，但正常退出断言失败；该项仍阻断完整运行通过声明。证据与产物散列见 [兼容性记录](archive/verification/electron-compatibility-2026-11-12.md)。
 
 阅读器现在通过 `features/reader/readerRuntime.ts` 提供 `mount`、`setBook`、`setAnnotations`、`setLayout`、翻页、`subscribe/getSnapshot` 和 `destroy`；当前应用也使用这个入口挂载。React 界面可直接使用 `readerReact.tsx` 中的 `ReaderSurface` 与 `useReaderSnapshot`。React 管理容器和周边界面，阅读器独占正文子节点；快照只包含普通数据，不传出 DOM 或 Range。卸载会移除阅读与选区监听、排版任务和尺寸观察；重新挂载保留书籍与源文档位置。业务数据保存仍由原有 repository/controller 负责。
 

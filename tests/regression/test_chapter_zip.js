@@ -6,7 +6,7 @@ const { JSDOM } = require('jsdom');
 
 (async () => {
     const dom = new JSDOM('<!doctype html><body></body>', { url: 'http://localhost:8095/' });
-    const keys = ['window', 'document', 'NodeFilter', 'DOMParser', 'localStorage'];
+    const keys = ['window', 'document', 'NodeFilter', 'DOMParser', 'localStorage', 'fetch'];
     const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     let storage;
     const originalCreate = URL.createObjectURL;
@@ -14,7 +14,7 @@ const { JSDOM } = require('jsdom');
     const blobs = new Map();
     const downloads = [];
     try {
-        for (const key of keys) globalThis[key] = dom.window[key];
+        for (const key of keys.filter(key => key !== 'fetch')) globalThis[key] = dom.window[key];
         URL.createObjectURL = blob => {
             const url = `blob:zip-${blobs.size}`;
             blobs.set(url, blob);
@@ -31,6 +31,7 @@ const { JSDOM } = require('jsdom');
         const { saveBookToDB } = await import('../../dist/client/infrastructure/bookRepository.js');
         const { saveNoteToDB } = await import('../../dist/client/infrastructure/annotationRepository.js');
         storage = await require('../helpers/sqlite').clientStorage();
+        globalThis.fetch = require('../helpers/sqlite').browserFetch(storage.base);
         const book = {
             id: 'zip-integration', title: '导出验证', format: 'EPUB',
             pages: [
@@ -120,6 +121,7 @@ const { JSDOM } = require('jsdom');
         if (process.env.AURA_ZIP_SAMPLE) fs.writeFileSync(process.env.AURA_ZIP_SAMPLE, Buffer.from(await downloads[0].blob.arrayBuffer()));
 
         const fixture = await parseEpub(fs.readFileSync(path.join(__dirname, '../fixtures/test.epub')), 'Alice.epub', JSZip);
+        await saveBookToDB(fixture);
         const pageIndex = fixture.pages.findIndex(html => {
             holder.innerHTML = html;
             return holder.textContent.includes('Down, down, down.');

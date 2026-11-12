@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "aurareader-workstation",
+    "productName": "AuraReader",
+    "appId": "org.aurareader.desktop",
+    "repository": {
+      "host": "github.com",
+      "owner": "yhdmjywx",
+      "name": "AuraReader"
+    }
+  },
+  "packageManager": {
+    "name": "npm",
+    "versionSource": "unknown",
+    "lockfile": "package-lock.json",
+    "lockfileVersion": 3,
+    "nodeEngine": ">=24.15.0"
+  },
+  "electron": {
+    "declaredVersion": "45.0.0",
+    "lockedVersion": "45.0.0",
+    "packagingVersion": "45.0.0"
+  },
+  "packaging": {
+    "tool": "electron-builder",
+    "declaredVersion": "26.15.3",
+    "lockedVersion": "26.15.3",
+    "configurationFile": "electron-builder.cjs",
+    "targets": [
+      {
+        "os": "windows",
+        "arch": "x64",
+        "format": "nsis"
+      }
+    ],
+    "automaticPublishing": false,
+    "signingConfiguration": "unknown"
+  },
+  "scripts": {
+    "start": "node src/server/server.js",
+    "prestart": "npm run build",
+    "dev": "node scripts/dev.mjs",
+    "desktop": "npm run build && node scripts/desktop.cjs",
+    "dist:win": "npm run build && node scripts/package-resources.cjs && electron-builder --config electron-builder.cjs --win nsis --x64 --publish never && node scripts/verify-package.cjs",
+    "verify:package": "node scripts/verify-package.cjs",
+    "test:install": "npm run dist:win && node scripts/package-upgrade-fixture.cjs && node scripts/test-install.cjs",
+    "test:desktop": "npm run build && node scripts/test-desktop.cjs",
+    "test:reading-workflow": "npm run build && node scripts/test-desktop.cjs reading-workflow.cjs",
+    "test:migration": "node scripts/test.cjs migration",
+    "test:stability": "npm run build && node scripts/test-stability.cjs",
+    "test:packaged:stability": "node tests/desktop/packaged-stability.cjs",
+    "test:desktop:native": "npm run build && node scripts/test-native-dialogs.cjs",
+    "build": "node scripts/build.cjs && vite build",
+    "build:modules": "node scripts/build.cjs",
+    "typecheck": "node scripts/build.cjs --check",
+    "test": "node scripts/test.cjs all",
+    "test:syntax": "node scripts/test.cjs syntax",
+    "test:unit": "node scripts/test.cjs unit",
+    "test:regression": "node scripts/test.cjs regression",
+    "test:all": "node scripts/test.cjs all"
+  },
+  "commands": {
+    "build": "npm run build",
+    "package": "npm run dist:win",
+    "typecheck": "npm run typecheck",
+    "test": "npm test",
+    "lint": "unknown",
+    "migration": "npm run test:migration",
+    "desktop": "npm run test:desktop",
+    "packageVerification": "npm run verify:package"
+  },
+  "outputDirectories": {
+    "renderer": "dist/renderer",
+    "testModules": "dist/client",
+    "package": "release",
+    "unpacked": "release/win-unpacked"
+  },
+  "version": {
+    "source": "package.json#version",
+    "lockfileSources": [
+      "package-lock.json#version",
+      "package-lock.json#packages[\"\"]#version"
+    ],
+    "tagConvention": "unknown"
+  },
+  "releaseArtifactPatterns": [
+    "release/AuraReader-Setup-${version}-x64.exe",
+    "release/AuraReader-Setup-${version}-x64.exe.sha256"
+  ],
+  "verificationReportPattern": "release/package-verification.json",
+  "sources": [
+    {
+      "path": "package.json",
+      "sha256": "7a871cb9bb0cb5459c85be231ab941778cbb741eeb837a65a61474a28eacc049"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "594728a83a1477583b64806355712cd479cd2f697ff6a302caf43d70721813de"
+    },
+    {
+      "path": "electron-builder.cjs",
+      "sha256": "3ec9f1da03f0d9f9b578bd18f8cb5e08f1c7f1a9c60c91be0cdc93ccfad6f5ca"
+    },
+    {
+      "path": "scripts/build.cjs",
+      "sha256": "bb2aed5c935e2e2efe4d7b9a40bedf88bef4f95a505b39c9a3bc7dd848058795"
+    },
+    {
+      "path": "scripts/test.cjs",
+      "sha256": "bd55e26be8c0f54743a5a1ef98f1ed82b8ff3a96aef31cb8108e35b4e56a4e63"
+    },
+    {
+      "path": "scripts/package-resources.cjs",
+      "sha256": "633fa726c0074262dca6f4240dd22339c8524faf57e41353c547366d8c217e87"
+    },
+    {
+      "path": "scripts/verify-package.cjs",
+      "sha256": "d49b67e82dcd194f9b1d546da60faeac8e0b8edfded2787821be9e60b92f7d0f"
+    },
+    {
+      "path": "vite.config.mjs",
+      "sha256": "b7672af594c0441ff0307a16ebf7a9d7e648786deb5a03629326a11582ae1cee"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "6b90cec0b3630e50d938fbf1c463458f4675528b64f6c4096e4612f607459811"
+    },
+    {
+      "path": "tsconfig.desktop.json",
+      "sha256": "2426226d9d6a61c5b0e667d2db3978e51b9a1e5be97964025096aa629b94ed7b"
+    },
+    {
+      "path": "docs/agents/project-profile.md",
+      "sha256": "f4ffc518b54ab53403754f4d29c2e527e446032a980228a32786ff9bf8ef386d"
+    },
+    {
+      "path": "docs/development.md",
+      "sha256": "12157f63880bb74c0fd43efff6d488c58e7c10645900e44a29d7aba2c6a415a4"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "06156fbd734e11fc97ea3605960b1a408ef3d3329d977994e49489627e625f36"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "6d8f706477612631e4570736186b2679be74230d16577d6b1ef8f8ac28d5b8a7"
+    }
+  ]
+}
