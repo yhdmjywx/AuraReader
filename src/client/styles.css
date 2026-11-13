@@ -707,9 +707,16 @@ body.theme-dark .export-backup-action i {
     transform: scale(1.15);
     border-color: var(--primary);
 }
-.paper-white { background-color: #ffffff; border: 1px solid #d1d5db; }
-.paper-sepia { background-color: #fbf0d9; border: 1px solid #e5d3b3; }
-.paper-dark  { background-color: #121827; border: 1px solid #374151; }
+.paper-white { background-color: #ffffff; }
+/* The reserved toolbar slot reveals Paper when the toolbar is transparent. */
+.paper-sepia,
+.workspace-container.immersive-notes:has(> .reader-panel.paper-sepia) { background-color: #fbf0d9; }
+.paper-dark,
+.workspace-container.immersive-notes:has(> .reader-panel.paper-dark) { background-color: #121827; }
+/* Swatch decoration must not change the reader panel or EPUB column geometry. */
+.paper-btn.paper-white { border: 1px solid #d1d5db; }
+.paper-btn.paper-sepia { border: 1px solid #e5d3b3; }
+.paper-btn.paper-dark  { border: 1px solid #374151; }
 
 /* TOC Drawer */
 .toc-drawer {

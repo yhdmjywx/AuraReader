@@ -139,6 +139,27 @@ does not declare it another planned redesign.
 
 ## Interface States
 
+### Reading Settings — line spacing and reading width, 2026-11-13
+
+The existing [Reading Settings main component, 7:275](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=7-275)
+now includes Line spacing and Reading width after Size. It retains its 340px width,
+existing control presentation, and original settings; its content height is about
+461.06px. The existing screen instance `15:542` inherits the extension and was
+visually checked. No new application settings system was introduced.
+
+The editable [line spacing and width review, 379:2822](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=379-2822)
+on 02 - Components contains nine instances: default, minimum, maximum, width
+constrained, keyboard focus, hover, pressed, fixed layout, and small viewport.
+Main-component, contextual-instance, and review-overview visual checks passed.
+These are static design states; live prototype interaction, keyboard operation,
+and small-viewport scrolling were not tested in the Figma prototype. Application
+implementation and directed Web checks were subsequently completed on 2026-11-13
+using the owner-authorized ego browser; desktop testing remains excluded. See the
+[implementation record](../epub-engine/reading-settings-implementation-2026-11-13.md).
+Requirements, source integration points, pagination constraints, design
+values, and verification limits:
+[line spacing and reading width](../epub-engine/reading-settings-line-spacing-width.md).
+
 The following five frames represent **one Reading Interface**, not five product pages.
 
 | Reading Interface state | Exact Frame | Context / related component |
@@ -148,6 +169,26 @@ The following five frames represent **one Reading Interface**, not five product 
 | Reading settings open | [Reading Interface / Reading settings open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-421) | [Reading Settings instance](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-542) |
 | Local library open | [Reading Interface / Local library open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-597) | [Local Library instance](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-718) |
 | Contents open | [Reading Interface / Contents open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-817) | [Contents Drawer instance](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-938) |
+
+On 2026-11-13, four editable Paper/toolbar comparison screens were added to
+**01 - Screens**, to the right of the original frames. These supplement the same
+Reading Interface; they do not replace the originals or introduce a new module.
+Hidden toolbars keep the 52px slot and reveal the selected Paper background;
+visible toolbars preserve the existing application surface. Reading geometry
+and source component links are preserved. The outer Paper background is now
+integrated in source and verified in the built-in browser against these four
+states. The 52px slot and existing visibility rules are retained; no live hover
+prototype connections were added in Figma. Desktop execution was not tested.
+
+| Paper / toolbar state | Exact Frame |
+| --- | --- |
+| Sepia / hidden | [388:1065](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=388-1065) |
+| Sepia / visible | [388:1194](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=388-1194) |
+| Dark / hidden | [388:1325](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=388-1325) |
+| Dark / visible | [388:1454](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=388-1454) |
+
+Design rules, color bindings and verification:
+[Paper and reading toolbar states](reading-paper-toolbar-states-2026-11-13.md).
 
 Goal Sidebar states live in [Goal Sidebar](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=14-581) on **02 - Components**.
 These are sidebar/component states, not full Goal workspace screens.

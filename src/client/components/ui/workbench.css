@@ -293,6 +293,7 @@ body.theme-dark :is(#appearance-panel, #btn-appearance) {
 #btn-appearance[aria-expanded="true"], #btn-appearance[aria-expanded="true"]:hover { background: var(--appearance-soft); color: var(--appearance-ink); }
 #appearance-panel {
     width: min(340px, calc(100vw - 24px)); padding: 16px; border: 1px solid var(--appearance-edge);
+    max-height: calc(100dvh - var(--header-height) - 24px); overflow-y: auto; overscroll-behavior: contain;
     border-radius: 8px; color: var(--appearance-ink); background: var(--bg-panel);
     box-shadow: 0 4px 12px #00000014;
 }
@@ -304,6 +305,9 @@ body.theme-dark :is(#appearance-panel, #btn-appearance) {
 #appearance-panel .ui-button:hover:not(:disabled) { background: var(--appearance-soft); }
 #appearance-panel .appearance-stepper { gap: 8px; }
 #appearance-panel .appearance-stepper .ui-button { width: 36px; height: 36px; padding: 0; }
+#appearance-panel .reading-geometry-stepper .ui-button:active:not(:disabled) { background: var(--appearance-edge); }
+#appearance-panel .reading-geometry-stepper .ui-button:disabled { opacity: .35; }
+#appearance-panel .reading-geometry-stepper .ui-button:focus-visible { outline: 2px solid var(--appearance-ink); outline-offset: 0; border-color: transparent; box-shadow: none; }
 #appearance-panel .appearance-stepper i { font-size: 18px; }
 #appearance-panel .font-size-text { min-width: 44px; font-family: inherit; font-size: 13px; line-height: 1.4; color: var(--appearance-ink); font-variant-numeric: tabular-nums; }
 #appearance-panel :is(.font-trigger, .select-sm) { border: 1px solid var(--appearance-edge); background: var(--bg-panel); padding: 7px 12px; }

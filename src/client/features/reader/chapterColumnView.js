@@ -125,8 +125,7 @@ export function fitChapterImages(elements, mode) {
     }
 }
 
-export function readTopLeftSentence(root, viewport) {
-    if (!root || typeof document === 'undefined') return '';
+function clippedReadingRect(root, viewport) {
     let view = readingViewportRect(root);
     if (viewport && viewport.ownerDocument !== root.ownerDocument) {
         const host = readerRect(view, root.ownerDocument);
@@ -139,6 +138,60 @@ export function readTopLeftSentence(root, viewport) {
             bottom: view.bottom - Math.max(0, host.bottom - clip.bottom) / scaleY,
             width: view.width, height: view.height };
     }
+    return view;
+}
+
+/** Plain source offset only: no DOM or Range escapes the reader boundary. */
+export function captureReadingPosition(root, viewport) {
+    if (!root || !viewport) return null;
+    const view = clippedReadingRect(root, viewport);
+    if (!view.width || !view.height) return null;
+    const reversed = readingAxis(root).reversed;
+    for (const [dx, dy] of [[56, 40], [88, 52], [56, 84], [120, 40]]) {
+        const x = reversed ? Math.max(view.left + 4, view.right - dx) : Math.min(view.right - 4, view.left + dx);
+        const hit = caretAt(x, Math.min(view.bottom - 4, view.top + dy), root.ownerDocument);
+        if (!hit || !root.contains(hit.node) || hit.node.nodeType !== 3 || !hit.node.textContent?.trim()) continue;
+        const offset = Math.min(hit.offset, Math.max(0, hit.node.textContent.length - 1));
+        const range = rangeAt(hit.node, offset);
+        if (!range || typeof range.getBoundingClientRect !== 'function') continue;
+        range.setEnd(hit.node, offset + 1);
+        const rect = range.getBoundingClientRect();
+        if (rect.right <= view.left || rect.left >= view.right || rect.bottom <= view.top || rect.top >= view.bottom) continue;
+        const projected = readerRect(rect, root.ownerDocument);
+        return { offset: offsetInside(root, hit.node, offset), source: root.dataset.sourceKey,
+            viewportY: projected.top - viewport.getBoundingClientRect().top };
+    }
+    return null;
+}
+
+/** Restore the screen containing the captured character without splitting source blocks. */
+export function restoreReadingPosition(root, viewport, position, mode) {
+    if (!root || !viewport || !position || position.source !== root.dataset.sourceKey) return false;
+    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let remaining = position.offset, node;
+    while ((node = walker.nextNode())) {
+        const length = node.textContent.length;
+        if (remaining >= length) { remaining -= length; continue; }
+        const range = rangeAt(node, remaining);
+        if (!range || typeof range.getBoundingClientRect !== 'function') return false;
+        range.setEnd(node, remaining + 1);
+        const rect = range.getBoundingClientRect(), axis = readingAxis(root);
+        if (mode === 'scroll' && !axis.vertical) {
+            const projected = readerRect(rect, root.ownerDocument);
+            viewport.scrollTop += projected.top - viewport.getBoundingClientRect().top - position.viewportY;
+        } else {
+            const host = readingViewportRect(root);
+            const absolute = axis.position + (axis.reversed ? host.right - rect.right : rect.left - host.left);
+            setReadingOffset(root, Math.floor(Math.max(0, absolute) / axis.step) * axis.step);
+        }
+        return true;
+    }
+    return false;
+}
+
+export function readTopLeftSentence(root, viewport) {
+    if (!root || typeof document === 'undefined') return '';
+    const view = clippedReadingRect(root, viewport);
     if (!view.width || !view.height) {
         if (!viewport) return '';
     }

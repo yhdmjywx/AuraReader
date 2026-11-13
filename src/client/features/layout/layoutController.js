@@ -9,6 +9,8 @@ export class LayoutController {
         if (stored === 'double') localStorage.setItem('aura_layout_mode', 'single');
         this.callbacks = callbacks;
         this.elements = null;
+        // Session-only preference; publication geometry remains authoritative for fixed layout.
+        this.readingWidth = 560;
     }
     getLayoutMode() { return this.layoutMode; }
     setPageMode(mode) {
@@ -26,7 +28,7 @@ export class LayoutController {
         const scroll = this.layoutMode === 'scroll';
         el.workspaceContainer.classList.toggle('layout-scroll', scroll);
         el.workspaceContainer.classList.toggle('layout-single', !scroll);
-        applyMarginGeometry(el);
+        applyMarginGeometry(el, this.readingWidth);
         for (const [button, active] of [[el.btnModeSingle, !scroll], [el.btnModeScroll, scroll]]) {
             button?.classList.toggle('active', active);
             button?.setAttribute('aria-pressed', String(active));

@@ -109,7 +109,7 @@ const { createFontStore, inspectFont } = require('../../src/server/fontStore');
         };
         const elements = Object.fromEntries(Object.entries(ids).map(([key, id]) => [key, document.getElementById(id)]));
         const panel = elements.appearancePanel;
-        assert.equal(panel.querySelectorAll('.appearance-row').length, 5, '阅读设置保留五行，应用主题位于全局设置');
+        assert.equal(panel.querySelectorAll('.appearance-row').length, 7, '原阅读设置加入行距、行宽两行，应用主题仍位于全局设置');
         assert.equal(elements.fontMenu.querySelectorAll('[data-font-choice]').length, 4, '自动、原书及两款精选字体');
         assert.equal(elements.fontMenu.querySelector('[data-font-choice="original"]').disabled, false, '原书字体已接通');
         let applied = 0;

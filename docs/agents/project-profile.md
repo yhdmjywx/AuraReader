@@ -86,6 +86,12 @@ verified: 2026-10-30 · owner rules: AGENTS.md
   images within the remaining content height. Scroll mode clears paged offsets
   and restores flowing media height. Real-book verification and related height
   cleanup are recorded in the P1 implementation document.
+- Reading Settings now includes session-only line spacing and reading width in
+  the existing panel. Scoped publisher-style overrides, effective notes-aware
+  geometry, source-offset reflow recovery, and fixed-layout exclusions are
+  implemented. The owner authorized ego-browser Web validation on 2026-11-13
+  after built-in browser access failed; no desktop execution was tested for this
+  feature. Evidence: docs/epub-engine/reading-settings-implementation-2026-11-13.md.
 - client persistence adapters: src/client/infrastructure/
 - local server and data store: src/server/
 - Electron entry and integration: src/desktop/

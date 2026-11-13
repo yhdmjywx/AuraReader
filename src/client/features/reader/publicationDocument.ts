@@ -105,8 +105,11 @@ export function preparePublicationDocument(paper: HTMLElement, book: Book | null
     }
     addStyle(document, `html { box-sizing:border-box; padding:0!important; margin:0!important; }
         @layer aura { body[data-authored="true"], body[data-authored="true"] *, body.fixed-layout, body.fixed-layout * { all:revert-layer; }
+            /* Paged gutters live on HTML; paint them without changing their geometry or background images. */
+            html[data-user-paper]:has(> body.book-paper:not(.fixed-layout)) { background-color:var(--bg-paper)!important; }
             html[data-user-paper] body.book-paper:not(.fixed-layout) { background:var(--bg-paper)!important; color:var(--bg-paper-text)!important; }
-            html[data-user-paper] body.book-paper:not(.fixed-layout) :not(svg,svg *,img,video) { color:inherit!important; background-color:transparent!important; }
+            html[data-user-paper] body.book-paper:not(.fixed-layout) :not(svg,svg *,img,video,mark,mark *) { color:inherit!important; }
+            html[data-user-paper] body.book-paper:not(.fixed-layout) :not(svg,svg *,img,video,.annotation-token,.annotation-token *,mark,mark *) { background-color:transparent!important; }
             body.reader-user-indent p { text-indent:var(--book-text-indent)!important; }
         }
         body.book-paper { box-sizing:border-box; max-width:none!important; }

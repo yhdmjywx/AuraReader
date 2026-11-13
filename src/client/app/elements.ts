@@ -43,6 +43,12 @@ export interface AppElements {
     fontSizeLabel?: HTMLElement | null;
     btnFontDec?: HTMLButtonElement | null;
     btnFontInc?: HTMLButtonElement | null;
+    lineSpacingLabel?: HTMLElement | null;
+    btnLineSpacingDec?: HTMLButtonElement | null;
+    btnLineSpacingInc?: HTMLButtonElement | null;
+    readingWidthLabel?: HTMLElement | null;
+    btnReadingWidthDec?: HTMLButtonElement | null;
+    btnReadingWidthInc?: HTMLButtonElement | null;
     paperBtns?: NodeListOf<HTMLElement>;
     btnThemeToggle?: HTMLButtonElement | null;
     btnAppearance?: HTMLButtonElement | null;

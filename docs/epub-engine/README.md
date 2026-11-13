@@ -14,6 +14,12 @@
 
 [P1 实施顺序、实现取舍与浏览器验证记录](p1-implementation-2026-11-12.md)
 
+[Reading settings：行距与行宽需求及设计](reading-settings-line-spacing-width.md)
+
+[行距与行宽：实施与 Web 验证记录](reading-settings-implementation-2026-11-13.md)
+
+[Paper 换色裁切：修复与 Web 验证记录](paper-theme-fix-2026-11-13.md)
+
 报告逐字保留本次会话中的原始内容，包括源代码位置、链接、测试结果和验证边界。后续调查进展及结论更新另行记录。
 
 ## 已确认处理项

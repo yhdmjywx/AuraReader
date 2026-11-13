@@ -69,6 +69,22 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
             </div>
         </div>
         <div className="appearance-row">
+            <span id="line-spacing-title">{"Line spacing"}</span>
+            <div className="appearance-stepper reading-geometry-stepper" role="group" aria-labelledby="line-spacing-title">
+                <Button id="btn-line-spacing-dec" size="icon-lg" className="btn btn-icon-sm" type="button" title="Decrease line spacing" aria-label="Decrease line spacing"><ActionIcon name="minus" /></Button>
+                <span id="line-spacing-label" className="font-size-text" aria-live="polite">{"1.85×"}</span>
+                <Button id="btn-line-spacing-inc" size="icon-lg" className="btn btn-icon-sm" type="button" title="Increase line spacing" aria-label="Increase line spacing"><ActionIcon name="plus" /></Button>
+            </div>
+        </div>
+        <div className="appearance-row">
+            <span id="reading-width-title">{"Reading width"}</span>
+            <div className="appearance-stepper reading-geometry-stepper" role="group" aria-labelledby="reading-width-title">
+                <Button id="btn-reading-width-dec" size="icon-lg" className="btn btn-icon-sm" type="button" title="Decrease reading width" aria-label="Decrease reading width"><ActionIcon name="minus" /></Button>
+                <span id="reading-width-label" className="font-size-text" aria-live="polite">{"560px"}</span>
+                <Button id="btn-reading-width-inc" size="icon-lg" className="btn btn-icon-sm" type="button" title="Increase reading width" aria-label="Increase reading width"><ActionIcon name="plus" /></Button>
+            </div>
+        </div>
+        <div className="appearance-row">
             <label htmlFor="indent-select">{"Indent"}</label>
             <select id="indent-select" className="select-sm" title="First-line indent" defaultValue="2em">
                 <option value="0em">{"None"}</option>

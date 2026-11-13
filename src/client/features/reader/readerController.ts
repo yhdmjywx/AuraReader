@@ -5,6 +5,8 @@ import { preparePublicationContent } from './publicationContent.js';
 import { layoutFixedDocument, preparePublicationDocument, publicationDocument, refreshReadiumStyles } from './publicationDocument.js';
 import { resolveEpubUrl } from '../../infrastructure/epubPaths.js';
 import { readingAxis, readingViewport, setReadingOffset } from './readingAxis.js';
+import { marginGeometry, isImmersiveNotes } from '../layout/marginNotesLayout.js';
+import { applyLineSpacing, readLineSpacing } from './readingTypography.js';
 import type { Book, ReadingLocation, TocEntry } from '../../domain/book.js';
 import type { Annotation } from '../../domain/annotation.js';
 import type { BookStructure } from '../../domain/bookStructure.js';
@@ -34,6 +36,8 @@ import {
     layoutChapterStrip,
     fitChapterImages,
     readTopLeftSentence,
+    captureReadingPosition,
+    restoreReadingPosition,
     placeSentenceAtTopLeft,
     placeAnchorIdAtTopLeft,
     shiftStrip,
@@ -57,6 +61,7 @@ export class ReaderController {
     private cancelViewport?: () => void;
     private cancelLayout?: () => void;
     private cancelAnchor?: () => void;
+    private cancelSettingsLayout?: () => void;
 
     subscribe(listener: (event: 'render' | 'viewport' | 'location') => void) {
         this.listeners.add(listener);
@@ -71,6 +76,7 @@ export class ReaderController {
         this.documentBindings?.abort(); this.documentBindings = undefined;
         clearTimeout(this._anchorTimer);
         this.cancelViewport?.(); this.cancelLayout?.(); this.cancelAnchor?.();
+        this.cancelSettingsLayout?.(); this.cancelSettingsLayout = undefined;
         this.cancelViewport = this.cancelLayout = undefined;
         this._viewportUpdatePending = false;
         this.fonts.destroy();
@@ -84,6 +90,8 @@ export class ReaderController {
     callbacks: ReaderCallbacks;
     fontSize: number;
     fontSizeOverride = false;
+    lineSpacing = 1.85;
+    lineSpacingOverride = false;
     fontFamily: string;
     textIndent: string;
     paperTheme: string;
@@ -137,6 +145,7 @@ export class ReaderController {
     }
 
     setBook(bookKey: string, bookObj: Book) {
+        this.cancelSettingsLayout?.(); this.cancelSettingsLayout = undefined;
         this.engine.setBook(bookKey, bookObj);
         this.bookStructure = buildBookStructure(bookObj);
         const loc = this.engine.getLocation();
@@ -166,6 +175,7 @@ export class ReaderController {
     getFirstPage() { return this.getCurrentBook()?.epub?.documents.find(document => document.linear !== false)?.page || 1; }
 
     clearBook() {
+        this.cancelSettingsLayout?.(); this.cancelSettingsLayout = undefined;
         clearTimeout(this._anchorTimer);
         this.engine.setBook('', null);
         this.bookStructure = null; this.flowAnchorText = ''; this._flowPage = 0; this._volumeTitlePages = [];
@@ -176,6 +186,7 @@ export class ReaderController {
             this.elements.currentBookTitle.removeAttribute('title');
         }
         this.renderTOC([]);
+        this.refreshReadingSettingsControls();
         this.emit('location');
     }
 
@@ -443,6 +454,12 @@ export class ReaderController {
         // Font Controls
         this.fonts.initUI(elements, signal);
 
+        elements.btnLineSpacingDec?.addEventListener('click', () => this.changeLineSpacing(-1), { signal });
+        elements.btnLineSpacingInc?.addEventListener('click', () => this.changeLineSpacing(1), { signal });
+        elements.btnReadingWidthDec?.addEventListener('click', () => this.changeReadingWidth(-1), { signal });
+        elements.btnReadingWidthInc?.addEventListener('click', () => this.changeReadingWidth(1), { signal });
+        this.refreshReadingSettingsControls();
+
         if (elements.btnFontDec) {
             elements.btnFontDec.addEventListener('click', () => {
                 if (this.fontSize > 13) {
@@ -574,7 +591,10 @@ export class ReaderController {
             if (!paper) return;
             this.fonts.apply(paper);
             this.fontFamily = this.fonts.resolved().family;
-            if (paper.dataset.layout === 'pre-paginated') return;
+            if (paper.dataset.layout === 'pre-paginated') {
+                applyLineSpacing(paper, null);
+                return;
+            }
             if (paper.dataset.authored === 'true' && !this.fontSizeOverride) {
                 paper.style.removeProperty('font-size');
                 this.fontSize = parseFloat(paper.ownerDocument.defaultView!.getComputedStyle(paper).fontSize) || 18;
@@ -582,7 +602,113 @@ export class ReaderController {
             } else paper.style.setProperty('font-size', `${this.fontSize}px`, 'important');
             paper.style.setProperty('--book-text-indent', this.textIndent);
             paper.classList.toggle('reader-user-indent', !!globalThis.localStorage?.getItem('aura_text_indent'));
+            applyLineSpacing(paper, this.lineSpacingOverride ? this.lineSpacing : null);
+            if (!this.lineSpacingOverride) this.lineSpacing = readLineSpacing(paper);
         });
+        // Width must be current before the chapter strip measures its columns.
+        this.layoutController?.updateLayoutClasses(elements);
+        this.refreshReadingSettingsControls();
+    }
+
+    private readingSettingsUnavailable() {
+        if (!this.getCurrentBook()) return 'Open a book to adjust reading layout';
+        if (this.elements?.bookPaper?.dataset.layout === 'pre-paginated') return 'Fixed-layout books keep their page layout';
+        return '';
+    }
+
+    private readingWidthGeometry(preferred = this.layoutController?.readingWidth || 560) {
+        const elements = this.elements;
+        if (!elements?.workspaceContainer || !isImmersiveNotes(elements)) return null;
+        const workspace = elements.workspaceContainer;
+        return marginGeometry(workspace.clientWidth || workspace.ownerDocument.defaultView?.innerWidth || 1200, preferred);
+    }
+
+    refreshReadingSettingsControls() {
+        const elements = this.elements;
+        if (!elements) return;
+        const reason = this.readingSettingsUnavailable();
+        const fixed = elements.bookPaper?.dataset.layout === 'pre-paginated';
+        const preferred = this.layoutController?.readingWidth || 560;
+        const geometry = this.readingWidthGeometry(fixed ? 560 : preferred);
+        const width = geometry?.readingWidth || elements.paperContainer?.clientWidth || 560;
+        const maximum = this.readingWidthGeometry(800)?.readingWidth || width;
+        if (elements.lineSpacingLabel) {
+            elements.lineSpacingLabel.textContent = `${this.lineSpacing.toFixed(2)}×`;
+            elements.lineSpacingLabel.title = reason || 'Body line height relative to font size';
+            elements.lineSpacingLabel.setAttribute('aria-label', reason || `Line spacing ${this.lineSpacing.toFixed(2)} times`);
+        }
+        if (elements.readingWidthLabel) {
+            elements.readingWidthLabel.textContent = `${Math.round(width)}px`;
+            const description = reason || (width < preferred ? `Preferred ${preferred}px; available ${Math.round(width)}px` : `Reading width ${Math.round(width)}px`);
+            elements.readingWidthLabel.title = description;
+            elements.readingWidthLabel.setAttribute('aria-label', description);
+        }
+        const controls: [HTMLButtonElement | null | undefined, boolean, string][] = [
+            [elements.btnLineSpacingDec, this.lineSpacing <= 1.20, 'Decrease line spacing'],
+            [elements.btnLineSpacingInc, this.lineSpacing >= 2.40, 'Increase line spacing'],
+            [elements.btnReadingWidthDec, !geometry || width <= 320, 'Decrease reading width'],
+            [elements.btnReadingWidthInc, !geometry || width >= Math.min(800, maximum), 'Increase reading width'],
+        ];
+        for (const [button, limit, label] of controls) if (button) {
+            button.disabled = !!reason || limit;
+            button.title = reason || label;
+        }
+    }
+
+    changeLineSpacing(direction: number) {
+        if (this.readingSettingsUnavailable()) return;
+        const value = Math.max(1.20, Math.min(2.40, Math.round((this.lineSpacing + Math.sign(direction) * 0.05) * 100) / 100));
+        if (!direction || value === this.lineSpacing) return;
+        this.queueReadingSettingsLayout();
+        this.lineSpacing = value;
+        this.lineSpacingOverride = true;
+        this.refreshReadingSettingsControls();
+    }
+
+    changeReadingWidth(direction: number) {
+        if (this.readingSettingsUnavailable() || !this.layoutController) return;
+        const geometry = this.readingWidthGeometry();
+        if (!geometry || !direction) return;
+        const width = geometry.readingWidth;
+        const maximum = this.readingWidthGeometry(800)!.readingWidth;
+        if (direction < 0 ? width <= 320 : width >= Math.min(800, maximum)) return;
+        const preferred = Math.max(320, Math.min(800, width + Math.sign(direction) * 40));
+        this.queueReadingSettingsLayout();
+        this.layoutController.readingWidth = preferred;
+        this.refreshReadingSettingsControls();
+    }
+
+    private queueReadingSettingsLayout() {
+        if (this.cancelSettingsLayout || !this.elements) return;
+        this.rememberAnchor();
+        const position = captureReadingPosition(this.elements.bookPaper, readerViewport(this.elements));
+        const view = this.elements.readerPanel?.ownerDocument.defaultView || this.elements.bookPaper?.ownerDocument.defaultView;
+        const update = () => {
+            this.cancelSettingsLayout = undefined;
+            if (!this.elements || !this.getCurrentBook()) return;
+            if (this.isChapterFlow()) {
+                this.applyTypography();
+                this.layoutAndPlace(this.callbacks.getNotes?.() || [], { preserve: true });
+                if (!restoreReadingPosition(this.elements.bookPaper, readerViewport(this.elements), position, this.effectiveReaderMode()) && this.flowAnchorText) {
+                    placeSentenceAtTopLeft(this.elements.bookPaper, readerViewport(this.elements), this.flowAnchorText, this.effectiveReaderMode());
+                }
+                this.syncChapterChrome();
+            }
+            else {
+                this.applyTypography();
+                syncReaderDocumentSize(this.elements);
+                this.callbacks.onPageRendered?.();
+                this.emit('render');
+                this.scheduleViewportChange();
+            }
+        };
+        if (view?.requestAnimationFrame) {
+            const id = view.requestAnimationFrame(update);
+            this.cancelSettingsLayout = () => view.cancelAnimationFrame(id);
+        } else {
+            const id = setTimeout(update, 0);
+            this.cancelSettingsLayout = () => clearTimeout(id);
+        }
     }
 
     refitAfterTypography() {
@@ -755,6 +881,7 @@ export class ReaderController {
         if (this.layoutController && typeof this.layoutController.updateLayoutClasses === 'function') {
             this.layoutController.updateLayoutClasses(elements);
         }
+        this.refreshReadingSettingsControls();
         this.scheduleViewportChange();
     }
 }

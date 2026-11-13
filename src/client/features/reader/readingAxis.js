@@ -12,7 +12,7 @@ export function readingAxis(paper) {
     const style = paper.ownerDocument.defaultView.getComputedStyle(paper);
     const vertical = /^(vertical|sideways)/.test(style.writingMode);
     const reversed = vertical ? /-rl$/.test(style.writingMode) : style.direction === 'rtl';
-    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.85 || 30;
+    const lineHeight = parseFloat(paper.style.getPropertyValue('--aura-reading-line-height')) || parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.85 || 30;
     const scrollStyle = scroller.ownerDocument.defaultView.getComputedStyle(scroller);
     const step = vertical ? Math.max(lineHeight, Math.floor((scroller.clientWidth - 2 * lineHeight) / lineHeight) * lineHeight) : Math.max(1, scroller.clientWidth + (parseFloat(scrollStyle.columnGap) || 0));
     const max = Math.max(0, scroller.scrollWidth - scroller.clientWidth);

@@ -100,7 +100,11 @@ Other shadcn styles and previously explored libraries remain historical referenc
 - On hover-capable devices, show the toolbar when the pointer enters its top area
   and hide it on leave. Reserve its space so reading content never shifts; retain
   access during keyboard focus, while a toolbar panel is open, and without hover.
-  Its at-rest workspace surface remains white.
+  The white-Paper reference keeps its white at-rest workspace surface. For
+  Sepia/Dark Paper, the reserved region behind a hidden toolbar follows Paper;
+  the visible toolbar retains its existing application surface. The 52px slot
+  and reading-content position remain unchanged. State references and Web validation:
+  [Paper and toolbar states](reading-paper-toolbar-states-2026-11-13.md).
 - The book title is single-line with ellipsis, at most 18ch wide and shrinkable.
   Preserve the full text and hover title; 18ch is a display width, not a data limit.
   Preserve the contents trigger and adjacent actions.

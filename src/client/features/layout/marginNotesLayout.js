@@ -4,9 +4,10 @@ import { readingViewportRect } from '../reader/readingAxis.js';
 // with the existing controllers and repositories.
 import { intersectVisibleRects } from '../reader/visibleAnnotations.js';
 
-export function marginGeometry(width) {
+export function marginGeometry(width, preferredWidth = 560) {
     const w = Math.max(1, Number(width) || 1);
-    let readingWidth = Math.min(560, Math.max(1, w - 32));
+    const preferred = Math.min(800, Math.max(320, Number(preferredWidth) || 560));
+    let readingWidth = Math.min(preferred, Math.max(1, w - 32));
     let placement = 'right', noteWidth = 260, gap = 48;
     let readingLeft = (w - readingWidth) / 2;
     if (readingLeft + readingWidth + gap + noteWidth > w - 24) {
@@ -26,11 +27,11 @@ export function isImmersiveNotes(elements) {
     return !!elements?.workspaceContainer?.classList.contains('immersive-notes');
 }
 
-export function applyMarginGeometry(elements) {
+export function applyMarginGeometry(elements, preferredWidth = 560) {
     if (!isImmersiveNotes(elements)) return;
     const workspace = elements.workspaceContainer;
     const width = workspace.clientWidth || workspace.ownerDocument.defaultView?.innerWidth || 1200;
-    const geometry = marginGeometry(width);
+    const geometry = marginGeometry(width, elements.bookPaper?.dataset.layout === 'pre-paginated' ? 560 : preferredWidth);
     workspace.dataset.notesPlacement = geometry.placement;
     workspace.style.setProperty('--reading-width', `${geometry.readingWidth}px`);
     workspace.style.setProperty('--reading-left', `${geometry.readingLeft}px`);
