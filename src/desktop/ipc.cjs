@@ -7,6 +7,8 @@ const { wikiExternalUrl } = require('../shared/wikiSites.js');
 
 /** @param {import('electron').BrowserWindow} window */
 function registerWikiIpc(window) {
+    const contents = window.webContents;
+    let disposed = false;
     const wiki = createWikiService();
     /** @type {Map<string, AbortController>} */
     const requests = new Map();
@@ -38,13 +40,15 @@ function registerWikiIpc(window) {
         }
     });
     const cancelAll = () => { requests.forEach(controller => controller.abort()); requests.clear(); };
-    window.webContents.on('did-start-navigation', cancelAll);
-    window.webContents.on('render-process-gone', cancelAll);
+    contents.on('did-start-navigation', cancelAll);
+    contents.on('render-process-gone', cancelAll);
     return () => {
+        if (disposed) return;
+        disposed = true;
         cancelAll();
         actions.forEach(action => ipcMain.removeHandler('aura:wiki:' + action));
-        window.webContents.removeListener('did-start-navigation', cancelAll);
-        window.webContents.removeListener('render-process-gone', cancelAll);
+        contents.removeListener('did-start-navigation', cancelAll);
+        contents.removeListener('render-process-gone', cancelAll);
     };
 }
 
@@ -107,44 +111,51 @@ function registerStorageIpc(window, storage) {
 
 /** @param {import('electron').BrowserWindow} window @param {ReturnType<typeof import('./storage.cjs').createDesktopStorage>} storage */
 function coordinateClose(window, storage) {
+    const contents = window.webContents;
+    let disposed = false;
     let allowed = false;
+    const closeWindow = () => { if (!disposed && !window.isDestroyed()) window.close(); };
     /** @type {{id: string, frame: import('electron').WebFrameMain, timer: NodeJS.Timeout} | null} */
     let pending = null;
     /** @param {string} message */
     const cancel = message => {
         if (pending) clearTimeout(pending.timer);
         pending = null;
-        if (!window.isDestroyed()) window.webContents.send('aura:lifecycle:close-cancelled', message);
+        if (!disposed && !window.isDestroyed() && !contents.isDestroyed()) contents.send('aura:lifecycle:close-cancelled', message);
     };
-    window.on('close', event => {
+    /** @param {Electron.Event} event */
+    const onClose = event => {
         if (allowed) return;
         event.preventDefault();
         if (pending) return;
         // A crashed renderer cannot acknowledge a flush. Its confirmed writes
         // are already in SQLite; keep its recovery journal and let the user exit.
-        if (window.webContents.isCrashed()) {
-            storage.settle().then(() => { allowed = true; window.close(); })
+        if (contents.isDestroyed() || contents.isCrashed()) {
+            storage.settle().then(() => { allowed = true; closeWindow(); })
                 .catch(error => console.error("Could not close the library after the crash.", error));
             return;
         }
-        if (window.webContents.mainFrame.url !== APP_URL) { cancel("The page is not ready. Closing was canceled. Keep this window open and try again."); return; }
+        if (contents.mainFrame.url !== APP_URL) { cancel("The page is not ready. Closing was canceled. Keep this window open and try again."); return; }
         const id = randomUUID();
-        pending = { id, frame: window.webContents.mainFrame,
+        pending = { id, frame: contents.mainFrame,
             timer: setTimeout(() => cancel("Save confirmation timed out. This window remains open. Check unsaved content and try again."), 30000) };
-        window.webContents.send('aura:lifecycle:prepare-close', id);
-    });
+        contents.send('aura:lifecycle:prepare-close', id);
+    };
+    window.on('close', onClose);
     ipcMain.handle('aura:lifecycle:request-close', (event, ...args) => {
         try {
             assertSender(event, window);
             if (args.length) throw new StorageError("Close requests do not accept arguments.");
-            setImmediate(() => { if (!window.isDestroyed()) window.close(); });
+            setImmediate(closeWindow);
             return { ok: true, value: { requested: true } };
         } catch (error) { return failure(error); }
     });
-    window.on('query-session-end', event => {
+    /** @param {Electron.Event} event */
+    const onSessionEnd = event => {
         if (allowed) return;
         event.preventDefault(); window.close();
-    });
+    };
+    window.on('query-session-end', onSessionEnd);
     ipcMain.handle('aura:lifecycle:complete-close', async (event, id, result) => {
         try {
             assertSender(event, window);
@@ -155,15 +166,21 @@ function coordinateClose(window, storage) {
             if (!result.ok) { cancel(result.message || "Some content is not confirmed saved. This window remains open."); return { ok: true, value: { accepted: false } }; }
             const request = pending;
             await storage.settle();
-            if (pending !== request) throw new StorageError("Close request canceled.", 409);
+            if (disposed || window.isDestroyed() || pending !== request) throw new StorageError("Close request canceled.", 409);
+            assertSender(event, window);
             clearTimeout(request.timer); pending = null; allowed = true;
             // Let invoke deliver its response before destroying the sender.
-            setImmediate(() => window.close());
+            setImmediate(closeWindow);
             return { ok: true, value: { accepted: true } };
         } catch (error) { return failure(error); }
     });
     return () => {
+        if (disposed) return;
+        disposed = true;
         if (pending) clearTimeout(pending.timer);
+        pending = null;
+        window.removeListener('close', onClose);
+        window.removeListener('query-session-end', onSessionEnd);
         ipcMain.removeHandler('aura:lifecycle:complete-close');
         ipcMain.removeHandler('aura:lifecycle:request-close');
     };

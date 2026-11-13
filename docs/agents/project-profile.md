@@ -72,6 +72,12 @@ verified: 2026-10-30 · owner rules: AGENTS.md
   reload passed, but normal process shutdown still failed; no installation was
   performed. Evidence and the remaining release blocker are recorded in
   docs/archive/verification/electron-compatibility-2026-11-12.md.
+- On 2026-11-13, the destroyed-window Wiki cleanup and delayed close callbacks
+  were fixed, and closed publication workers were made terminal. Source reading,
+  failed-save close protection, and standalone packaged EPUB close/restart checks
+  passed with exact data preservation. This supersedes the earlier shutdown
+  blocker for these tested paths; installation remains unverified. Evidence:
+  docs/archive/verification/electron-lifecycle-2026-11-13.md.
 - Font behavior confirmed by the owner on 2026-11-12: Auto selects application
   fonts by publication language. The existing Book font menu item now selects
   publisher fonts through a persisted original-font preference, including fixed

@@ -68,7 +68,8 @@
     "lint": "unknown",
     "migration": "npm run test:migration",
     "desktop": "npm run test:desktop",
-    "packageVerification": "npm run verify:package"
+    "packageVerification": "npm run verify:package",
+    "packageRuntimeVerification": "node tests/desktop/packaged-epub.cjs"
   },
   "outputDirectories": {
     "renderer": "dist/renderer",
@@ -132,11 +133,11 @@
     },
     {
       "path": "docs/agents/project-profile.md",
-      "sha256": "f4ffc518b54ab53403754f4d29c2e527e446032a980228a32786ff9bf8ef386d"
+      "sha256": "16321d7cf7d641be4e07cf5f41144e698b30a8a346be12cb50589e568cba0c71"
     },
     {
       "path": "docs/development.md",
-      "sha256": "12157f63880bb74c0fd43efff6d488c58e7c10645900e44a29d7aba2c6a415a4"
+      "sha256": "f714c51ddaca09d9b104a4451a41df7d8ce64f91437bd970bb14bf6c2e5a42dd"
     },
     {
       "path": "AGENTS.md",
@@ -145,6 +146,26 @@
     {
       "path": ".gitignore",
       "sha256": "6d8f706477612631e4570736186b2679be74230d16577d6b1ef8f8ac28d5b8a7"
+    },
+    {
+      "path": "src/desktop/ipc.cjs",
+      "sha256": "658cf5d5ba6fb96268758842bd0d09a487f5d4c17e58ef99742635948f3c55b0"
+    },
+    {
+      "path": "src/desktop/main.cjs",
+      "sha256": "577ebcafc44fefb592b2546f4c50faabad76d615563ab862082f2d2edc9045d9"
+    },
+    {
+      "path": "src/server/publicationWorkerClient.js",
+      "sha256": "0f11225a4d7b9086b9c0b24963e51a2ce1724894249308b25651cfc1963284e6"
+    },
+    {
+      "path": "scripts/test-desktop.cjs",
+      "sha256": "ff8a556e58d69e0f93d14c317cf1d368a1be21c3b618da10d473a4ad246ac1b4"
+    },
+    {
+      "path": "tests/desktop/packaged-epub.cjs",
+      "sha256": "91a7abe0922c1f1a1ce2c4eb0e8f57571168b43fae8b073945060d887d05e6fd"
     }
   ]
 }

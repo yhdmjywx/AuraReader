@@ -11,8 +11,11 @@ delete env.ELECTRON_RUN_AS_NODE;
 async function run(entry, args = []) {
     await new Promise((resolve, reject) => {
         const child = spawn(require('electron'), [path.join(root, 'tests/desktop', entry), output, ...args], {
-            cwd: root, env, stdio: 'inherit', windowsHide: false
+            cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: false
         });
+        let stderr = '';
+        child.stdout.on('data', bytes => process.stdout.write(bytes));
+        child.stderr.on('data', bytes => { stderr += bytes; process.stderr.write(bytes); });
         const timer = setTimeout(() => {
             child.kill(); reject(new Error(`Desktop regression exceeded 90 seconds: ${entry}`));
         }, 90000);
@@ -20,6 +23,7 @@ async function run(entry, args = []) {
         child.on('exit', (code, signal) => {
             clearTimeout(timer);
             if (code !== 0 || signal) reject(new Error(`Electron regression failed: ${entry}, exit=${code}, signal=${signal}; artifacts: ${output}`));
+            else if (/Desktop cleanup failed:/.test(stderr)) reject(new Error(`Desktop cleanup failed: ${entry}; artifacts: ${output}`));
             else resolve();
         });
     });
@@ -30,6 +34,13 @@ async function run(entry, args = []) {
         const entry = selected || 'reading-workflow.cjs';
         if (!['main.cjs','restart.cjs','note-interaction.cjs','goal-interaction.cjs','goal-home.cjs','goal-lifecycle.cjs','reading-workflow.cjs'].includes(entry)) throw new Error('Unknown desktop test: ' + entry);
         await run(entry, process.argv.slice(3));
+        if (!selected) {
+            for (const mode of ['empty', 'save-guard']) {
+                await run('lifecycle.cjs', [mode]);
+                const result = JSON.parse(fs.readFileSync(path.join(output, 'lifecycle-' + mode + '.json'), 'utf8'));
+                if (result.passed !== true) throw new Error('Lifecycle report did not pass: ' + mode);
+            }
+        }
         console.log('Desktop artifacts:', output);
         return;
     }

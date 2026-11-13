@@ -67,7 +67,11 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
     const removeWikiHandlers = registerWikiIpc(window);
     const removeCloseHandlers = coordinateClose(window, { ...storage, async settle() { await storage.settle(); await files.settle(); } });
     window.once('closed', () => {
-        removeStorageHandlers(); removeFileHandlers(); removeWikiHandlers(); removeCloseHandlers(); storage.close();
+        // A cleanup error must not leave the database or worker alive. Keep the
+        // error visible while completing the remaining independent disposals.
+        for (const dispose of [removeStorageHandlers, removeFileHandlers, removeWikiHandlers, removeCloseHandlers, () => storage.close()]) {
+            try { dispose(); } catch (error) { console.error('Desktop cleanup failed:', error); }
+        }
     });
     app.on('window-all-closed', () => app.quit());
     window.webContents.on('preload-error', (_event, _file, error) => {

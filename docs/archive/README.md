@@ -28,6 +28,8 @@
 
 ## 验收与验证记录
 
+- [Electron 关闭生命周期修复与验证 — 2026-11-13](verification/electron-lifecycle-2026-11-13.md)
+- [Electron 构建与资源兼容性修复 — 2026-11-12](verification/electron-compatibility-2026-11-12.md)
 - [Windows unpacked desktop package verification — 2026-10-30](verification/desktop-package-verification-2026-10-30.md)
 - [产品文案统一英文：实现与验证](verification/english-ui-verification-2026-10-30.md)
 - [Figma 页面差异与验证](verification/figma-ui-verification-2026-11-03.md)

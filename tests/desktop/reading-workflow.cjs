@@ -12,7 +12,9 @@ const noteText = 'A React note\n中文输入保持光标\n';
 app.on('web-contents-created', (_event, contents) => {
     contents.on('console-message', details => { if (details.level === 'error') errors.push(details.message); });
 });
-const watchdog = setTimeout(() => { console.error('React workflow timed out', errors); app.exit(1); }, 60000);
+// Screenshot-heavy interaction checks can exceed 60s on this workstation. Keep
+// a bound below the runner's 90s process deadline, including normal shutdown.
+const watchdog = setTimeout(() => { console.error('React workflow timed out', errors); app.exit(1); }, 80000);
 
 (async () => {
     const output = path.resolve(process.argv[2]);
@@ -398,5 +400,5 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     assert.deepEqual(errors, []);
     clearTimeout(watchdog);
     console.log('PASS: React Home → Goal/book picker → EPUB/IME note → SQLite/Goal link → cross-book source → shelf/search → preferences/export/backup → full Goal edit → keyboard menu/dialog → reload/persisted data');
-    app.exit(0);
+    window.close();
 })().catch(error => { console.error(error, errors); app.exit(1); });
