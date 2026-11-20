@@ -42,6 +42,7 @@ const { createWorkbench, ui, click, input, waitFor } = require('../helpers/react
         assert.equal(document.activeElement, elements.btnShelf);
         await click('#btn-appearance'); await click('#btn-shelf');
         assert.equal(elements.appearancePanel.classList.contains('open'), false);
+        await click('#btn-workspace-settings');
         await click('#btn-export-menu');
         assert.equal(elements.shelfPanel.classList.contains('open'), false);
         await ui(() => require('../../dist/client/components/ui/renderSurface.js').renderSurface(elements.shelfList, null));

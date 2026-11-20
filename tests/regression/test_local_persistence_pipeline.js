@@ -4,10 +4,21 @@ const path = require('node:path');
 const { clientStorage } = require('../helpers/sqlite');
 
 (async () => {
-    const storage = await clientStorage([{ id: 'pipeline', pages: ['<p>原文😀</p>'] }]);
+    const book = { id: 'pipeline', title: '巴黎圣母院', pages: ['<p>原文😀</p>'] };
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    globalThis.window = { get indexedDB() { throw new Error('SQLite 启动和业务读写不能访问 IndexedDB'); } };
+    let storage;
     try {
+        storage = await clientStorage([book], {
+            fetch(url, options) {
+                assert.ok(!new Headers(options?.headers).has('X-Aura-Source'));
+                assert.ok(!url.includes('/migration/'));
+                return fetch(url, options);
+            }
+        });
         const books = await import('../../dist/client/infrastructure/bookRepository.js');
         const repo = await import('../../dist/client/infrastructure/annotationRepository.js');
+        assert.deepEqual(await books.loadBookFromDB(book.id), book);
         const record = { id: 'pipeline-note', bookId: 'pipeline', quote: '原文😀', comment: '笔记\n', location: { start: 0, end: 4 }, unknown: { value: 1 } };
         await repo.saveNoteToDB(record);
         assert.deepEqual(storage.read('annotations', record.id), record);
@@ -22,5 +33,9 @@ const { clientStorage } = require('../helpers/sqlite');
             assert.ok(!/indexedDB|\.transaction\(/.test(text), '业务 Repository 不再包含 IndexedDB 访问');
         }
         console.log('✅ SQLite 持久化管道：真实保存、服务重开、完整字段、级联删除及旧业务实现清理通过');
-    } finally { await storage.close(); }
+    } finally {
+        if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+        else delete globalThis.window;
+        await storage?.close();
+    }
 })().catch(error => { console.error(error); process.exitCode = 1; });

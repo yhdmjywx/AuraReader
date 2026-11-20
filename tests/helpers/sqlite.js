@@ -4,7 +4,7 @@ const path = require('node:path');
 const { once } = require('node:events');
 const { createServer } = require('../../src/server/server');
 
-async function sqliteServer({ bootstrap = true } = {}) {
+async function sqliteServer() {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aurareader-test-'));
     let server; let base; let token;
     async function start() {
@@ -38,7 +38,7 @@ async function sqliteServer({ bootstrap = true } = {}) {
         async request(route, body, extra = {}) {
             const response = await fetch(base + '/api/storage/' + route, {
                 method: body === undefined ? 'GET' : 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Aura-Token': token, 'X-Aura-Source': 'test-source', ...extra },
+                headers: { 'Content-Type': 'application/json', 'X-Aura-Token': token, ...extra },
                 body: body === undefined ? undefined : JSON.stringify(body)
             });
             return { status: response.status, ...(await response.json()) };
@@ -51,11 +51,6 @@ async function sqliteServer({ bootstrap = true } = {}) {
             await fs.rm(target, { recursive: true, force: true });
         }
     };
-    if (bootstrap) {
-        const result = await api.request('migration/snapshot', { origin: '', indexedDB: { books: [], notes: [] }, caches: {}, pending: {}, builtins: { books: [], notes: [] } });
-        const committed = await api.request('migration/commit', { snapshotId: result.snapshotId });
-        if (committed.status !== 200) throw new Error(JSON.stringify(committed));
-    }
     return api;
 }
 module.exports = { sqliteServer };
@@ -76,7 +71,7 @@ async function clientStorage(books = [], options = {}) {
     const allBooks = [...builtinBooks, ...books];
     const result = await server.request('restore', { opId: require('node:crypto').randomUUID(), books: allBooks, notes: data.getSeedNotes() });
     if (result.status !== 200) throw new Error(JSON.stringify(result));
-    const configure = fetcher => client.configureStorage({ baseUrl: server.base + '/api/storage', sourceId: 'test-source', fetch: fetcher || options.fetch || globalThis.fetch });
+    const configure = fetcher => client.configureStorage({ baseUrl: server.base + '/api/storage', fetch: fetcher || options.fetch || globalThis.fetch });
     configure();
     await client.initializeStorage();
     server.configureClient = configure;

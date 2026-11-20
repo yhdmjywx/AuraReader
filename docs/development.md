@@ -28,13 +28,13 @@ $env:PORT = '8096'
 npm start
 ```
 
-随后访问 `http://localhost:8096/`。SQLite 书库属于这份项目的 `data/` 目录，同一本地服务的不同浏览器或端口共用该书库；阅读偏好仍按浏览器访问地址保存。升级前的 IndexedDB 数据按原地址隔离，首次迁移应从原来的浏览器、配置文件和访问地址打开。
+随后访问 `http://localhost:8096/`。服务从项目的 `data/` 目录打开 SQLite 书库，连接这份项目的不同浏览器或端口共用该书库。阅读偏好仍按浏览器访问地址保存。旧浏览器数据的范围见 [数据与备份](data-and-backup.md#浏览器启动与旧版数据)。
 
 ## 开发与测试
 
 Electron Windows 桌面迁移已进入阶段 6 的本地验证，保留 Windows x64 NSIS 候选安装包，暂不发布。运行 `npm run desktop` 也可从源码创建独立桌面书库，通过 Windows 原生对话框导入 EPUB/TXT、阅读并保存高亮和笔记；可读取系统字体、导入 TTF/OTF/WOFF2，以及保存 Markdown、章节文件夹和每书 `.aurabackup`，并恢复当前书籍备份。旧阶段记录中的带标注 HTML 与章节 ZIP 属于历史验收能力，当前菜单不再提供这些导出入口。文件取消与保存失败会明确反馈，多书备份显示实际保存数量。桌面资源与 JSZip 随应用提供，离线运行不使用 localhost 服务。
 
-首次创建书库需明确点击；桌面 SQLite 和导入字体位于 `%APPDATA%\AuraReader\data`，不在安装目录内。按当前范围只保证现用 SQLite 的读写、版本/幂等、备份与恢复，不提供旧数据库或 IndexedDB 的桌面迁移；未知或缺失数据库仍阻断启动，不静默清库。浏览器模式继续独立运行，[旧版迁移说明](data-and-backup.md#从旧版本迁移)仅适用于现有浏览器模式。阶段 6 增加实际 SQLite 容量、只读和锁竞争故障、Renderer/主进程终止恢复、大书与持续读写、打包程序及安装生命周期验证，并修复容量错误掩盖与页面关闭漏保存。发布验收仍有未验证项；最新证据与限制见 [阶段 6 记录](archive/plans-and-implementation/electron-desktop-stage6.md)，安装设计见 [阶段 5](archive/plans-and-implementation/electron-desktop-stage5.md)，文件功能见 [阶段 4](archive/plans-and-implementation/electron-desktop-stage4.md)，历史记录见 [阶段 3](archive/plans-and-implementation/electron-desktop-stage3.md)、[审计](archive/plans-and-implementation/electron-desktop-audit.md)和[外壳记录](archive/plans-and-implementation/electron-desktop-stage2.md)。
+首次创建桌面书库需明确点击。桌面 SQLite 和导入字体位于安装目录之外的 `%APPDATA%\AuraReader\data`。桌面支持 SQLite 读写、版本校验、幂等重试、备份与恢复，未知或缺失的数据库会阻断启动。阶段 6 增加实际 SQLite 容量、只读和锁竞争故障、Renderer/主进程终止恢复、大书与持续读写、打包程序及安装生命周期验证，并修复容量错误掩盖与页面关闭漏保存。发布验收仍有未验证项；最新证据与限制见 [阶段 6 记录](archive/plans-and-implementation/electron-desktop-stage6.md)，安装设计见 [阶段 5](archive/plans-and-implementation/electron-desktop-stage5.md)，文件功能见 [阶段 4](archive/plans-and-implementation/electron-desktop-stage4.md)，历史记录见 [阶段 3](archive/plans-and-implementation/electron-desktop-stage3.md)、[审计](archive/plans-and-implementation/electron-desktop-audit.md)和[外壳记录](archive/plans-and-implementation/electron-desktop-stage2.md)。
 
 源码位于 `src/client/` 和 `src/server/`。前端使用 React + Vite：`entry.tsx` 先挂载 `WorkbenchShell`，再按运行环境载入浏览器／桌面应用。首页、完整 Goal 页面、阅读 Goal 侧栏、书库列表、选区操作和页边笔记均由 React 展示；偏好和导出面板也由 React 创建，原有 controller 继续执行字体、布局、保存和文件命令。
 

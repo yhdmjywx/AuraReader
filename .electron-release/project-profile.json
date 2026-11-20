@@ -93,79 +93,221 @@
   "sources": [
     {
       "path": "package.json",
-      "sha256": "7a871cb9bb0cb5459c85be231ab941778cbb741eeb837a65a61474a28eacc049"
+      "sha256": "7a871cb9bb0cb5459c85be231ab941778cbb741eeb837a65a61474a28eacc049",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "183cb5bf9357c2db890a128e2e262de817d6a118b6255d17d2b3b9b4dd577722"
+      }
     },
     {
       "path": "package-lock.json",
-      "sha256": "594728a83a1477583b64806355712cd479cd2f697ff6a302caf43d70721813de"
+      "sha256": "594728a83a1477583b64806355712cd479cd2f697ff6a302caf43d70721813de",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "40f6faac6971df6ca6fad7b58007b18d1c964322c39fe73b7ff04a53bae14e41"
+      }
     },
     {
       "path": "electron-builder.cjs",
-      "sha256": "3ec9f1da03f0d9f9b578bd18f8cb5e08f1c7f1a9c60c91be0cdc93ccfad6f5ca"
+      "sha256": "3ec9f1da03f0d9f9b578bd18f8cb5e08f1c7f1a9c60c91be0cdc93ccfad6f5ca",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "af137de9cac3bb178132f809e4e2b447096b66383661d9eff544d1478b01cf1e"
+      }
     },
     {
       "path": "scripts/build.cjs",
-      "sha256": "bb2aed5c935e2e2efe4d7b9a40bedf88bef4f95a505b39c9a3bc7dd848058795"
+      "sha256": "bb2aed5c935e2e2efe4d7b9a40bedf88bef4f95a505b39c9a3bc7dd848058795",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "cc17ea07b41e4b8c928cbee96a18da85750515e4aaa44ee9acc2cc6c9f533564"
+      }
     },
     {
       "path": "scripts/test.cjs",
-      "sha256": "bd55e26be8c0f54743a5a1ef98f1ed82b8ff3a96aef31cb8108e35b4e56a4e63"
+      "sha256": "bd55e26be8c0f54743a5a1ef98f1ed82b8ff3a96aef31cb8108e35b4e56a4e63",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "c003f8650bca947016fa5ad47036fa62c65d045a0f0e8a9a3875eb05ba6a27a6"
+      }
     },
     {
       "path": "scripts/package-resources.cjs",
-      "sha256": "633fa726c0074262dca6f4240dd22339c8524faf57e41353c547366d8c217e87"
+      "sha256": "633fa726c0074262dca6f4240dd22339c8524faf57e41353c547366d8c217e87",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "633fa726c0074262dca6f4240dd22339c8524faf57e41353c547366d8c217e87"
+      }
     },
     {
       "path": "scripts/verify-package.cjs",
-      "sha256": "d49b67e82dcd194f9b1d546da60faeac8e0b8edfded2787821be9e60b92f7d0f"
+      "sha256": "3e160bb5d5205db5fb50abac5ce4ac1398bd396a6784f8408d93f197bae34664",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "d49b67e82dcd194f9b1d546da60faeac8e0b8edfded2787821be9e60b92f7d0f"
+      }
     },
     {
       "path": "vite.config.mjs",
-      "sha256": "b7672af594c0441ff0307a16ebf7a9d7e648786deb5a03629326a11582ae1cee"
+      "sha256": "b7672af594c0441ff0307a16ebf7a9d7e648786deb5a03629326a11582ae1cee",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "b7672af594c0441ff0307a16ebf7a9d7e648786deb5a03629326a11582ae1cee"
+      }
     },
     {
       "path": "tsconfig.json",
-      "sha256": "6b90cec0b3630e50d938fbf1c463458f4675528b64f6c4096e4612f607459811"
+      "sha256": "6b90cec0b3630e50d938fbf1c463458f4675528b64f6c4096e4612f607459811",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "ba50f7955bc65e2b5aac53284337de5611abbc25bf5a443a25a45ad26a0ef82d"
+      }
     },
     {
       "path": "tsconfig.desktop.json",
-      "sha256": "2426226d9d6a61c5b0e667d2db3978e51b9a1e5be97964025096aa629b94ed7b"
+      "sha256": "2426226d9d6a61c5b0e667d2db3978e51b9a1e5be97964025096aa629b94ed7b",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "2426226d9d6a61c5b0e667d2db3978e51b9a1e5be97964025096aa629b94ed7b"
+      }
     },
     {
       "path": "docs/agents/project-profile.md",
-      "sha256": "16321d7cf7d641be4e07cf5f41144e698b30a8a346be12cb50589e568cba0c71"
+      "sha256": "40e1612beb6ddcf5537c3cb15985edcf3aa5e3f673446bdb0164e05cc116bc28",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "1e80720d89609674329e22ef0fef5a9cf63f3f8209e60fefde1769017fd711e7"
+      }
     },
     {
       "path": "docs/development.md",
-      "sha256": "f714c51ddaca09d9b104a4451a41df7d8ce64f91437bd970bb14bf6c2e5a42dd"
+      "sha256": "f714c51ddaca09d9b104a4451a41df7d8ce64f91437bd970bb14bf6c2e5a42dd",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "d2933d2c49b34a51634883e40b665609a7aac07b35333132d181a461f6267bb0"
+      }
     },
     {
       "path": "AGENTS.md",
-      "sha256": "06156fbd734e11fc97ea3605960b1a408ef3d3329d977994e49489627e625f36"
+      "sha256": "06156fbd734e11fc97ea3605960b1a408ef3d3329d977994e49489627e625f36",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "2fe2d75200a6b68570ac8dddc1a4add26b7a9835a2a7d7ed88649578a39d56ee"
+      }
     },
     {
       "path": ".gitignore",
-      "sha256": "6d8f706477612631e4570736186b2679be74230d16577d6b1ef8f8ac28d5b8a7"
+      "sha256": "6d8f706477612631e4570736186b2679be74230d16577d6b1ef8f8ac28d5b8a7",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "59191e786b2cc34b608a141ad5a96a9c8061366bf4adae3ef54ff0b89bf6a6f7"
+      }
     },
     {
       "path": "src/desktop/ipc.cjs",
-      "sha256": "658cf5d5ba6fb96268758842bd0d09a487f5d4c17e58ef99742635948f3c55b0"
+      "sha256": "658cf5d5ba6fb96268758842bd0d09a487f5d4c17e58ef99742635948f3c55b0",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "b8946806e31ab07bce42c037a91eaf32952cdb1fe0f8ae2a9ffe0957a3cfff62"
+      }
     },
     {
       "path": "src/desktop/main.cjs",
-      "sha256": "577ebcafc44fefb592b2546f4c50faabad76d615563ab862082f2d2edc9045d9"
+      "sha256": "577ebcafc44fefb592b2546f4c50faabad76d615563ab862082f2d2edc9045d9",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "2ff3269868c3312e39e286cc984e711b24300a2cdd4cfb1915cda20c14069d08"
+      }
     },
     {
       "path": "src/server/publicationWorkerClient.js",
-      "sha256": "0f11225a4d7b9086b9c0b24963e51a2ce1724894249308b25651cfc1963284e6"
+      "sha256": "0f11225a4d7b9086b9c0b24963e51a2ce1724894249308b25651cfc1963284e6",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "34e914ef50a4aaa741cd25891ee209f929b9671f856124c279ab599f96820e7b"
+      }
     },
     {
       "path": "scripts/test-desktop.cjs",
-      "sha256": "ff8a556e58d69e0f93d14c317cf1d368a1be21c3b618da10d473a4ad246ac1b4"
+      "sha256": "ff8a556e58d69e0f93d14c317cf1d368a1be21c3b618da10d473a4ad246ac1b4",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "9ff1d195d599848d5b93968df94a358cf3e2324e3f25b3cb3ea10991758a0df5"
+      }
     },
     {
       "path": "tests/desktop/packaged-epub.cjs",
-      "sha256": "91a7abe0922c1f1a1ce2c4eb0e8f57571168b43fae8b073945060d887d05e6fd"
+      "sha256": "ca52a78d9434e5746ab207026bbc77cca2507302e492967675f54599c70a257f",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "91a7abe0922c1f1a1ce2c4eb0e8f57571168b43fae8b073945060d887d05e6fd"
+      }
     }
-  ]
+  ],
+  "validationCoverage": {
+    "source": {
+      "command": "npm test",
+      "covers": [
+        "strict-types",
+        "build:modules",
+        "vite-build",
+        "server-syntax",
+        "unit",
+        "regression",
+        "migration-16"
+      ],
+      "source": "scripts/test.cjs"
+    },
+    "desktop": {
+      "command": "node scripts/test-desktop.cjs",
+      "prerequisite": "current npm test build outputs",
+      "covers": [
+        "reading-workflow",
+        "lifecycle-empty",
+        "lifecycle-save-guard"
+      ],
+      "source": "scripts/test-desktop.cjs"
+    },
+    "package": {
+      "command": "npm run dist:win",
+      "covers": [
+        "production-build",
+        "package-resources",
+        "nsis-x64",
+        "verify:package"
+      ],
+      "source": "package.json#scripts.dist:win"
+    },
+    "packagedRuntime": {
+      "command": "node tests/desktop/packaged-epub.cjs",
+      "covers": [
+        "isolated-boot",
+        "epub-workers-resources",
+        "reload",
+        "close-flush",
+        "restart",
+        "normal-exits"
+      ],
+      "source": "tests/desktop/packaged-epub.cjs"
+    }
+  }
 }

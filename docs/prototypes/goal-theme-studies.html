@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Goal · 三种形状</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f6f4ed;
+      --ink: #222828;
+      --muted: #505d56;
+      --rule: #d3d5ca;
+      font: 15px/1.55 system-ui, "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1320px; padding: clamp(18px, 5vw, 64px); margin: auto; }
+    h1 { margin: 0 0 24px; font-size: clamp(26px, 4vw, 45px); letter-spacing: -.04em; font-weight: 650; }
+    h2, p, blockquote { margin: 0; }
+    .studies { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+    .study { display: grid; align-content: start; min-width: 0; border-top: 1px solid var(--rule); }
+    .study > h2 { margin: 12px 0 2px; font-size: 18px; font-weight: 620; }
+    .stage { position: relative; width: min(100%, 330px); aspect-ratio: 1; margin: 5px auto; }
+    .reading {
+      min-height: 94px;
+      border-top: 1px solid var(--rule);
+      padding-top: 12px;
+    }
+    .reading p { font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+    .reading blockquote { font: 17px/1.6 "Songti SC", SimSun, serif; }
+    button { color: inherit; font: inherit; cursor: pointer; }
+    button:focus-visible { outline: 2px solid #263872; outline-offset: 4px; }
+
+    .dial { position: absolute; inset: 6%; }
+    .dial-goal {
+      position: absolute;
+      z-index: 1;
+      inset: 30%;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      font-size: clamp(16px, 1.6vw, 20px);
+      font-weight: 650;
+      pointer-events: none;
+    }
+    .arc {
+      position: absolute;
+      inset: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      clip-path: var(--sector);
+    }
+    .arc::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(from var(--angle), var(--color) 0 110deg, transparent 110deg);
+      mask: radial-gradient(farthest-side, transparent 69%, #000 70%);
+    }
+    .arc[aria-pressed="true"]::before { background: conic-gradient(from var(--angle), var(--active) 0 110deg, transparent 110deg); }
+    .arc span {
+      position: absolute;
+      left: var(--x);
+      top: var(--y);
+      transform: translate(-50%, -50%);
+      padding: 3px 5px;
+      color: #263330;
+      font-size: 13px;
+      font-weight: 650;
+      white-space: nowrap;
+      border-radius: 10px;
+    }
+    .arc[aria-pressed="true"] span { color: #fff; }
+    .arc:focus-visible span { outline: 2px solid currentColor; outline-offset: 2px; }
+    .own { --angle: 305deg; --sector: polygon(50% 50%, 0 19%, 0 0, 100% 0, 100% 19%); --color: #c5d8cd; --active: #386856; --x: 50%; --y: 8%; }
+    .books { --angle: 65deg; --sector: polygon(50% 50%, 100% 22%, 100% 100%, 52% 100%); --color: #ced5ec; --active: #45588d; --x: 86%; --y: 72%; }
+    .response { --angle: 185deg; --sector: polygon(50% 50%, 48% 100%, 0 100%, 0 22%); --color: #e3d4e9; --active: #6e4d7f; --x: 14%; --y: 72%; }
+
+    .fan .page {
+      position: absolute;
+      left: 30%;
+      top: 13%;
+      width: 40%;
+      height: 71%;
+      transform-origin: 50% 92%;
+      transform: translateX(var(--offset)) rotate(var(--closed));
+      border: 1px solid #a89576;
+      border-radius: 4px 13px 5px 4px;
+      background: var(--sheet);
+      box-shadow: 0 5px 12px #453d211a;
+      padding: 12px 9px 22px;
+      text-align: center;
+      writing-mode: vertical-rl;
+      font: 18px/1.35 "Songti SC", SimSun, serif;
+    }
+    .fan .page[aria-pressed="true"] {
+      z-index: 1;
+      transform: translateX(var(--offset)) rotate(var(--open)) translateY(-6%);
+      border-color: #695435;
+      font-weight: bold;
+    }
+    .fan .first { --offset: -22%; --closed: -28deg; --open: -17deg; --sheet: #ede1c8; }
+    .fan .second { --offset: 22%; --closed: 28deg; --open: 17deg; --sheet: #d5e1d4; }
+    .fan .pivot {
+      z-index: 2;
+      position: absolute;
+      left: 50%;
+      bottom: 12%;
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: 100%;
+      padding: 4px 12px;
+      border: 1px solid #a89576;
+      border-radius: 50px;
+      background: var(--paper);
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .lens .circle {
+      position: absolute;
+      top: 21%;
+      width: 66%;
+      aspect-ratio: 1;
+      border: 1px solid var(--rim);
+      border-radius: 50%;
+      background: var(--tint);
+      mix-blend-mode: multiply;
+      pointer-events: none;
+    }
+    .lens .left { left: 1%; --tint: #e7d9e9; --rim: #8d6c98; }
+    .lens .right { right: 1%; --tint: #d3e5dc; --rim: #508272; }
+    .lens button {
+      position: absolute;
+      top: 54%;
+      transform: translate(-50%, -50%);
+      width: max-content;
+      max-width: 28%;
+      min-height: 44px;
+      padding: 4px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      text-align: center;
+      line-height: 1.35;
+      font-size: 13px;
+      font-weight: 620;
+    }
+    .lens button[aria-pressed="true"] { background: #f7f4eb; border-color: #695872; }
+    .lens .left-label { left: 18%; }
+    .lens .shared-label { left: 50%; }
+    .lens .right-label { left: 82%; }
+
+    @media (max-width: 840px) { .studies { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) {
+      .studies { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+      .reading { min-height: 0; padding-bottom: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Goal · 三种形状</h1>
+    <div class="studies">
+      <section class="study" aria-labelledby="ring-heading">
+        <h2 id="ring-heading">圆环</h2>
+        <div class="stage">
+          <div class="dial" role="group" aria-label="按关系查看内容">
+            <p class="dial-goal">他为什么<br>说谎？</p>
+            <button type="button" class="arc own" data-choice="own" aria-pressed="false"><span>自写</span></button>
+            <button type="button" class="arc books" data-choice="books" aria-pressed="false"><span>原文</span></button>
+            <button type="button" class="arc response" data-choice="response" aria-pressed="true"><span>回应</span></button>
+          </div>
+        </div>
+        <div class="reading" aria-live="polite">
+          <p>回应 · 《无灯的走廊》</p>
+          <blockquote>“我没事。”他把缠着纱布的手藏进口袋。</blockquote>
+        </div>
+      </section>
+
+      <section class="study" aria-labelledby="fan-heading">
+        <h2 id="fan-heading">折扇</h2>
+        <div class="stage fan" role="group" aria-label="按书籍查看摘录">
+          <button type="button" class="page first" data-choice="hall" aria-pressed="true">《无灯的走廊》</button>
+          <button type="button" class="page second" data-choice="winter" aria-pressed="false">《冬天的信》</button>
+          <p class="pivot">他为什么说谎？</p>
+        </div>
+        <div class="reading" aria-live="polite">
+          <p>《无灯的走廊》</p>
+          <blockquote>“我没事。”他把缠着纱布的手藏进口袋。</blockquote>
+        </div>
+      </section>
+
+      <section class="study" aria-labelledby="lens-heading">
+        <h2 id="lens-heading">重叠圆</h2>
+        <div class="stage lens" role="group" aria-label="查看各个 Goal 及共有摘录">
+          <div class="circle left" aria-hidden="true"></div>
+          <div class="circle right" aria-hidden="true"></div>
+          <button type="button" class="left-label" data-choice="lie" aria-pressed="false">他为什么<br>说谎？</button>
+          <button type="button" class="shared-label" data-choice="shared" aria-pressed="true">共有<br>摘录</button>
+          <button type="button" class="right-label" data-choice="silence" aria-pressed="false">父亲为何<br>沉默？</button>
+        </div>
+        <div class="reading" aria-live="polite">
+          <p>左：回应　·　右：摘录</p>
+          <blockquote>“我没事。”他把缠着纱布的手藏进口袋。</blockquote>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const hallQuote = "“我没事。”他把缠着纱布的手藏进口袋。";
+    const winterQuote = "信写了三页，寄出的只有一句“都好”。";
+    const passages = {
+      own: ["自写", "他想藏起来的也许是伤口，也许是父亲的担心。"],
+      books: ["原文 · 《冬天的信》", winterQuote],
+      response: ["回应 · 《无灯的走廊》", hallQuote],
+      hall: ["《无灯的走廊》", hallQuote],
+      winter: ["《冬天的信》", winterQuote],
+      lie: ["《冬天的信》", winterQuote],
+      shared: ["左：回应　·　右：摘录", hallQuote],
+      silence: ["《无灯的走廊》", "父亲看了一眼纱布，把剥好的橘子推给他。"]
+    };
+
+    for (const study of document.querySelectorAll(".study")) {
+      const buttons = study.querySelectorAll("[data-choice]");
+      const source = study.querySelector(".reading p");
+      const quote = study.querySelector(".reading blockquote");
+      for (const button of buttons) {
+        button.addEventListener("click", () => {
+          for (const peer of buttons) peer.setAttribute("aria-pressed", String(peer === button));
+          const [sourceText, quoteText] = passages[button.dataset.choice];
+          source.textContent = sourceText;
+          quote.textContent = quoteText;
+        });
+      }
+    }
+  </script>
+</body>
+</html>

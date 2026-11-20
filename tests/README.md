@@ -2,7 +2,7 @@
 
 2026-10-28：双页已移除，现行布局检查覆盖旧双页偏好转单页、单页／滚动切换、窗口重排、逐页边界和右侧笔记。下列早期双页验收为历史记录。
 
-`npm test` 依次运行语法检查、6 个单元测试脚本和 `regression/` 中的全部脚本。回归脚本自动发现，每个脚本失败必须以非零状态退出；不使用跳过项掩盖环境或产品错误。需要 Node.js >= 24.15.0。
+`npm test` 依次运行语法、单元和回归检查。测试脚本自动发现，每个脚本失败必须以非零状态退出；不使用跳过项掩盖环境或产品错误。需要 Node.js >= 24.15.0。
 
 SQLite 集成测试使用 `helpers/sqlite.js` 创建临时目录、真实 HTTP API 和真实 SQLite 文件，结束后仅清理自己的临时目录。不会连接日常运行的书库。`sqlite_child.cjs` 用于真实 Node.js 正常退出和强制终止测试。
 
@@ -10,7 +10,7 @@ SQLite 集成测试使用 `helpers/sqlite.js` 创建临时目录、真实 HTTP A
 
 | 分类 | 测试 | 处理与覆盖 |
 | --- | --- | --- |
-| 保留 | SQLite API、迁移、恢复、进程重启、备份恢复、Markdown 摘要、单章 Markdown、整书及所选章节文件夹导出 | 调用实际模块/API，比较完整对象和磁盘数据 |
+| 保留 | SQLite API、进程重启、备份恢复、Markdown 摘要、单章 Markdown、整书及所选章节文件夹导出 | 调用实际模块/API，比较完整对象和磁盘数据 |
 | 保留 | `test_inline_notes.js`、`test_visible_notes.js`、`test_mini_tooltip_interaction.js`、`test_immersive_notes.js` | DOM 事件、原位编辑、合成 IME 事件、焦点与光标、可见范围、独立删除、页边定位 |
 | 改造 | `test_unified_note_editing.js` | 替换源码搜索和自写模拟：创建、输入中自动保存、服务重启后重开、编辑和删除，均经过实际控制器与 SQLite |
 | 改造 | `test_selection_fix_verification.js` | 实际左右页 mouseup/touchend 与 click 冒泡，不再要求门面内存在空监听器 |
@@ -35,7 +35,7 @@ DOM 测试通过 jsdom 执行真实产品事件和模块，只为不可用的几
 
 `npm run test:desktop:native` 是单独的交互验收，不能在无人桌面上自动通过。它不注入对话框替身，依次要求用真实系统对话框选择项目 `test.epub`、`literata.woff2`，将 Markdown 保存到终端打印的隔离输出目录，然后取消 ZIP 保存；完成后检查实际文件、SQLite 完整性和 UI 反馈，生成 `.commandcode/desktop-native/run-*/results.json` 与截图。失败或十分钟超时返回非零，不得改为跳过通过。本次已通过实际 Windows 操作完成该检查。
 
-上述桌面文件测试使用本地源码和未打包 Electron；不能单独证明安装包验收通过。旧数据库桌面迁移已按用户要求移出范围，原浏览器测试保留。文件操作边界见 [阶段 4 记录](../docs/archive/plans-and-implementation/electron-desktop-stage4.md)。
+上述桌面文件测试使用本地源码和未打包 Electron。文件操作边界见 [阶段 4 记录](../docs/archive/plans-and-implementation/electron-desktop-stage4.md)。
 
 阶段 5 增加 `npm run dist:win` / `npm run verify:package`：检查实际 app.asar 的 16 项必需资源、生产依赖、许可证、安全 fuses 和私有数据/测试/HTTP Server 排除，生成 SHA256 与 package-verification.json。安装验收使用 `npm run test:install`，它构建 1.0.0 候选包及仅供本地测试的 1.0.1 包，调用真实 NSIS 执行当前用户安装、升级、卸载、重装。脚本按稳定安装 GUID 检查 HKCU/HKLM；发现已有 AuraReader 安装就停止，不覆盖用户安装。递归卸载前核对注册路径精确属于本轮 `.commandcode/install-tests/run-*/AuraReader`，保留隔离 profile。
 
@@ -53,7 +53,13 @@ DOM 测试通过 jsdom 执行真实产品事件和模块，只为不可用的几
 
 源码静态检查只用于明确的资源/结构约束（例如无独立笔记弹窗、红色 caret CSS、入口 DOM 引用），不要用函数名、源码片段或测试自写的算法代替行为验证。
 
-## SQLite 收尾与侧栏清理验证记录（2026-10-19）
+## 现行 SQLite 访问检查
+
+- 浏览器验证覆盖仅凭本地会话读取书库、旧迁移路由下线、带旧来源标识的请求直接读取书库，以及客户端启动时不访问 IndexedDB。
+- `npm run test:desktop -- browser-storage.cjs` 在隔离的 Chromium 中打开和刷新网页，验证旧 IndexedDB 有同 ID 书籍时仍显示 SQLite 正文。请求结果记录在本次运行目录的 `browser-storage.json`。
+- 桌面验证覆盖显式建库、在线备份重开及已建桌面库的旧标记兼容。
+
+## SQLite 收尾与侧栏清理历史验证记录（2026-10-19）
 
 - 迁移收尾沿用上一阶段独立浏览器测试：旧书库、待写恢复、待删除生效、重载持久化；原 IndexedDB 记录仍保留。后续迁移修复由真实 SQLite 迁移/恢复测试覆盖，日常 Repository 不再调用 IndexedDB。
 - 补验真实 Node.js 正常退出和强制终止后重启：完整书籍字段、大章节 HTML、已确认笔记均保留。恢复演练包含在线备份、拒绝缺失数据库的静默重建、从已验证备份恢复及从迁移快照重建。

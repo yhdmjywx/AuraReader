@@ -88,9 +88,18 @@ function registerFileIpc(window, files) {
             return { ok: true, value: { fullscreen: window.isFullScreen() } };
         } catch (error) { return failure(error, "Could not toggle window fullscreen."); }
     });
+    ipcMain.handle('aura:window:controls-tone', (event, tone) => {
+        try {
+            assertSender(event, window);
+            if (tone !== 'light' && tone !== 'dark') throw new StorageError('Invalid window controls tone.');
+            if (process.platform === 'win32') window.setTitleBarOverlay({ symbolColor: tone === 'light' ? '#d1d5db' : '#767680' });
+            return { ok: true, value: undefined };
+        } catch (error) { return failure(error, 'Could not update window controls.'); }
+    });
     return () => {
         actions.forEach(action => ipcMain.removeHandler('aura:files:' + action));
         ipcMain.removeHandler('aura:window:fullscreen');
+        ipcMain.removeHandler('aura:window:controls-tone');
     };
 }
 

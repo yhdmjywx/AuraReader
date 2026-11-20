@@ -71,6 +71,7 @@ Other shadcn styles and previously explored libraries remain historical referenc
 
 ## Component Principles
 
+- Give each action one visible control within the same interaction context.
 - Use appropriate primary, secondary, ghost, and destructive variants. Ghost
   actions have no persistent background and use neutral hover feedback.
 - Preserve distinct selected, checked, active, focus, disabled, editing, loading,
@@ -97,8 +98,8 @@ Other shadcn styles and previously explored libraries remain historical referenc
   commands, IDs, values, and placement except where explicitly approved below.
 - Keep one pagination instance inside the existing book-actions toolbar, between
   the book title and right-side actions. No extra row/bar or bottom duplicate.
-- On hover-capable devices, show the toolbar when the pointer enters its top area
-  and hide it on leave. Reserve its space so reading content never shifts; retain
+- In the original Book Toolbar design, show the toolbar on pointer entry on
+  hover-capable devices and hide it on leave. Reserve its space so reading content never shifts; retain
   access during keyboard focus, while a toolbar panel is open, and without hover.
   The white-Paper reference keeps its white at-rest workspace surface. For
   Sepia/Dark Paper, the reserved region behind a hidden toolbar follows Paper;
@@ -108,6 +109,25 @@ Other shadcn styles and previously explored libraries remain historical referenc
 - The book title is single-line with ellipsis, at most 18ch wide and shrinkable.
   Preserve the full text and hover title; 18ch is a display width, not a data limit.
   Preserve the contents trigger and adjacent actions.
+- The compact toolbar stays visible above the reading column. Its Contents
+  icon and label form the single control that opens and closes the chapter list.
+  Highlight the open state. Place the popover immediately below Contents and
+  align its outer left edge with the compact toolbar's outer left edge. The
+  list starts with chapter rows and overlays the reading area as needed while
+  preserving its line width and pagination.
+  See [Compact toolbar and Contents popover requirements](../product/reading-toolbar/feature-spec.md).
+- In the immersive reading layout, center the book title and pagination above
+  the reading area. Place Contents, Local Library, and Reading Settings
+  in a vertical group at the midpoint of the reading area's right edge. Both
+  groups blend into the paper. Tool icons are gray at rest. The button with an
+  open popover uses the accent color and a lightly tinted background. The three
+  popovers open to the left of the tool group at a shared width of 210px (75%
+  of the previous width). Their vertical centers align with the tool group's
+  vertical center. Popovers fit their contents up to 360px, with at least 8px
+  clearance at the top and bottom of the reading area. Long contents scroll
+  inside the popover. During reading, the application Settings panel groups
+  Notes summary and Chapters under the collapsed Export book disclosure.
+  See [Immersive reading toolbar and right-side tools](design-index.md#immersive-reading-toolbar-and-right-side-tools).
 - Local Library shows book titles and remove actions without structure metadata,
   row separators, or the bottom service/backup hint. Keep search, import,
   sample-book access, removal confirmation, and errors. Shorter lists fit contents

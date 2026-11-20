@@ -115,3 +115,14 @@ HTML 保留三个候选的比较过程，没有新增、编辑或导航交互。
 - 正文覆盖保留、完整原型路径、左右间距、字体、遮挡及截图均待最终检查。原型不验证浏览器焦点、自动碰撞避让、系统减少动态效果或持久化。
 
 本地续作记录：`.local-materials/response-ux-state.json`、`response-ux-baseline.json`、`response-ux-review-build.js`。未改应用代码，未运行应用构建、浏览器或桌面功能测试。
+
+## Response UX 续作进度（2026-11-11）
+
+本轮 MCP 批量写入被 Starter 额度限制拒绝，随后通过 Figma 中的 Scripter 插件继续处理。
+
+- 已读取并确认六个 Goal Content Item 变体的保存反馈实例均连接 `Save feedback#313:12` 与 `Show save feedback#313:15`。
+- 已确认 Default／Hover 关闭态菜单透明度均为 0，Menu 展开态透明度为 1。缩放修正已在脚本中执行，仍需结合最终画面检查过渡。
+- 新的 [Response UX review · 325:2747](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=325-2747) 当前为部分生成稿，只有 Text 上下文。完整组合脚本已修正为从 Panel 的 Items 插槽创建条目，尚待执行和验收。
+- 重试、关闭和 Saving 到 Saved 的原型连接已提交到插件脚本，完整原型走查、三类内容与九种状态的组合及截图检查仍待完成。
+
+浏览器自动化无法稳定触发插件内的运行操作，已请求用户点击 Scripter 中 `Untitled 1` 的 Run 后继续检查。此时不能将该审阅稿标记为完成。本地脚本与进度保存在 `.local-materials/response-ux-complete-native.js` 和 `response-ux-state.json`。

@@ -24,7 +24,7 @@
 | Dark Paper / Toolbar hidden | [388:1325](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=388-1325) | `388:1329`，复用 Rest |
 | Dark Paper / Toolbar visible | [388:1454](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=388-1454) | `388:1458`，复用 Visible |
 
-复制来源为原 [Reading Interface](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-129) 与 [At rest](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-278)，原稿不变。原有组件实例链接保留。
+当时的复制来源为 [Reading Interface](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-129) 与 [At rest](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-278)。四张对照画板及其原有组件实例链接现保留在 [Reading Interface / Archive](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=424-1893)。原主画板已迁移为 [沉浸式阅读默认态](design-index.md#immersive-reading-toolbar-and-right-side-tools)。
 
 颜色采用当前 Paper 渲染值：米色背景 `#fbf0d9`、正文 `#433422`；深色背景 `#121827`、正文 `#d1d5db`。新增四个限定于新画板使用的颜色变量：`reading-paper/sepia/background`、`reading-paper/sepia/text`、`reading-paper/dark/background`、`reading-paper/dark/text`。变量分别限制背景／形状填充或文字填充用途，未改变现有 `bg-paper`、`bg-paper-text` 等变量的值或模式。
 

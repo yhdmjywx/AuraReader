@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Goal 分支样稿</title>
+<style>
+  body {
+    margin: 0;
+    background: light-dark(#edf1f3, #11191f);
+    color-scheme: light dark;
+  }
+  #goal-branch-preview {
+    max-width: 760px;
+    margin: clamp(12px, 6vh, 56px) auto;
+  }
+  #goal-branch-preview button { cursor: pointer; }
+  #goal-branch-preview {
+    color-scheme: light dark;
+    --ink: light-dark(#1e2a32, #e6edf6);
+    --surface: light-dark(#f8fafb, #182129);
+    --rule: light-dark(#b0bfca, #53697b);
+    --blue: light-dark(#175a84, #a0d8ff);
+    --blue-soft: light-dark(#e6f2f9, #223b4c);
+    padding: clamp(6px, 2vw, 18px);
+  }
+  #goal-branch-preview .goal-workspace {
+    padding: clamp(14px, 4vw, 30px);
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    font: 15px/1.55 system-ui, sans-serif;
+  }
+  #goal-branch-preview [hidden] { display: none !important; }
+  #goal-branch-preview :is(h1,h2) { margin: 0; font-size: clamp(21px, 4vw, 30px); }
+  #goal-branch-preview p { margin: 0; }
+  #goal-branch-preview .goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 8px 16px;
+    flex-wrap: wrap;
+  }
+  #goal-branch-preview button { color: var(--blue); font: inherit; }
+  #goal-branch-preview .action,
+  #goal-branch-preview .node {
+    min-height: 44px;
+    padding: 8px 11px;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--surface);
+  }
+  #goal-branch-preview button:hover { background: var(--blue-soft); }
+  #goal-branch-preview .text-action {
+    min-height: 44px;
+    padding: 4px;
+    border: 0;
+    background: transparent;
+  }
+  #goal-branch-preview .materials,
+  #goal-branch-preview .branch-map {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+  }
+  #goal-branch-preview .quote {
+    margin: 14px 0 0;
+    padding-left: 13px;
+    border-left: 2px solid var(--rule);
+  }
+  #goal-branch-preview .quote blockquote { margin: 0; }
+  #goal-branch-preview .branches {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0;
+    padding: 24px 0 0;
+    list-style: none;
+  }
+  #goal-branch-preview .branches::before,
+  #goal-branch-preview .branches::after,
+  #goal-branch-preview .branches li::before {
+    content: "";
+    position: absolute;
+    background: var(--rule);
+  }
+  #goal-branch-preview .branches::before { top: 0; left: 50%; width: 1px; height: 12px; }
+  #goal-branch-preview .branches::after { top: 11px; inset-inline: calc(25% - 3px); height: 1px; }
+  #goal-branch-preview .branches li { position: relative; min-width: 0; }
+  #goal-branch-preview .branches li::before { top: -12px; left: 50%; width: 1px; height: 12px; }
+  #goal-branch-preview .node {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    text-align: left;
+    color: var(--ink);
+  }
+  #goal-branch-preview .node[aria-expanded=true] {
+    background: var(--blue-soft);
+    border-color: var(--blue);
+  }
+  #goal-branch-preview .indicator { color: var(--blue); font-size: 18px; }
+  #goal-branch-preview .branch-material { margin-top: 11px; padding-left: 11px; border-left: 2px solid var(--rule); }
+  #goal-branch-preview .branch-actions { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 8px; }
+  #goal-branch-preview .source-page h2 { margin: 6px 0 18px; }
+  #goal-branch-preview .source-page p + p { margin-top: 10px; }
+  #goal-branch-preview mark { color: var(--ink); background: var(--blue-soft); }
+  @media (max-width: 430px) {
+    #goal-branch-preview .branches { grid-template-columns: minmax(0, 1fr); padding: 12px 0 0 24px; gap: 10px; }
+    #goal-branch-preview .branches::before { left: 11px; height: calc(100% - 22px); }
+    #goal-branch-preview .branches::after { display: none; }
+    #goal-branch-preview .branches li::before { top: 22px; left: -13px; width: 13px; height: 1px; }
+    #goal-branch-preview .branches li:last-child::after {
+      content: ""; position: absolute; left: -13px; top: 23px; bottom: 0; width: 1px; background: var(--surface);
+    }
+  }
+</style>
+</head>
+<body>
+<div id="goal-branch-preview">
+  <section class="goal-workspace" aria-label="Goal 工作区样稿">
+    <div data-workspace>
+      <button type="button" class="text-action" data-back hidden>← 读懂这对父子</button>
+      <header class="goal-header">
+        <div>
+          <h1 data-title>读懂这对父子</h1>
+        </div>
+        <button type="button" class="action" data-branches aria-controls="goal-preview-map" aria-expanded="false">展开分支</button>
+      </header>
+      <div class="materials">
+        <p data-note>谁会先开口？</p>
+        <figure class="quote">
+          <blockquote data-quote>他们隔着一张小方桌，慢慢吃完了那顿饭。</blockquote>
+          <figcaption><button type="button" class="text-action" data-source="current">第一章 · 原文 ↗</button></figcaption>
+        </figure>
+      </div>
+      <section id="goal-preview-map" class="branch-map" aria-label="读懂这对父子的两个子 Goal" hidden>
+        <ul class="branches">
+          <li>
+            <button type="button" class="node" data-node="son" aria-controls="goal-preview-son" aria-expanded="false">儿子为什么说谎？<span class="indicator" aria-hidden="true">+</span></button>
+            <div class="branch-material" id="goal-preview-son" hidden>
+              <p>“我没事。”他把缠着纱布的手藏进口袋。</p>
+              <div class="branch-actions">
+                <button type="button" class="action" data-enter="son">进入 <span aria-hidden="true">→</span></button>
+                <button type="button" class="text-action" data-source="son">原文 <span aria-hidden="true">↗</span></button>
+              </div>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="node" data-node="father" aria-controls="goal-preview-father" aria-expanded="false">父亲何时选择沉默？<span class="indicator" aria-hidden="true">+</span></button>
+            <div class="branch-material" id="goal-preview-father" hidden>
+              <p>父亲看了一眼那圈纱布，把剥好的橘子推到他面前。</p>
+              <div class="branch-actions">
+                <button type="button" class="action" data-enter="father">进入 <span aria-hidden="true">→</span></button>
+                <button type="button" class="text-action" data-source="father">原文 <span aria-hidden="true">↗</span></button>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+    </div>
+    <section class="source-page" data-reader aria-label="原文" hidden>
+      <button type="button" class="text-action" data-reader-back>← 返回</button>
+      <h2 data-chapter></h2>
+      <p data-before></p>
+      <p><mark data-passage></mark></p>
+      <p data-after></p>
+    </section>
+  </section>
+</div>
+
+<script>
+(() => {
+  const root = document.getElementById("goal-branch-preview");
+  const workspace = root.querySelector("[data-workspace]");
+  const reader = root.querySelector("[data-reader]");
+  const map = root.querySelector(".branch-map");
+  const branchButton = root.querySelector("[data-branches]");
+  const back = root.querySelector("[data-back]");
+  const readerBack = root.querySelector("[data-reader-back]");
+  const nodes = [...root.querySelectorAll("[data-node]")];
+  const title = root.querySelector("[data-title]");
+  const note = root.querySelector("[data-note]");
+  const quote = root.querySelector("[data-quote]");
+  const source = root.querySelector('[data-source="current"]');
+  const goals = {
+    parent: {
+      title: title.textContent,
+      note: note.textContent,
+      quote: quote.textContent,
+      chapter: "第一章",
+      before: "厨房的钟走得慢了一拍。",
+      after: "父亲收走盘子，儿子还攥着筷子。"
+    },
+    son: {
+      title: nodes[0].firstChild.textContent,
+      note: "他开口说没事之前，先把手藏了起来。",
+      quote: root.querySelector("#goal-preview-son p").textContent,
+      chapter: "第三章",
+      before: "父亲听见门响，从厨房探出头来。",
+      after: "走廊里还亮着灯。"
+    },
+    father: {
+      title: nodes[1].firstChild.textContent,
+      note: "他看见了伤口，还是把追问咽了回去。",
+      quote: root.querySelector("#goal-preview-father p").textContent,
+      chapter: "第四章",
+      before: "儿子伸手去够桌上的水杯。",
+      after: "窗外的雨下得更急了。"
+    }
+  };
+  let current = "parent";
+  let mapOpen = false;
+  let readingFrom;
+  const previews = new Set();
+
+  function renderWorkspace() {
+    const goal = goals[current];
+    title.textContent = goal.title;
+    note.textContent = goal.note;
+    quote.textContent = goal.quote;
+    source.textContent = goal.chapter + " · 原文 ↗";
+    back.hidden = current === "parent";
+    branchButton.hidden = current !== "parent";
+    branchButton.setAttribute("aria-expanded", String(mapOpen));
+    branchButton.textContent = mapOpen ? "收起分支" : "展开分支";
+    map.hidden = current !== "parent" || !mapOpen;
+    for (const node of nodes) {
+      const expanded = previews.has(node.dataset.node);
+      node.setAttribute("aria-expanded", String(expanded));
+      node.querySelector(".indicator").textContent = expanded ? "−" : "+";
+      document.getElementById(node.getAttribute("aria-controls")).hidden = !expanded;
+    }
+  }
+
+  branchButton.addEventListener("click", () => {
+    mapOpen = !mapOpen;
+    renderWorkspace();
+  });
+  for (const node of nodes) {
+    node.addEventListener("click", () => {
+      const key = node.dataset.node;
+      if (previews.has(key)) previews.delete(key);
+      else previews.add(key);
+      renderWorkspace();
+    });
+  }
+  root.querySelectorAll("[data-enter]").forEach(button => button.addEventListener("click", () => {
+    current = button.dataset.enter;
+    renderWorkspace();
+    back.focus();
+  }));
+  back.addEventListener("click", () => {
+    const previous = current;
+    current = "parent";
+    renderWorkspace();
+    const node = nodes.find(candidate => candidate.dataset.node === previous);
+    (mapOpen ? node : branchButton).focus();
+  });
+  root.querySelectorAll("[data-source]").forEach(button => button.addEventListener("click", () => {
+    const key = button.dataset.source === "current" ? current : button.dataset.source;
+    const { chapter, before, quote, after } = goals[key];
+    reader.querySelector("[data-chapter]").textContent = chapter;
+    reader.querySelector("[data-before]").textContent = before;
+    reader.querySelector("[data-passage]").textContent = quote;
+    reader.querySelector("[data-after]").textContent = after;
+    readingFrom = button;
+    workspace.hidden = true;
+    reader.hidden = false;
+    readerBack.focus();
+  }));
+  readerBack.addEventListener("click", () => {
+    reader.hidden = true;
+    workspace.hidden = false;
+    readingFrom.focus();
+  });
+})();
+</script>
+</body>
+</html>

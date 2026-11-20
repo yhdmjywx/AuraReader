@@ -23,16 +23,14 @@ const { randomUUID } = require('node:crypto');
         token = (await (await fetch(base + 'session')).json()).token;
     }
     async function request(route, body) {
-        const response = await fetch(base + route, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'X-Aura-Source': 'restart', 'X-Aura-Token': token }, body: body ? JSON.stringify(body) : undefined });
+        const response = await fetch(base + route, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'X-Aura-Token': token }, body: body ? JSON.stringify(body) : undefined });
         const value = await response.json(); assert.equal(response.status, 200, JSON.stringify(value)); return value;
     }
     try {
         await start();
         const book = { id: 'restart', pages: ['<p>原文😀</p>', '<p>' + '章节正文'.repeat(150000) + '</p>'], extension: { unknown: [null, true] } };
         const note = { id: 'n', bookId: book.id, kind: 'note', quote: '原文😀', comment: '跨进程保留\n', location: { start: 0, end: 4 } };
-        const snapshot = { origin: '', indexedDB: { books: [book], notes: [note] }, caches: {}, pending: {}, builtins: { books: [], notes: [] } };
-        const saved = await request('migration/snapshot', snapshot);
-        await request('migration/commit', saved);
+        await request('restore', { opId: randomUUID(), books: [book], notes: [note] });
         const first = await request('notes/query', { bookIds: ['restart'] });
         const bookRow = (await request('books')).records[0];
         const gracefullyExited = once(child, 'exit');
@@ -46,7 +44,6 @@ const { randomUUID } = require('node:crypto');
         await start();
         assert.deepEqual((await request('books')).records[0].value, book);
         assert.equal((await request('notes/query', { bookIds: ['restart'] })).records[0].value.comment, '强制终止前已确认\n');
-        assert.equal((await request('migration/status')).completed, true);
         console.log('✅ SQLite 进程持久化：真实 Node.js 正常退出及强制终止／重启、大章节 HTML、完整字段及已确认笔记保留通过');
     } finally {
         if (child && child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill(); await exited; }

@@ -45,6 +45,11 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
     window = new BrowserWindow({
         title: 'AuraReader', width: 1440, height: 960, minWidth: 800, minHeight: 600,
         backgroundColor: '#f8fafc', show: false,
+        ...(process.platform === 'win32' ? {
+            titleBarStyle: 'hidden',
+            // Match the midpoint of the gutter and the 52px workbench slot.
+            titleBarOverlay: { height: 68, color: '#00000000', symbolColor: '#767680' }
+        } : {}),
         webPreferences: {
             preload: path.join(__dirname, 'preload.cjs'), session: desktopSession,
             nodeIntegration: false, nodeIntegrationInWorker: false, nodeIntegrationInSubFrames: false,
@@ -82,14 +87,6 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
     await window.loadURL(APP_URL);
     window.show();
     return window;
-}
-
-if (require.main === module) {
-    startDesktop().catch(error => {
-        console.error('Desktop startup failed:', error);
-        dialog.showErrorBox("AuraReader startup failed", error instanceof Error ? error.message : String(error));
-        app.exit(1);
-    });
 }
 
 module.exports = { startDesktop };

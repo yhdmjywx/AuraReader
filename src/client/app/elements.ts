@@ -61,7 +61,6 @@ export interface AppElements {
     fileInput?: HTMLInputElement | null;
     btnToc?: HTMLButtonElement | null;
     tocDrawer?: HTMLElement | null;
-    btnCloseToc?: HTMLButtonElement | null;
     tocList?: HTMLElement | null;
     selectionTooltip?: HTMLElement | null;
     btnAddNote?: HTMLButtonElement | null;

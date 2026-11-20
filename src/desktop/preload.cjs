@@ -35,7 +35,10 @@ if (process.isMainFrame) {
             system: () => ipcRenderer.invoke('aura:files:systemFonts', undefined),
             importFont: () => ipcRenderer.invoke('aura:files:importFont', undefined)
         },
-        window: { toggleFullscreen: () => ipcRenderer.invoke('aura:window:fullscreen') },
+        window: {
+            toggleFullscreen: () => ipcRenderer.invoke('aura:window:fullscreen'),
+            setControlsTone: tone => ipcRenderer.invoke('aura:window:controls-tone', tone)
+        },
         wiki: {
             read: input => ipcRenderer.invoke('aura:wiki:read', input),
             cancel: id => ipcRenderer.invoke('aura:wiki:cancel', id),

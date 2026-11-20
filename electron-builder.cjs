@@ -15,7 +15,7 @@ module.exports = {
         'src/server/dataStore.js', 'src/server/fontStore.js',
         'src/server/publicationResources.js', 'src/server/publicationWorkerClient.js', 'src/server/publicationWorker.cjs', 'src/shared/epubPaths.mjs',
         'src/server/wikiService.js', 'src/shared/wikiSites.js',
-        'src/server/goalLibrary.js', 'src/server/goalValidation.js', 'src/server/migration.js',
+        'src/server/goalLibrary.js', 'src/server/goalValidation.js',
         'src/server/storageMaintenance.js'
     ],
     extraFiles: [{ from: '.commandcode/package-resources/THIRD-PARTY-NOTICES.txt', to: 'THIRD-PARTY-NOTICES.txt' },

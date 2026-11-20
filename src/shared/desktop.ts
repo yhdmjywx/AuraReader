@@ -46,7 +46,10 @@ export interface DesktopBridge {
         system(): Promise<DesktopResult<{ supported: boolean; fonts: string[] }>>;
         importFont(): Promise<DesktopResult<{ canceled: true } | { canceled: false; font: DesktopFont }>>;
     };
-    readonly window: { toggleFullscreen(): Promise<DesktopResult<{ fullscreen: boolean }>> };
+    readonly window: {
+        toggleFullscreen(): Promise<DesktopResult<{ fullscreen: boolean }>>;
+        setControlsTone(tone: 'light' | 'dark'): Promise<DesktopResult<void>>;
+    };
     readonly wiki: {
         read(input: WikiRequest): Promise<DesktopResult<WikiResponse>>;
         cancel(id: string): Promise<DesktopResult<void>>;

@@ -54,11 +54,6 @@
 .goal-panel .goal-items-toggle .goal-items-icon { width: 16px; height: 16px; }
 .goal-panel .goal-items-toggle .goal-items-caret { width: 12px; height: 12px; }
 .goal-panel .goal-items-toggle[aria-expanded="true"] .goal-items-caret { transform: rotate(180deg); }
-#btn-appearance.vega-action { width: 40px; height: 40px; min-height: 40px; border-radius: 12px; }
-.reader-toolbar .vega-action { gap: 8px; }
-.reader-toolbar .header-actions { gap: 4px; }
-.reader-toolbar .book-nav-btn.vega-action { padding: 0 10px; border-radius: 12px; }
-.reader-toolbar .book-nav-caret { width: 16px; height: 16px; }
 .workspace-settings.vega-action { gap: 8px; }
 #appearance-panel .vega-action { min-height: 40px; border-radius: 12px; }
 #appearance-panel .appearance-stepper .vega-action,

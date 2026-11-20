@@ -1,6 +1,5 @@
 const { randomUUID } = require('node:crypto');
 const { StorageError } = require('./dataStore');
-const { createMigration } = require('./migration');
 
 const MAX_JSON_BYTES = 256 * 1024 * 1024;
 function localRequest(req) {
@@ -16,7 +15,7 @@ async function readJson(req) {
     let size = 0; const chunks = [];
     for await (const chunk of req) {
         size += chunk.length;
-        if (size > MAX_JSON_BYTES) throw new StorageError("Data exceeds the 256 MB request limit. Preserve original data and migrate in smaller batches.", 413);
+        if (size > MAX_JSON_BYTES) throw new StorageError("Data exceeds the 256 MB request limit.", 413);
         chunks.push(chunk);
     }
     try {
@@ -28,7 +27,6 @@ async function readJson(req) {
 }
 function createStorageApi(store) {
     const token = randomUUID();
-    const migration = createMigration(store);
     return async (req, res, url) => {
         const reply = (status, body) => {
             res.removeHeader('Access-Control-Allow-Origin');
@@ -39,12 +37,6 @@ function createStorageApi(store) {
             if (!localRequest(req)) throw new StorageError("Only the local reader may access the database.", 403);
             if (req.method === 'GET' && url.pathname === '/api/storage/session') return reply(200, { token });
             if (req.headers['x-aura-token'] !== token) throw new StorageError("Invalid database session.", 403);
-            const source = req.headers['x-aura-source'];
-            if (typeof source !== 'string' || !source || source.length > 200) throw new StorageError("Migration source is required.", 400);
-            if (req.method === 'GET' && url.pathname === '/api/storage/migration/status') return reply(200, migration.status(source));
-            if (req.method === 'POST' && url.pathname === '/api/storage/migration/snapshot') return reply(200, migration.snapshot(source, await readJson(req)));
-            if (req.method === 'POST' && url.pathname === '/api/storage/migration/commit') return reply(200, migration.commit(source, (await readJson(req)).snapshotId));
-            if (!migration.status(source).completed) throw new StorageError("Legacy data has not been migrated. Complete migration validation first.", 423);
             if (req.method === 'GET' && url.pathname === '/api/storage/books') return reply(200, { records: store.books() });
             if (req.method === 'GET' && url.pathname === '/api/storage/books/summary') return reply(200, { records: store.bookSummaries() });
             if (req.method === 'GET' && url.pathname === '/api/storage/goals/library') return reply(200, store.goalLibrary());

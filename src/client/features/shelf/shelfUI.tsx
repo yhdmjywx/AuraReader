@@ -44,8 +44,11 @@ export function renderShelf(props: ShelfProps) {
 }
 export function openShelf(elements: AppElements) {
     elements.shelfPanel?.classList.add('open'); elements.shelfPanel?.setAttribute('aria-hidden', 'false'); elements.btnShelf?.setAttribute('aria-expanded', 'true');
-    requestAnimationFrame(() => elements.shelfList?.querySelector<HTMLInputElement>('input')?.focus());
+    requestAnimationFrame(() => {
+        if (elements.shelfPanel?.classList.contains('open')) elements.shelfList?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
+    });
 }
 export function closeShelf(elements: AppElements) {
+    if (elements.shelfPanel?.contains(elements.shelfPanel.ownerDocument.activeElement)) elements.btnShelf?.focus({ preventScroll: true });
     elements.shelfPanel?.classList.remove('open'); elements.shelfPanel?.setAttribute('aria-hidden', 'true'); elements.btnShelf?.setAttribute('aria-expanded', 'false');
 }

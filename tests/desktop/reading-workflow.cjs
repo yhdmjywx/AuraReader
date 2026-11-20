@@ -35,6 +35,14 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
         await fs.writeFile(path.join(output, name + '-geometry.json'), JSON.stringify(geometry, null, 2));
     };
     await waitFor(`document.documentElement.dataset.desktopReady === 'setup'`);
+    if (process.platform === 'win32') {
+        assert.equal(await run(`(() => {
+            const overlay = navigator.windowControlsOverlay;
+            const drag = document.querySelector('.window-drag-region');
+            return overlay?.visible && overlay.getTitlebarAreaRect().right < innerWidth
+                && drag.getBoundingClientRect().height > 0 && getComputedStyle(drag).appRegion === 'drag';
+        })()`), true, 'Windows caption controls reserve native space and share the app top area');
+    }
     await capture('library-setup');
     await run(`document.getElementById('desktop-create-library').click()`);
     await waitFor(`document.documentElement.dataset.reactWorkbench === 'true'`);
@@ -81,7 +89,8 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     assert.equal(await run(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').lang`), 'en', 'reader keeps the source book language independently of UI copy');
     assert.equal(await run(`!!document.querySelector('#goal-panel select, #goal-panel .goal-collections, #react-reading-book select')`), false, 'reader omits redundant filters, collections and book picker');
     assert.equal(await run(`document.getElementById('btn-fullscreen') === null && document.getElementById('goal-expand') !== null`), true, 'EPUB fullscreen is removed and Goal expansion remains');
-    assert.equal(await run(`['btn-toc', 'btn-shelf', 'btn-appearance', 'btn-export-menu'].every(id => !!document.getElementById(id).closest('.reader-toolbar'))`), true, 'book actions belong to the reading surface');
+    assert.equal(await run(`JSON.stringify([...document.querySelectorAll('.reader-side-tools > button')].map(button => button.id))`), JSON.stringify(['btn-toc', 'btn-shelf', 'btn-appearance']), 'the right-side group contains the three reading tools');
+    assert.equal(await run(`document.getElementById('btn-export-menu').closest('#workspace-settings-panel') !== null && !document.getElementById('btn-export-menu').getClientRects().length`), true, 'book export is available inside Settings');
     for (const theme of ['light', 'dark']) {
         if (theme === 'dark') await run(`(async () => { const a = await import(${JSON.stringify(mainUrl)}); a.appShell.toggleAppTheme(); })()`);
         assert.equal(await run(`getComputedStyle(document.querySelector('.app-header')).backgroundColor === getComputedStyle(document.getElementById('goal-sidebar')).backgroundColor`), true, `${theme} header shares the Goal background`);
@@ -100,13 +109,40 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     assert.equal(await run(`(() => {
         const pagination = document.querySelector('.reader-pagination').getBoundingClientRect();
         const toolbar = document.querySelector('.reader-toolbar').getBoundingClientRect();
+        const slot = document.querySelector('.reader-toolbar-slot').getBoundingClientRect();
         const viewport = document.getElementById('reader-viewport').getBoundingClientRect();
-        const title = document.getElementById('btn-toc').getBoundingClientRect();
-        const actions = document.querySelector('.reader-toolbar .header-actions').getBoundingClientRect();
+        const title = document.getElementById('current-book-title').getBoundingClientRect();
+        const tools = document.querySelector('.reader-side-tools').getBoundingClientRect();
+        const workspace = document.getElementById('workspace-container').getBoundingClientRect();
         return document.querySelectorAll('.reader-pagination').length === 1 && document.querySelector('.reader-toolbar > .reader-pagination')
-            && Math.abs(toolbar.height - 52) < 1 && pagination.top >= toolbar.top && pagination.bottom <= toolbar.bottom
-            && Math.abs(viewport.top - toolbar.bottom) < 1 && title.right <= pagination.left + 1 && pagination.right <= actions.left + 1;
-    })()`), true, 'one pagination control shares the existing 52px toolbar with no extra row');
+            && Math.abs(toolbar.height - 36) < 1 && Math.abs(slot.height - 52) < 1 && toolbar.width < slot.width
+            && Math.abs(toolbar.left + toolbar.right - slot.left - slot.right) < 1
+            && pagination.top >= toolbar.top && pagination.bottom <= toolbar.bottom
+            && Math.abs(viewport.top - slot.bottom) < 1 && title.right <= pagination.left + 1
+            && getComputedStyle(document.querySelector('.reader-toolbar')).backgroundColor === 'rgba(0, 0, 0, 0)'
+            && Math.abs(tools.top + tools.bottom - workspace.top - workspace.bottom) < 1 && Math.abs(workspace.right - tools.right - 10) < 1;
+    })()`), true, 'the transparent header and tool group center on the reading workspace');
+    const readerBeforeToc = await run(`JSON.stringify([document.getElementById('reader-viewport').getBoundingClientRect(), document.querySelector('.page-indicator').textContent])`);
+    await run(`document.getElementById('btn-toc').click()`);
+    assert.equal(await run(`(() => {
+        const panel = document.getElementById('toc-drawer');
+        return !panel.hidden && panel.querySelector('.toc-row') && !panel.querySelector('#btn-close-toc,.toc-header');
+    })()`), true, 'the visible Contents panel starts with chapter rows');
+    for (const [button, panel] of [['btn-toc', 'toc-drawer'], ['btn-shelf', 'shelf-panel'], ['btn-appearance', 'appearance-panel']]) {
+        await run(`(() => { const trigger = document.getElementById('${button}'); if (trigger.getAttribute('aria-expanded') !== 'true') trigger.click(); })()`);
+        assert.equal(await run(`(() => {
+            const open = [...document.querySelectorAll('.reader-tool-panel.open')];
+            const expanded = [...document.querySelectorAll('.reader-side-tools > button[aria-expanded="true"]')];
+            const tools = document.querySelector('.reader-side-tools').getBoundingClientRect();
+            const panel = document.getElementById('${panel}').getBoundingClientRect();
+            return open.length === 1 && open[0].id === '${panel}' && expanded.length === 1 && expanded[0].id === '${button}'
+                && Math.abs(panel.width - 210) < 1 && panel.height <= 360 && Math.abs(tools.left - panel.right - 7) < 1
+                && Math.abs(panel.top + panel.bottom - tools.top - tools.bottom) < 1;
+        })()`), true, `${panel} opens exclusively at the tool group's center`);
+    }
+    await run(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').click()`);
+    assert.equal(await run(`document.querySelectorAll('.reader-tool-panel.open').length`), 0, 'clicking the reader iframe closes the open panel');
+    assert.equal(await run(`JSON.stringify([document.getElementById('reader-viewport').getBoundingClientRect(), document.querySelector('.page-indicator').textContent])`), readerBeforeToc);
     await run(`document.getElementById('btn-next-page').click()`);
     await waitFor(`Number(document.getElementById('current-page').textContent) > 1`);
     await run(`document.getElementById('btn-prev-page').click()`);
@@ -127,18 +163,25 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     window.setSize(800, 600);
     await run(`new Promise(resolve => setTimeout(resolve, 350))`);
     assert.equal(await run(`(() => {
-        const title = document.getElementById('btn-toc').getBoundingClientRect(), actions = document.querySelector('.reader-toolbar .header-actions').getBoundingClientRect();
+        const title = document.getElementById('current-book-title').getBoundingClientRect();
         const pagination = document.querySelector('.reader-pagination').getBoundingClientRect();
-        return title.right <= pagination.left + 1 && pagination.right <= actions.left + 1 && pagination.left >= 0 && pagination.right <= innerWidth + 1
+        const overlay = navigator.windowControlsOverlay;
+        const rightLimit = overlay?.visible ? overlay.getTitlebarAreaRect().right : innerWidth;
+        return title.right <= pagination.left + 1 && pagination.left >= 0 && pagination.right <= rightLimit
             && ['btn-prev-page', 'btn-next-page'].every(id => { const r = document.getElementById(id).getBoundingClientRect(); return r.left >= pagination.left && r.right <= pagination.right; });
     })()`), true, 'title and pagination remain usable at the minimum supported desktop size');
     await capture('reader-minimum-window');
     window.setBounds(originalBounds);
     await run(`document.getElementById('current-book-title').textContent = window.originalTitle; delete window.originalTitle; new Promise(resolve => setTimeout(resolve, 350))`);
-    assert.equal(await run(`['btn-goal-sidebar', 'goal-home-nav', 'goal-up', 'goal-new', 'goal-expand', 'btn-shelf', 'btn-appearance', 'btn-export-menu'].every(id => {
+    assert.equal(await run(`['btn-goal-sidebar', 'goal-home-nav', 'goal-up', 'goal-new', 'goal-expand'].every(id => {
         const control = document.getElementById(id), rect = control.getBoundingClientRect();
         return Math.abs(rect.width - 40) < 1 && Math.abs(rect.height - 40) < 1 && !!control.querySelector('svg');
-    })`), true, 'workbench icon actions share 40px SVG button targets');
+    })`), true, 'Goal icon actions retain 40px SVG button targets');
+    assert.equal(await run(`['btn-toc', 'btn-shelf', 'btn-appearance'].every(id => {
+        const control = document.getElementById(id), rect = control.getBoundingClientRect();
+        return Math.abs(rect.width - 32) < 1 && Math.abs(rect.height - 32) < 1
+            && getComputedStyle(control.querySelector('.reader-tool-icon')).maskImage !== 'none';
+    })`), true, 'right-side book actions use local design vectors and fixed targets');
     const goalTitleBounds = await run(`(() => {
         const panel = document.getElementById('goal-panel');
         const rect = element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width }; };
@@ -308,15 +351,27 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').style.getPropertyValue('--book-text-indent') === '3em'`);
     await run(`(() => { const input = document.getElementById('indent-select'); input.value = '2em'; input.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-paper="sepia"]').click(); })()`);
     await waitFor(`document.getElementById('reader-panel').classList.contains('paper-sepia')`);
+    assert.equal(await run(`getComputedStyle(document.getElementById('workspace-container')).backgroundColor`), 'rgb(251, 240, 217)');
+    await run(`document.querySelector('[data-paper="dark"]').click()`);
+    await waitFor(`['workspace-container', 'reader-panel', 'appearance-panel'].every(id => getComputedStyle(document.getElementById(id)).backgroundColor === 'rgb(18, 24, 39)')`);
+    await waitFor(`document.getElementById('btn-appearance').getAttribute('aria-expanded') === 'true' && getComputedStyle(document.getElementById('btn-appearance')).color === 'rgb(187, 185, 255)'`);
+    await capture('reader-dark-paper');
     await run(`document.querySelector('[data-paper="white"]').click(); document.getElementById('btn-mode-scroll').click()`);
     await waitFor(`document.getElementById('workspace-container').classList.contains('layout-scroll') && document.getElementById('btn-mode-scroll').getAttribute('aria-pressed') === 'true'`);
     await run(`document.getElementById('btn-mode-single').click(); document.getElementById('font-family-select').click()`);
     await waitFor(`!document.getElementById('font-menu').hidden && document.getElementById('btn-mode-single').getAttribute('aria-pressed') === 'true'`);
+    assert.equal(await run(`(() => {
+        const panel = document.getElementById('appearance-panel'), fonts = document.getElementById('font-menu');
+        return getComputedStyle(fonts).position === 'static' && panel.scrollWidth <= panel.clientWidth + 1
+            && fonts.getBoundingClientRect().right <= panel.getBoundingClientRect().right;
+    })()`), true, 'the full font menu fits the 210px settings panel');
     await capture('reader-font-menu');
     await run(`document.querySelector('[data-font-choice="sarasa"]').click()`);
     await waitFor(`document.getElementById('font-choice-label').textContent === 'Sarasa Gothic SC' && document.getElementById('font-menu').hidden`);
     await run(`document.getElementById('font-family-select').click(); document.querySelector('[data-font-choice="auto"]').click()`);
     await waitFor(`document.getElementById('font-choice-label').textContent === 'Auto' && document.getElementById('font-menu').hidden`);
+    await run(`document.getElementById('btn-workspace-settings').click()`);
+    await waitFor(`document.getElementById('btn-export-menu').getClientRects().length > 0`);
     await run(`document.getElementById('btn-export-menu').click()`);
     await waitFor(`document.getElementById('export-panel').classList.contains('open') && !document.getElementById('appearance-panel').classList.contains('open')`);
     await run(`document.getElementById('btn-export-chapters').click(); document.getElementById('btn-select-chapters').click()`);
@@ -324,6 +379,8 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await run(`document.querySelector('#chapter-export-list input').click()`);
     await waitFor(`document.getElementById('btn-confirm-chapter-export').disabled === false`);
     await capture('chapter-export');
+    await run(`document.getElementById('btn-workspace-settings').click()`);
+    await waitFor(`document.getElementById('btn-workspace-settings').getAttribute('aria-expanded') === 'false'`);
     await run(`document.getElementById('btn-workspace-settings').click()`);
     await waitFor(`document.getElementById('workspace-settings-panel').getClientRects().length > 0 && !document.getElementById('export-panel').classList.contains('open')`);
     await capture('workspace-settings');

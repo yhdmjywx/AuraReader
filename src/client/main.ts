@@ -92,7 +92,6 @@ export function queryElements(): AppElements {
         // TOC Drawer
         btnToc: document.getElementById('btn-toc') as HTMLButtonElement | null,
         tocDrawer: document.getElementById('toc-drawer'),
-        btnCloseToc: document.getElementById('btn-close-toc') as HTMLButtonElement | null,
         tocList: document.getElementById('toc-list'),
 
         // Floating Selection Tooltip
@@ -224,11 +223,21 @@ export function bootstrapApp() {
         appShell,
         navigation
     });
+    const closeReadingTools = (except?: 'contents' | 'library') => {
+        if (except !== 'contents') reader.closeTOC();
+        if (except !== 'library') shelf.closeShelf();
+        appShell.closeAppearance();
+        appShell.closeExportPanel();
+    };
+    reader.callbacks.onOpenContents = () => closeReadingTools('contents');
+    reader.callbacks.onReadingDocumentClick = closeReadingTools;
+    reader.callbacks.onPaperChanged = () => appShell.syncWindowControls();
+
     const homeHost = typeof document !== 'undefined' ? document.getElementById('goal-home') : null;
     const home = homeHost ? new GoalHome(homeHost, {
         goals, coordinator, currentBookId: () => session.getCurrentBookId(),
         finishAnnotations: async () => { await annotations.finishInlineEdit(); await annotations.assertInlineWritesSaved(); },
-        beforeOpen: () => { shelf.closeShelf(); appShell.closeAppearance(); appShell.closeExportPanel(); reader.rememberAnchor(); }
+        beforeOpen: () => { closeReadingTools(); reader.rememberAnchor(); }
     }) : null;
     const brand = typeof document !== 'undefined' ? document.querySelector<HTMLElement>('.brand') : null;
     if (brand && home) {
@@ -239,7 +248,7 @@ export function bootstrapApp() {
     }
     coordinator.onBookRemoved = async () => { await home?.open(); };
     navigation.subscribe(surface => {
-        shelf.closeShelf(); reader.closeTOC(); appShell.closeAppearance(); appShell.closeExportPanel();
+        closeReadingTools();
         selection.hideSelectionTooltip(); selection.hideHighlightAction(); goals.actions.close(false);
         appShell.setBookLoading(false);
         if (elements.btnGoalBack) elements.btnGoalBack.setAttribute('aria-label', navigation.returnTarget === 'home' || !session.getCurrentBookId() ? 'Back to home' : 'Back to reading');
@@ -334,10 +343,7 @@ export function bootstrapApp() {
     };
     selection.callbacks.onClearFocus = () => annotations.clearFocusedAnnotations();
 
-    shelf.callbacks.onOpen = () => {
-        appShell.closeAppearance();
-        appShell.closeExportPanel();
-    };
+    shelf.callbacks.onOpen = () => closeReadingTools('library');
     shelf.callbacks.onOpenBook = async (bookId) => {
         await coordinator.openBook(bookId);
     };
@@ -379,7 +385,8 @@ export function bootstrapApp() {
 
         appShell.init(elements, {
             onThemeChanged: () => { positionMarginNotes(elements); goals.updateReadingContext(); },
-            onOpenPanel: () => shelf.closeShelf(),
+            onOpenPanel: () => { shelf.closeShelf(); reader.closeTOC(); },
+            onCloseAppearance: () => reader.fonts.close(false),
             onPrevPage: () => { if (!goals.page && !home?.active) reader.prevPage(annotations.getNotes()); },
             onNextPage: () => { if (!goals.page && !home?.active) reader.nextPage(annotations.getNotes()); },
             onSwitchDemo: () => {
@@ -455,8 +462,8 @@ async function initializeApp() {
 
     try { await initDB(); }
     catch (error) {
-        appInstance.appShell.showToast(errorMessage(error, "Database migration is incomplete. Legacy data is preserved."), { kind: 'error' });
-        console.error("Database startup or migration stopped", error);
+        appInstance.appShell.showToast(errorMessage(error, "Could not open the local database."), { kind: 'error' });
+        console.error("Database startup failed", error);
         throw error;
     }
     await appInstance.reader.fonts.ready;

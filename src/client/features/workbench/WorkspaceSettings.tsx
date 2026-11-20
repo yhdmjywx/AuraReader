@@ -1,29 +1,42 @@
-import { useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Button } from '../../components/ui/button.js';
 import { ActionIcon } from '../../components/ui/action-icon.js';
 import { Input } from '../../components/ui/input.js';
 
 /** Global controls keep their existing IDs and controller bindings. */
-export function WorkspaceSettings() {
+export function WorkspaceSettings({ bookExport }: { bookExport: ReactNode }) {
     const [open, setOpen] = useState(false);
-    return <Popover.Root open={open} onOpenChange={setOpen}>
+    const popupRef = useRef<HTMLDivElement>(null);
+    const changeOpen = (next: boolean) => {
+        setOpen(next);
+        if (!next) popupRef.current?.dispatchEvent(new Event('workspacesettingsclose'));
+    };
+    return <Popover.Root open={open} onOpenChange={changeOpen}>
         <Popover.Trigger render={<Button id="btn-workspace-settings" size="lg" className="workspace-settings" />} aria-label="Settings" title="Settings">
             <ActionIcon name="settings" /><span>Settings</span>
         </Popover.Trigger>
         <Popover.Portal keepMounted>
             <Popover.Positioner side="top" align="start" sideOffset={8} collisionPadding={12} className="ui-floating-positioner">
-                <Popover.Popup id="workspace-settings-panel" data-slot="dialog-content" className="workspace-settings-panel" aria-label="Settings">
+                <Popover.Popup ref={popupRef} id="workspace-settings-panel" data-slot="dialog-content" className="workspace-settings-panel" aria-label="Settings">
                     <Popover.Title>Settings</Popover.Title>
                     <div className="workspace-theme-row"><span>Appearance</span>
                         <Button id="btn-theme-toggle" className="btn btn-icon-sm" type="button" title="Toggle theme"><i className="ri-sun-line" /></Button>
                     </div>
+                    <div className="workspace-book-export">
+                        <hr />
+                        <Button id="btn-export-menu" className="export-menu-action workspace-export-toggle" type="button" aria-expanded="false" aria-controls="export-panel">
+                            <span className="export-action-label">Export book</span>
+                            <i className="ri-arrow-right-s-line workspace-export-chevron" aria-hidden="true" />
+                        </Button>
+                        {bookExport}
+                    </div>
                     <hr />
                     <h3 className="export-section-title">Backup and restore</h3>
-                    <Button id="btn-export-full-backup" className="export-menu-action export-backup-action" type="button" onClick={() => setOpen(false)}>
+                    <Button id="btn-export-full-backup" className="export-menu-action export-backup-action" type="button" onClick={() => changeOpen(false)}>
                         <i className="ri-archive-line" aria-hidden="true" /><span className="export-action-label">Back up books</span><span className="export-extension">.aurabackup</span>
                     </Button>
-                    <Button id="btn-import-full-backup" className="export-menu-action export-backup-action" type="button" onClick={() => setOpen(false)}>
+                    <Button id="btn-import-full-backup" className="export-menu-action export-backup-action" type="button" onClick={() => changeOpen(false)}>
                         <i className="ri-upload-line" aria-hidden="true" /><span className="export-action-label">Restore books</span>
                     </Button>
                     <p className="export-panel-note">One file/book · Highlights + notes</p>

@@ -4,11 +4,13 @@ import { Button } from '../../components/ui/button.js';
 import { ActionIcon } from '../../components/ui/action-icon.js';
 import { Input } from '../../components/ui/input.js';
 import { WorkspaceSettings } from './WorkspaceSettings.js';
+import { ReadingToolbar, ReadingTools } from './ReadingToolbar.js';
 
 // Mount once before bootstrap. Controllers own only the explicit engine/view hosts below.
 // Keeping these hosts stable preserves EPUB ranges, imported fonts and export command state.
 export const WorkbenchShell = memo(function WorkbenchShell() {
     return <>
+    <div className="window-drag-region" aria-hidden="true" />
     <section id="app-status" className="app-status" role="status" aria-live="polite"><p>{"Opening library…"}</p></section>
     <header className="app-header">
         <div className="header-side header-brand">
@@ -18,9 +20,87 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
             </div>
         </div>
         <Button id="btn-goal-sidebar" size="icon-lg" className="btn btn-icon-sm" type="button" aria-label="Toggle goals sidebar" aria-expanded="true" aria-controls="goal-sidebar" hidden><ActionIcon name="sidebar" /></Button>
-        <WorkspaceSettings />
+        <WorkspaceSettings bookExport={<ExportPanel />} />
     </header>
-    <div id="appearance-panel" className="appearance-panel" role="dialog" aria-label="Reading settings">
+    <div className="reading-workspace" id="reading-workspace">
+        <aside className="goal-sidebar" id="goal-sidebar" aria-label="Goals sidebar" hidden>
+            <div className="goal-panel" id="goal-panel" aria-label="Reading goals" hidden></div>
+            <div className="goal-resizer" id="goal-resizer" role="separator" tabIndex={0} aria-label="Resize goals sidebar" aria-orientation="vertical" aria-controls="goal-sidebar"></div>
+        </aside>
+        <main className="workspace-container immersive-notes" id="workspace-container">
+            <ReadingToolbar />
+            <ReadingTools library={<LibraryPanel />} settings={<ReadingSettingsPanel />} />
+            <section className="reader-panel" id="reader-panel">
+                <div className="reader-viewport" id="reader-viewport"><div className="paper-container" id="paper-container"><article className="book-paper" id="book-paper"></article></div></div>
+                <div className="selection-tooltip" id="selection-tooltip">
+                    <span id="react-selection-actions"></span>
+                    <Button className="tooltip-btn hl-yellow" data-color="yellow" title="Highlight text">
+                        <i className="ri-mark-pen-line"></i>
+                        {"Highlight"}
+                    </Button>
+                    <Button className="tooltip-btn" id="btn-add-note" title="Add note">
+                        <i className="ri-sticky-note-line"></i>
+                        {"Note"}
+                    </Button>
+                </div>
+                <div className="selection-tooltip" id="highlight-action-tooltip">
+                    <Button className="tooltip-btn" id="btn-hl-remove" type="button" style={{"color":"#fca5a5"}} title="Remove only the yellow highlight">
+                        <i className="ri-delete-bin-line"></i>
+                        {"Delete highlight"}
+                    </Button>
+                    <Button className="tooltip-btn" id="btn-note-remove" type="button" style={{"color":"#fca5a5"}} title="Delete only the linked note">
+                        <i className="ri-delete-bin-line"></i>
+                        <span>{"Delete note"}</span>
+                    </Button>
+                    <Button className="tooltip-btn" id="btn-annotation-goal" type="button" hidden aria-label="Add to goal">
+                        <i className="ri-links-line" aria-hidden="true"></i>
+                        <span>{"Goal"}</span>
+                    </Button>
+                </div>
+            </section>
+            <section className="notes-panel" id="notes-panel">
+                <div className="tabs-header"><Button className="tab-btn active" data-tab="tab-highlights">
+                        <i className="ri-quill-pen-line"></i>
+                        <span>{"Highlights and notes"}</span>
+                        <span className="badge-count" id="count-highlights">{"0"}</span>
+                    </Button></div>
+                <div className="tab-content active" id="tab-highlights">
+                    <div className="notes-toolbar">
+                        <span className="notes-count-text">
+                            <strong id="notes-total-count">{"0"}</strong>
+                            {" notes"}
+                        </span>
+                        <div className="notes-actions" style={{"display":"flex","gap":"6px","alignItems":"center"}}><Button id="btn-toggle-show-highlights" className="btn btn-outline-sm" style={{"fontSize":"0.78rem","padding":"3px 8px"}} title="Toggle highlights in the notes panel">
+                                <i className="ri-eye-line"></i>
+                                {"Show highlights ("}
+                                <span id="count-pure-highlights">{"0"}</span>
+                                {")"}
+                            </Button></div>
+                    </div>
+                    <div className="notes-list" id="notes-list">
+                        <div id="react-notes"></div>
+                        <div className="empty-state" id="empty-notes-state">
+                            <i className="ri-draft-line"></i>
+                            <p>{"No highlights or notes"}</p>
+                            <small>{"Select text in the book to highlight or add a note."}</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <main id="goal-page" className="goal-page" aria-label="Goals" hidden>
+        <Button id="btn-goal-back" className="btn btn-icon-sm" type="button" aria-label="Back to reading" title="Back to reading"><i className="ri-fullscreen-exit-line" aria-hidden="true"></i></Button>
+        <div id="goal-page-content" className="goal-page-content"></div>
+    </main>
+    <main id="goal-home" className="goal-home" aria-label="Reading home" hidden></main>
+    <BackupDialog />
+    <div className="toast" id="toast-msg"></div>
+    </>;
+});
+
+function ReadingSettingsPanel() {
+    return <div id="appearance-panel" className="appearance-panel reader-tool-panel" role="dialog" aria-label="Reading settings" aria-hidden="true">
         <h2 className="appearance-heading">Reading settings</h2>
         <div className="appearance-row">
             <label htmlFor="font-family-select">{"Font"}</label>
@@ -107,16 +187,17 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                 <Button id="btn-mode-single" size="lg" className="btn btn-icon-sm mode-choice" type="button" title="Single page">{"Page"}</Button>
             </div>
         </div>
-    </div>
-    <section id="export-panel" className="export-panel" role="dialog" aria-labelledby="export-panel-title" aria-hidden="true">
+    </div>;
+}
+
+function ExportPanel() {
+    return <section id="export-panel" className="export-panel" aria-labelledby="btn-export-menu" aria-hidden="true">
         <div className="export-panel-heading">
-            <h2 id="export-panel-title">{"Export book"}</h2>
             <p>
                 {"Book · "}
                 <span id="export-book-title">{"No book open"}</span>
             </p>
         </div>
-        <h3 className="export-section-title">{"Export"}</h3>
         <Button id="btn-export-markdown" className="export-menu-action" type="button" data-export-action="">
             <i className="ri-file-text-line" aria-hidden="true"></i>
             <span className="export-action-label">{"Notes summary"}</span>
@@ -148,112 +229,11 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
                 </div>
             </div>
         </div>
-    </section>
-    <div className="reading-workspace" id="reading-workspace">
-        <aside className="goal-sidebar" id="goal-sidebar" aria-label="Goals sidebar" hidden>
-            <div className="goal-panel" id="goal-panel" aria-label="Reading goals" hidden></div>
-            <div className="goal-resizer" id="goal-resizer" role="separator" tabIndex={0} aria-label="Resize goals sidebar" aria-orientation="vertical" aria-controls="goal-sidebar"></div>
-        </aside>
-        <main className="workspace-container immersive-notes" id="workspace-container">
-            <header className="reader-toolbar" aria-label="Book actions">
-                <div className="header-center"><Button id="btn-toc" size="lg" className="book-nav-btn" type="button" title="Open contents" aria-expanded="false" aria-controls="toc-drawer">
-                    <ActionIcon name="contents" /><span id="current-book-title" className="book-nav-title">No book open</span><ActionIcon name="down" className="book-nav-caret" />
-                </Button></div>
-                <nav className="reader-pagination" aria-label="Pagination">
-                    <Button id="btn-prev-page" size="icon-lg" className="page-turn-btn" type="button" title="Previous page (←)" aria-label="Previous page"><ActionIcon name="left" /></Button>
-                    <span className="page-indicator">
-                        <span id="current-page">{"1"}</span>
-                        {"/"}
-                        <span id="total-pages">{"1"}</span>
-                        <span id="page-unit">{" page"}</span>
-                    </span>
-                    <Button id="btn-next-page" size="icon-lg" className="page-turn-btn" type="button" title="Next page (→)" aria-label="Next page"><ActionIcon name="right" /></Button>
-                </nav>
-                <div className="header-actions">
-                    <Button id="btn-shelf" size="icon-lg" className="btn btn-icon nav-icon" type="button" title="My library" aria-expanded="false" aria-controls="shelf-panel" aria-haspopup="dialog">
-                        <ActionIcon name="library" /><span className="badge-count" id="shelf-book-count" hidden>0</span>
-                    </Button>
-                    <Button id="btn-appearance" size="icon-lg" className="btn btn-icon reader-appearance-trigger" type="button" title="Reading settings" aria-label="Reading settings" aria-expanded="false" aria-controls="appearance-panel"><ActionIcon name="palette" /></Button>
-                    <Button id="btn-export-menu" size="icon-lg" className="btn btn-icon nav-icon" type="button" title="Export book" aria-label="Export book" aria-expanded="false" aria-controls="export-panel"><ActionIcon name="more" /></Button>
-                </div>
-                <span id="react-reading-book"></span>
-            </header>
-            <section className="reader-panel" id="reader-panel">
-                <aside className="toc-drawer" id="toc-drawer">
-                    <div className="toc-header">
-                        <h4>
-                            <i className="ri-list-check"></i>
-                            {"Contents"}
-                        </h4>
-                        <Button id="btn-close-toc" className="btn btn-icon-sm"><i className="ri-close-line"></i></Button>
-                    </div>
-                    <ul className="toc-list" id="toc-list"></ul>
-                </aside>
-                <div className="reader-viewport" id="reader-viewport"><div className="paper-container" id="paper-container"><article className="book-paper" id="book-paper"></article></div></div>
-                <div className="selection-tooltip" id="selection-tooltip">
-                    <span id="react-selection-actions"></span>
-                    <Button className="tooltip-btn hl-yellow" data-color="yellow" title="Highlight text">
-                        <i className="ri-mark-pen-line"></i>
-                        {"Highlight"}
-                    </Button>
-                    <Button className="tooltip-btn" id="btn-add-note" title="Add note">
-                        <i className="ri-sticky-note-line"></i>
-                        {"Note"}
-                    </Button>
-                </div>
-                <div className="selection-tooltip" id="highlight-action-tooltip">
-                    <Button className="tooltip-btn" id="btn-hl-remove" type="button" style={{"color":"#fca5a5"}} title="Remove only the yellow highlight">
-                        <i className="ri-delete-bin-line"></i>
-                        {"Delete highlight"}
-                    </Button>
-                    <Button className="tooltip-btn" id="btn-note-remove" type="button" style={{"color":"#fca5a5"}} title="Delete only the linked note">
-                        <i className="ri-delete-bin-line"></i>
-                        <span>{"Delete note"}</span>
-                    </Button>
-                    <Button className="tooltip-btn" id="btn-annotation-goal" type="button" hidden aria-label="Add to goal">
-                        <i className="ri-links-line" aria-hidden="true"></i>
-                        <span>{"Goal"}</span>
-                    </Button>
-                </div>
-            </section>
-            <section className="notes-panel" id="notes-panel">
-                <div className="tabs-header"><Button className="tab-btn active" data-tab="tab-highlights">
-                        <i className="ri-quill-pen-line"></i>
-                        <span>{"Highlights and notes"}</span>
-                        <span className="badge-count" id="count-highlights">{"0"}</span>
-                    </Button></div>
-                <div className="tab-content active" id="tab-highlights">
-                    <div className="notes-toolbar">
-                        <span className="notes-count-text">
-                            <strong id="notes-total-count">{"0"}</strong>
-                            {" notes"}
-                        </span>
-                        <div className="notes-actions" style={{"display":"flex","gap":"6px","alignItems":"center"}}><Button id="btn-toggle-show-highlights" className="btn btn-outline-sm" style={{"fontSize":"0.78rem","padding":"3px 8px"}} title="Toggle highlights in the notes panel">
-                                <i className="ri-eye-line"></i>
-                                {"Show highlights ("}
-                                <span id="count-pure-highlights">{"0"}</span>
-                                {")"}
-                            </Button></div>
-                    </div>
-                    <div className="notes-list" id="notes-list">
-                        <div id="react-notes"></div>
-                        <div className="empty-state" id="empty-notes-state">
-                            <i className="ri-draft-line"></i>
-                            <p>{"No highlights or notes"}</p>
-                            <small>{"Select text in the book to highlight or add a note."}</small>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </main>
-    </div>
-    <main id="goal-page" className="goal-page" aria-label="Goals" hidden>
-        <Button id="btn-goal-back" className="btn btn-icon-sm" type="button" aria-label="Back to reading" title="Back to reading"><i className="ri-fullscreen-exit-line" aria-hidden="true"></i></Button>
-        <div id="goal-page-content" className="goal-page-content"></div>
-    </main>
-    <main id="goal-home" className="goal-home" aria-label="Reading home" hidden></main>
-    <BackupDialog />
-    <section id="shelf-panel" className="appearance-panel shelf-panel" role="dialog" aria-modal="false" aria-labelledby="shelf-panel-title" aria-hidden="true">
+    </section>;
+}
+
+function LibraryPanel() {
+    return <section id="shelf-panel" className="appearance-panel shelf-panel reader-tool-panel" role="dialog" aria-modal="false" aria-labelledby="shelf-panel-title" aria-hidden="true">
         <div className="shelf-header">
             <h2 id="shelf-panel-title">{"Local library"}</h2>
             <Button id="btn-close-shelf" size="icon" className="btn btn-icon-sm" type="button" aria-label="Close library" title="Close library"><ActionIcon name="close" /></Button>
@@ -264,7 +244,5 @@ export const WorkbenchShell = memo(function WorkbenchShell() {
             <Input type="file" id="file-input" accept=".epub,.pdf,.txt" hidden />
         </div>
         <ul className="shelf-list" id="shelf-list" aria-label="Local books"></ul>
-    </section>
-    <div className="toast" id="toast-msg"></div>
-    </>;
-});
+    </section>;
+}

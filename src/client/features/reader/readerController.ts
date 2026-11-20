@@ -421,7 +421,10 @@ export class ReaderController {
                 });
                 if (!document.dispatchEvent(forwarded)) event.preventDefault();
             }, { signal: contentSignal });
-            contentDocument.addEventListener('click', () => domCloseTOC(elements), { signal: contentSignal });
+            contentDocument.addEventListener('click', () => {
+                if (this.callbacks.onReadingDocumentClick) this.callbacks.onReadingDocumentClick();
+                else domCloseTOC(elements);
+            }, { signal: contentSignal });
             contentDocument.addEventListener('scroll', () => {
                 this.scheduleViewportChange();
                 if (!this.isChapterFlow() || this.effectiveReaderMode() !== 'scroll') return;
@@ -551,31 +554,26 @@ export class ReaderController {
                     if (elements.readerPanel) {
                         elements.readerPanel.className = `reader-panel paper-${this.paperTheme}`;
                     }
+                    this.callbacks.onPaperChanged?.();
                     this.scheduleViewportChange();
                 }, { signal });
             });
         }
 
-        // TOC Drawer Controls
-        if (elements.btnToc) {
-            elements.btnToc.addEventListener('click', (e) => {
-                e.stopPropagation();
-                domToggleTOC(elements);
-            }, { signal });
-        }
-        if (elements.btnCloseToc) {
-            elements.btnCloseToc.addEventListener('click', (e) => {
-                e.stopPropagation();
-                domCloseTOC(elements);
-            }, { signal });
-        }
-        document.addEventListener('click', (e) => {
-            if (elements.tocDrawer && elements.tocDrawer.classList.contains('open')) {
-                if (!eventElement(e)?.closest('#toc-drawer') && !eventElement(e)?.closest('#btn-toc')) {
-                    domCloseTOC(elements);
-                }
-            }
+        elements.btnToc?.addEventListener('click', () => {
+            if (!elements.tocDrawer?.classList.contains('open')) this.callbacks.onOpenContents?.();
+            domToggleTOC(elements);
         }, { signal });
+        document.addEventListener('click', (e) => {
+            if (!elements.tocDrawer?.classList.contains('open')) return;
+            const path = e.composedPath();
+            if (!path.some(node => node === elements.tocDrawer || node === elements.btnToc)) domCloseTOC(elements);
+        }, { capture: true, signal });
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || !elements.tocDrawer?.classList.contains('open')) return;
+            e.preventDefault();
+            domCloseTOC(elements);
+        }, { capture: true, signal });
     }
 
     applyTypography() {

@@ -3,6 +3,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
+const { DatabaseSync } = require('node:sqlite');
 const { createDesktopStorage, command } = require('../../src/desktop/storage.cjs');
 
 (async () => {
@@ -41,7 +42,31 @@ const { createDesktopStorage, command } = require('../../src/desktop/storage.cjs
         assert.ok(!(await service.call('listBooks')).records.some(row => row.id === 'rollback'));
         const backup = await service.call('backup');
         assert.equal(backup.integrity, 'ok'); assert.ok(!backup.name.includes(path.sep));
-        await fs.access(path.join(directory, 'backups', backup.name));
+        const restoredDirectory = path.join(temporary, 'restored');
+        await fs.mkdir(restoredDirectory);
+        await fs.copyFile(path.join(directory, 'storage-installed.json'), path.join(restoredDirectory, 'storage-installed.json'));
+        const restoredFile = path.join(restoredDirectory, 'aurareader.sqlite');
+        await fs.copyFile(path.join(directory, 'backups', backup.name), restoredFile);
+        async function checkRestoredLibrary() {
+            const restored = createDesktopStorage(restoredDirectory);
+            try {
+                assert.deepEqual(await restored.call('status'), { initialized: true });
+                assert.deepEqual((await restored.call('getBook', { id: book.id })).record.value, book);
+                assert.deepEqual((await restored.call('queryNotes', { bookIds: [book.id] })).records[0].value, note);
+            } finally { restored.close(); }
+        }
+        await checkRestoredLibrary();
+
+        // Reproduce the initialization metadata in an existing desktop SQLite backup.
+        const oldDatabase = new DatabaseSync(restoredFile);
+        try {
+            oldDatabase.exec(`
+                PRAGMA application_id = 0;
+                CREATE TABLE migrations(source_id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, manifest TEXT NOT NULL);
+                INSERT INTO migrations VALUES('aurareader-desktop-v1', 'prior-snapshot', '{"books":0,"notes":0}');
+            `);
+        } finally { oldDatabase.close(); }
+        await checkRestoredLibrary();
         await service.call('deleteNote', { opId: randomUUID(), expected: 1, generation: version.generation, bookId: book.id, id: note.id });
         await assert.rejects(service.call('saveNote', { ...save, opId: randomUUID() }), { status: 409 });
         await service.call('deleteBook', { opId: randomUUID(), expected: 1, id: book.id });
@@ -61,7 +86,7 @@ const { createDesktopStorage, command } = require('../../src/desktop/storage.cjs
         try { await assert.rejects(unknown.call('createLibrary'), { status: 409 }); }
         finally { unknown.close(); }
         assert.equal(await fs.readFile(path.join(temporary, 'unknown', 'original.json'), 'utf8'), 'keep');
-        console.log('PASS: desktop explicit initialization, validation, CAS/idempotency/tombstones/generation, complete JSON, backup, rollback, reopen and missing/unknown data guards');
+        console.log('PASS: desktop explicit initialization, validation, CAS/idempotency/tombstones/generation, complete JSON, backup and old desktop library compatibility, rollback, reopen and missing/unknown data guards');
     } finally {
         service.close();
         const target = path.resolve(temporary);

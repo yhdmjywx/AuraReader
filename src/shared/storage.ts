@@ -27,11 +27,6 @@ export interface DeleteNoteCommand {
 export interface SaveBookCommand { opId: string; expected: number; book: Book }
 export interface DeleteBookCommand { opId: string; expected: number; id: string }
 export interface RestoreCommand { opId: string; books: Book[]; notes: StoredAnnotation[]; goalStates?: GoalBackupState[]; goalGraph?: GoalGraphBackup }
-export interface MigrationManifest {
-    cleanup?: { caches?: Record<string, string>; pending?: Record<string, string> };
-    [field: string]: unknown;
-}
-export interface MigrationStatus { completed: boolean; snapshotId?: string; manifest?: MigrationManifest }
 export interface StorageRoutes {
     books: { request: undefined; response: { records: BookRecord[] } };
     'books/summary': { request: undefined; response: { records: BookSummaryRecord[] } };
@@ -46,7 +41,4 @@ export interface StorageRoutes {
     'goals/library': { request: undefined; response: GoalLibraryRecord };
     'goals/library/save': { request: SaveGoalLibraryCommand; response: Revision };
     restore: { request: RestoreCommand; response: { books: number; notes: number } };
-    'migration/status': { request: undefined; response: MigrationStatus };
-    'migration/snapshot': { request: Record<string, unknown>; response: { snapshotId: string } };
-    'migration/commit': { request: { snapshotId: string }; response: MigrationStatus };
 }

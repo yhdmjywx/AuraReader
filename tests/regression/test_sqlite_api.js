@@ -7,6 +7,10 @@ const { sqliteServer } = require('../helpers/sqlite');
 (async () => {
     const server = await sqliteServer();
     try {
+        assert.deepEqual(await server.request('books'), { status: 200, records: [] });
+        assert.equal((await server.request('migration/status')).status, 404);
+        assert.equal((await server.request('migration/snapshot', {})).status, 404);
+        assert.equal((await server.request('migration/commit', {})).status, 404);
         const book = { id: 'a', title: '完整书籍', pages: ['<p>原文😀</p>'], unknown: { preserved: [1, null, ''] } };
         const command = { opId: randomUUID(), book, expected: 0 };
         const saved = await server.request('books/save', command);
@@ -28,6 +32,7 @@ const { sqliteServer } = require('../helpers/sqlite');
         assert.equal((await server.request('notes/query', { bookIds: ['other'] })).records.length, 0);
         await server.restart();
         assert.deepEqual((await server.request('books')).records[0].value, book);
+        assert.deepEqual((await server.request('books', undefined, { 'X-Aura-Source': 'unmigrated-browser' })).records[0].value, book);
         assert.deepEqual((await server.request('notes/query', { bookIds: ['a'] })).records.find(r => r.id === 'h').value, highlight);
 
         const badRestore = await server.request('restore', { opId: randomUUID(), books: [{ id: 'rollback', pages: ['正文'] }], notes: [{ ...note, id: 'orphan', bookId: 'missing' }] });

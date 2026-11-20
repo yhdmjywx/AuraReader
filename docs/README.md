@@ -8,7 +8,7 @@
 | --- | --- |
 | [阅读、Goal 与导出](reading-guide.md) | 基本使用、Goal 导航、按键交互、页边笔记与导出规则 |
 | [安装、开发与桌面验收](development.md) | 安装与源码运行、端口、构建测试、桌面阶段记录 |
-| [数据与备份](data-and-backup.md) | 独立书库、IndexedDB 迁移、SQLite 一致性备份与恢复 |
+| [数据与备份](data-and-backup.md) | 独立 SQLite 书库、一致性备份与恢复 |
 | [当前状态与已知限制](known-limitations.md) | 平台、格式、离线范围、安装包及资源许可边界 |
 | [产品演示](product-demo.md) | README 动画、Goal 跨书叙事、素材与更新方法 |
 

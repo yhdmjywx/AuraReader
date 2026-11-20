@@ -63,7 +63,6 @@ function createDataStore(directory) {
         CREATE TABLE IF NOT EXISTS annotations(id TEXT PRIMARY KEY, book_id TEXT NOT NULL REFERENCES books(id), payload TEXT, revision INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
         CREATE INDEX IF NOT EXISTS annotations_book ON annotations(book_id);
         CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, hash TEXT NOT NULL, result TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS migrations(source_id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, manifest TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS goal_states(book_id TEXT PRIMARY KEY REFERENCES books(id), payload TEXT, revision INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
         COMMIT;`); }
     catch (error) { if (db.isTransaction) db.exec('ROLLBACK'); db.close(); throw error; }

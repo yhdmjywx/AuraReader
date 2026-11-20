@@ -9,19 +9,31 @@ const { createWorkbench, ui, click } = require('../helpers/react-workbench.cjs')
         const shell = new AppShell(); shell.init(elements);
         document.documentElement.dataset.appSurface = 'reader';
         elements.currentBookTitle.textContent = '当前书籍';
+        const settings = document.getElementById('workspace-settings-panel');
+        const settingsButton = document.getElementById('btn-workspace-settings');
+        assert.ok(settings.contains(elements.btnExportMenu));
+        assert.equal(document.querySelector('.reader-side-tools').contains(elements.btnExportMenu), false);
+        const openSettings = async () => {
+            if (settingsButton.getAttribute('aria-expanded') !== 'true') await click(settingsButton);
+        };
+        await openSettings();
         await click('#btn-export-menu');
         assert.equal(elements.exportPanel.classList.contains('open'), true);
         assert.equal(elements.exportBookTitle.textContent, '当前书籍');
         await click('#btn-appearance');
         assert.equal(elements.exportPanel.classList.contains('open'), false);
+        await openSettings();
         await click('#btn-export-menu');
         assert.equal(elements.appearancePanel.classList.contains('open'), false);
         await ui(() => document.body.click());
         assert.equal(elements.exportPanel.classList.contains('open'), false);
+        await openSettings();
         await click('#btn-export-menu'); document.getElementById('btn-export-markdown').focus();
         await ui(() => document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', { key:'Escape', bubbles:true })));
         assert.equal(elements.exportPanel.classList.contains('open'), false);
-        assert.equal(document.activeElement, elements.btnExportMenu);
+        assert.equal(settingsButton.getAttribute('aria-expanded'), 'false');
+        await openSettings();
+        assert.equal(elements.btnExportMenu.getAttribute('aria-expanded'), 'false');
         for (const id of ['btn-export-markdown','btn-export-chapters','btn-export-current-chapter','btn-export-all-chapters','btn-select-chapters']) {
             assert.equal(document.querySelectorAll('#' + id).length, 1);
             assert.ok(elements.exportPanel.contains(document.getElementById(id)));
@@ -31,6 +43,6 @@ const { createWorkbench, ui, click } = require('../helpers/react-workbench.cjs')
             assert.ok(document.getElementById('workspace-settings-panel').contains(document.getElementById(id)));
         }
         assert.equal(document.getElementById('btn-fullscreen'), null);
-        console.log('PASS: React export hosts, exclusive panels, current title, outside close and keyboard focus return');
+        console.log('PASS: Settings export hosts, exclusive panels, current title, outside close and Escape reset');
     } finally { dom.window.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
