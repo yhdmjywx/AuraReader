@@ -75,12 +75,6 @@ export class ShelfController {
             });
         }
 
-        if (elements.btnCloseShelf) {
-            elements.btnCloseShelf.addEventListener('click', () => {
-                this.closeShelf();
-            });
-        }
-
         document.addEventListener('click', event => {
             if (!elements.shelfPanel?.classList.contains('open')) return;
             const path = event.composedPath();
@@ -103,6 +97,5 @@ export class ShelfController {
         elements.fileInput?.addEventListener('change', () => {
             if (elements.fileInput.files?.length) this.closeShelf();
         });
-        elements.btnSwitchDemo?.addEventListener('click', () => this.closeShelf());
     }
 }

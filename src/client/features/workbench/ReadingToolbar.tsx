@@ -25,8 +25,8 @@ interface ReadingToolsProps {
 }
 
 export function ReadingTools({ library, settings }: ReadingToolsProps) {
-    return <div className="reader-tools">
-        <div className="reader-side-tools" role="group" aria-label="Book actions">
+    return <div id="reading-tools" className="reader-tools">
+        <div id="reader-tool-group" className="reader-side-tools" role="group" aria-label="Book actions">
             <Button id="btn-toc" size="icon-lg" title="Open contents" aria-label="Contents" aria-expanded="false" aria-controls="toc-drawer">
                 <span className="reader-tool-icon contents-icon" aria-hidden="true" />
             </Button>
@@ -42,5 +42,10 @@ export function ReadingTools({ library, settings }: ReadingToolsProps) {
             </Button>
             {settings}
         </div>
+        <div className="reader-tool-bridge" aria-hidden="true" />
+        <Button id="btn-reading-tools" size="icon-lg" className="reader-tool-disclosure" title="Reading tools"
+            aria-label="Reading tools" aria-expanded="false" aria-controls="reader-tool-group" tabIndex={-1} inert>
+            <span className="reader-tool-icon tool-stack-icon" aria-hidden="true" />
+        </Button>
     </div>;
 }

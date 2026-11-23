@@ -10,7 +10,7 @@
 
 ## 桌面窗口
 
-Windows `BrowserWindow` 启用 Electron Window Controls Overlay，在原生窗口中提供最小化、最大化／还原和关闭。样式使用系统报告的安全区避开窗口按钮，顶部空白用作拖动区。原生关闭事件继续进入 `coordinateClose`，执行现有的保存确认。浏览器模式使用同一短栏，窗口由浏览器管理。参见 [Electron 自定义标题栏](https://www.electronjs.org/docs/latest/tutorial/custom-title-bar)。
+Windows 客户端使用系统原生标题栏。原生关闭事件继续进入 `coordinateClose`，执行保存确认。浏览器模式使用同一阅读栏，窗口由浏览器管理。
 
 `src/desktop/entry.cjs` 是 Electron 的应用入口，调用 `main.cjs` 的 `startDesktop`。Electron 动态导入入口时直接启动应用。桌面测试仍可单独导入 `startDesktop`，以隔离的书库启动同一窗口。
 
@@ -26,11 +26,13 @@ Windows `BrowserWindow` 启用 Electron Window Controls Overlay，在原生窗�
 - `ReadingToolbar` 专门绘制书名与翻页，`ReadingTools` 挂载右侧入口和浮层。两者共用阅读区的纸面颜色。绝对定位覆盖层与正文视口并列，使用阅读工作区的高度对齐浮层和工具组。52 px 顶部区继续承担阅读视口定位。
 - 现有目录、书库和阅读设置控制器负责各自的命令与展开状态。`main.ts` 接入互斥关闭及阅读文档的点击事件。三个右侧浮层共用 CSS 高度上限，取 360 px 和阅读区高度减 16 px 中的较小值。字体菜单共用阅读设置的滚动区，并在 Escape 时先返回字体入口。
 - `WorkspaceSettings` 挂载 `Export book` 折叠区域及现有导出控件，关闭时通知 `AppShell` 收起导出区域。导出及章节选择逻辑继续复用原控制器。章节列表保留内部滚动，展开导出时 Settings 也按可用空间限制自身高度。
-- Paper 颜色通过阅读区的 CSS 变量覆盖相应层。Windows 渲染器经受限 IPC 更新原生按钮前景色，窗口安全区与拖动由 Window Controls Overlay 提供。关闭仍进入统一的 `coordinateClose` 保存流程。
+- Paper 颜色通过阅读区的 CSS 变量覆盖相应层。原生窗口关闭仍进入统一的 `coordinateClose` 保存流程。
 
 [现行 Figma 阅读画板](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=424-1892) · [沉浸式组件](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=419-4306)
 
 ### 沉浸式布局首次上线验证
+
+以下记录包含当时的窗口覆盖层验证。Connector 候选版使用原生标题栏。
 
 - 生产构建与 `npm test` 通过，79 项检查全部通过。Windows 阅读流程和两种关闭保存流程在同一构建上通过 `node scripts/test-desktop.cjs` 验证。
 - 内置浏览器使用实际 EPUB，确认四个浮层宽 210 px、距工具组 7 px、中线重合且互斥。验证了目录 Tab 与 Escape、点击正文关闭、字体搜索和逐层 Escape、章节导出长列表、三种纸面、390 px 和 640 px 视口以及 Goal 侧栏开合。正文调至 600 px 后开合浮层，正文几何和页码保持稳定。

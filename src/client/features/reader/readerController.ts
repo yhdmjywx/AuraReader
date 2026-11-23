@@ -1,5 +1,7 @@
 import { eventElement } from '../../app/dom.js';
+import { observeScrollHint } from '../../components/ui/scrollHint.js';
 import { readerAbortController, readerViewport } from './readerDom.js';
+import { observeReadingScroll } from './readingScrollActivity.js';
 import { syncReaderDocumentSize } from './readerDocument.js';
 import { preparePublicationContent } from './publicationContent.js';
 import { layoutFixedDocument, preparePublicationDocument, publicationDocument, refreshReadiumStyles } from './publicationDocument.js';
@@ -7,6 +9,7 @@ import { resolveEpubUrl } from '../../infrastructure/epubPaths.js';
 import { readingAxis, readingViewport, setReadingOffset } from './readingAxis.js';
 import { marginGeometry, isImmersiveNotes } from '../layout/marginNotesLayout.js';
 import { applyLineSpacing, readLineSpacing } from './readingTypography.js';
+import { defaultIndent, fontSizeRange, indentRange, lineSpacingRange, readingWidthRange, readingWidthStops, showReadingSlider } from './readingSliderUI.js';
 import type { Book, ReadingLocation, TocEntry } from '../../domain/book.js';
 import type { Annotation } from '../../domain/annotation.js';
 import type { BookStructure } from '../../domain/bookStructure.js';
@@ -54,6 +57,8 @@ import {
     toggleTOC as domToggleTOC
 } from './tocUI.js';
 
+const indentPreference = 'aura_text_indent';
+
 export class ReaderController {
     private bindings?: AbortController;
     private documentBindings?: AbortController;
@@ -62,6 +67,8 @@ export class ReaderController {
     private cancelLayout?: () => void;
     private cancelAnchor?: () => void;
     private cancelSettingsLayout?: () => void;
+    private resetScrollActivity?: () => void;
+    private widthStops: number[] = [];
 
     subscribe(listener: (event: 'render' | 'viewport' | 'location') => void) {
         this.listeners.add(listener);
@@ -74,6 +81,7 @@ export class ReaderController {
         this.rememberAnchor();
         this.bindings?.abort(); this.bindings = undefined;
         this.documentBindings?.abort(); this.documentBindings = undefined;
+        this.resetScrollActivity = undefined;
         clearTimeout(this._anchorTimer);
         this.cancelViewport?.(); this.cancelLayout?.(); this.cancelAnchor?.();
         this.cancelSettingsLayout?.(); this.cancelSettingsLayout = undefined;
@@ -117,7 +125,8 @@ export class ReaderController {
         const storage = (typeof localStorage !== 'undefined') ? localStorage : null;
         this.fontSize = 18;
         this.fontFamily = "'Inter', sans-serif";
-        this.textIndent = (storage && storage.getItem('aura_text_indent')) || '2em';
+        const savedIndent = storage?.getItem(indentPreference);
+        this.textIndent = savedIndent === '3em' ? `${indentRange.max}em` : savedIndent || `${defaultIndent}em`;
         this.paperTheme = 'white';
 
         this.currentPage = 1;
@@ -145,6 +154,7 @@ export class ReaderController {
     }
 
     setBook(bookKey: string, bookObj: Book) {
+        this.resetScrollActivity?.();
         this.cancelSettingsLayout?.(); this.cancelSettingsLayout = undefined;
         this.engine.setBook(bookKey, bookObj);
         this.bookStructure = buildBookStructure(bookObj);
@@ -175,6 +185,7 @@ export class ReaderController {
     getFirstPage() { return this.getCurrentBook()?.epub?.documents.find(document => document.linear !== false)?.page || 1; }
 
     clearBook() {
+        this.resetScrollActivity?.();
         this.cancelSettingsLayout?.(); this.cancelSettingsLayout = undefined;
         clearTimeout(this._anchorTimer);
         this.engine.setBook('', null);
@@ -252,6 +263,7 @@ export class ReaderController {
     }
 
     renderPage(pageNum: number, preserveScroll = false, notes: Annotation[] = [], options: ChapterRenderOptions = {}): ReadingLocation {
+        this.resetScrollActivity?.();
         if (this.isChapterFlow()) {
             return this.renderChapterPage(pageNum, preserveScroll, notes, options);
         }
@@ -313,15 +325,20 @@ export class ReaderController {
     }
 
     nextPage(notes: Annotation[] = []): ReadingLocation {
-        if (this.isChapterFlow()) return this.stepChapter(1, notes);
-        const loc = this.engine.nextPage();
-        return this.renderPage(loc.page, false, notes);
+        return this.turnPage(1, notes);
     }
 
     prevPage(notes: Annotation[] = []): ReadingLocation {
-        if (this.isChapterFlow()) return this.stepChapter(-1, notes);
-        const loc = this.engine.prevPage();
-        return this.renderPage(loc.page, false, notes);
+        return this.turnPage(-1, notes);
+    }
+
+    private turnPage(direction: -1 | 1, notes: Annotation[]): ReadingLocation {
+        if (this.isChapterFlow()) return this.stepChapter(direction, notes);
+        const previous = this.currentPage;
+        const target = direction === 1 ? this.engine.nextPage() : this.engine.prevPage();
+        const location = this.renderPage(target.page, false, notes);
+        if (location.page !== previous && this.effectiveReaderMode() !== 'scroll') this.callbacks.onPageTurn?.();
+        return location;
     }
 
     goToPage(pageNum: number, offset = 0, notes: Annotation[] = []) {
@@ -358,6 +375,7 @@ export class ReaderController {
 
     scrollToAnchor(anchor: string) {
         if (this.elements) {
+            this.resetScrollActivity?.();
             this.cancelAnchor?.();
             this.cancelAnchor = domScrollToAnchor(anchor, this.elements);
         }
@@ -371,6 +389,7 @@ export class ReaderController {
         if (!this.elements || !annotationId) return null;
         const token = findAnnotationToken(this.elements.bookPaper, annotationId);
         if (!token) return null;
+        this.resetScrollActivity?.();
         token.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return token;
     }
@@ -392,6 +411,7 @@ export class ReaderController {
                 if (item.anchor) this.scrollToAnchor(item.anchor);
             }
             domCloseTOC(this.elements);
+            this.callbacks.onSelectContents?.();
             if (this.callbacks.showToast) {
                 this.callbacks.showToast(`Jumped to: ${item.title}`);
             }
@@ -409,6 +429,8 @@ export class ReaderController {
         const document = elements.readerPanel?.ownerDocument || elements.bookPaper?.ownerDocument || globalThis.document;
         this.bindings = readerAbortController(document);
         const signal = this.bindings.signal;
+        const stopScrollHint = observeScrollHint(elements.tocDrawer, elements.tocList);
+        if (stopScrollHint) signal.addEventListener('abort', stopScrollHint, { once: true });
         const contentDocument = elements.bookPaper?.ownerDocument || document;
         this.documentBindings = readerAbortController(contentDocument);
         const contentSignal = this.documentBindings.signal;
@@ -458,57 +480,22 @@ export class ReaderController {
         // Font Controls
         this.fonts.initUI(elements, signal);
 
-        elements.btnLineSpacingDec?.addEventListener('click', () => this.changeLineSpacing(-1), { signal });
-        elements.btnLineSpacingInc?.addEventListener('click', () => this.changeLineSpacing(1), { signal });
-        elements.btnReadingWidthDec?.addEventListener('click', () => this.changeReadingWidth(-1), { signal });
-        elements.btnReadingWidthInc?.addEventListener('click', () => this.changeReadingWidth(1), { signal });
+        const { fontSizeInput, indentInput, lineSpacingInput, readingWidthInput } = elements;
+        fontSizeInput?.addEventListener('input', () => this.setFontSize(fontSizeInput.valueAsNumber), { signal });
+        indentInput?.addEventListener('input', () => this.setIndent(indentInput.valueAsNumber), { signal });
+        lineSpacingInput?.addEventListener('input', () => this.setLineSpacing(lineSpacingInput.valueAsNumber), { signal });
+        readingWidthInput?.addEventListener('input', () => {
+            if (readingWidthInput.disabled) return;
+            const value = this.widthStops[readingWidthInput.valueAsNumber];
+            if (value !== undefined) this.setReadingWidth(value);
+        }, { signal });
         this.refreshReadingSettingsControls();
-
-        if (elements.btnFontDec) {
-            elements.btnFontDec.addEventListener('click', () => {
-                if (this.fontSize > 13) {
-                    this.rememberAnchor();
-                    this.fontSize -= 1;
-                    this.fontSizeOverride = true;
-                    if (elements.fontSizeLabel) elements.fontSizeLabel.textContent = `${this.fontSize}px`;
-                    this.applyTypography();
-                    this.refitAfterTypography();
-                }
-            }, { signal });
-        }
-
-        if (elements.btnFontInc) {
-            elements.btnFontInc.addEventListener('click', () => {
-                if (this.fontSize < 32) {
-                    this.rememberAnchor();
-                    this.fontSize += 1;
-                    this.fontSizeOverride = true;
-                    if (elements.fontSizeLabel) elements.fontSizeLabel.textContent = `${this.fontSize}px`;
-                    this.applyTypography();
-                    this.refitAfterTypography();
-                }
-            }, { signal });
-        }
-
-        if (elements.indentSelect) {
-            elements.indentSelect.value = this.textIndent;
-            elements.indentSelect.addEventListener('change', (e) => {
-                this.rememberAnchor();
-                const input = e.currentTarget as HTMLSelectElement;
-                this.textIndent = input.value;
-                if (typeof localStorage !== 'undefined') {
-                    localStorage.setItem('aura_text_indent', this.textIndent);
-                }
-                this.applyTypography();
-                this.refitAfterTypography();
-                if (this.callbacks.showToast) {
-                    this.callbacks.showToast(`First-line indent: ${input.options[input.selectedIndex].text}`, { anchor: input });
-                }
-            }, { signal });
-        }
 
         const viewport = readerViewport(this.elements);
         if (viewport) {
+            this.resetScrollActivity = observeReadingScroll(viewport, contentDocument, signal, contentSignal,
+                () => this.readingScrollPosition(),
+                (distance, extent) => this.callbacks.onReadingScroll?.(distance, extent));
             let lastWheelTurn = -Infinity;
             const onWheel = (event: WheelEvent) => {
                 if (event.defaultPrevented || !this.getCurrentBook()) return;
@@ -555,7 +542,6 @@ export class ReaderController {
                     if (elements.readerPanel) {
                         elements.readerPanel.className = `reader-panel paper-${this.paperTheme}`;
                     }
-                    this.callbacks.onPaperChanged?.();
                     this.scheduleViewportChange();
                 }, { signal });
             });
@@ -597,10 +583,9 @@ export class ReaderController {
             if (paper.dataset.authored === 'true' && !this.fontSizeOverride) {
                 paper.style.removeProperty('font-size');
                 this.fontSize = parseFloat(paper.ownerDocument.defaultView!.getComputedStyle(paper).fontSize) || 18;
-                if (elements.fontSizeLabel) elements.fontSizeLabel.textContent = `${this.fontSize}px`;
             } else paper.style.setProperty('font-size', `${this.fontSize}px`, 'important');
             paper.style.setProperty('--book-text-indent', this.textIndent);
-            paper.classList.toggle('reader-user-indent', !!globalThis.localStorage?.getItem('aura_text_indent'));
+            paper.classList.toggle('reader-user-indent', !!globalThis.localStorage?.getItem(indentPreference));
             applyLineSpacing(paper, this.lineSpacingOverride ? this.lineSpacing : null);
             if (!this.lineSpacingOverride) this.lineSpacing = readLineSpacing(paper);
         });
@@ -629,51 +614,63 @@ export class ReaderController {
         const fixed = elements.bookPaper?.dataset.layout === 'pre-paginated';
         const preferred = this.layoutController?.readingWidth || 560;
         const geometry = this.readingWidthGeometry(fixed ? 560 : preferred);
-        const width = geometry?.readingWidth || elements.paperContainer?.clientWidth || 560;
-        const maximum = this.readingWidthGeometry(800)?.readingWidth || width;
-        if (elements.lineSpacingLabel) {
-            elements.lineSpacingLabel.textContent = `${this.lineSpacing.toFixed(2)}×`;
-            elements.lineSpacingLabel.title = reason || 'Body line height relative to font size';
-            elements.lineSpacingLabel.setAttribute('aria-label', reason || `Line spacing ${this.lineSpacing.toFixed(2)} times`);
+        const width = Math.round(geometry?.readingWidth || elements.paperContainer?.clientWidth || 560);
+        const maximum = Math.round(this.readingWidthGeometry(readingWidthRange.max)?.readingWidth || width);
+        const spacing = this.lineSpacing.toFixed(2);
+        const size = Number(this.fontSize.toFixed(2));
+        showReadingSlider(elements.fontSizeInput, elements.fontSizeLabel, size, `${size}px`, `${size} pixels`, reason);
+        showReadingSlider(elements.lineSpacingInput, elements.lineSpacingLabel,
+            this.lineSpacing, `${spacing}×`, `${spacing} times`, reason);
+        const indent = parseFloat(this.textIndent);
+        showReadingSlider(elements.indentInput, elements.indentLabel,
+            Number.isFinite(indent) ? indent : defaultIndent, this.textIndent, this.textIndent, reason);
+
+        // Keep the scale stable during a drag, including after a prior resize
+        // left the preferred width between regular 40px stops.
+        if (this.widthStops.at(-1) !== maximum || !this.widthStops.includes(width)) {
+            this.widthStops = readingWidthStops(maximum, width);
         }
-        if (elements.readingWidthLabel) {
-            elements.readingWidthLabel.textContent = `${Math.round(width)}px`;
-            const description = reason || (width < preferred ? `Preferred ${preferred}px; available ${Math.round(width)}px` : `Reading width ${Math.round(width)}px`);
-            elements.readingWidthLabel.title = description;
-            elements.readingWidthLabel.setAttribute('aria-label', description);
-        }
-        const controls: [HTMLButtonElement | null | undefined, boolean, string][] = [
-            [elements.btnLineSpacingDec, this.lineSpacing <= 1.20, 'Decrease line spacing'],
-            [elements.btnLineSpacingInc, this.lineSpacing >= 2.40, 'Increase line spacing'],
-            [elements.btnReadingWidthDec, !geometry || width <= 320, 'Decrease reading width'],
-            [elements.btnReadingWidthInc, !geometry || width >= Math.min(800, maximum), 'Increase reading width'],
-        ];
-        for (const [button, limit, label] of controls) if (button) {
-            button.disabled = !!reason || limit;
-            button.title = reason || label;
-        }
+        const widthInput = elements.readingWidthInput;
+        if (widthInput) widthInput.max = String(this.widthStops.length - 1);
+        const description = width < preferred ? `Preferred ${preferred}px; available ${width}px` : `${width} pixels`;
+        const widthReason = reason || (!geometry || this.widthStops.length < 2 ? 'No room to adjust reading width' : '');
+        showReadingSlider(widthInput, elements.readingWidthLabel, this.widthStops.indexOf(width), `${width}px`, description, widthReason);
     }
 
-    changeLineSpacing(direction: number) {
+    private setFontSize(value: number) {
         if (this.readingSettingsUnavailable()) return;
-        const value = Math.max(1.20, Math.min(2.40, Math.round((this.lineSpacing + Math.sign(direction) * 0.05) * 100) / 100));
-        if (!direction || value === this.lineSpacing) return;
+        const size = Math.max(fontSizeRange.min, Math.min(fontSizeRange.max, value));
+        if (size === this.fontSize) return;
         this.queueReadingSettingsLayout();
-        this.lineSpacing = value;
+        this.fontSize = size;
+        this.fontSizeOverride = true;
+        this.refreshReadingSettingsControls();
+    }
+
+    private setIndent(value: number) {
+        if (this.readingSettingsUnavailable() || !Number.isInteger(value) || value < indentRange.min || value > indentRange.max) return;
+        const indent = `${value}em`;
+        if (indent === this.textIndent) return;
+        this.queueReadingSettingsLayout();
+        this.textIndent = indent;
+        globalThis.localStorage?.setItem(indentPreference, indent);
+        this.refreshReadingSettingsControls();
+    }
+
+    private setLineSpacing(value: number) {
+        if (this.readingSettingsUnavailable()) return;
+        const spacing = Math.max(lineSpacingRange.min, Math.min(lineSpacingRange.max, value));
+        if (spacing === this.lineSpacing) return;
+        this.queueReadingSettingsLayout();
+        this.lineSpacing = spacing;
         this.lineSpacingOverride = true;
         this.refreshReadingSettingsControls();
     }
 
-    changeReadingWidth(direction: number) {
+    private setReadingWidth(width: number) {
         if (this.readingSettingsUnavailable() || !this.layoutController) return;
-        const geometry = this.readingWidthGeometry();
-        if (!geometry || !direction) return;
-        const width = geometry.readingWidth;
-        const maximum = this.readingWidthGeometry(800)!.readingWidth;
-        if (direction < 0 ? width <= 320 : width >= Math.min(800, maximum)) return;
-        const preferred = Math.max(320, Math.min(800, width + Math.sign(direction) * 40));
         this.queueReadingSettingsLayout();
-        this.layoutController.readingWidth = preferred;
+        this.layoutController.readingWidth = width;
         this.refreshReadingSettingsControls();
     }
 
@@ -793,6 +790,7 @@ export class ReaderController {
     }
 
     layoutAndPlace(notes: Annotation[], options: ChapterRenderOptions = {}): void {
+        this.resetScrollActivity?.();
         const elements = this.elements;
         if (!elements) return;
         const mode = this.effectiveReaderMode();
@@ -838,15 +836,30 @@ export class ReaderController {
         this._anchorTimer = setTimeout(() => this.rememberAnchor(), 60);
     }
 
+    private readingScrollPosition() {
+        const paper = this.elements?.bookPaper;
+        const viewport = readerViewport(this.elements);
+        if (!paper || !viewport || !this.getCurrentBook() || this.effectiveReaderMode() !== 'scroll') return null;
+        const axis = readingAxis(paper);
+        return axis.vertical
+            ? { offset: axis.position, extent: axis.scroller.clientWidth }
+            : { offset: viewport.scrollTop, extent: viewport.clientHeight };
+    }
+
     stepChapter(direction: number, notes: Annotation[] = []): ReadingLocation {
         notes = this.callbacks.beforeNavigate?.() || notes;
         const mode = this.effectiveReaderMode();
         const fixed = publicationDocument(this.getCurrentBook(), this.currentPage)?.layout === 'pre-paginated';
+        const before = mode === 'scroll' ? this.readingScrollPosition() : null;
+        this.resetScrollActivity?.();
         const moved = fixed ? 'edge' : shiftStrip(this.elements, mode, direction);
         if (moved === 'moved') {
             this.syncChapterChrome();
             clearTimeout(this._anchorTimer);
             this._anchorTimer = setTimeout(() => this.rememberAnchor(), 60);
+            const after = before && this.readingScrollPosition();
+            if (before && after) this.callbacks.onReadingScroll?.(Math.abs(after.offset - before.offset), after.extent);
+            if (mode !== 'scroll') this.callbacks.onPageTurn?.();
             return this.getLocation();
         }
         let target = (direction < 0 ? (this._volumeTitlePages[0] || this.currentPage) : this.currentPage) + direction;
@@ -857,7 +870,9 @@ export class ReaderController {
             return this.getLocation();
         }
         this.flowAnchorText = '';
-        return this.renderChapterPage(target, false, notes, { toEnd: direction < 0, toStart: direction > 0 });
+        const location = this.renderChapterPage(target, false, notes, { toEnd: direction < 0, toStart: direction > 0 });
+        if (mode !== 'scroll') this.callbacks.onPageTurn?.();
+        return location;
     }
 
     syncChapterChrome() {

@@ -21,6 +21,13 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     const window = await startDesktop({ profileDirectory: path.join(output, 'react-workflow-profile') });
     window.webContents.setBackgroundThrottling(false);
     const run = source => window.webContents.executeJavaScript(source, true);
+    const clickReadingTool = id => run(`(() => {
+        const tools = document.getElementById('reading-tools');
+        if (tools.hasAttribute('data-collapsed')) document.getElementById('btn-reading-tools').click();
+        const tool = document.getElementById(${JSON.stringify(id)});
+        if (tool.closest('[inert]')) throw new Error('Reading tools did not expand');
+        tool.click();
+    })()`);
     const waitFor = expression => run(`(async () => {
         const end = Date.now() + 15000;
         while (!(${expression})) { if (Date.now() > end) throw new Error(${JSON.stringify(expression)} + '\\nActive: ' + document.activeElement?.outerHTML); await new Promise(resolve => setTimeout(resolve, 20)); }
@@ -36,12 +43,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     };
     await waitFor(`document.documentElement.dataset.desktopReady === 'setup'`);
     if (process.platform === 'win32') {
-        assert.equal(await run(`(() => {
-            const overlay = navigator.windowControlsOverlay;
-            const drag = document.querySelector('.window-drag-region');
-            return overlay?.visible && overlay.getTitlebarAreaRect().right < innerWidth
-                && drag.getBoundingClientRect().height > 0 && getComputedStyle(drag).appRegion === 'drag';
-        })()`), true, 'Windows caption controls reserve native space and share the app top area');
+        assert.equal(await run('navigator.windowControlsOverlay?.visible === true'), false, 'Windows keeps the native title bar');
     }
     await capture('library-setup');
     await run(`document.getElementById('desktop-create-library').click()`);
@@ -123,13 +125,13 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
             && Math.abs(tools.top + tools.bottom - workspace.top - workspace.bottom) < 1 && Math.abs(workspace.right - tools.right - 10) < 1;
     })()`), true, 'the transparent header and tool group center on the reading workspace');
     const readerBeforeToc = await run(`JSON.stringify([document.getElementById('reader-viewport').getBoundingClientRect(), document.querySelector('.page-indicator').textContent])`);
-    await run(`document.getElementById('btn-toc').click()`);
+    await clickReadingTool('btn-toc');
     assert.equal(await run(`(() => {
         const panel = document.getElementById('toc-drawer');
         return !panel.hidden && panel.querySelector('.toc-row') && !panel.querySelector('#btn-close-toc,.toc-header');
     })()`), true, 'the visible Contents panel starts with chapter rows');
     for (const [button, panel] of [['btn-toc', 'toc-drawer'], ['btn-shelf', 'shelf-panel'], ['btn-appearance', 'appearance-panel']]) {
-        await run(`(() => { const trigger = document.getElementById('${button}'); if (trigger.getAttribute('aria-expanded') !== 'true') trigger.click(); })()`);
+        if (await run(`document.getElementById('${button}').getAttribute('aria-expanded') !== 'true'`)) await clickReadingTool(button);
         assert.equal(await run(`(() => {
             const open = [...document.querySelectorAll('.reader-tool-panel.open')];
             const expanded = [...document.querySelectorAll('.reader-side-tools > button[aria-expanded="true"]')];
@@ -165,10 +167,12 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     assert.equal(await run(`(() => {
         const title = document.getElementById('current-book-title').getBoundingClientRect();
         const pagination = document.querySelector('.reader-pagination').getBoundingClientRect();
-        const overlay = navigator.windowControlsOverlay;
-        const rightLimit = overlay?.visible ? overlay.getTitlebarAreaRect().right : innerWidth;
-        return title.right <= pagination.left + 1 && pagination.left >= 0 && pagination.right <= rightLimit
-            && ['btn-prev-page', 'btn-next-page'].every(id => { const r = document.getElementById(id).getBoundingClientRect(); return r.left >= pagination.left && r.right <= pagination.right; });
+        return title.right <= pagination.left + 1 && pagination.left >= 0 && pagination.right <= innerWidth + 1
+            && ['btn-prev-page', 'btn-next-page'].every(id => {
+                const button = document.getElementById(id).getBoundingClientRect();
+                const pixel = value => Math.round(value * devicePixelRatio);
+                return pixel(button.left) >= pixel(pagination.left) && pixel(button.right) <= pixel(pagination.right);
+            });
     })()`), true, 'title and pagination remain usable at the minimum supported desktop size');
     await capture('reader-minimum-window');
     window.setBounds(originalBounds);
@@ -320,7 +324,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     assert.equal(saved.notes[0].comment, noteText);
     assert.equal(saved.links.length, 1);
     assert.equal(saved.links[0].annotationId, saved.notes[0].id);
-    await run(`document.getElementById('btn-shelf').click()`);
+    await clickReadingTool('btn-shelf');
     await waitFor(`document.querySelectorAll('#shelf-list .shelf-entry').length === 2`);
     await run(`(() => {
         const row = [...document.querySelectorAll('#shelf-list .shelf-entry')].find(row => row.textContent.includes('workflow B'));
@@ -329,7 +333,7 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
     await waitFor(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').textContent.includes('Second book')`);
     await run(`document.querySelector('#goal-panel .goal-item-text').click()`);
     await waitFor(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').textContent.includes('Alpha evidence') && document.querySelector('iframe.reader-document').contentDocument.querySelector('.annotation-token.is-active')`);
-    await run(`document.getElementById('btn-shelf').click()`);
+    await clickReadingTool('btn-shelf');
     await waitFor(`document.querySelector('#shelf-list [aria-label="Search library"]')`);
     await capture('shelf');
     await run(`(() => {
@@ -338,18 +342,25 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
         input.dispatchEvent(new Event('input', { bubbles: true }));
     })()`);
     await waitFor(`document.querySelectorAll('#shelf-list .shelf-entry').length === 1 && document.querySelector('#shelf-list .shelf-book-title').textContent.includes('workflow B')`);
-    await run(`document.getElementById('btn-close-shelf').click(); document.getElementById('btn-appearance').click()`);
+    await clickReadingTool('btn-shelf');
+    await clickReadingTool('btn-appearance');
     await waitFor(`document.activeElement?.id === 'font-family-select'`);
     assert.equal(await run(`document.getElementById('btn-appearance').textContent.trim()`), '', 'reading settings trigger stays icon-only');
     assert.equal(await run(`document.getElementById('btn-appearance').getAttribute('aria-label')`), 'Reading settings', 'icon-only settings retains its accessible name');
     await capture('reader-settings');
-    await run(`document.getElementById('btn-font-inc').click()`);
+    const adjustReadingSlider = (id, value) => run(`(() => {
+        const input = document.getElementById(${JSON.stringify(id)});
+        input.valueAsNumber = ${value};
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    await adjustReadingSlider('font-size', 19);
     await waitFor(`document.getElementById('font-size-label').textContent === '19px'`);
-    await run(`document.getElementById('btn-font-dec').click()`);
+    await adjustReadingSlider('font-size', 18);
     await waitFor(`document.getElementById('font-size-label').textContent === '18px'`);
-    await run(`(() => { const input = document.getElementById('indent-select'); input.value = '3em'; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-    await waitFor(`document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').style.getPropertyValue('--book-text-indent') === '3em'`);
-    await run(`(() => { const input = document.getElementById('indent-select'); input.value = '2em'; input.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-paper="sepia"]').click(); })()`);
+    await adjustReadingSlider('indent', 0);
+    await waitFor(`document.getElementById('indent-label').textContent === '0em' && document.querySelector('iframe.reader-document').contentDocument.getElementById('book-paper').style.getPropertyValue('--book-text-indent') === '0em'`);
+    await adjustReadingSlider('indent', 2);
+    await run(`document.querySelector('[data-paper="sepia"]').click()`);
     await waitFor(`document.getElementById('reader-panel').classList.contains('paper-sepia')`);
     assert.equal(await run(`getComputedStyle(document.getElementById('workspace-container')).backgroundColor`), 'rgb(251, 240, 217)');
     await run(`document.querySelector('[data-paper="dark"]').click()`);

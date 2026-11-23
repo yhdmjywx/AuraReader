@@ -128,11 +128,17 @@ Other shadcn styles and previously explored libraries remain historical referenc
   inside the popover. During reading, the application Settings panel groups
   Notes summary and Chapters under the collapsed Export book disclosure.
   See [Immersive reading toolbar and right-side tools](design-index.md#immersive-reading-toolbar-and-right-side-tools).
-- Local Library shows book titles and remove actions without structure metadata,
-  row separators, or the bottom service/backup hint. Keep search, import,
-  sample-book access, removal confirmation, and errors. Shorter lists fit contents
-  and the popover remains constrained by the viewport.
+- Local Library shows search, book titles and remove actions. Long lists scroll
+  inside the popover, with a 16px fade at the bottom while more results are
+  available below. The centered import icon sits in the solid paper area below
+  the fade and uses the Library home symbol, tooltip and accessible name. Use
+  the tool trigger, outside click or Escape to close the popover. Omit structure
+  metadata, row separators and the service/backup hint. Keep removal confirmation
+  and errors.
 - Reading Settings preserves layout, values, commands, and preference behavior.
+  Size, Line spacing, Reading width, and Indent use horizontal sliders with
+  narrow handles and separate, right-aligned live values. Indent has three
+  stops at 0em, 1em, and 2em.
   Font choices are radio menu items with selection indication. Paper/layout choices
   use neutral active feedback. Paper swatches
   remain unlabeled at rest, selected, and hovered, with accessible names, tooltips,
@@ -312,7 +318,7 @@ They are not global tokens; report conflicts rather than generalizing or discard
 | Parent contents / material disclosure | Group indent 16px; 4px before disclosure and between material list/rows. Disclosure 44×28px with 16px links icon and separate 12px caret |
 | Sidebar Goal rows only | Root/current parent 16px Medium; child 14px Regular; 40px compact single-line rows, 10px horizontal text insets. Full Goal typography is unchanged |
 | Reading toolbar | 52px reserved height; title width as specified in Workbench and Reading |
-| Local Library | 300px popover, 8px padding, 38px header, 28px close target/16px icon, 36px book rows; maximum height 370px, constrained by viewport and content |
+| Local Library (immersive reading) | 210px popover, 8px padding, 16px scroll fade, 28px centered import target with 16px icon, 360px maximum height constrained by reading area |
 | Reading Settings controls | Unlabeled 40px swatches: #fafaf7, #f3ead7, #222321. Size readout uses interface font, 13px/1.4; font-menu rows retain Vega styling |
 | Goal/menu alignment | 13px text, 1.4 line height, 8px vertical item padding (about 34.2px per row); compact separator/lower inset, about 123px for the ongoing three-item Goal menu |
 | Margin-note custom caret only | Saturated red #dc2626, width 0.5ch; opacity and input behavior as specified above |

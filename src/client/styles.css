@@ -389,11 +389,6 @@ body.theme-dark .btn-icon-sm.auto-downgraded {
 .appearance-row .select-sm {
     max-width: 160px;
 }
-.appearance-stepper {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
 .font-picker { position: relative; }
 .font-trigger {
     width: 180px;
@@ -605,13 +600,6 @@ body.theme-dark .export-backup-action i {
     color: var(--text-secondary);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
-}
-
-.font-size-text {
-    font-size: 12px;
-    min-width: 32px;
-    text-align: center;
-    font-family: 'Fira Code', monospace;
 }
 
 /* Paper Theme Switch Buttons */
@@ -1239,29 +1227,22 @@ mark.hl-active {
     display: flex;
     flex-direction: column;
 }
-.shelf-header {
+.shelf-footer {
+    position: relative;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     flex: none;
-    height: 38px;
-    padding: 0 8px;
+    padding-block-start: 4px;
 }
-.shelf-header h2 {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1.4;
+.shelf-footer .ui-button {
+    width: 28px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    border-radius: 8px;
 }
-#btn-close-shelf { width: 28px; height: 28px; min-height: 28px; padding: 0; border-radius: 8px; }
-#btn-close-shelf svg { width: 16px; height: 16px; }
-.shelf-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: none;
-    padding: 6px 0 10px;
-}
+.shelf-footer svg { width: 16px; height: 16px; }
 .shelf-list {
     list-style: none;
     margin: 0;

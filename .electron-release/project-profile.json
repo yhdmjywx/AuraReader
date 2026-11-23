@@ -58,7 +58,11 @@
     "test:syntax": "node scripts/test.cjs syntax",
     "test:unit": "node scripts/test.cjs unit",
     "test:regression": "node scripts/test.cjs regression",
-    "test:all": "node scripts/test.cjs all"
+    "test:all": "node scripts/test.cjs all",
+    "build:connector": "node scripts/build-connector.cjs",
+    "pack:connector": "node scripts/build-connector.cjs --package",
+    "test:connector": "npm run pack:connector && node tests/connector/stdio.cjs",
+    "test:connector:desktop": "npm run pack:connector && npm run build && node scripts/test-desktop.cjs connector.cjs"
   },
   "commands": {
     "build": "npm run build",
@@ -69,7 +73,10 @@
     "migration": "npm run test:migration",
     "desktop": "npm run test:desktop",
     "packageVerification": "npm run verify:package",
-    "packageRuntimeVerification": "node tests/desktop/packaged-epub.cjs"
+    "packageRuntimeVerification": "node tests/desktop/packaged-epub.cjs",
+    "connector": "npm run test:connector",
+    "connectorDesktop": "node scripts/test-desktop.cjs connector.cjs",
+    "browserStorage": "node scripts/test-desktop.cjs browser-storage.cjs"
   },
   "outputDirectories": {
     "renderer": "dist/renderer",
@@ -93,11 +100,11 @@
   "sources": [
     {
       "path": "package.json",
-      "sha256": "7a871cb9bb0cb5459c85be231ab941778cbb741eeb837a65a61474a28eacc049",
+      "sha256": "865d4fa832f9645a6f8a7bb7cbcc3b0f8df13e7208356c7c3fc9533c7f49140c",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "183cb5bf9357c2db890a128e2e262de817d6a118b6255d17d2b3b9b4dd577722"
+        "value": "865d4fa832f9645a6f8a7bb7cbcc3b0f8df13e7208356c7c3fc9533c7f49140c"
       }
     },
     {
@@ -111,11 +118,11 @@
     },
     {
       "path": "electron-builder.cjs",
-      "sha256": "3ec9f1da03f0d9f9b578bd18f8cb5e08f1c7f1a9c60c91be0cdc93ccfad6f5ca",
+      "sha256": "86fb0ddbff7bcc7a9a65e733dd9ad538259db48a021384b09937848586965336",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "af137de9cac3bb178132f809e4e2b447096b66383661d9eff544d1478b01cf1e"
+        "value": "c54de09611bf022d361d6670c300d7b1a65ae8fe81501ebe4e064dcbdd73e0af"
       }
     },
     {
@@ -138,7 +145,7 @@
     },
     {
       "path": "scripts/package-resources.cjs",
-      "sha256": "633fa726c0074262dca6f4240dd22339c8524faf57e41353c547366d8c217e87",
+      "sha256": "68435e09a9378783d05556d67ff988a67721fd850b16d5385249ab6f943f3963",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
@@ -147,16 +154,16 @@
     },
     {
       "path": "scripts/verify-package.cjs",
-      "sha256": "3e160bb5d5205db5fb50abac5ce4ac1398bd396a6784f8408d93f197bae34664",
+      "sha256": "633de7a9cd571e43ed852d157b2a27ee1e3d9932aebc5181bf87150a7539ac5d",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "d49b67e82dcd194f9b1d546da60faeac8e0b8edfded2787821be9e60b92f7d0f"
+        "value": "ab9a832510042d3ad50d7c682a850d5769fef6b8f6c3b3546994b0843e9e83b6"
       }
     },
     {
       "path": "vite.config.mjs",
-      "sha256": "b7672af594c0441ff0307a16ebf7a9d7e648786deb5a03629326a11582ae1cee",
+      "sha256": "5abbc12c01e0ca0fc08b2ea28a139acc15db5d2175414128ed4b7aeb3f44a504",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
@@ -174,7 +181,7 @@
     },
     {
       "path": "tsconfig.desktop.json",
-      "sha256": "2426226d9d6a61c5b0e667d2db3978e51b9a1e5be97964025096aa629b94ed7b",
+      "sha256": "12fd247bc4b586a37cd01285ea3ef761e2c83fd4bb4b6fe10c4c40ac2c9b949d",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
@@ -183,20 +190,20 @@
     },
     {
       "path": "docs/agents/project-profile.md",
-      "sha256": "40e1612beb6ddcf5537c3cb15985edcf3aa5e3f673446bdb0164e05cc116bc28",
+      "sha256": "33d5e117a162d23f0cbb89e7ed78254295203d3ab89a7f44de07094f5cd3cc7a",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "1e80720d89609674329e22ef0fef5a9cf63f3f8209e60fefde1769017fd711e7"
+        "value": "33d5e117a162d23f0cbb89e7ed78254295203d3ab89a7f44de07094f5cd3cc7a"
       }
     },
     {
       "path": "docs/development.md",
-      "sha256": "f714c51ddaca09d9b104a4451a41df7d8ce64f91437bd970bb14bf6c2e5a42dd",
+      "sha256": "acebc041b74fe62d9ce7e74e4c37d8f7c9f7f946949bc24d7fcb85d639cdbcdc",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "d2933d2c49b34a51634883e40b665609a7aac07b35333132d181a461f6267bb0"
+        "value": "3eb195d8b7371fb6137ae47350c453368aef2e34a0d70e6bc16826e443650216"
       }
     },
     {
@@ -219,20 +226,20 @@
     },
     {
       "path": "src/desktop/ipc.cjs",
-      "sha256": "658cf5d5ba6fb96268758842bd0d09a487f5d4c17e58ef99742635948f3c55b0",
+      "sha256": "241aaa9245ea6780e6999a7e866edd40a01299cc8db650ac7a7f566a1fa594fd",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "b8946806e31ab07bce42c037a91eaf32952cdb1fe0f8ae2a9ffe0957a3cfff62"
+        "value": "241aaa9245ea6780e6999a7e866edd40a01299cc8db650ac7a7f566a1fa594fd"
       }
     },
     {
       "path": "src/desktop/main.cjs",
-      "sha256": "577ebcafc44fefb592b2546f4c50faabad76d615563ab862082f2d2edc9045d9",
+      "sha256": "56071e09a363856afaefaea0eb1df52f4fcf478ba06d02fff02cac2598c99532",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "2ff3269868c3312e39e286cc984e711b24300a2cdd4cfb1915cda20c14069d08"
+        "value": "56071e09a363856afaefaea0eb1df52f4fcf478ba06d02fff02cac2598c99532"
       }
     },
     {
@@ -246,11 +253,11 @@
     },
     {
       "path": "scripts/test-desktop.cjs",
-      "sha256": "ff8a556e58d69e0f93d14c317cf1d368a1be21c3b618da10d473a4ad246ac1b4",
+      "sha256": "c94ae17999e629c0c4c03a09b06db7c71968ce5f3113654bc347815769a6cc43",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "9ff1d195d599848d5b93968df94a358cf3e2324e3f25b3cb3ea10991758a0df5"
+        "value": "c94ae17999e629c0c4c03a09b06db7c71968ce5f3113654bc347815769a6cc43"
       }
     },
     {
@@ -260,6 +267,78 @@
         "algorithm": "sha256",
         "normalization": "utf8-lf",
         "value": "91a7abe0922c1f1a1ce2c4eb0e8f57571168b43fae8b073945060d887d05e6fd"
+      }
+    },
+    {
+      "path": "src/desktop/entry.cjs",
+      "sha256": "e35bea0e4f7d8d458e6cae5cb7283783212ca7a0276acd1c19c7e73512b04380",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "8d806ecfb45412b9ce195aedef788e1fac3429ae1edb4fc9ae1e7e60badfbf96"
+      }
+    },
+    {
+      "path": "src/desktop/libraryObserver.cjs",
+      "sha256": "1ec315a3fc6a474d6e24776c306b12b25b83ed91d1562cb63f4d5bbf979f978d",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "1ec315a3fc6a474d6e24776c306b12b25b83ed91d1562cb63f4d5bbf979f978d"
+      }
+    },
+    {
+      "path": "scripts/build-connector.cjs",
+      "sha256": "deb8819df571393ca66f862b0fe97d643de8a553ada9975437914564dbfd1346",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "deb8819df571393ca66f862b0fe97d643de8a553ada9975437914564dbfd1346"
+      }
+    },
+    {
+      "path": "src/connector/package-lock.json",
+      "sha256": "b77b45d0111620e2d9552409b93e4a02d02f271091d3d0d9a3cd804532ad1f31",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "b77b45d0111620e2d9552409b93e4a02d02f271091d3d0d9a3cd804532ad1f31"
+      }
+    },
+    {
+      "path": "tsconfig.connector.json",
+      "sha256": "6907d03be93bad8156d81fe262fc5c88205655ac58f04e859e17e74d2a87fa4c",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "6907d03be93bad8156d81fe262fc5c88205655ac58f04e859e17e74d2a87fa4c"
+      }
+    },
+    {
+      "path": "tests/connector/stdio.cjs",
+      "sha256": "473d9f29e800af93d3d60ab4db4defe4a809e819d89d1ad7918fa6faf50e2668",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "473d9f29e800af93d3d60ab4db4defe4a809e819d89d1ad7918fa6faf50e2668"
+      }
+    },
+    {
+      "path": "tests/desktop/connector.cjs",
+      "sha256": "7a04ca4e65c071b4977af07db39b206045058e55068f1751bdcd644018295502",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "7a04ca4e65c071b4977af07db39b206045058e55068f1751bdcd644018295502"
+      }
+    },
+    {
+      "path": "tests/desktop/browser-storage.cjs",
+      "sha256": "499c703830385efd2acba65b6a5c77806947002049789dba1c0e318c8804c3c2",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "normalization": "utf8-lf",
+        "value": "5c4926927da6034c08d369cbd87335c47802b8db9a49ff4a0cb3cb54d077ba6e"
       }
     }
   ],
@@ -308,6 +387,37 @@
         "normal-exits"
       ],
       "source": "tests/desktop/packaged-epub.cjs"
+    },
+    "connector": {
+      "command": "npm run test:connector",
+      "covers": [
+        "connector-bundle",
+        "packaged-stdio",
+        "sqlite-read-write",
+        "file-round-trips"
+      ],
+      "source": "tests/connector/stdio.cjs"
+    },
+    "connectorDesktop": {
+      "command": "node scripts/test-desktop.cjs connector.cjs",
+      "prerequisite": "current npm test build outputs and npm run test:connector bundle",
+      "covers": [
+        "desktop-connector-live-sync",
+        "reader-position-and-selection",
+        "draft-conflict-recovery",
+        "close-save-guard"
+      ],
+      "source": "tests/desktop/connector.cjs"
+    },
+    "browserStorage": {
+      "command": "node scripts/test-desktop.cjs browser-storage.cjs",
+      "prerequisite": "current npm test build outputs",
+      "covers": [
+        "http-sqlite-library-access",
+        "legacy-indexeddb-preservation",
+        "browser-reload"
+      ],
+      "source": "tests/desktop/browser-storage.cjs"
     }
   }
 }

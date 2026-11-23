@@ -69,7 +69,6 @@ export class AppShell {
         if (e?.goalPage) e.goalPage.hidden = surface !== 'goal';
         for (const control of [e?.btnToc, e?.btnShelf]) if (control) control.hidden = surface !== 'reader';
         for (const control of [e?.btnExportMarkdown, e?.chapterExportEntry]) if (control) control.hidden = surface !== 'reader';
-        this.syncWindowControls();
         const status = document.getElementById('app-status');
         if (status) { status.hidden = true; status.replaceChildren(); }
         const back = e?.btnGoalBack;
@@ -97,18 +96,6 @@ export class AppShell {
             }
         }
         this.callbacks.onThemeChanged?.();
-        this.syncWindowControls();
-    }
-
-    syncWindowControls() {
-        const desktop = window.auraDesktop;
-        if (desktop?.platform !== 'win32') return;
-        const paper = document.documentElement.dataset.appSurface === 'reader' ? this.elements?.readerPanel : null;
-        const dark = paper?.classList.contains('paper-dark') || (
-            !paper?.matches('.paper-white, .paper-sepia') && this.appTheme === 'dark'
-        );
-        void desktop.window.setControlsTone(dark ? 'light' : 'dark').then(unwrapDesktop)
-            .catch(error => console.error('Could not update window controls:', error));
     }
 
     toggleAppearance(forceOpen?: boolean) {
@@ -251,15 +238,6 @@ export class AppShell {
                 if (!button || !icon) return;
                 icon.className = document.fullscreenElement ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
                 button.title = document.fullscreenElement ? "Exit fullscreen" : "Fullscreen";
-            });
-        }
-
-        // Switch Demo Book
-        if (elements.btnSwitchDemo) {
-            elements.btnSwitchDemo.addEventListener('click', () => {
-                if (this.callbacks.onSwitchDemo) {
-                    this.callbacks.onSwitchDemo();
-                }
             });
         }
 

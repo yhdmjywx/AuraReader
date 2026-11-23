@@ -5,12 +5,12 @@ import { ActionIcon } from '../../components/ui/action-icon.js';
 import { Input } from '../../components/ui/input.js';
 import { WorkspaceSettings } from './WorkspaceSettings.js';
 import { ReadingToolbar, ReadingTools } from './ReadingToolbar.js';
+import { defaultIndent, fontSizeRange, indentRange, lineSpacingRange, readingWidthRange } from '../reader/readingSliderUI.js';
 
 // Mount once before bootstrap. Controllers own only the explicit engine/view hosts below.
 // Keeping these hosts stable preserves EPUB ranges, imported fonts and export command state.
 export const WorkbenchShell = memo(function WorkbenchShell() {
     return <>
-    <div className="window-drag-region" aria-hidden="true" />
     <section id="app-status" className="app-status" role="status" aria-live="polite"><p>{"Opening library…"}</p></section>
     <header className="app-header">
         <div className="header-side header-brand">
@@ -140,38 +140,12 @@ function ReadingSettingsPanel() {
                 </div>
             </div>
         </div>
-        <div className="appearance-row">
-            <span>{"Size"}</span>
-            <div className="appearance-stepper">
-                <Button id="btn-font-dec" size="icon-lg" className="btn btn-icon-sm" type="button" title="Decrease font size" aria-label="Decrease font size"><ActionIcon name="minus" /></Button>
-                <span id="font-size-label" className="font-size-text">{"18px"}</span>
-                <Button id="btn-font-inc" size="icon-lg" className="btn btn-icon-sm" type="button" title="Increase font size" aria-label="Increase font size"><ActionIcon name="plus" /></Button>
-            </div>
-        </div>
-        <div className="appearance-row">
-            <span id="line-spacing-title">{"Line spacing"}</span>
-            <div className="appearance-stepper reading-geometry-stepper" role="group" aria-labelledby="line-spacing-title">
-                <Button id="btn-line-spacing-dec" size="icon-lg" className="btn btn-icon-sm" type="button" title="Decrease line spacing" aria-label="Decrease line spacing"><ActionIcon name="minus" /></Button>
-                <span id="line-spacing-label" className="font-size-text" aria-live="polite">{"1.85×"}</span>
-                <Button id="btn-line-spacing-inc" size="icon-lg" className="btn btn-icon-sm" type="button" title="Increase line spacing" aria-label="Increase line spacing"><ActionIcon name="plus" /></Button>
-            </div>
-        </div>
-        <div className="appearance-row">
-            <span id="reading-width-title">{"Reading width"}</span>
-            <div className="appearance-stepper reading-geometry-stepper" role="group" aria-labelledby="reading-width-title">
-                <Button id="btn-reading-width-dec" size="icon-lg" className="btn btn-icon-sm" type="button" title="Decrease reading width" aria-label="Decrease reading width"><ActionIcon name="minus" /></Button>
-                <span id="reading-width-label" className="font-size-text" aria-live="polite">{"560px"}</span>
-                <Button id="btn-reading-width-inc" size="icon-lg" className="btn btn-icon-sm" type="button" title="Increase reading width" aria-label="Increase reading width"><ActionIcon name="plus" /></Button>
-            </div>
-        </div>
-        <div className="appearance-row">
-            <label htmlFor="indent-select">{"Indent"}</label>
-            <select id="indent-select" className="select-sm" title="First-line indent" defaultValue="2em">
-                <option value="0em">{"None"}</option>
-                <option value="2em">{"2 em"}</option>
-                <option value="3em">{"3 em"}</option>
-            </select>
-        </div>
+        <ReadingSlider id="font-size" name="Size" range={fontSizeRange} initial={18} readout="18px" />
+        <ReadingSlider id="line-spacing" name="Line spacing" range={lineSpacingRange} initial={1.85} readout="1.85×" />
+        <ReadingSlider id="reading-width" name="Reading width"
+            range={{ min: 0, max: (readingWidthRange.max - readingWidthRange.min) / readingWidthRange.step, step: 1 }}
+            initial={(560 - readingWidthRange.min) / readingWidthRange.step} readout="560px" />
+        <ReadingSlider id="indent" name="Indent" range={indentRange} initial={defaultIndent} readout={`${defaultIndent}em`} />
         <div className="appearance-row">
             <span>{"Paper"}</span>
             <div className="paper-themes">
@@ -186,6 +160,22 @@ function ReadingSettingsPanel() {
                 <Button id="btn-mode-scroll" size="lg" className="btn btn-icon-sm mode-choice" type="button" title="Continuous scroll">{"Scroll"}</Button>
                 <Button id="btn-mode-single" size="lg" className="btn btn-icon-sm mode-choice" type="button" title="Single page">{"Page"}</Button>
             </div>
+        </div>
+    </div>;
+}
+
+function ReadingSlider({ id, name, range, initial, readout }: {
+    id: string;
+    name: string;
+    range: { min: number; max: number; step: number };
+    initial: number;
+    readout: string;
+}) {
+    return <div className="appearance-row">
+        <label htmlFor={id}>{name}</label>
+        <div className="reading-slider">
+            <input id={id} type="range" {...range} defaultValue={initial} />
+            <output id={`${id}-label`} htmlFor={id} aria-live="off">{readout}</output>
         </div>
     </div>;
 }
@@ -233,16 +223,13 @@ function ExportPanel() {
 }
 
 function LibraryPanel() {
-    return <section id="shelf-panel" className="appearance-panel shelf-panel reader-tool-panel" role="dialog" aria-modal="false" aria-labelledby="shelf-panel-title" aria-hidden="true">
-        <div className="shelf-header">
-            <h2 id="shelf-panel-title">{"Local library"}</h2>
-            <Button id="btn-close-shelf" size="icon" className="btn btn-icon-sm" type="button" aria-label="Close library" title="Close library"><ActionIcon name="close" /></Button>
-        </div>
-        <div className="shelf-actions">
-            <Button id="btn-import-book" className="btn btn-ghost-sm" type="button" title="Open local EPUB / PDF / TXT">{"Import book"}</Button>
-            <Button id="btn-switch-demo" className="btn btn-ghost-sm" type="button" title="Switch sample book">{"Sample book"}</Button>
+    return <section id="shelf-panel" className="appearance-panel shelf-panel reader-tool-panel" role="dialog" aria-modal="false" aria-label="Local library" aria-hidden="true">
+        <ul className="shelf-list" id="shelf-list" aria-label="Local books"></ul>
+        <div className="shelf-footer">
+            <Button id="btn-import-book" size="icon" className="btn btn-icon-sm" aria-label="Import book" title="Import book">
+                <ActionIcon name="import-book" />
+            </Button>
             <Input type="file" id="file-input" accept=".epub,.pdf,.txt" hidden />
         </div>
-        <ul className="shelf-list" id="shelf-list" aria-label="Local books"></ul>
     </section>;
 }

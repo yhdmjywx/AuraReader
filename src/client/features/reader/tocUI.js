@@ -4,6 +4,8 @@
    and delegates chapter navigation to the reader controller.
    ========================================================================== */
 
+import { syncScrollHint } from '../../components/ui/scrollHint.js';
+
 /** @param {import('../../domain/book.js').TocEntry[]} tocItems
  * @param {import('../../app/elements.js').AppElements} elements
  * @param {((entry: import('../../domain/book.js').TocEntry) => void) | null} onSelectChapter */
@@ -46,6 +48,7 @@ export function renderTOC(tocItems = [], elements, onSelectChapter = null) {
         li.append(row);
         list.append(li);
     });
+    syncScrollHint(elements.tocDrawer, list);
 }
 
 function setTocOpen(elements, open) {
@@ -56,6 +59,7 @@ function setTocOpen(elements, open) {
     }
     popover.hidden = !open;
     popover.classList.toggle('open', open);
+    syncScrollHint(popover, elements.tocList);
     elements.btnToc?.setAttribute('aria-expanded', String(open));
     if (elements.btnToc) elements.btnToc.title = open ? 'Close contents' : 'Open contents';
 }

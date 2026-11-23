@@ -123,10 +123,8 @@ body.theme-dark {
 /* Application controls and book controls occupy their own surfaces. */
 .app-header {
     display: flex; justify-content: space-between; flex: none; min-height: var(--header-height);
-    padding: 0 calc(20px + var(--window-control-space)) 0 20px; gap: 12px; border-bottom: 0; background: var(--bg-app);
-    app-region: drag;
+    padding: 0 20px; gap: 12px; border-bottom: 0; background: var(--bg-app);
 }
-.app-header :is(.brand, button) { app-region: no-drag; }
 #btn-goal-sidebar { flex: none; width: 36px; height: 36px; padding: 0; border-radius: var(--ui-radius); color: var(--text-primary); }
 #btn-goal-sidebar[aria-expanded="true"], #btn-goal-sidebar:hover { background: var(--goal-hover-bg); color: var(--text-primary); }
 .workspace-settings {
@@ -307,13 +305,6 @@ body.theme-dark #appearance-panel {
 #appearance-panel :is(.ui-button, .select-sm, .font-search) { min-height: 36px; border-radius: var(--ui-radius); font-size: 14px; color: var(--appearance-ink); }
 #appearance-panel :is(.ui-button, .select-sm, .font-search):focus-visible { outline-color: var(--appearance-ink); }
 #appearance-panel .ui-button:hover:not(:disabled) { background: var(--appearance-soft); }
-#appearance-panel .appearance-stepper { gap: 8px; }
-#appearance-panel .appearance-stepper .ui-button { width: 36px; height: 36px; padding: 0; }
-#appearance-panel .reading-geometry-stepper .ui-button:active:not(:disabled) { background: var(--appearance-edge); }
-#appearance-panel .reading-geometry-stepper .ui-button:disabled { opacity: .35; }
-#appearance-panel .reading-geometry-stepper .ui-button:focus-visible { outline: 2px solid var(--appearance-ink); outline-offset: 0; border-color: transparent; box-shadow: none; }
-#appearance-panel .appearance-stepper i { font-size: 18px; }
-#appearance-panel .font-size-text { min-width: 44px; font-family: inherit; font-size: 13px; line-height: 1.4; color: var(--appearance-ink); font-variant-numeric: tabular-nums; }
 #appearance-panel :is(.font-trigger, .select-sm) { border: 1px solid var(--appearance-edge); background: var(--bg-panel); padding: 7px 12px; }
 #appearance-panel .font-trigger { width: 178px; }
 #appearance-panel .font-trigger[aria-expanded="true"] { border-color: var(--appearance-ink); }

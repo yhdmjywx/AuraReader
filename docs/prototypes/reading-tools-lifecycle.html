@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reading tools · Reveal while reading</title>
+    <style>
+        :root {
+            --paper: #fff;
+            --ink: #252530;
+            --muted: #555560;
+            --rule: #e5e5e8;
+            --wash: #f1f1f4;
+            --accent: #6261ce;
+            --accent-wash: #ededf9;
+            --tool-size: 32px;
+            --edge: 10px;
+            --gap: 7px;
+        }
+        * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        body {
+            display: grid;
+            min-height: 100dvh;
+            margin: 0;
+            place-items: center;
+            background: #f6f6f7;
+            color: var(--ink);
+            font: 12px/1.4 Inter, system-ui, sans-serif;
+        }
+        .paper {
+            position: relative;
+            width: min(480px, calc(100vw - 24px));
+            height: min(292px, calc(100dvh - 24px));
+            border: 1px solid var(--rule);
+            border-radius: 12px;
+            background: var(--paper);
+        }
+        .tools {
+            position: absolute;
+            inset: 50% var(--edge) auto 0;
+            display: flex;
+            justify-content: flex-end;
+            translate: 0 -50%;
+            pointer-events: none;
+        }
+        .tools :is(button, section) { pointer-events: auto; }
+        button, input { font: inherit; }
+        button {
+            border: 0;
+            color: inherit;
+            background: transparent;
+            cursor: pointer;
+        }
+        .tool {
+            display: grid;
+            width: var(--tool-size);
+            height: var(--tool-size);
+            place-items: center;
+            padding: 0;
+            border-radius: 6px;
+            color: var(--muted);
+        }
+        .tool svg { width: 18px; height: 18px; }
+        #show-tools { color: #6c6c78; }
+        .tool:hover, .item:hover { background: var(--wash); }
+        .tool[aria-expanded="true"] { color: var(--accent); background: var(--accent-wash); }
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        #reading-tools { display: grid; gap: 4px; }
+        .popover {
+            position: absolute;
+            top: 50%;
+            right: calc(var(--tool-size) + var(--gap));
+            translate: 0 -50%;
+            width: min(210px, calc(100% - var(--tool-size) - var(--gap) - 8px));
+            max-height: min(260px, calc(100dvh - 44px));
+            overflow: auto;
+            padding: 6px;
+            border: 1px solid var(--rule);
+            border-radius: 10px;
+            background: var(--paper);
+            box-shadow: 0 6px 16px #0000001a;
+        }
+        .item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            min-height: 28px;
+            padding: 4px 6px;
+            border-radius: 5px;
+            text-align: left;
+        }
+        .item small { color: var(--muted); }
+        .setting { display: flex; align-items: center; gap: 8px; padding: 4px; }
+        .setting input { flex: 1; min-width: 0; accent-color: var(--accent); }
+        .setting output { min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+
+        body { padding: 12px; }
+        .demo { width: min(680px, 100%); }
+        .demo-controls, .pagination { display: flex; align-items: center; gap: 12px; }
+        .demo-controls { flex-wrap: wrap; justify-content: space-between; margin-bottom: 8px; }
+        .demo-controls label { display: flex; align-items: center; gap: 6px; }
+        select { font: inherit; color: inherit; border: 1px solid var(--rule); border-radius: 6px; padding: 4px 6px; background: var(--paper); }
+        .icon-options {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 10px;
+        }
+        .icon-options > span { margin-inline-end: 4px; color: var(--muted); }
+        .icon-options button {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            min-height: 30px;
+            padding: 3px 7px;
+            color: var(--muted);
+            border: 1px solid transparent;
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+        .icon-options button:hover { background: var(--wash); }
+        .icon-options button[aria-pressed="true"] { border-color: var(--rule); background: var(--paper); color: var(--ink); }
+        .icon-options svg { width: 18px; height: 18px; }
+        .icon-definitions { position: absolute; width: 0; height: 0; overflow: hidden; }
+        .paper { width: 100%; height: clamp(240px, 68dvh, 470px); overflow: hidden; }
+        .paper header { display: flex; min-height: 42px; justify-content: center; align-items: center; gap: 12px; }
+        .pagination { gap: 4px; }
+        .pagination button { width: 28px; height: 28px; border-radius: 6px; }
+        .pagination button:disabled { opacity: .3; cursor: default; }
+        .pagination button:enabled:hover { background: var(--wash); }
+        #page-count { min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
+        #reading-area { position: absolute; inset: 42px 47px 20px 14px; overflow: hidden; padding: 14px 12px; }
+        #reading-area[data-scroll="true"] { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+        article { max-width: 390px; margin-inline: auto; font: var(--sample-size, 18px)/1.6 Georgia, serif; }
+        article h1 { margin: 0 0 .6em; font-size: 1.24em; line-height: 1.3; }
+        article p { margin: 0 0 .9em; }
+        .tools { z-index: 1; height: 104px; }
+        #show-tools, #reading-tools { transition: opacity 160ms ease, scale 160ms ease; }
+        #show-tools { position: absolute; right: 0; top: calc(50% - var(--tool-size) / 2); }
+        #reading-tools { pointer-events: auto; }
+        .tools[data-expanded="true"] #show-tools { opacity: 0; scale: .86; pointer-events: none; }
+        .tools[data-expanded="false"] #reading-tools { opacity: 0; scale: .86; pointer-events: none; }
+        .tools[data-expanded="false"] #reading-tools button { pointer-events: none; }
+        .tool:hover, .item:hover, .item[aria-current="page"] { background: var(--wash); }
+        #tool-bridge { position: absolute; right: var(--tool-size); width: var(--gap); top: 0; bottom: 0; pointer-events: auto; }
+        .popover { max-height: min(360px, calc(68dvh - 16px)); }
+        @media (prefers-reduced-motion: reduce) {
+            #show-tools, #reading-tools { transition: none; }
+        }
+    </style>
+</head>
+<body>
+    <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+        <symbol id="icon-edge-arrow" viewBox="0 0 20 20">
+            <path d="M14 4.5v11M10 6.5l-3.5 3.5 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </symbol>
+        <symbol id="icon-side-panel" viewBox="0 0 20 20">
+            <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <rect x="3" y="4.75" width="14" height="10.5" rx="2"/>
+                <path d="M12.75 5v10"/>
+            </g>
+        </symbol>
+        <symbol id="icon-tool-stack" viewBox="0 0 20 20">
+            <g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round">
+                <rect x="7.9" y="3.1" width="4.2" height="3" rx=".7"/>
+                <rect x="7.9" y="8.5" width="4.2" height="3" rx=".7"/>
+                <rect x="7.9" y="13.9" width="4.2" height="3" rx=".7"/>
+            </g>
+        </symbol>
+        <symbol id="icon-edge-handle" viewBox="0 0 20 20">
+            <path d="M10 4.75v10.5" fill="none" stroke="currentColor" stroke-opacity=".75" stroke-width="3.5" stroke-linecap="round"/>
+        </symbol>
+    </svg>
+    <div class="demo">
+      <div class="demo-controls">
+          <label>Book
+              <select id="book"><option value="0">Reading notes</option><option value="1">Design notebook</option></select>
+          </label>
+          <label>Collapse delay
+              <select id="collapse-delay">
+                  <option value="5">5 seconds</option>
+                  <option value="10" selected>10 seconds</option>
+                  <option value="30">30 seconds</option>
+              </select>
+          </label>
+          <label>Layout
+              <select id="mode"><option value="page">Page</option><option value="scroll">Scroll</option></select>
+          </label>
+      </div>
+      <div class="icon-options" role="group" aria-labelledby="icon-options-label">
+          <span id="icon-options-label">Collapsed icon</span>
+          <button type="button" data-icon="edge-arrow" aria-pressed="true"><svg aria-hidden="true"><use href="#icon-edge-arrow"/></svg>Edge arrow</button>
+          <button type="button" data-icon="side-panel" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-side-panel"/></svg>Side panel</button>
+          <button type="button" data-icon="tool-stack" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-tool-stack"/></svg>Tool stack</button>
+          <button type="button" data-icon="edge-handle" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-edge-handle"/></svg>Edge handle</button>
+      </div>
+      <main class="paper" aria-label="Reading area">
+        <header>
+            <span id="book-title">Reading notes</span>
+            <div class="pagination" id="pagination" aria-label="Pagination">
+                <button id="prev" type="button" aria-label="Previous page">‹</button>
+                <span id="page-count" aria-live="polite">1 / 3</span>
+                <button id="next" type="button" aria-label="Next page">›</button>
+            </div>
+        </header>
+        <div id="reading-area" role="region" aria-label="Book text">
+            <article id="text"></article>
+        </div>
+        <div class="tools" data-expanded="true">
+            <div id="tool-bridge" aria-hidden="true" hidden></div>
+            <button class="tool" id="show-tools" type="button" aria-label="Show reading tools" aria-controls="reading-tools" aria-expanded="true" tabindex="-1" inert title="Contents, library, and reading settings">
+                <svg aria-hidden="true"><use href="#icon-edge-arrow"/></svg>
+            </button>
+            <div id="reading-tools" role="group" aria-label="Reading tools">
+                <button class="tool" type="button" aria-label="Contents" aria-controls="contents" aria-expanded="false" title="Contents">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M5 3h10M5 8h10M5 13h10M1 3h.4M1 8h.4M1 13h.4"/></svg>
+                </button>
+                <button class="tool" type="button" aria-label="My library" aria-controls="library" aria-expanded="false" title="My library">
+                    <svg viewBox="0 0 19 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M1 1h3v14H1zM7 1h3v14H7zM12 3l3-1 3 12-3 1z"/></svg>
+                </button>
+                <button class="tool" type="button" aria-label="Reading settings" aria-controls="settings" aria-expanded="false" title="Reading settings">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M8 1a7 7 0 0 0 0 14h1a1.5 1.5 0 0 0 1-2.6 1.2 1.2 0 0 1 .8-2.1h2A2.2 2.2 0 0 0 15 8 7 7 0 0 0 8 1ZM5 5.5h.1M8 3.8h.1M3.8 8.5h.1"/></svg>
+                </button>
+            </div>
+            <section class="popover" id="contents" aria-label="Contents" hidden>
+                <button class="item" type="button" data-page="0">Introduction <small>P.1</small></button>
+                <button class="item" type="button" data-page="1">Chapter 1 <small>P.2</small></button>
+                <button class="item" type="button" data-page="2">Chapter 2 <small>P.3</small></button>
+            </section>
+            <section class="popover" id="library" aria-label="My library" hidden>
+                <button class="item" type="button" data-book="0">Reading notes</button>
+                <button class="item" type="button" data-book="1">Design notebook</button>
+            </section>
+            <section class="popover" id="settings" aria-label="Reading settings" hidden>
+                <div class="setting">
+                    <label for="sample-size">Size</label>
+                    <input id="sample-size" type="range" min="13" max="32" value="18">
+                    <output for="sample-size" aria-live="off">18px</output>
+                </div>
+            </section>
+        </div>
+      </main>
+    </div>
+    <script>
+        const tools = document.querySelector('.tools');
+        const trigger = document.querySelector('#show-tools');
+        const group = document.querySelector('#reading-tools');
+        const bridge = document.querySelector('#tool-bridge');
+        const buttons = [...group.querySelectorAll('button')];
+        const bookPicker = document.querySelector('#book');
+        const delayPicker = document.querySelector('#collapse-delay');
+        const iconChoices = document.querySelector('.icon-options');
+        const mode = document.querySelector('#mode');
+        const area = document.querySelector('#reading-area');
+        const text = document.querySelector('#text');
+        const pageCount = document.querySelector('#page-count');
+        const pagination = document.querySelector('#pagination');
+        const prev = document.querySelector('#prev');
+        const next = document.querySelector('#next');
+        const sampleSize = document.querySelector('#sample-size');
+        const titles = ['Introduction', 'Chapter 1', 'Chapter 2'];
+        const passages = [
+            [
+                'A reading note starts with a question. Give it a sentence of its own, then let the chapter help you decide whether it is the right question to ask.',
+                'When a passage stops you, read the sentence on either side of it. The explanation may be in the surrounding paragraph, while the sentence that caught your eye is only the doorway.',
+                'Keep a short record of what changed your mind. The next time you return to the book, it will give you a place to begin.'
+            ],
+            [
+                'The most useful early sketches are the ones you can put aside. With only a few marks on the page, a small change has room to become a different idea.',
+                'Look at each sketch for the problem it makes easier to see. Then try to describe that problem without referring to the sketch.',
+                'A notebook is a record of choices. Leave enough room to write down why two versions felt different, even when the difference is small.'
+            ]
+        ];
+        function createBookStates() {
+            return passages.map(() => ({ holdUntil: 0, hasCollapsed: false, page: 0, scrollTop: 0, distance: 0 }));
+        }
+
+        let books = createBookStates();
+        let book = books[0];
+        let activeTool = null;
+        let pointerInside = false;
+        let keyboardInside = false;
+        let collapseDelay;
+        let restoringFocus = false;
+        let ignoreScroll = false;
+
+        function setExpanded(expanded) {
+            tools.dataset.expanded = String(expanded);
+            trigger.setAttribute('aria-expanded', String(expanded));
+            // Keep a focused or explicitly clicked trigger alive for the next Tab.
+            trigger.inert = expanded && document.activeElement !== trigger;
+            trigger.tabIndex = expanded ? -1 : 0;
+            group.inert = !expanded;
+        }
+
+        function refreshTools() {
+            clearTimeout(collapseDelay);
+            if (!book.holdUntil || pointerInside || keyboardInside || activeTool) {
+                setExpanded(true);
+            } else if (tools.dataset.expanded === 'true') {
+                const remaining = book.hasCollapsed ? 0 : book.holdUntil - performance.now();
+                collapseDelay = setTimeout(() => {
+                    book.hasCollapsed = true;
+                    setExpanded(false);
+                }, Math.max(220, remaining));
+            }
+        }
+
+        function deferFirstCollapse() {
+            if (book.hasCollapsed) return;
+            book.holdUntil = performance.now() + Number(delayPicker.value) * 1000;
+            refreshTools();
+        }
+
+        function showPanel(selected) {
+            activeTool = selected;
+            bridge.hidden = !selected;
+            for (const button of buttons) {
+                const open = button === selected;
+                document.getElementById(button.getAttribute('aria-controls')).hidden = !open;
+                button.setAttribute('aria-expanded', String(open));
+            }
+            refreshTools();
+        }
+
+        function returnFocus(button) {
+            restoringFocus = true;
+            button.focus({ preventScroll: true });
+            restoringFocus = false;
+        }
+
+        function dismissFromTool() {
+            const previousTool = activeTool;
+            showPanel(null);
+            if (book.hasCollapsed) {
+                pointerInside = false;
+                keyboardInside = false;
+                clearTimeout(collapseDelay);
+                setExpanded(false);
+                returnFocus(trigger);
+            } else {
+                returnFocus(previousTool || buttons[0]);
+                keyboardInside = document.activeElement.matches(':focus-visible');
+                refreshTools();
+            }
+        }
+
+        function renderBook() {
+            const scroll = mode.value === 'scroll';
+            area.dataset.scroll = String(scroll);
+            area.tabIndex = scroll ? 0 : -1;
+            pagination.hidden = scroll;
+            document.querySelector('#book-title').textContent = bookPicker.selectedOptions[0].text;
+            pageCount.textContent = `${book.page + 1} / ${titles.length}`;
+            prev.disabled = book.page === 0;
+            next.disabled = book.page === titles.length - 1;
+            const copy = passages[Number(bookPicker.value)];
+            text.replaceChildren();
+            for (const page of scroll ? [0, 1, 2] : [book.page]) {
+                const chapter = document.createElement('section');
+                chapter.id = `chapter-${page}`;
+                const heading = document.createElement('h1');
+                heading.textContent = titles[page];
+                chapter.append(heading);
+                for (let i = 0; i < copy.length; i++) {
+                    const paragraph = document.createElement('p');
+                    paragraph.textContent = copy[(i + page) % copy.length];
+                    chapter.append(paragraph);
+                }
+                text.append(chapter);
+            }
+            ignoreScroll = true;
+            area.scrollTop = scroll ? book.scrollTop : 0;
+            requestAnimationFrame(() => { ignoreScroll = false; });
+            for (const chapter of document.querySelectorAll('[data-page]')) {
+                if (Number(chapter.dataset.page) === book.page) chapter.setAttribute('aria-current', 'page');
+                else chapter.removeAttribute('aria-current');
+            }
+        }
+
+        function openBook(id) {
+            bookPicker.value = id;
+            book = books[Number(id)];
+            pointerInside = false;
+            keyboardInside = false;
+            setExpanded(!book.hasCollapsed);
+            showPanel(null);
+            renderBook();
+        }
+
+        function turnPage(direction) {
+            const page = book.page + direction;
+            if (page < 0 || page >= titles.length) return;
+            book.page = page;
+            renderBook();
+            deferFirstCollapse();
+        }
+
+        prev.addEventListener('click', () => turnPage(-1));
+        next.addEventListener('click', () => turnPage(1));
+        bookPicker.addEventListener('change', () => openBook(bookPicker.value));
+        delayPicker.addEventListener('change', () => {
+            books = createBookStates();
+            openBook(bookPicker.value);
+        });
+        iconChoices.addEventListener('click', event => {
+            const selected = event.target.closest('[data-icon]');
+            if (!selected) return;
+            trigger.querySelector('use').setAttribute('href', `#icon-${selected.dataset.icon}`);
+            for (const option of iconChoices.querySelectorAll('button')) {
+                option.setAttribute('aria-pressed', String(option === selected));
+            }
+        });
+        mode.addEventListener('change', renderBook);
+        area.addEventListener('scroll', () => {
+            if (ignoreScroll || mode.value !== 'scroll') return;
+            const moved = Math.abs(area.scrollTop - book.scrollTop);
+            book.scrollTop = area.scrollTop;
+            if (book.hasCollapsed || !moved) return;
+            book.distance += moved;
+            if (book.distance >= area.clientHeight / 2) deferFirstCollapse();
+        }, { passive: true });
+
+        tools.addEventListener('pointerenter', event => {
+            if (event.pointerType !== 'mouse') return;
+            pointerInside = true;
+            refreshTools();
+        });
+        tools.addEventListener('pointerleave', event => {
+            if (event.pointerType !== 'mouse') return;
+            pointerInside = false;
+            refreshTools();
+        });
+        tools.addEventListener('focusin', event => {
+            if (restoringFocus || !event.target.matches(':focus-visible')) return;
+            keyboardInside = true;
+            refreshTools();
+        });
+        tools.addEventListener('focusout', event => {
+            if (tools.contains(event.relatedTarget)) return;
+            keyboardInside = false;
+            refreshTools();
+        });
+        trigger.addEventListener('click', () => {
+            keyboardInside = trigger.matches(':focus-visible');
+            setExpanded(true);
+            buttons[0].focus({ preventScroll: true });
+        });
+        for (const button of buttons) {
+            button.addEventListener('click', () => {
+                showPanel(activeTool === button ? null : button);
+                if (activeTool && button.matches(':focus-visible')) {
+                    document.getElementById(button.getAttribute('aria-controls')).querySelector('button, input')?.focus();
+                }
+            });
+        }
+
+        document.addEventListener('click', event => {
+            const chapter = event.target.closest('[data-page]');
+            const selectedBook = event.target.closest('[data-book]');
+            if (chapter) {
+                book.page = Number(chapter.dataset.page);
+                renderBook();
+                if (mode.value === 'scroll') {
+                    const target = document.querySelector(`#chapter-${book.page}`);
+                    area.scrollTop = target.offsetTop;
+                    book.scrollTop = area.scrollTop;
+                }
+                dismissFromTool();
+            } else if (selectedBook) {
+                openBook(selectedBook.dataset.book);
+                returnFocus(bookPicker);
+            } else if (!tools.contains(event.target) && (activeTool || book.holdUntil)) {
+                pointerInside = false;
+                keyboardInside = false;
+                showPanel(null);
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && (activeTool || (book.hasCollapsed && tools.dataset.expanded === 'true'))) {
+                event.preventDefault();
+                dismissFromTool();
+            }
+        });
+        sampleSize.addEventListener('input', () => {
+            document.querySelector('output').value = `${sampleSize.value}px`;
+            text.style.setProperty('--sample-size', `${sampleSize.value}px`);
+        });
+
+        openBook('0');
+    </script>
+</body>
+</html>

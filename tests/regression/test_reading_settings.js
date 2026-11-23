@@ -3,8 +3,10 @@ const { JSDOM } = require('jsdom');
 
 (async () => {
     const dom = new JSDOM(`<main class="workspace-container immersive-notes"><section id="reader"><div class="reader-viewport"><div class="paper-container"><article class="book-paper"></article></div></div></section></main>
-        <button id="line-down"></button><span id="line-label"></span><button id="line-up"></button>
-        <button id="width-down"></button><span id="width-label"></span><button id="width-up"></button>`,
+        <input id="size" type="range" min="13" max="32" step="1"><output id="size-label"></output>
+        <input id="line" type="range" min="1.2" max="2.4" step="0.05"><output id="line-label"></output>
+        <input id="width" type="range" min="0" max="12" step="1"><output id="width-label"></output>
+        <input id="indent" type="range" min="0" max="2" step="1"><output id="indent-label"></output>`,
         { url: 'http://localhost/', pretendToBeVisual: true });
     const keys = ['window', 'document', 'localStorage', 'Node', 'NodeFilter'];
     const prior = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
@@ -21,9 +23,15 @@ const { JSDOM } = require('jsdom');
         Object.defineProperty(workspace, 'clientWidth', { get: () => available });
         Object.defineProperty(container, 'clientWidth', { get: () => parseFloat(workspace.style.getPropertyValue('--reading-width')) || 560 });
         Object.defineProperty(container, 'clientHeight', { get: () => 600 });
-        const controls = { workspaceContainer: workspace, lineSpacingLabel: byId('line-label'),
-            btnLineSpacingDec: byId('line-down'), btnLineSpacingInc: byId('line-up'),
-            readingWidthLabel: byId('width-label'), btnReadingWidthDec: byId('width-down'), btnReadingWidthInc: byId('width-up') };
+        const controls = { workspaceContainer: workspace, fontSizeInput: byId('size'), fontSizeLabel: byId('size-label'),
+            lineSpacingInput: byId('line'), lineSpacingLabel: byId('line-label'),
+            readingWidthInput: byId('width'), readingWidthLabel: byId('width-label'),
+            indentInput: byId('indent'), indentLabel: byId('indent-label') };
+        const adjust = (id, value) => {
+            const range = byId(id);
+            range.valueAsNumber = value;
+            range.dispatchEvent(new window.Event('input', { bubbles: true }));
+        };
         const paragraph = '<p id="body" style="line-height:2.10!important">Stable quotation for highlights and margin notes. <code style="line-height:24px">a + b</code><ruby style="line-height:1.25">字<rt>zi</rt></ruby></p>';
         const pages = [`<h1 style="line-height:1.1">Heading</h1>${paragraph}<table><tbody><tr><td><p style="line-height:1.3">Cell</p></td></tr></tbody></table>`,
             '<p>Fixed page</p>', '<p id="rtl">نص عربي محفوظ في المصدر ولا تتغير علاقة الملاحظات به.</p>', '<p>縦書きの本文と元の方向を維持して行間を調整します。</p>'];
@@ -35,22 +43,40 @@ const { JSDOM } = require('jsdom');
         const note = { id: 'layout-note', bookId: book.id, kind: 'note', page: 1, quote: 'Stable quotation', comment: 'Preserved note',
             location: { sectionId: 'chapter-1', page: 1, start, end: start + 16, offset: start } };
         const source = JSON.stringify(book), annotation = JSON.stringify(note);
+        localStorage.setItem('aura_text_indent', '3em');
+        assert.equal(new ReaderRuntime().reader.textIndent, '2em', 'legacy 3em preferences use the closest available stop');
+        localStorage.removeItem('aura_text_indent');
         runtime = new ReaderRuntime(); runtime.mount(byId('reader'), controls); runtime.setBook(book, [note]);
         const reader = runtime.reader, paper = reader.elements.bookPaper;
         const body = paper.querySelector('#body'), token = paper.querySelector('.annotation-token');
         assert.equal(byId('line-label').textContent, '2.10×', 'display current author line height before overriding');
         assert.equal(body.style.getPropertyValue('line-height'), '2.1', 'initial rendering keeps author style');
         assert.equal(reader.lineSpacingOverride, false);
+        assert.equal(byId('indent-label').textContent, '1em');
+        assert.equal(paper.classList.contains('reader-user-indent'), false, 'the default preserves authored EPUB indentation');
         const frame = () => new Promise(resolve => window.requestAnimationFrame(() => resolve()));
         await frame(); // Allow the existing initial font-ready callback to finish first.
         let layouts = 0;
         const layout = reader.layoutAndPlace.bind(reader);
         reader.layoutAndPlace = (...args) => { layouts++; return layout(...args); };
-        byId('line-up').click(); byId('line-up').click(); byId('width-down').click();
+        adjust('size', 21);
+        adjust('line', 2.15);
+        adjust('line', 2.20);
+        adjust('width', byId('width').valueAsNumber - 1);
+        adjust('indent', 0);
+        assert.equal(byId('size-label').textContent, '21px');
+        assert.equal(byId('line-label').textContent, '2.20×');
+        assert.equal(byId('width-label').textContent, '520px', 'the readouts respond before reflow');
+        assert.equal(byId('indent-label').textContent, '0em');
+        assert.equal(localStorage.getItem('aura_text_indent'), '0em');
+        assert.equal(new ReaderRuntime().reader.textIndent, '0em');
         await frame();
         assert.equal(layouts, 1, 'rapid setting changes share one pagination pass');
+        assert.equal(paper.style.fontSize, '21px');
         assert.equal(body.style.lineHeight, '2.2');
         assert.equal(container.clientWidth, 520);
+        assert.equal(paper.style.getPropertyValue('--book-text-indent'), '0em');
+        assert.equal(paper.classList.contains('reader-user-indent'), true);
         assert.equal(paper.querySelector('h1').style.lineHeight, '1.1');
         assert.equal(paper.querySelector('code').style.lineHeight, '24px');
         assert.equal(paper.querySelector('ruby').style.lineHeight, '1.25');
@@ -68,23 +94,24 @@ const { JSDOM } = require('jsdom');
         split.remove();
         reader.applyTypography();
 
-        for (let i = 0; i < 50; i++) byId('line-up').click();
+        adjust('line', 2.4);
         await frame();
-        assert.equal(reader.lineSpacing, 2.4); assert.equal(byId('line-up').disabled, true);
-        for (let i = 0; i < 50; i++) byId('line-down').click();
+        assert.equal(reader.lineSpacing, 2.4); assert.equal(byId('line').disabled, false);
+        adjust('line', 1.2);
         await frame();
-        assert.equal(reader.lineSpacing, 1.2); assert.equal(byId('line-down').disabled, true);
+        assert.equal(reader.lineSpacing, 1.2);
         reader.layoutController.readingWidth = 560;
         available = 732; runtime.relayout();
         assert.equal(byId('width-label').textContent, '448px');
         assert.match(byId('width-label').title, /Preferred 560px/);
-        assert.equal(byId('width-up').disabled, true);
-        byId('width-down').click(); await frame();
+        assert.equal(byId('width').value, byId('width').max, 'the thumb stops at the available width');
+        adjust('width', byId('width').valueAsNumber - 1); await frame();
         assert.equal(container.clientWidth, 408, 'decrease starts at actual constrained width');
         available = 1600; runtime.relayout();
         assert.equal(container.clientWidth, 408, 'resize keeps the session preference');
+        assert.equal(byId('width').getAttribute('aria-valuetext'), '408 pixels');
         runtime.goToPage(2);
-        assert.equal(byId('line-up').disabled, true); assert.equal(byId('width-up').disabled, true);
+        for (const id of ['size', 'line', 'width', 'indent']) assert.equal(byId(id).disabled, true);
         assert.match(byId('line-label').title, /Fixed-layout/);
         assert.equal(container.clientWidth, 560, 'fixed layout uses original container geometry');
         assert.equal(paper.querySelector('p').style.lineHeight, '', 'fixed content receives no line-height override');
@@ -99,14 +126,15 @@ const { JSDOM } = require('jsdom');
         assert.equal(parseFloat(paper.style.getPropertyValue('--aura-reading-line-height')), columnSpacing);
         const step = readingAxis(paper).step;
         assert.ok(Math.abs(step / columnSpacing - Math.round(step / columnSpacing)) < 0.00001, 'vertical steps follow the new body line spacing');
-        reader.clearBook(); assert.equal(byId('line-up').disabled, true); assert.equal(byId('width-down').disabled, true);
+        reader.clearBook();
+        for (const id of ['size', 'line', 'width', 'indent']) assert.equal(byId(id).disabled, true);
         for (const width of [600, 732, 800, 1200, 1600, 1920]) for (const preferred of [320, 560, 800]) {
             const g = marginGeometry(width, preferred);
             assert.ok(g.readingWidth <= preferred); assert.ok(g.readingLeft >= 16);
             assert.ok(g.rightNoteLeft >= g.readingLeft + g.readingWidth + 32);
             assert.ok(g.rightNoteLeft + g.noteWidth <= width, 'custom reading width retains the notes lane');
         }
-        console.log('PASS: session controls, coalesced reflow, reversible scoped typography, preserved special content/annotations/source, constrained width, fixed/RTL transitions and notes geometry');
+        console.log('PASS: reading sliders and live values, coalesced reflow, reversible scoped typography, preserved special content/annotations/source, constrained width, fixed/RTL transitions and notes geometry');
     } finally {
         runtime?.destroy(); dom.window.close();
         for (const [key, value] of prior) { if (value) Object.defineProperty(globalThis, key, value); else delete globalThis[key]; }

@@ -179,7 +179,7 @@ Book export is an inline disclosure in application Settings.
 | Default | [Reading Interface](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-129) | Migrated the original base frame in place |
 | Contents open | [Reading Interface / Contents open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-817) | Migrated the original drawer state to the tool-group popover |
 | Local library open | [Reading Interface / Local library open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-597) | Migrated the original state to the tool-group popover |
-| Reading settings open | [Reading Interface / Reading settings open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-421) | Migrated the original state to the tool-group popover |
+| Reading settings open | [Reading Interface / Reading settings open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-421) | Uses the [compact popover component](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=419-4507) with separate sliders and right-aligned values for Size, Line spacing, and Reading width |
 | Settings / Export book | [Reading Interface / Settings / Export book](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=423-4923) | Shows the [Settings export component](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=441-2860) above the sidebar Settings button |
 | Dark Paper | [Reading Interface / Dark Paper](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=430-1892) | Default tool state with the existing dark-paper variables and local control color overrides |
 

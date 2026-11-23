@@ -54,7 +54,6 @@ export interface DesktopBridge {
     };
     readonly window: {
         toggleFullscreen(): Promise<DesktopResult<{ fullscreen: boolean }>>;
-        setControlsTone(tone: 'light' | 'dark'): Promise<DesktopResult<void>>;
     };
     readonly wiki: {
         read(input: WikiRequest): Promise<DesktopResult<WikiResponse>>;

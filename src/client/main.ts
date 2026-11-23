@@ -27,6 +27,7 @@ import { BackupController } from './features/backup/backupController.js';
 import { AppShell } from './app/appShell.js';
 import { AppCoordinator } from './app/appCoordinator.js';
 import { AppNavigation } from './app/navigation.js';
+import { ReadingToolsDisclosure } from './features/workbench/readingToolsDisclosure.js';
 
 export function queryElements(): AppElements {
     if (typeof document === 'undefined') return {};
@@ -70,16 +71,14 @@ export function queryElements(): AppElements {
         fontFileInput: document.getElementById('font-file-input') as HTMLInputElement | null,
         fontStatus: document.getElementById('font-status'),
         fontBrowserList: document.getElementById('font-browser-list'),
-        indentSelect: document.getElementById('indent-select') as HTMLSelectElement | null,
+        indentInput: document.getElementById('indent') as HTMLInputElement | null,
+        indentLabel: document.getElementById('indent-label'),
         fontSizeLabel: document.getElementById('font-size-label'),
-        btnFontDec: document.getElementById('btn-font-dec') as HTMLButtonElement | null,
-        btnFontInc: document.getElementById('btn-font-inc') as HTMLButtonElement | null,
+        fontSizeInput: document.getElementById('font-size') as HTMLInputElement | null,
         lineSpacingLabel: document.getElementById('line-spacing-label'),
-        btnLineSpacingDec: document.getElementById('btn-line-spacing-dec') as HTMLButtonElement | null,
-        btnLineSpacingInc: document.getElementById('btn-line-spacing-inc') as HTMLButtonElement | null,
+        lineSpacingInput: document.getElementById('line-spacing') as HTMLInputElement | null,
         readingWidthLabel: document.getElementById('reading-width-label'),
-        btnReadingWidthDec: document.getElementById('btn-reading-width-dec') as HTMLButtonElement | null,
-        btnReadingWidthInc: document.getElementById('btn-reading-width-inc') as HTMLButtonElement | null,
+        readingWidthInput: document.getElementById('reading-width') as HTMLInputElement | null,
         paperBtns: document.querySelectorAll<HTMLElement>('.paper-btn'),
         btnThemeToggle: document.getElementById('btn-theme-toggle') as HTMLButtonElement | null,
         btnAppearance: document.getElementById('btn-appearance') as HTMLButtonElement | null,
@@ -87,7 +86,6 @@ export function queryElements(): AppElements {
         btnExportMenu: document.getElementById('btn-export-menu') as HTMLButtonElement | null,
         exportPanel: document.getElementById('export-panel'),
         exportBookTitle: document.getElementById('export-book-title'),
-        btnSwitchDemo: document.getElementById('btn-switch-demo') as HTMLButtonElement | null,
         fileInput: document.getElementById('file-input') as HTMLInputElement | null,
 
         // TOC Drawer
@@ -143,7 +141,6 @@ export function queryElements(): AppElements {
         btnShelf: document.getElementById('btn-shelf') as HTMLButtonElement | null,
         shelfPanel: document.getElementById('shelf-panel'),
         btnImportBook: document.getElementById('btn-import-book') as HTMLButtonElement | null,
-        btnCloseShelf: document.getElementById('btn-close-shelf') as HTMLButtonElement | null,
         shelfList: document.getElementById('shelf-list'),
         shelfBookCount: document.getElementById('shelf-book-count'),
         toastMsg: document.getElementById('toast-msg')
@@ -230,9 +227,18 @@ export function bootstrapApp() {
         appShell.closeAppearance();
         appShell.closeExportPanel();
     };
+    const toolsRoot = elements.workspaceContainer?.querySelector<HTMLElement>('#reading-tools');
+    const readingTools = toolsRoot ? new ReadingToolsDisclosure(toolsRoot) : null;
+    const syncReadingToolsBook = () => readingTools?.setBook(navigation.surface === 'reader' ? session.getCurrentBookId() : '');
+    session.subscribe(syncReadingToolsBook);
     reader.callbacks.onOpenContents = () => closeReadingTools('contents');
-    reader.callbacks.onReadingDocumentClick = closeReadingTools;
-    reader.callbacks.onPaperChanged = () => appShell.syncWindowControls();
+    reader.callbacks.onSelectContents = () => readingTools?.dismiss();
+    reader.callbacks.onPageTurn = () => readingTools?.pageTurned();
+    reader.callbacks.onReadingScroll = (distance, viewport) => readingTools?.scrolled(distance, viewport);
+    reader.callbacks.onReadingDocumentClick = () => {
+        closeReadingTools();
+        readingTools?.outsideClick();
+    };
 
     const homeHost = typeof document !== 'undefined' ? document.getElementById('goal-home') : null;
     const home = homeHost ? new GoalHome(homeHost, {
@@ -250,6 +256,7 @@ export function bootstrapApp() {
     coordinator.onBookRemoved = async () => { await home?.open(); };
     navigation.subscribe(surface => {
         closeReadingTools();
+        syncReadingToolsBook();
         selection.hideSelectionTooltip(); selection.hideHighlightAction(); goals.actions.close(false);
         appShell.setBookLoading(false);
         if (elements.btnGoalBack) elements.btnGoalBack.setAttribute('aria-label', navigation.returnTarget === 'home' || !session.getCurrentBookId() ? 'Back to home' : 'Back to reading');
@@ -408,10 +415,6 @@ export function bootstrapApp() {
             onCloseAppearance: () => reader.fonts.close(false),
             onPrevPage: () => { if (!goals.page && !home?.active) reader.prevPage(annotations.getNotes()); },
             onNextPage: () => { if (!goals.page && !home?.active) reader.nextPage(annotations.getNotes()); },
-            onSwitchDemo: () => {
-                const nextKey = session.getCurrentBookId() === 'crisis-era' ? 'deep-work' : 'crisis-era';
-                coordinator.openBook(nextKey);
-            },
             onImportFile: (file) => coordinator.importBook(file),
             onWindowResize: (notify) => {
                 if (goals.page || home?.active) return;
@@ -481,8 +484,8 @@ async function initializeApp() {
 
     try { await initDB(); }
     catch (error) {
-        appInstance.appShell.showToast(errorMessage(error, "Could not open the local database."), { kind: 'error' });
-        console.error("Database startup failed", error);
+        appInstance.appShell.showToast(errorMessage(error, "Database migration is incomplete. Legacy data is preserved."), { kind: 'error' });
+        console.error("Database startup or migration stopped", error);
         throw error;
     }
     await appInstance.reader.fonts.ready;

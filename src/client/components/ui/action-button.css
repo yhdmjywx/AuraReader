@@ -56,7 +56,6 @@
 .goal-panel .goal-items-toggle[aria-expanded="true"] .goal-items-caret { transform: rotate(180deg); }
 .workspace-settings.vega-action { gap: 8px; }
 #appearance-panel .vega-action { min-height: 40px; border-radius: 12px; }
-#appearance-panel .appearance-stepper .vega-action,
 #appearance-panel .paper-btn.vega-action { width: 40px; height: 40px; padding: 0; }
 #appearance-panel .font-trigger.vega-action { justify-content: space-between; }
 #appearance-panel .vega-action:is(.active, [aria-pressed="true"]) { background: var(--appearance-soft); color: var(--appearance-ink); }
