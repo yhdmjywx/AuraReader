@@ -1,8 +1,10 @@
 /* ==========================================================================
-   TocUI - Table of Contents Drawer Presentation (Feature Layer)
+   TocUI - Table of Contents Popover Presentation
    Pure UI presentation. Renders multi-level TOC lists, displays page numbers,
-   and delegates chapter navigation & drawer toggle to coordinator.
+   and delegates chapter navigation to the reader controller.
    ========================================================================== */
+
+import { syncScrollHint } from '../../components/ui/scrollHint.js';
 
 /** @param {import('../../domain/book.js').TocEntry[]} tocItems
  * @param {import('../../app/elements.js').AppElements} elements
@@ -10,7 +12,9 @@
 export function renderTOC(tocItems = [], elements, onSelectChapter = null) {
     if (!elements || !elements.tocList) return;
 
-    elements.tocList.innerHTML = '';
+    const list = elements.tocList;
+    const document = list.ownerDocument;
+    list.replaceChildren();
     const items = Array.isArray(tocItems) ? tocItems : [];
 
     items.forEach(item => {
@@ -20,53 +24,54 @@ export function renderTOC(tocItems = [], elements, onSelectChapter = null) {
         const level = Math.max(0, Math.min(Number(item.level) || 0, 6));
         const li = document.createElement('li');
         li.className = `toc-item toc-level-${level}${item.hasChildren ? ' toc-branch' : ''}`;
-        li.setAttribute('aria-level', String(level + 1));
-        li.innerHTML = `<span class="toc-title">${escapeHtml(title)}</span>${item.navigable === false ? '' : `<small class="toc-page">P.${item.page || 1}</small>`}`;
-        if (item.navigable === false) { li.setAttribute('role', 'heading'); li.style.cursor = 'default'; elements.tocList.appendChild(li); return; }
-
-        li.addEventListener('click', () => {
-            if (typeof onSelectChapter === 'function') {
-                onSelectChapter(item);
-            }
-        });
-
-        elements.tocList.appendChild(li);
+        const label = document.createElement('span');
+        label.className = 'toc-title';
+        label.textContent = title;
+        let row;
+        if (item.navigable === false) {
+            row = document.createElement('div');
+            row.setAttribute('role', 'heading');
+            row.setAttribute('aria-level', String(level + 1));
+            row.append(label);
+        } else {
+            row = document.createElement('button');
+            row.type = 'button';
+            row.title = title;
+            const page = document.createElement('small');
+            page.className = 'toc-page';
+            page.textContent = `P.${item.page || 1}`;
+            row.append(label, page);
+            row.addEventListener('click', () => onSelectChapter?.(item));
+        }
+        row.className = 'toc-row';
+        row.style.setProperty('--toc-depth', String(level));
+        li.append(row);
+        list.append(li);
     });
+    syncScrollHint(elements.tocDrawer, list);
 }
 
-function syncTocTrigger(elements) {
-    if (!elements || !elements.btnToc || !elements.tocDrawer) return;
-    const open = elements.tocDrawer.classList.contains('open');
-    elements.btnToc.classList.toggle('is-open', open);
-    elements.btnToc.setAttribute('aria-expanded', open ? 'true' : 'false');
+function setTocOpen(elements, open) {
+    const popover = elements?.tocDrawer;
+    if (!popover) return;
+    if (!open && popover.contains(popover.ownerDocument.activeElement)) {
+        elements.btnToc?.focus({ preventScroll: true });
+    }
+    popover.hidden = !open;
+    popover.classList.toggle('open', open);
+    syncScrollHint(popover, elements.tocList);
+    elements.btnToc?.setAttribute('aria-expanded', String(open));
+    if (elements.btnToc) elements.btnToc.title = open ? 'Close contents' : 'Open contents';
 }
 
 export function openTOC(elements) {
-    if (elements && elements.tocDrawer) {
-        elements.tocDrawer.classList.add('open');
-        syncTocTrigger(elements);
-    }
+    setTocOpen(elements, true);
 }
 
 export function closeTOC(elements) {
-    if (elements && elements.tocDrawer) {
-        elements.tocDrawer.classList.remove('open');
-        syncTocTrigger(elements);
-    }
+    setTocOpen(elements, false);
 }
 
 export function toggleTOC(elements) {
-    if (elements && elements.tocDrawer) {
-        elements.tocDrawer.classList.toggle('open');
-        syncTocTrigger(elements);
-    }
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+    setTocOpen(elements, !elements?.tocDrawer?.classList.contains('open'));
 }

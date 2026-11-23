@@ -84,12 +84,20 @@ body.theme-dark {
 }
 
 /* Paper Theme Adjustments */
-.reader-panel.paper-sepia {
+.reader-panel.paper-white,
+.workspace-container:has(> .reader-panel.paper-white) {
+    --bg-paper: #fff;
+    --bg-paper-text: #1d2129;
+}
+
+.reader-panel.paper-sepia,
+.workspace-container:has(> .reader-panel.paper-sepia) {
     --bg-paper: #fbf0d9;
     --bg-paper-text: #433422;
 }
 
-.reader-panel.paper-dark {
+.reader-panel.paper-dark,
+.workspace-container:has(> .reader-panel.paper-dark) {
     --bg-paper: #121827;
     --bg-paper-text: #d1d5db;
 }
@@ -312,54 +320,6 @@ body.theme-dark .btn-icon-sm.auto-downgraded {
     border-radius: 10px;
 }
 
-.header-center {
-    justify-self: center;
-    min-width: 0;
-    max-width: min(440px, calc(100vw - 230px));
-}
-.book-nav-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    max-width: 100%;
-    height: 34px;
-    padding: 0 12px 0 14px;
-    border: none;
-    border-radius: 999px;
-    background-color: var(--nav-pill-bg);
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1;
-}
-.book-nav-btn:hover,
-.book-nav-btn.is-open {
-    background-color: #e8eaed;
-    color: var(--text-primary);
-}
-body.theme-dark .book-nav-btn:hover,
-body.theme-dark .book-nav-btn.is-open {
-    background-color: #2d3b52;
-}
-.book-nav-btn i {
-    flex: none;
-    font-size: 16px;
-}
-.book-nav-title {
-    min-width: 0;
-    max-width: 18ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-primary);
-}
-.book-nav-caret {
-    transition: transform 0.15s ease;
-}
-.book-nav-btn.is-open .book-nav-caret {
-    transform: rotate(180deg);
-}
 .book-format-tag {
     font-size: 10px;
     font-weight: 700;
@@ -397,9 +357,7 @@ body.theme-dark .book-nav-btn.is-open {
     text-align: center;
 }
 
-/* Shared outer geometry for the three toolbar panels. */
-.appearance-panel,
-.export-panel {
+.appearance-panel {
     display: none;
     position: fixed;
     top: calc(var(--header-height) + 8px);
@@ -412,8 +370,7 @@ body.theme-dark .book-nav-btn.is-open {
     box-shadow: var(--shadow-lg);
     z-index: 40;
 }
-.appearance-panel.open,
-.export-panel.open {
+.appearance-panel.open {
     display: block;
 }
 .appearance-row {
@@ -431,11 +388,6 @@ body.theme-dark .book-nav-btn.is-open {
 }
 .appearance-row .select-sm {
     max-width: 160px;
-}
-.appearance-stepper {
-    display: flex;
-    align-items: center;
-    gap: 6px;
 }
 .font-picker { position: relative; }
 .font-trigger {
@@ -540,29 +492,6 @@ body.theme-dark .book-nav-btn.is-open {
     color: var(--primary);
 }
 
-#btn-export-menu[aria-expanded="true"] {
-    color: var(--primary);
-    background: var(--primary-light);
-}
-.export-panel {
-    max-height: calc(100vh - var(--header-height) - 24px);
-    overflow-y: auto;
-    color: var(--text-primary);
-}
-.export-panel-heading {
-    padding: 8px 10px 12px;
-}
-.export-panel-heading h2 {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 500;
-}
-.export-panel-heading p {
-    margin: 3px 0 0;
-    color: var(--text-secondary);
-    font-size: 12px;
-    overflow-wrap: anywhere;
-}
 .export-section-title {
     margin: 0;
     padding: 7px 10px 4px;
@@ -620,12 +549,6 @@ body.theme-dark .export-backup-action i {
     color: var(--text-secondary);
     font-size: 12px;
 }
-@media (max-width: 480px) {
-    .export-panel {
-        right: 16px;
-    }
-}
-
 /* --------------------------------------------------------------------------
    4. Main Workspace Layout
    -------------------------------------------------------------------------- */
@@ -640,9 +563,6 @@ body.theme-dark .export-backup-action i {
 @media (max-width: 680px) {
     .brand-name {
         display: none;
-    }
-    .header-center {
-        max-width: calc(100vw - 168px);
     }
     .app-header {
         padding: 0 10px;
@@ -682,13 +602,6 @@ body.theme-dark .export-backup-action i {
     font-variant-numeric: tabular-nums;
 }
 
-.font-size-text {
-    font-size: 12px;
-    min-width: 32px;
-    text-align: center;
-    font-family: 'Fira Code', monospace;
-}
-
 /* Paper Theme Switch Buttons */
 .paper-themes {
     display: flex;
@@ -708,99 +621,12 @@ body.theme-dark .export-backup-action i {
     border-color: var(--primary);
 }
 .paper-white { background-color: #ffffff; }
-/* The reserved toolbar slot reveals Paper when the toolbar is transparent. */
-.paper-sepia,
-.workspace-container.immersive-notes:has(> .reader-panel.paper-sepia) { background-color: #fbf0d9; }
-.paper-dark,
-.workspace-container.immersive-notes:has(> .reader-panel.paper-dark) { background-color: #121827; }
+.paper-sepia { background-color: #fbf0d9; }
+.paper-dark { background-color: #121827; }
 /* Swatch decoration must not change the reader panel or EPUB column geometry. */
 .paper-btn.paper-white { border: 1px solid #d1d5db; }
 .paper-btn.paper-sepia { border: 1px solid #e5d3b3; }
 .paper-btn.paper-dark  { border: 1px solid #374151; }
-
-/* TOC Drawer */
-.toc-drawer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 280px;
-    background-color: var(--bg-panel);
-    border-right: 1px solid var(--border-color);
-    z-index: 15;
-    transform: translateX(-100%);
-    transition: transform 0.25s ease-in-out;
-    display: flex;
-    flex-direction: column;
-    box-shadow: var(--shadow-md);
-}
-.toc-drawer.open {
-    transform: translateX(0);
-}
-
-.toc-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-color);
-}
-.toc-header h4 {
-    font-size: 14px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.toc-list {
-    list-style: none;
-    overflow-y: auto;
-    flex: 1;
-    padding: 8px 0;
-}
-.toc-item {
-    padding: 8px 14px 8px 16px;
-    font-size: 13px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-    transition: var(--transition-fast);
-}
-.toc-item .toc-title {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.toc-item .toc-page {
-    flex: none;
-    color: var(--text-muted);
-    font-size: 11px;
-}
-.toc-level-1 { padding-left: 38px; }
-.toc-level-2 { padding-left: 60px; }
-.toc-level-3 { padding-left: 82px; }
-.toc-level-4 { padding-left: 104px; }
-.toc-level-5 { padding-left: 126px; }
-.toc-level-6 { padding-left: 148px; }
-.toc-item.toc-branch {
-    color: var(--text-primary);
-    font-weight: 600;
-}
-.toc-item:hover, .toc-item.active {
-    background-color: var(--primary-light);
-    color: var(--primary);
-    font-weight: 500;
-}
-.toc-item.toc-branch:hover,
-.toc-item.toc-branch.active {
-    font-weight: 600;
-}
 
 /* Reader Viewport & Book Paper Canvas */
 .reader-document-host { width: 100%; min-width: 0; }
@@ -1401,29 +1227,22 @@ mark.hl-active {
     display: flex;
     flex-direction: column;
 }
-.shelf-header {
+.shelf-footer {
+    position: relative;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     flex: none;
-    height: 38px;
-    padding: 0 8px;
+    padding-block-start: 4px;
 }
-.shelf-header h2 {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1.4;
+.shelf-footer .ui-button {
+    width: 28px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    border-radius: 8px;
 }
-#btn-close-shelf { width: 28px; height: 28px; min-height: 28px; padding: 0; border-radius: 8px; }
-#btn-close-shelf svg { width: 16px; height: 16px; }
-.shelf-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: none;
-    padding: 6px 0 10px;
-}
+.shelf-footer svg { width: 16px; height: 16px; }
 .shelf-list {
     list-style: none;
     margin: 0;
@@ -1799,8 +1618,6 @@ html[data-app-surface="loading"] .reading-workspace,
 html[data-app-surface="loading"] .goal-page,
 html[data-app-surface="loading"] .goal-home,
 html[data-app-surface="loading"] .app-header { display: none; }
-html[data-app-surface="home"] .header-center,
-html[data-app-surface="goal"] .header-center { visibility: hidden; }
 html[data-app-surface="home"] #appearance-panel .appearance-row:not(:last-child),
 html[data-app-surface="goal"] #appearance-panel .appearance-row:not(:last-child) { display: none; }
 

@@ -9,18 +9,46 @@ const { createWorkbench, ui, click, input, waitFor } = require('../helpers/react
         const { AppShell } = await import('../../dist/client/app/appShell.js');
         const repository = await import('../../dist/client/infrastructure/bookRepository.js');
         const elements = {};
-        for (const [key,id] of Object.entries({ btnShelf:'btn-shelf', shelfPanel:'shelf-panel', shelfList:'shelf-list', shelfBookCount:'shelf-book-count', btnCloseShelf:'btn-close-shelf', btnImportBook:'btn-import-book', fileInput:'file-input', btnSwitchDemo:'btn-switch-demo', btnAppearance:'btn-appearance', appearancePanel:'appearance-panel', btnExportMenu:'btn-export-menu', exportPanel:'export-panel' })) elements[key] = document.getElementById(id);
-        let opened, deleted = false, deletion;
+        for (const [key,id] of Object.entries({ btnShelf:'btn-shelf', shelfPanel:'shelf-panel', shelfList:'shelf-list', shelfBookCount:'shelf-book-count', btnImportBook:'btn-import-book', fileInput:'file-input', btnAppearance:'btn-appearance', appearancePanel:'appearance-panel', btnExportMenu:'btn-export-menu', exportPanel:'export-panel' })) elements[key] = document.getElementById(id);
+        let opened, deleted = false, deletion, imported;
         const shell = new AppShell();
         const shelf = new ShelfController({ callbacks: {
             onOpen: () => { shell.closeAppearance(); shell.closeExportPanel(); },
             onOpenBook: id => { opened = id; },
             onDeleteBook: id => deletion = repository.deleteBookFromDB(id).then(() => { deleted = true; })
         } });
-        shelf.initUI(elements); shell.init(elements, { onOpenPanel: () => shelf.closeShelf() });
+        shelf.initUI(elements); shell.init(elements, {
+            onOpenPanel: () => shelf.closeShelf(),
+            onImportFile: file => { imported = file; }
+        });
         document.documentElement.dataset.appSurface = 'reader';
         await ui(() => shelf.openShelf()); await ui(() => shelf.refreshShelf());
         assert.equal(elements.shelfPanel.classList.contains('open'), true);
+        assert.equal(elements.shelfPanel.querySelector('.shelf-header, #btn-switch-demo, #btn-close-shelf'), null);
+        assert.equal(elements.shelfList.nextElementSibling.contains(elements.btnImportBook), true);
+        assert.equal(elements.shelfPanel.getAttribute('aria-label'), 'Local library');
+        assert.equal(elements.btnImportBook.textContent, '');
+        assert.equal(elements.btnImportBook.getAttribute('aria-label'), 'Import book');
+        assert.ok(elements.btnImportBook.querySelector('svg'));
+        Object.defineProperties(elements.shelfList, {
+            clientHeight: { value: 200 },
+            scrollHeight: { value: 400 }
+        });
+        elements.shelfList.dispatchEvent(new dom.window.Event('scroll'));
+        assert.equal(elements.shelfPanel.hasAttribute('data-can-scroll-down'), true);
+        elements.shelfList.scrollTop = 200;
+        elements.shelfList.dispatchEvent(new dom.window.Event('scroll'));
+        assert.equal(elements.shelfPanel.hasAttribute('data-can-scroll-down'), false);
+        let choseFile = false;
+        elements.fileInput.addEventListener('click', () => { choseFile = true; }, { once: true });
+        await click(elements.btnImportBook);
+        assert.equal(choseFile, true, 'the icon opens the existing file input');
+        const file = new dom.window.File(['Chapter'], 'shelf-import.txt', { type: 'text/plain' });
+        Object.defineProperty(elements.fileInput, 'files', { value: [file] });
+        await ui(() => elements.fileInput.dispatchEvent(new dom.window.Event('change', { bubbles: true })));
+        assert.equal(imported, file);
+        assert.equal(elements.shelfPanel.classList.contains('open'), false);
+        await ui(() => shelf.openShelf()); await ui(() => shelf.refreshShelf());
         await input('#shelf-list input', '长书名');
         assert.equal(document.querySelectorAll('.shelf-entry').length, 1);
         assert.equal(document.querySelector('.shelf-book-title').textContent, title);
@@ -42,9 +70,10 @@ const { createWorkbench, ui, click, input, waitFor } = require('../helpers/react
         assert.equal(document.activeElement, elements.btnShelf);
         await click('#btn-appearance'); await click('#btn-shelf');
         assert.equal(elements.appearancePanel.classList.contains('open'), false);
+        await click('#btn-workspace-settings');
         await click('#btn-export-menu');
         assert.equal(elements.shelfPanel.classList.contains('open'), false);
         await ui(() => require('../../dist/client/components/ui/renderSurface.js').renderSurface(elements.shelfList, null));
-        console.log('PASS: React shelf search/text rendering, open/delete/cancel, Escape/focus and exclusive panels');
+        console.log('PASS: React shelf footer import, scroll hint, search/text rendering, open/delete/cancel, Escape/focus and exclusive panels');
     } finally { await storage.close(); dom.window.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

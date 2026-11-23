@@ -69,6 +69,7 @@ export class AppShell {
         if (e?.goalPage) e.goalPage.hidden = surface !== 'goal';
         for (const control of [e?.btnToc, e?.btnShelf]) if (control) control.hidden = surface !== 'reader';
         for (const control of [e?.btnExportMarkdown, e?.chapterExportEntry]) if (control) control.hidden = surface !== 'reader';
+        this.syncWindowControls();
         const status = document.getElementById('app-status');
         if (status) { status.hidden = true; status.replaceChildren(); }
         const back = e?.btnGoalBack;
@@ -96,6 +97,18 @@ export class AppShell {
             }
         }
         this.callbacks.onThemeChanged?.();
+        this.syncWindowControls();
+    }
+
+    syncWindowControls() {
+        const desktop = window.auraDesktop;
+        if (desktop?.platform !== 'win32') return;
+        const paper = document.documentElement.dataset.appSurface === 'reader' ? this.elements?.readerPanel : null;
+        const dark = paper?.classList.contains('paper-dark') || (
+            !paper?.matches('.paper-white, .paper-sepia') && this.appTheme === 'dark'
+        );
+        void desktop.window.setControlsTone(dark ? 'light' : 'dark').then(unwrapDesktop)
+            .catch(error => console.error('Could not update window controls:', error));
     }
 
     toggleAppearance(forceOpen?: boolean) {
@@ -106,12 +119,14 @@ export class AppShell {
         if (open) {
             this.closeExportPanel();
             this.callbacks.onOpenPanel?.();
+        } else {
+            this.callbacks.onCloseAppearance?.();
+            if (panel.contains(document.activeElement)) button?.focus({ preventScroll: true });
         }
         panel.classList.toggle('open', open);
         panel.setAttribute('aria-hidden', String(!open));
         if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
         if (open) requestAnimationFrame(() => { if (panel.classList.contains('open')) panel.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus(); });
-        else if (panel.contains(document.activeElement)) button?.focus({ preventScroll: true });
     }
 
     closeAppearance() {
@@ -127,11 +142,11 @@ export class AppShell {
             this.closeAppearance();
             this.callbacks.onOpenPanel?.();
             if (this.elements?.exportBookTitle) {
-                this.elements.exportBookTitle.textContent = this.elements.currentBookTitle
-                    ? this.elements.currentBookTitle.textContent
-                    : "No book open";
+                const title = this.elements.currentBookTitle?.textContent || "No book open";
+                this.elements.exportBookTitle.textContent = title;
+                this.elements.exportBookTitle.title = title;
             }
-        }
+        } else if (panel.contains(document.activeElement)) button?.focus({ preventScroll: true });
         panel.classList.toggle('open', open);
         panel.setAttribute('aria-hidden', open ? 'false' : 'true');
         if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -140,7 +155,6 @@ export class AppShell {
         if (open) requestAnimationFrame(() => {
             if (panel.classList.contains('open')) [...panel.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')].find(control => !control.hidden && !control.closest('[hidden]'))?.focus();
         });
-        else if (panel.contains(document.activeElement)) button?.focus({ preventScroll: true });
     }
 
     closeExportPanel() {
@@ -206,6 +220,8 @@ export class AppShell {
         }
 
         if (elements.btnExportMenu && elements.exportPanel) {
+            const workspaceSettings = elements.btnExportMenu.closest('#workspace-settings-panel');
+            workspaceSettings?.addEventListener('workspacesettingsclose', () => this.closeExportPanel());
             elements.btnExportMenu.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.toggleExportPanel();
@@ -219,7 +235,7 @@ export class AppShell {
             document.addEventListener('click', (e) => {
                 if (!elements.exportPanel?.classList.contains('open')) return;
                 const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
-                if (path.some(node => node === elements.exportPanel || node === elements.btnExportMenu)) return;
+                if (path.some(node => node === workspaceSettings || node === elements.exportPanel || node === elements.btnExportMenu)) return;
                 this.closeExportPanel();
             }, true);
         }
@@ -238,15 +254,6 @@ export class AppShell {
             });
         }
 
-        // Switch Demo Book
-        if (elements.btnSwitchDemo) {
-            elements.btnSwitchDemo.addEventListener('click', () => {
-                if (this.callbacks.onSwitchDemo) {
-                    this.callbacks.onSwitchDemo();
-                }
-            });
-        }
-
         // File Input Upload
         if (elements.fileInput) {
             elements.fileInput.addEventListener('change', (e) => {
@@ -262,11 +269,17 @@ export class AppShell {
         // Global Keyboard Shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.defaultPrevented || e.isComposing) return;
-            if (eventElement(e)?.closest('[role="menu"],[data-slot="dialog-content"]')) return;
-            if (e.key === 'Escape' && elements.exportPanel && elements.exportPanel.classList.contains('open')) {
+            if (eventElement(e)?.closest('[role="menu"],[data-slot="dialog-content"],.toc-popover')) return;
+            if (e.key === 'Escape' && elements.exportPanel?.classList.contains('open')) {
                 e.preventDefault();
                 this.closeExportPanel();
                 if (elements.btnExportMenu) elements.btnExportMenu.focus();
+                return;
+            }
+            if (e.key === 'Escape' && elements.appearancePanel?.classList.contains('open')) {
+                e.preventDefault();
+                this.closeAppearance();
+                elements.btnAppearance?.focus({ preventScroll: true });
                 return;
             }
             const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
@@ -278,11 +291,7 @@ export class AppShell {
             if (elements.exportPanel?.classList.contains('open')) return;
             if (elements.shelfPanel?.classList.contains('open')) return;
 
-            if (e.key === 'Escape' && elements.appearancePanel && elements.appearancePanel.classList.contains('open')) {
-                e.preventDefault();
-                this.closeAppearance();
-                return;
-            }
+            if (eventElement(e)?.closest('.reader-tool-panel')) return;
 
             if (document.documentElement.dataset.appSurface && document.documentElement.dataset.appSurface !== 'reader') return;
 

@@ -1,9 +1,8 @@
 # AuraReader Design Index
 
-Verified: 2026-11-03 through Figma MCP `get_metadata`: all three pages, their
-screen/component trees, the supplied node, and the Goal Sidebar set.
-Names and node links below are verified navigation targets. This was a structural
-inventory, not a new pixel audit, prototype-interaction review, or code verification.
+Initial inventory: 2026-11-03 through Figma MCP `get_metadata`, covering all
+three pages, their screen and component trees, and the Goal Sidebar set.
+The 2026-11-20 reading-screen refactor was verified in the Figma editor.
 Global principles and authority: [Design System](design-system.md).
 
 ## Figma Project
@@ -13,7 +12,6 @@ Global principles and authority: [Design System](design-system.md).
 
 Purpose: reading workspace, its interaction states, Goal Sidebar, shared component
 references, and documentation of styles extracted from the existing implementation.
-No Figma file reorganization or design edits are part of this documentation task.
 
 | Actual Figma Page | Node | Purpose / classification |
 | --- | --- | --- |
@@ -31,8 +29,9 @@ instance inside Reading Interface / At rest**, not the entire reading screen.
 Owner-supplied design, updated from the owner's browser comments on 2026-11-05:
 [Wiki Sidebar, 236:1614](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=236-1614),
 an independent main component on **02 - Components**. The owner rejected embedding
-Wiki in a Screen: [Reading Interface, 15:129](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-129)
-has been restored, with only the original Reader Paper instance in viewport `15:263`.
+Wiki in a Screen. The 2026-11-05 restoration of
+[Reading Interface, 15:129](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-129)
+used the original Reader Paper instance inside viewport `15:263`.
 Original Wiki Frame `194:1665` was converted into component `236:1614`; its runtime
 placement is still the right notes area, covering notes while open. The component's
 reference size was subsequently redesigned by the owner to **337 × 341**, verified
@@ -128,7 +127,7 @@ instance-ID changes and visual evidence: [design record](../product/goals/user-i
 
 | Interface | Exact screen entry | Classification | Design status | Code implementation status |
 | --- | --- | --- | --- | --- |
-| Reading Interface | [Reading Interface](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-129) — Frame on 01 - Screens | Approved Design | Basically complete; states below | Not reverified in this task; see existing verification record |
+| Reading Interface | [Reading Interface / Current](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=424-1892) — Section on 01 - Screens | Approved Design | Five immersive screen states and a dark-paper reference | [Immersive layout implementation](../product/reading-toolbar/architecture.md#现行沉浸式布局实现) |
 | Goal Sidebar, within reading | [Goal Sidebar](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-2) — Instance on 01 - Screens; [embedded instance](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-130) | Approved Design; component/state references below | Design available | Not reverified in this task |
 | Home | No frame found in this file | Planned design | **Planned / Not designed** — owner-confirmed identity, 2026-11-03 | Existing Home documented in [book module design](../archive/plans-and-implementation/goal-books-module-design.md); design absence does not mean missing code |
 | Full Goal workspace | No frame found in this file | Existing Implementation / approved behavior documents | **Awaiting confirmation** of visual design coverage; not inferred from Sidebar | Shared editor/page documented in [cross-book plan](../archive/plans-and-implementation/goal-cross-book-sidebar-plan.md); not reverified |
@@ -144,8 +143,9 @@ does not declare it another planned redesign.
 The existing [Reading Settings main component, 7:275](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=7-275)
 now includes Line spacing and Reading width after Size. It retains its 340px width,
 existing control presentation, and original settings; its content height is about
-461.06px. The existing screen instance `15:542` inherits the extension and was
-visually checked. No new application settings system was introduced.
+461.06px. The original screen instance `15:542` inherited the extension and was
+visually checked in that layout. The immersive screen uses its 210px settings
+popover component. No new application settings system was introduced.
 
 The editable [line spacing and width review, 379:2822](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=379-2822)
 on 02 - Components contains nine instances: default, minimum, maximum, width
@@ -160,19 +160,67 @@ Requirements, source integration points, pagination constraints, design
 values, and verification limits:
 [line spacing and reading width](../epub-engine/reading-settings-line-spacing-width.md).
 
-The following five frames represent **one Reading Interface**, not five product pages.
+### Immersive reading toolbar and right-side tools
 
-| Reading Interface state | Exact Frame | Context / related component |
+[Reading Interface / Current](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=424-1892)
+on **01 - Screens** contains five reading states and a dark-paper reference for one
+reading interface. Each frame
+uses the existing Goal Sidebar instance and a shared
+[Reading Workspace / Immersive Shell](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=423-4723)
+for the paper, document viewport, window controls and nested Immersive Toolbar
+instance. The right-side tools and their popovers are instances of the
+[toolbar and tool components](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=419-4306).
+The three right-side popovers share a 210px width, a 360px height cap, and the
+vertical center of the tool group. Long lists scroll inside their popover.
+Book export is an inline disclosure in application Settings.
+
+| State | Current frame | Refactor |
 | --- | --- | --- |
-| Base reference | [Reading Interface](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-129) | [Book Toolbar instance](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-199) |
-| At rest | [Reading Interface / At rest](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-278) | [Book Toolbar instance](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-348); reserved toolbar region |
-| Reading settings open | [Reading Interface / Reading settings open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-421) | [Reading Settings instance](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-542) |
-| Local library open | [Reading Interface / Local library open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-597) | [Local Library instance](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-718) |
-| Contents open | [Reading Interface / Contents open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-817) | [Contents Drawer instance](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-938) |
+| Default | [Reading Interface](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-129) | Migrated the original base frame in place |
+| Contents open | [Reading Interface / Contents open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-817) | Migrated the original drawer state to the tool-group popover |
+| Local library open | [Reading Interface / Local library open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-597) | Migrated the original state to the tool-group popover |
+| Reading settings open | [Reading Interface / Reading settings open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-421) | Uses the [compact popover component](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=419-4507) with separate sliders and right-aligned values for Size, Line spacing, and Reading width |
+| Settings / Export book | [Reading Interface / Settings / Export book](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=423-4923) | Shows the [Settings export component](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=441-2860) above the sidebar Settings button |
+| Dark Paper | [Reading Interface / Dark Paper](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=430-1892) | Default tool state with the existing dark-paper variables and local control color overrides |
 
-On 2026-11-13, four editable Paper/toolbar comparison screens were added to
-**01 - Screens**, to the right of the original frames. These supplement the same
-Reading Interface; they do not replace the originals or introduce a new module.
+The four migrated frames retain their IDs. Earlier workspace and overlay layers
+are hidden in place so the original layer links remain available, including
+[Book Toolbar](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-199),
+[Contents Drawer](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-938),
+[Local Library](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-718)
+and [Reading Settings](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-542).
+The 2026-11-20 review checked the frame grouping, instance references and the
+five light-paper screen compositions. The dark-paper reference was checked for
+paper continuity behind the title, pagination and window controls, and for
+right-side tool and document text visibility. These are static Figma states.
+
+[Reading Interface / Archive](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=424-1893)
+contains nine original frames with their IDs. The
+[At rest frame](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=15-278)
+records the old reserved toolbar region. The two compact frames and four paper
+comparison frames below record earlier toolbar designs and verification. The
+standalone immersive [default](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=420-1766)
+and [Contents open](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=420-1923)
+studies document the version approved before integration into the original screens.
+
+### Compact toolbar and Contents popover
+
+The compact toolbar has a [default state](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=394-1551)
+and a [Contents open state](https://www.figma.com/design/eib6b1sDBsFa7hTzY2Zmsi?node-id=394-1742)
+under **Reading Interface / Archive**. In the owner-approved design on 2026-11-19, the popover
+opens below the Contents control, with its outer left edge aligned to the
+compact toolbar. The open state highlights Contents. The panel can overlay part
+of the reading column and uses a local override of the Contents Drawer instance.
+The frames show static design states. The compact toolbar is implemented in
+the Web and Windows source builds. See the
+[feature requirements](../product/reading-toolbar/feature-spec.md) and
+[architecture and verification](../product/reading-toolbar/architecture.md).
+
+### Paper and toolbar visibility
+
+The four editable Paper/toolbar comparison screens from 2026-11-13 are under
+**Reading Interface / Archive**. They document the previous toolbar's appearance
+for sepia and dark paper, including the reserved slot.
 Hidden toolbars keep the 52px slot and reveal the selected Paper background;
 visible toolbars preserve the existing application surface. Reading geometry
 and source component links are preserved. The outer Paper background is now

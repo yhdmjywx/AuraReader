@@ -1,25 +1,9 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { JSDOM } = require('jsdom');
 
 console.log('=== AuraReader 目录层级解析与渲染测试 ===');
-
-function elementStub(tag) {
-    return {
-        tag,
-        className: '',
-        innerHTML: '',
-        attrs: {},
-        style: {},
-        children: [],
-        setAttribute(name, value) { this.attrs[name] = String(value); },
-        appendChild(child) { this.children.push(child); return child; },
-        addEventListener(type, fn) {
-            this.listeners = this.listeners || {};
-            this.listeners[type] = fn;
-        }
-    };
-}
 
 (async () => {
     const {
@@ -175,21 +159,24 @@ function elementStub(tag) {
     assert.deepStrictEqual(navItemsFromFixture, fixtureItems, '同一书籍的 EPUB3 nav 和 NCX 目录应一致');
     console.log('✅ Alice EPUB 的 16 条目录、十二章正文及 EPUB3 nav / NCX 一致性');
 
-    globalThis.document = { createElement: elementStub };
     const { renderTOC } = await import('../../dist/client/features/reader/tocUI.js');
-    const tocList = elementStub('ul');
+    const dom = new JSDOM('<ul></ul>');
+    const tocList = dom.window.document.querySelector('ul');
     const selected = [];
     renderTOC(flatBook, { tocList }, item => selected.push(item.title));
     assert.strictEqual(tocList.children.length, flatBook.length);
     assert.ok(tocList.children[0].className.includes('toc-level-0'));
     assert.ok(tocList.children[1].className.includes('toc-branch'));
     assert.ok(tocList.children[2].className.includes('toc-level-1'));
-    assert.strictEqual(tocList.children[2].attrs['aria-level'], '2');
-    assert.ok(tocList.children[2].innerHTML.includes('大堂'));
+    const chapter = tocList.children[2].querySelector('button');
+    assert.strictEqual(chapter.style.getPropertyValue('--toc-depth'), '1');
+    assert.strictEqual(chapter.querySelector('.toc-title').textContent, '大堂');
+    assert.strictEqual(chapter.querySelector('.toc-page').textContent, 'P.2');
     assert.ok(!tocList.children[2].className.includes('toc-level-0'));
-    tocList.children[2].listeners.click();
+    chapter.click();
     assert.deepStrictEqual(selected, ['大堂']);
-    console.log('✅ 目录抽屉按 level 缩进渲染');
+    dom.window.close();
+    console.log('✅ 目录浮层按 level 缩进渲染');
 
     console.log('\n=== ALL TOC HIERARCHY CHECKS PASSED ===');
 })().catch(err => {

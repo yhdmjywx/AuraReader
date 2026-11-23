@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import type { AppElements } from '../../app/elements.js';
 import type { BookSummary } from '../../domain/book.js';
 import { Button } from '../../components/ui/button.js';
 import { Input } from '../../components/ui/input.js';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog.js';
 import { renderSurface } from '../../components/ui/renderSurface.js';
+import { observeScrollHint, syncScrollHint } from '../../components/ui/scrollHint.js';
 
 interface ShelfProps {
     elements: AppElements; books: BookSummary[];
@@ -14,6 +15,9 @@ function ShelfBooks({ elements, books, onOpenBook, onDeleteBook }: ShelfProps) {
     const [query, setQuery] = useState(''), [removing, setRemoving] = useState<BookSummary | null>(null);
     const [busy, setBusy] = useState(false), [error, setError] = useState('');
     const visible = books.filter(book => book.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+    const { shelfPanel, shelfList } = elements;
+    useLayoutEffect(() => observeScrollHint(shelfPanel, shelfList), [shelfPanel, shelfList]);
+    useLayoutEffect(() => syncScrollHint(shelfPanel, shelfList), [shelfPanel, shelfList, visible.length]);
     return <>
         <li className="shelf-search"><Input type="search" aria-label="Search library" placeholder="Search books" value={query} onChange={event => setQuery(event.currentTarget.value)} /></li>
         {!visible.length && <li className="shelf-empty"><p>{books.length ? "No matching books" : "No local books yet"}</p><span>Import EPUB, PDF, or TXT to start reading.</span></li>}
@@ -44,8 +48,13 @@ export function renderShelf(props: ShelfProps) {
 }
 export function openShelf(elements: AppElements) {
     elements.shelfPanel?.classList.add('open'); elements.shelfPanel?.setAttribute('aria-hidden', 'false'); elements.btnShelf?.setAttribute('aria-expanded', 'true');
-    requestAnimationFrame(() => elements.shelfList?.querySelector<HTMLInputElement>('input')?.focus());
+    syncScrollHint(elements.shelfPanel, elements.shelfList);
+    requestAnimationFrame(() => {
+        if (elements.shelfPanel?.classList.contains('open')) elements.shelfList?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
+    });
 }
 export function closeShelf(elements: AppElements) {
+    if (elements.shelfPanel?.contains(elements.shelfPanel.ownerDocument.activeElement)) elements.btnShelf?.focus({ preventScroll: true });
     elements.shelfPanel?.classList.remove('open'); elements.shelfPanel?.setAttribute('aria-hidden', 'true'); elements.btnShelf?.setAttribute('aria-expanded', 'false');
+    syncScrollHint(elements.shelfPanel, elements.shelfList);
 }

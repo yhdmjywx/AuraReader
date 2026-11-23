@@ -75,19 +75,14 @@ export class ShelfController {
             });
         }
 
-        if (elements.btnCloseShelf) {
-            elements.btnCloseShelf.addEventListener('click', () => {
-                this.closeShelf();
-            });
-        }
-
         document.addEventListener('click', event => {
             if (!elements.shelfPanel?.classList.contains('open')) return;
             const path = event.composedPath();
             if (!path.includes(elements.shelfPanel) && !path.includes(elements.btnShelf)) this.closeShelf();
         }, true);
         document.addEventListener('keydown', event => {
-            if (event.key !== 'Escape' || !elements.shelfPanel?.classList.contains('open')) return;
+            if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing || !elements.shelfPanel?.classList.contains('open')) return;
+            if (elements.shelfPanel.ownerDocument.querySelector('.ui-dialog[data-open]')) return;
             event.preventDefault();
             this.closeShelf();
             elements.btnShelf?.focus();
@@ -102,6 +97,5 @@ export class ShelfController {
         elements.fileInput?.addEventListener('change', () => {
             if (elements.fileInput.files?.length) this.closeShelf();
         });
-        elements.btnSwitchDemo?.addEventListener('click', () => this.closeShelf());
     }
 }

@@ -34,6 +34,12 @@ export interface ReaderCallbacks {
     onViewportChange?: () => void;
     onPageChange?: (location: import('../domain/book.js').ReadingLocation) => void;
     onMarkClick?: (element: HTMLElement, annotation: Annotation) => void;
+    onOpenContents?: () => void;
+    onSelectContents?: () => void;
+    onPageTurn?: () => void;
+    onReadingScroll?: (distance: number, viewport: number) => void;
+    onReadingDocumentClick?: () => void;
+    onPaperChanged?: () => void;
 }
 export interface AnnotationCallbacks {
     getGoalAction?: (id: string) => GoalActionState;
@@ -97,9 +103,9 @@ export interface BackupCallbacks {
 export interface ShellCallbacks {
     onThemeChanged?: () => void;
     onOpenPanel?: () => void;
+    onCloseAppearance?: () => void;
     onPrevPage?: () => void;
     onNextPage?: () => void;
-    onSwitchDemo?: () => void;
     onImportFile?: AsyncAction<[file: File]>;
     onWindowResize?: (notify: boolean) => void;
 }

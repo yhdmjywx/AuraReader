@@ -11,6 +11,7 @@ import type { ReadingApplication } from './features/workbench/workbenchStore.js'
 import { WorkbenchShell } from './features/workbench/WorkbenchShell.js';
 import './components/ui/workbench.css';
 import './components/ui/action-button.css';
+import './features/workbench/readingToolbar.css';
 
 // Render stable shell hosts first, then connect the existing engines and commands.
 let startup: Promise<typeof import('./main.js')> | undefined;

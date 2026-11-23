@@ -1,9 +1,8 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const { JSDOM } = require('jsdom');
+const { click, createWorkbench, ui } = require('../helpers/react-workbench.cjs');
 
 (async () => {
-    const dom = require('../helpers/react-workbench.cjs').createWorkbench({ url: 'https://reader.test' });
+    const dom = createWorkbench({ url: 'https://reader.test' });
     const originals = new Map(['document', 'window', 'NodeFilter'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
     try {
         for (const key of originals.keys()) globalThis[key] = dom.window[key];
@@ -30,6 +29,8 @@ const { JSDOM } = require('jsdom');
             getCurrentNotes: () => notes, showToast: message => messages.push(message), closeExportPanel: () => shell.closeExportPanel() } });
         controller.initUI(elements);
         const menu = controller.chapterExportMenu;
+        document.documentElement.dataset.appSurface = 'reader';
+        await click('#btn-workspace-settings');
         const open = () => { elements.btnExportMenu.click(); elements.btnExportChapters.click(); };
         open();
         assert.ok(elements.exportPanel.classList.contains('open'));
@@ -50,13 +51,13 @@ const { JSDOM } = require('jsdom');
         await menu.run('current');
         const second = Buffer.from(singles[1].bytes).toString();
         assert.ok(second.includes('独立正文') && second.includes('Chapter notes') && !second.includes('共享正文'), '当前章节按点击时位置确定');
-        await require('../helpers/react-workbench.cjs').ui(() => { open(); elements.btnSelectChapters.click(); });
+        await ui(() => { open(); elements.btnSelectChapters.click(); });
         assert.equal(elements.chapterExportList.querySelectorAll('input').length, 3, '卷标题和同篇锚点沿用共享内容单元');
         assert.equal(elements.btnConfirmChapterExport.disabled, true);
         const checkboxes = elements.chapterExportList.querySelectorAll('input');
         for (const checkbox of [checkboxes[0], checkboxes[1]]) { checkbox.checked = true; checkbox.dispatchEvent(new window.Event('change', { bubbles: true })); }
         const pending = menu.run('custom');
-        await require('../helpers/react-workbench.cjs').ui(() => menu.run('custom'));
+        await ui(() => menu.run('custom'));
         assert.equal(folders.length, 1);
         assert.equal(elements.btnConfirmChapterExport.disabled, true);
         assert.equal(elements.btnExportAllChapters.disabled, true);
@@ -78,21 +79,26 @@ const { JSDOM } = require('jsdom');
         await menu.run('custom');
         assert.match(messages.at(-1), /Saved chapter folder.*\(2\)/);
         assert.ok(!elements.exportPanel.classList.contains('open'));
-        await require('../helpers/react-workbench.cjs').ui(() => { open(); elements.btnSelectChapters.click(); });
+        await ui(() => { open(); elements.btnSelectChapters.click(); });
         assert.equal(elements.chapterExportList.querySelectorAll('input:checked').length, 0);
         book = { ...book, id: 'other', title: '另一本' };
         await menu.run('custom');
         assert.match(messages.at(-1), /current book has changed/);
-        elements.btnSelectChapters.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await ui(() => elements.btnSelectChapters.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
         assert.equal(elements.chapterExportCustom.hidden, true);
-        elements.btnSelectChapters.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await ui(() => elements.btnSelectChapters.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
         assert.equal(elements.chapterExportOptions.hidden, true);
-        elements.btnExportChapters.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await ui(() => {
+            elements.btnExportChapters.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        });
         assert.ok(!elements.exportPanel.classList.contains('open'));
+        await click('#btn-workspace-settings');
         open(); await menu.run('all');
         assert.match(messages.at(-1), /Saved chapter folder/);
         console.log('PASS: inline chapter export, live current position, grouped chapters, actual Markdown/folder payloads, no overlay, empty selection, duplicate prevention, cancel/error/retry, book switch, keyboard');
     } finally {
+        const settings = document.getElementById('btn-workspace-settings');
+        if (settings.getAttribute('aria-expanded') === 'true') await click(settings);
         dom.window.close();
         for (const [key, descriptor] of originals) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; }
     }

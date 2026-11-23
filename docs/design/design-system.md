@@ -71,6 +71,7 @@ Other shadcn styles and previously explored libraries remain historical referenc
 
 ## Component Principles
 
+- Give each action one visible control within the same interaction context.
 - Use appropriate primary, secondary, ghost, and destructive variants. Ghost
   actions have no persistent background and use neutral hover feedback.
 - Preserve distinct selected, checked, active, focus, disabled, editing, loading,
@@ -97,8 +98,8 @@ Other shadcn styles and previously explored libraries remain historical referenc
   commands, IDs, values, and placement except where explicitly approved below.
 - Keep one pagination instance inside the existing book-actions toolbar, between
   the book title and right-side actions. No extra row/bar or bottom duplicate.
-- On hover-capable devices, show the toolbar when the pointer enters its top area
-  and hide it on leave. Reserve its space so reading content never shifts; retain
+- In the original Book Toolbar design, show the toolbar on pointer entry on
+  hover-capable devices and hide it on leave. Reserve its space so reading content never shifts; retain
   access during keyboard focus, while a toolbar panel is open, and without hover.
   The white-Paper reference keeps its white at-rest workspace surface. For
   Sepia/Dark Paper, the reserved region behind a hidden toolbar follows Paper;
@@ -108,11 +109,36 @@ Other shadcn styles and previously explored libraries remain historical referenc
 - The book title is single-line with ellipsis, at most 18ch wide and shrinkable.
   Preserve the full text and hover title; 18ch is a display width, not a data limit.
   Preserve the contents trigger and adjacent actions.
-- Local Library shows book titles and remove actions without structure metadata,
-  row separators, or the bottom service/backup hint. Keep search, import,
-  sample-book access, removal confirmation, and errors. Shorter lists fit contents
-  and the popover remains constrained by the viewport.
+- The compact toolbar stays visible above the reading column. Its Contents
+  icon and label form the single control that opens and closes the chapter list.
+  Highlight the open state. Place the popover immediately below Contents and
+  align its outer left edge with the compact toolbar's outer left edge. The
+  list starts with chapter rows and overlays the reading area as needed while
+  preserving its line width and pagination.
+  See [Compact toolbar and Contents popover requirements](../product/reading-toolbar/feature-spec.md).
+- In the immersive reading layout, center the book title and pagination above
+  the reading area. Place Contents, Local Library, and Reading Settings
+  in a vertical group at the midpoint of the reading area's right edge. Both
+  groups blend into the paper. Tool icons are gray at rest. The button with an
+  open popover uses the accent color and a lightly tinted background. The three
+  popovers open to the left of the tool group at a shared width of 210px (75%
+  of the previous width). Their vertical centers align with the tool group's
+  vertical center. Popovers fit their contents up to 360px, with at least 8px
+  clearance at the top and bottom of the reading area. Long contents scroll
+  inside the popover. During reading, the application Settings panel groups
+  Notes summary and Chapters under the collapsed Export book disclosure.
+  See [Immersive reading toolbar and right-side tools](design-index.md#immersive-reading-toolbar-and-right-side-tools).
+- Local Library shows search, book titles and remove actions. Long lists scroll
+  inside the popover, with a 16px fade at the bottom while more results are
+  available below. The centered import icon sits in the solid paper area below
+  the fade and uses the Library home symbol, tooltip and accessible name. Use
+  the tool trigger, outside click or Escape to close the popover. Omit structure
+  metadata, row separators and the service/backup hint. Keep removal confirmation
+  and errors.
 - Reading Settings preserves layout, values, commands, and preference behavior.
+  Size, Line spacing, Reading width, and Indent use horizontal sliders with
+  narrow handles and separate, right-aligned live values. Indent has three
+  stops at 0em, 1em, and 2em.
   Font choices are radio menu items with selection indication. Paper/layout choices
   use neutral active feedback. Paper swatches
   remain unlabeled at rest, selected, and hovered, with accessible names, tooltips,
@@ -292,7 +318,7 @@ They are not global tokens; report conflicts rather than generalizing or discard
 | Parent contents / material disclosure | Group indent 16px; 4px before disclosure and between material list/rows. Disclosure 44×28px with 16px links icon and separate 12px caret |
 | Sidebar Goal rows only | Root/current parent 16px Medium; child 14px Regular; 40px compact single-line rows, 10px horizontal text insets. Full Goal typography is unchanged |
 | Reading toolbar | 52px reserved height; title width as specified in Workbench and Reading |
-| Local Library | 300px popover, 8px padding, 38px header, 28px close target/16px icon, 36px book rows; maximum height 370px, constrained by viewport and content |
+| Local Library (immersive reading) | 210px popover, 8px padding, 16px scroll fade, 28px centered import target with 16px icon, 360px maximum height constrained by reading area |
 | Reading Settings controls | Unlabeled 40px swatches: #fafaf7, #f3ead7, #222321. Size readout uses interface font, 13px/1.4; font-menu rows retain Vega styling |
 | Goal/menu alignment | 13px text, 1.4 line height, 8px vertical item padding (about 34.2px per row); compact separator/lower inset, about 123px for the ongoing three-item Goal menu |
 | Margin-note custom caret only | Saturated red #dc2626, width 0.5ch; opacity and input behavior as specified above |
