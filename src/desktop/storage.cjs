@@ -58,7 +58,7 @@ function command(input, keys, limit = MAX_JSON_BYTES) {
 }
 
 /** @param {string} directory */
-function createDesktopStorage(directory) {
+function createDesktopStorage(directory, { attachOnly = false } = {}) {
     /** @type {ReturnType<typeof createDataStore> | null} */
     let store = null;
     /** @type {Promise<{initialized: boolean}> | null} */
@@ -66,6 +66,7 @@ function createDesktopStorage(directory) {
     /** @type {Set<Promise<unknown>>} */
     const active = new Set();
     let closed = false;
+    let initialized = false;
     function openExisting() {
         if (closed) throw new StorageError("The library is closed.", 503);
         if (store) return store;
@@ -73,17 +74,17 @@ function createDesktopStorage(directory) {
         if (!files.length) return null;
         // Never call createDataStore on an unknown directory or a missing library.
         if (!files.includes('storage-installed.json')) throw new StorageError("Unrecognized data directory. Preserve original files and restore a verified backup.", 409);
-        store = createDataStore(directory); // Retains missing/empty DB and schema-version guards.
+        store = createDataStore(directory, { attachOnly, applicationId: DESKTOP_APPLICATION_ID }); // Retains missing/empty DB and schema-version guards.
         return store;
     }
     function status() {
         const current = openExisting();
         if (!current) return { initialized: false };
         const applicationId = current.one('PRAGMA application_id')?.application_id;
-        if (applicationId === DESKTOP_APPLICATION_ID) return { initialized: true };
+        if (applicationId === DESKTOP_APPLICATION_ID) return { initialized: initialized = true };
         // Recognize desktop libraries created before the SQLite marker was introduced.
         const hasLegacyTable = current.one("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='migrations'");
-        if (hasLegacyTable && current.one('SELECT 1 FROM migrations WHERE source_id=?', 'aurareader-desktop-v1')) return { initialized: true };
+        if (hasLegacyTable && current.one('SELECT 1 FROM migrations WHERE source_id=?', 'aurareader-desktop-v1')) return { initialized: initialized = true };
         if (applicationId !== 0 || current.one('SELECT 1 FROM books LIMIT 1') || current.one('SELECT 1 FROM operations LIMIT 1')
             || (hasLegacyTable && current.one('SELECT 1 FROM migrations LIMIT 1'))) {
             throw new StorageError("This is not a current desktop library directory. Preserve original files. Legacy databases are not supported.", 409);
@@ -96,6 +97,7 @@ function createDesktopStorage(directory) {
     }
     async function initialize() {
         if (status().initialized) return { initialized: true };
+        if (attachOnly) throw new StorageError('Create a local desktop library first.', 423);
         if (creating) return creating;
         creating = (async () => {
             if (closed) throw new StorageError("The library is closed.", 503);
@@ -104,12 +106,14 @@ function createDesktopStorage(directory) {
                 current.check();
                 current.db.exec(`PRAGMA application_id = ${DESKTOP_APPLICATION_ID}`);
             });
-            return { initialized: true };
+            return { initialized: initialized = true };
         })();
         try { return await creating; } finally { creating = null; }
     }
     const publications = createPublicationResources(readyStore);
     return {
+        library: readyStore,
+        observationStore: () => initialized ? store : null,
         /** @param {{url: string, method: string}} request */
         async publicationResource(request) {
             const operation = publications.respond(request);
@@ -184,7 +188,7 @@ function createDesktopStorage(directory) {
             active.add(operation);
             try { return await operation; } finally { active.delete(operation); }
         },
-        async settle() { await Promise.all([...active]); },
+        async settle() { await Promise.allSettled([...active]); },
         close() { closed = true; publications.clear(); store?.close(); store = null; }
     };
 }

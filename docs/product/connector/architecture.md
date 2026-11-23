@@ -1,6 +1,6 @@
 # AuraReader 本地 Connector 代码架构设计
 
-2026-11-23 · 初版设计 · 分支 `codex/connector-mvp`
+2026-11-23 · 架构设计 · 分支 `codex/connector-mvp` · [实现与验收](implementation.md)
 
 本设计对应[已确认的 MVP](feature-spec.md)。本机 ChatGPT 或 Codex 启动一个独立的 MCP 标准输入输出进程。Connector 和 Electron 各自打开同一桌面书库，复用 AuraReader 的数据校验、事务和领域规则。读者关闭阅读器后，对话仍能读写。默认选择 Electron 书库是 MVP 中记录的实施假设。
 
@@ -74,6 +74,6 @@ AuraReader 渲染进程 → preload → 现有 Electron IPC ──────�
 
 浏览器和 Electron 的原入口需在未安装插件时独立通过回归。实施时优先增加能复现新风险的测试，例如固定编辑基线、无关 Goal 改动保留草稿、重导入后旧引文失效。复用已有[桌面存储回归](../../../tests/regression/test_desktop_storage.js)、[Goal 恢复回归](../../../tests/regression/test_goal_library_recovery.js)与[阅读流程](../../../tests/desktop/reading-workflow.cjs)。
 
-## 本轮验证边界
+## 设计阶段验证边界
 
 在该分支使用 Node 24.16.0 运行现有桌面存储回归，通过。另用临时桌面书库、两个独立 Node 进程及一条观察连接验证：另一进程提交后可读新值、观察连接的 data_version 变化、同一请求重放只增加一次 revision、旧 revision 保存返回 409、重新打开保留已提交内容。本轮验证的是现有存储基础。插件宿主接入、同步时延、编辑器草稿保护、完整导入导出等价性及应用全量回归留待实现阶段验收。

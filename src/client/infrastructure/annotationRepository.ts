@@ -1,40 +1,47 @@
 import type { Annotation, AnnotationInput } from '../domain/annotation.js';
-import type { StoredAnnotation } from '../../shared/storage.js';
-import type { NoteCommand, PendingNoteWrite } from './annotationRecovery.js';
+import type { StoredAnnotation, NoteRecord } from '../../shared/storage.js';
+import type { NoteCommand, PendingNoteWrite, NoteEditBaseline } from './annotationRecovery.js';
 import { StorageClientError, errorMessage } from './storageError.js';
 import { normalizeAnnotation } from '../domain/annotationEngine.js';
-import { pendingNoteWrites, pendingNoteBookIds, recordNoteWrite, acknowledgeNoteWrite, attachNoteCommand } from './annotationRecovery.js';
+import { pendingNoteWrites, pendingNoteBookIds, advanceNoteBaseline, recordNoteWrite, acknowledgeNoteWrite, attachNoteCommand } from './annotationRecovery.js';
 import { initializeStorage, readNotes, enqueue, bookVersion, noteVersion, acceptNote, storageRequest } from './storageClient.js';
 
-const normalize = (notes: (AnnotationInput | null)[]): Annotation[] => notes.map(normalizeAnnotation).filter((note): note is Annotation => note !== null);
 const commands = new Map<string, NoteCommand>();
-export function saveNoteToDB(note: StoredAnnotation) {
+const displayedBaselines = new WeakMap<AnnotationInput, { expected: number; generation: string }>();
+export const displayedNoteBaseline = (note: AnnotationInput) => displayedBaselines.get(note);
+export function displayedNote(record: NoteRecord, generation?: string) {
+    const note = record.deleted ? null : normalizeAnnotation(record.value);
+    if (note && generation) displayedBaselines.set(note, { expected: record.revision, generation });
+    return note;
+}
+export function saveNoteToDB(note: StoredAnnotation, baseline?: NoteEditBaseline) {
     if (!note?.id) return Promise.resolve();
-    return submit(recordNoteWrite({ id: note.id, bookId: note.bookId, operation: 'save', note }));
+    return submit(recordNoteWrite({ id: note.id, bookId: note.bookId, operation: 'save', note }, baseline), false, baseline);
 }
-export function deleteNoteFromDB(id: string, bookId: string) {
+export function deleteNoteFromDB(id: string, bookId: string, baseline?: NoteEditBaseline) {
     if (!id) return Promise.resolve();
-    return submit(recordNoteWrite({ id, bookId, operation: 'delete' }));
+    return submit(recordNoteWrite({ id, bookId, operation: 'delete' }, baseline), false, baseline);
 }
-function submit(entry: PendingNoteWrite, retry = false) {
+function submit(entry: PendingNoteWrite, retry = false, editing?: NoteEditBaseline) {
     return enqueue(entry.bookId, async () => {
         try {
             await initializeStorage();
             const latest = pendingNoteWrites(entry.bookId).find(item => item.id === entry.id);
             if (retry && latest?.version !== entry.version) return;
+            const baseline = editing || (retry ? latest?.baseline : entry.baseline);
             for (const prior of latest?.prerequisites || entry.prerequisites || []) {
                 if (prior.version === entry.version) continue;
                 const result = await sendNoteCommand(prior.command);
                 acceptNote(entry.id, entry.bookId, result, prior.operation === 'delete');
-                acknowledgeNoteWrite({ ...entry, version: prior.version });
+                const acknowledged = { command: prior.command, chain: prior.chain, revision: result.revision };
+                advanceNoteBaseline(baseline, acknowledged);
+                acknowledgeNoteWrite({ ...entry, version: prior.version }, acknowledged);
                 commands.delete(prior.version);
             }
             let command = entry.command || commands.get(entry.version);
             if (!command) {
-                const book = await bookVersion(entry.bookId);
-                const note = await noteVersion(entry.id, entry.bookId);
-                if (!book.generation) throw new Error("The book was deleted or does not exist.");
-                const version = { opId: entry.version, expected: note.revision, generation: book.generation };
+                const version = baseline ? { opId: entry.version, expected: baseline.expected, generation: baseline.generation }
+                    : await latestNoteVersion(entry);
                 command = entry.operation === 'save' ? { ...version, note: entry.note }
                     : { ...version, id: entry.id, bookId: entry.bookId };
                 commands.set(entry.version, command);
@@ -42,7 +49,9 @@ function submit(entry: PendingNoteWrite, retry = false) {
             entry = attachNoteCommand(entry, command);
             const result = await sendNoteCommand(command);
             acceptNote(entry.id, entry.bookId, result, entry.operation === 'delete');
-            acknowledgeNoteWrite(entry); commands.delete(entry.version);
+            const acknowledged = { command, chain: entry.baseline?.chain, revision: result.revision };
+            advanceNoteBaseline(baseline, acknowledged);
+            acknowledgeNoteWrite(entry, acknowledged); commands.delete(entry.version);
         } catch (cause) {
             const error = new StorageClientError(errorMessage(cause, "Could not save note"), { cause });
             error.status = cause instanceof StorageClientError ? cause.status : undefined; error.recoveryAvailable = entry.durable !== false;
@@ -51,9 +60,16 @@ function submit(entry: PendingNoteWrite, retry = false) {
         }
     });
 }
+async function latestNoteVersion(entry: PendingNoteWrite) {
+    const book = await bookVersion(entry.bookId);
+    const note = await noteVersion(entry.id, entry.bookId);
+    if (!book.generation) throw new Error('The book was deleted or does not exist.');
+    return { opId: entry.version, expected: note.revision, generation: book.generation };
+}
 export async function loadNotesFromDB(bookId: string): Promise<Annotation[]> {
     if (!bookId) return [];
-    return normalize((await readNotes([bookId])).flatMap(row => row.deleted ? [] : [row.value]));
+    const { generation } = await bookVersion(bookId);
+    return (await readNotes([bookId])).map(row => displayedNote(row, generation)).filter((note): note is Annotation => note !== null);
 }
 export async function loadNotesForBook(bookId: string): Promise<Annotation[]> {
     if (!bookId) return [];
@@ -70,7 +86,14 @@ function overlay(notes: Annotation[], pending: PendingNoteWrite[]): Annotation[]
     const byId = new Map(notes.map(note => [note.id, note]));
     for (const entry of pending) {
         if (entry.operation === 'delete') byId.delete(entry.id);
-        else { const note = normalizeAnnotation(entry.note); if (note) byId.set(entry.id, note); }
+        else {
+            const note = normalizeAnnotation(entry.note);
+            if (note) {
+                const version = entry.baseline || (entry.command && { expected: entry.command.expected, generation: entry.command.generation });
+                if (version) displayedBaselines.set(note, version);
+                byId.set(entry.id, note);
+            }
+        }
     }
     return [...byId.values()];
 }

@@ -2,9 +2,9 @@ import type { GoalStateRecord, SaveGoalsCommand, NoteDeleteRevision } from '../.
 import type { GoalLibraryRecord, SaveGoalLibraryCommand } from '../../shared/storage.js';
 import type { GoalBackupState, GoalGraphBackup } from '../domain/goal.js';
 import type { Book } from '../domain/book.js';
-import type { BookRecord, BookRevision, NoteRecord, Revision, StorageRoutes, StoredAnnotation } from '../../shared/storage.js';
+import type { BookRecord, BookSummaryRecord, BookRevision, NoteRecord, Revision, StorageRoutes, StoredAnnotation } from '../../shared/storage.js';
 import { StorageClientError } from './storageError.js';
-import type { DesktopResult, DesktopStorage } from '../../shared/desktop.js';
+import type { DesktopLibraryChanges, DesktopResult, DesktopStorage } from '../../shared/desktop.js';
 // The browser remains asynchronous; SQLite is owned exclusively by Node.js.
 let base = '/api/storage';
 let transport: typeof fetch = (...args) => fetch(...args);
@@ -15,7 +15,7 @@ const bookVersions = new Map<string, BookRevision & { deleted: boolean }>();
 const noteVersions = new Map<string, Revision & { bookId: string; deleted: boolean }>();
 const goalVersions = new Map<string, GoalStateRecord>();
 let libraryVersion: GoalLibraryRecord | undefined;
-const libraryListeners = new Set<(record: GoalLibraryRecord) => void>();
+const libraryListeners = new Set<(record: GoalLibraryRecord, external?: { previous?: GoalLibraryRecord }) => void>();
 const goalListeners = new Set<(record: GoalStateRecord) => void>();
 const queues = new Map<string, Promise<unknown>>();
 export const operationId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -119,15 +119,13 @@ export async function readBooks() {
     records.forEach(rememberBookVersion);
     return records;
 }
-function rememberBookVersion(row: BookRecord) {
+function rememberBookVersion(row: BookRecord | BookSummaryRecord) {
     if ((bookVersions.get(row.id)?.revision || 0) <= row.revision) bookVersions.set(row.id, { revision: row.revision, generation: row.generation, deleted: row.deleted });
 }
 export async function readBookSummaries() {
     await initializeStorage();
     const { records } = await storageRequest('books/summary', undefined);
-    records.forEach(row => {
-        if ((bookVersions.get(row.id)?.revision || 0) <= row.revision) bookVersions.set(row.id, { revision: row.revision, generation: row.generation, deleted: row.deleted });
-    });
+    records.forEach(rememberBookVersion);
     return records;
 }
 export async function readBook(id: string) {
@@ -139,8 +137,24 @@ export async function readBook(id: string) {
 export async function readNotes(bookIds: string[] = []) {
     await initializeStorage();
     const { records } = await storageRequest('notes/query', { bookIds });
-    records.forEach(row => { if ((noteVersions.get(row.id)?.revision || 0) <= row.revision) noteVersions.set(row.id, row); });
+    records.forEach(rememberNoteVersion);
     return records;
+}
+function rememberNoteVersion(row: NoteRecord) {
+    if ((noteVersions.get(row.id)?.revision || 0) <= row.revision) noteVersions.set(row.id, row);
+}
+export function onExternalLibraryChanges(listener: (batch: DesktopLibraryChanges) => void) {
+    return desktopStorage()?.onExternalChanges?.(batch => {
+        batch.books.forEach(rememberBookVersion);
+        batch.notes.forEach(rememberNoteVersion);
+        const previous = libraryVersion;
+        if (batch.goals && batch.goals.revision > (previous?.revision ?? -1)) {
+            const record = batch.goals;
+            acceptGoalLibrary(record);
+            libraryListeners.forEach(callback => callback(record, { previous }));
+        }
+        listener(batch);
+    });
 }
 export function enqueue<T>(bookId: string, task: () => T | PromiseLike<T>): Promise<T> {
     const previous = queues.get(bookId) || Promise.resolve();
@@ -150,6 +164,7 @@ export function enqueue<T>(bookId: string, task: () => T | PromiseLike<T>): Prom
     return next;
 }
 export async function drainStorage() { await Promise.all([...queues.values()]); }
+export const cachedBookVersion = (id: string) => bookVersions.get(id);
 export async function bookVersion(id: string): Promise<BookRevision> {
     if (!bookVersions.has(id)) await readBookSummaries();
     return bookVersions.get(id) || { revision: 0 };
@@ -190,7 +205,7 @@ export function acceptGoalLibrary(record: GoalLibraryRecord, notify = false) {
     if (notify) libraryListeners.forEach(listener => listener(record));
 }
 export const cachedGoalLibrary = () => libraryVersion;
-export function onGoalLibraryChanged(listener: (record: GoalLibraryRecord) => void) { libraryListeners.add(listener); return () => libraryListeners.delete(listener); }
+export function onGoalLibraryChanged(listener: (record: GoalLibraryRecord, external?: { previous?: GoalLibraryRecord }) => void) { libraryListeners.add(listener); return () => libraryListeners.delete(listener); }
 export async function readGoalLibrary() {
     await initializeStorage(); const record = await storageRequest('goals/library', undefined); acceptGoalLibrary(record); return record;
 }

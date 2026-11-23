@@ -291,16 +291,17 @@ export class ReaderController {
         return loc;
     }
 
-    refreshAnnotations(notes: Annotation[] = []) {
+    refreshAnnotations(notes: Annotation[] = [], changedPages?: ReadonlySet<number>) {
         const elements = this.elements;
         if (!elements) return;
         const viewport = readerViewport(elements);
         const surfaces = [viewport, elements.bookPaper, elements.bookPaper ? readingViewport(elements.bookPaper) : null].filter((node): node is HTMLElement => !!node);
         const positions = surfaces.map(node => ({ node, left: node.scrollLeft, top: node.scrollTop }));
         if (elements.bookPaper) {
-            applyHighlightsToPaper(elements.bookPaper, this.currentPage, notes);
+            if (!changedPages || changedPages.has(this.currentPage)) applyHighlightsToPaper(elements.bookPaper, this.currentPage, notes);
             for (const title of elements.bookPaper.querySelectorAll<HTMLElement>('[data-volume-title-page]')) {
-                applyHighlightsToPaper(title, Number(title.dataset.volumeTitlePage), notes);
+                const page = Number(title.dataset.volumeTitlePage);
+                if (!changedPages || changedPages.has(page)) applyHighlightsToPaper(title, page, notes);
             }
         }
         for (const { node, left, top } of positions) {

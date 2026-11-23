@@ -8,18 +8,21 @@ async function sqliteServer() {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aurareader-test-'));
     let server; let base; let token;
     async function start() {
-        server = createServer({ dataDirectory: directory });
-        // Windows can assign ephemeral ports forbidden by Fetch (e.g. 10080).
-        // Ask the OS again without making that unrelated port policy a failure.
-        const forbidden = new Set([2049, 3659, 4045, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6697, 10080]);
-        do {
-            server.listen(0, '127.0.0.1'); await once(server, 'listening');
-            if (!forbidden.has(server.address().port)) break;
-            const closed = once(server, 'close'); server.close(); await closed;
+        // Windows can assign ephemeral ports rejected by the bundled Fetch.
+        // Retry once on its actual port error so the fixture stays independent
+        // of Node's version-specific deny list.
+        for (let attempt = 0; ; attempt++) {
             server = createServer({ dataDirectory: directory });
-        } while (true);
-        base = `http://127.0.0.1:${server.address().port}`;
-        token = (await (await fetch(base + '/api/storage/session')).json()).token;
+            server.listen(0, '127.0.0.1'); await once(server, 'listening');
+            base = `http://127.0.0.1:${server.address().port}`;
+            try {
+                token = (await (await fetch(base + '/api/storage/session')).json()).token;
+                return;
+            } catch (error) {
+                await stop();
+                if (attempt || error.cause?.message !== 'bad port') throw error;
+            }
+        }
     }
     async function stop() { const closed = once(server, 'close'); server.close(); server.closeAllConnections(); await closed; }
     await start();

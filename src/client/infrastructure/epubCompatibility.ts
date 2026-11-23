@@ -2,10 +2,10 @@ import type { Book } from '../domain/book.js';
 import { parseEpub } from './epubParser.js';
 
 /** Reimport attaches original resources while preserving the existing source-page coordinate system. */
-export function retainEpubLocations(incoming: Book, previous: Book | null | undefined): Book {
+export function retainEpubLocations(incoming: Book, previous: Book | null | undefined, parser?: DOMParser): Book {
     if (!previous || !incoming.epub) return incoming;
-    const parser = new DOMParser();
-    const text = (html: string) => parser.parseFromString(html, 'text/html').body.textContent || '';
+    const htmlParser = parser || new DOMParser();
+    const text = (html: string) => htmlParser.parseFromString(html, 'text/html').body.textContent || '';
     const nextText = incoming.pages.map(text);
     const used = new Set<number>();
     const oldToNew = previous.pages.map((html, index) => {

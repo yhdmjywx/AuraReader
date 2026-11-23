@@ -1,3 +1,4 @@
+import type { GoalLibraryRecord } from '../../../shared/storage.js';
 import type { Annotation } from '../../domain/annotation.js';
 import type { Goal, GoalDraft, GoalLibraryState, GoalSourceLink, GoalInputDraft } from '../../domain/goal.js';
 import { addGoalInput, changeGoalInput, deleteGoalInput, addGoalSource, normalizeGoalContent } from '../../domain/goalContentEngine.js';
@@ -9,8 +10,8 @@ import type { ShowToast } from '../../app/contracts.js';
 import type { ReadingLocation } from '../../domain/book.js';
 import { addGoal, changeGoal, goalOrigin } from '../../domain/goalEngine.js';
 import { normalizeAnnotation } from '../../domain/annotationEngine.js';
-import { bookVersion, readBookSummaries, onGoalLibraryChanged, operationId } from '../../infrastructure/storageClient.js';
-import { stageLibrary, flushLibrary, loadGoalLibrary, loadGoalMaterials, pendingLibrary, libraryDrafts, storeLibraryDraft, discardLibraryDraft } from '../../infrastructure/goalLibraryRepository.js';
+import { bookVersion, cachedGoalLibrary, readBookSummaries, onGoalLibraryChanged, operationId } from '../../infrastructure/storageClient.js';
+import { stageLibrary, rebaseUnsentInlineEdit, flushLibrary, loadGoalLibrary, loadGoalMaterials, pendingLibrary, libraryDrafts, storeLibraryDraft, discardLibraryDraft } from '../../infrastructure/goalLibraryRepository.js';
 import { pendingBookIntents, stageBookIntent, acknowledgeBookIntent } from '../../infrastructure/goalLibraryRepository.js';
 import { GoalUI } from './goalUI.js';
 import { GoalSidebar, positionGoals } from './goalLayout.js';
@@ -41,10 +42,13 @@ export class GoalController {
     disabled = true; visible = false;
     get page() { return this.navigation.surface === 'goal'; }
     elements: AppElements | null = null; ui: GoalUI | null = null; sidebar: GoalSidebar | null = null;
-    private dirty = false; private serial = 0; private stagedSerial = -1;
+    private dirty = false;
+    private dirtyBase = 0;
+    private serial = 0; private stagedSerial = -1;
     private linksInFlight = new Set<Promise<void>>(); private timer: ReturnType<typeof setTimeout> | null = null;
     private failure: unknown; private ready: Promise<void> | null = null;
     get saveError() { return this.failure; }
+    private externalPending: GoalLibraryRecord | null = null;
     private materialRequest = 0; private materials: Annotation[] = []; private titles = new Map<string, string>();
     private materialStatus: 'ready' | 'loading' | 'error' = 'ready';
     lifecycleBusy = false;
@@ -62,12 +66,56 @@ export class GoalController {
             this.render();
         });
         navigation.subscribe(() => { this.updateReadingContext(); this.callbacks.onSurfaceChanged?.(); });
-        onGoalLibraryChanged(record => {
+        onGoalLibraryChanged((record, external) => {
             if (record.deleted) return;
+            if (external) { this.receiveExternal(record, external.previous); return; }
             if (this.dirty || this.edit || pendingLibrary().length || inputDrafts().length) { this.disabled = true; this.fail(Object.assign(new Error("Goal data has changed. Unsaved content is preserved. Reload to resolve the conflict."), { status: 409 })); }
             else { this.state = normalizeGoalContent(record.value); this.ensureSelection(); this.refreshMaterials(); }
             this.render();
         });
+    }
+    private receiveExternal(record: GoalLibraryRecord, previous?: GoalLibraryRecord) {
+        if (record.deleted) return;
+        const remote = normalizeGoalContent(record.value);
+        const confirmed = previous && !previous.deleted ? normalizeGoalContent(previous.value) : this.state;
+        const edit = this.edit;
+        const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+        if (edit && edit.mode !== 'root') {
+            const goalId = edit.mode === 'input-new' || edit.mode === 'input-edit' ? edit.draft.goalId
+                : edit.mode === 'child' ? edit.draft.parentId : edit.draft.id;
+            const extract = (state: GoalLibraryState) => edit.mode === 'input-edit'
+                ? state.inputs?.find(item => item.id === edit.draft.id)
+                : edit.mode === 'edit' ? state.goals.find(item => item.id === edit.draft.id) : null;
+            if (!goalEditable(remote, goalId) || !same(extract(confirmed), extract(remote))) {
+                this.disabled = true;
+                this.fail(Object.assign(new Error("This Goal or its text changed. Your input is preserved locally. Reload to resolve the conflict."), { status: 409 }));
+                return;
+            }
+            if (this.dirty && previous && (edit.mode === 'edit' || edit.mode === 'input-edit')) {
+                // Merge only the edited row when it is the entire unsent change.
+                // A dispatched command keeps the revision and body it was sent with.
+                const local = extract(this.state);
+                const field = edit.mode === 'edit' ? 'goals' : 'inputs';
+                const baselineItems = confirmed[field] || [];
+                const localItems = this.state[field] || [];
+                const revisedBaseline = { ...confirmed, [field]: baselineItems.map(item => item.id === edit.draft.id ? local : item) };
+                if (local && localItems.some(item => item.id === local.id) && same(revisedBaseline, this.state)) {
+                    const merged = { ...remote, [field]: (remote[field] || []).map(item => item.id === local.id ? local : item) };
+                    if (rebaseUnsentInlineEdit(previous.revision, record.revision, merged)) {
+                        this.dirtyBase = record.revision;
+                        this.installExternal(merged); return;
+                    }
+                }
+            }
+        }
+        if (this.dirty || pendingLibrary().length) { this.externalPending = record; return; }
+        this.installExternal(remote);
+    }
+    private installExternal(state: GoalLibraryState) {
+        this.state = state;
+        this.undoChange = null;
+        if (this.selected && !goalEditable(this.state, this.selected)) this.ensureSelection();
+        void this.refreshMaterials();
     }
     initialize(): Promise<void> {
         if (this.ready) return this.ready;
@@ -146,6 +194,13 @@ export class GoalController {
     }
     updateDraft(text: string) {
         const edit = this.edit; if (!edit) return; edit.draft.text = text; if (text.trim()) edit.lastNonempty = text;
+        if (this.disabled && this.failure) {
+            try {
+                if ('goalId' in edit.draft) storeInputDraft(edit.draft);
+                else storeLibraryDraft({ draft: edit.draft });
+            } catch (error) { this.fail(error); }
+            return;
+        }
         if (edit.mode === 'input-new' || edit.mode === 'input-edit') {
             try {
                 storeInputDraft({ ...edit.draft, text: text.trim() ? text : edit.mode === 'input-edit' ? edit.lastNonempty : '' });
@@ -158,6 +213,7 @@ export class GoalController {
     }
     private endEdit() {
         const edit = this.edit; if (!edit) return; if (this.ui?.editingText !== undefined) this.updateDraft(this.ui.editingText); this.edit = null; this.ui?.releaseEditorFocus();
+        if (this.disabled && this.failure) { this.render(); return; }
         if (edit.mode === 'input-new' || edit.mode === 'input-edit') {
             const text = edit.draft.text.trim() ? edit.draft.text : edit.mode === 'input-edit' ? edit.lastNonempty : '';
             if (text.trim()) {
@@ -189,14 +245,22 @@ export class GoalController {
     }
     async finishInlineEdit(): Promise<void> { this.endEdit(); await this.flush(); await Promise.all([...this.linksInFlight]); this.resumeDraft(); this.render(); }
     private persist(state: GoalLibraryState) {
-        if (state === this.state) return; this.undoChange = null; this.state = state; this.dirty = true; this.serial++;
-        try { stageLibrary(state, [...this.responseWrites.values()]); this.stagedSerial = this.serial; } catch (error) { this.fail(error); }
+        if (state === this.state) return;
+        if (!this.dirty) this.dirtyBase = cachedGoalLibrary()?.revision || 0;
+        this.undoChange = null; this.state = state; this.dirty = true; this.serial++;
+        try { stageLibrary(state, [...this.responseWrites.values()], this.dirtyBase); this.stagedSerial = this.serial; } catch (error) { this.fail(error); }
         if (this.timer) clearTimeout(this.timer); this.timer = setTimeout(() => { this.flush().catch(() => {}); }, 250); this.callbacks.onActionsChanged?.();
     }
     async flush() {
         if (this.timer) { clearTimeout(this.timer); this.timer = null; } const serial = this.serial;
         if (this.disabled && this.failure && (this.dirty || pendingLibrary().length || libraryDrafts().length || inputDrafts().length)) throw this.failure;
-        try { if (this.dirty && this.stagedSerial !== serial) { stageLibrary(this.state, [...this.responseWrites.values()]); this.stagedSerial = serial; } if (pendingLibrary().length) await flushLibrary(); if (this.serial === serial) { this.dirty = false; this.failure = undefined; this.changedInputs.clear(); } this.render(); }
+        try { if (this.dirty && this.stagedSerial !== serial) { stageLibrary(this.state, [...this.responseWrites.values()], this.dirtyBase); this.stagedSerial = serial; } if (pendingLibrary().length) await flushLibrary(); if (this.serial === serial) {
+                this.dirty = false; this.failure = undefined; this.changedInputs.clear();
+                const external = this.externalPending; this.externalPending = null;
+                if (external && !external.deleted && external.revision >= (cachedGoalLibrary()?.revision || 0)) {
+                    this.installExternal(normalizeGoalContent(external.value));
+                }
+            } this.render(); }
         catch (error) { this.fail(error); throw error; }
     }
     setResponse(target: GoalResponseTarget, marked: boolean) {

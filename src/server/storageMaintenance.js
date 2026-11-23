@@ -36,16 +36,19 @@ function verifyDatabase(filename) {
         return { integrity: 'ok', books: db.prepare('SELECT count(*) AS n FROM books WHERE deleted=0').get().n, notes: db.prepare('SELECT count(*) AS n FROM annotations WHERE deleted=0').get().n };
     } finally { db.close(); }
 }
-async function backupDatabase(directory) {
+async function backupDatabase(directory, destination) {
     const source = path.join(directory, 'aurareader.sqlite');
-    const dir = path.join(directory, 'backups'); fs.mkdirSync(dir, { recursive: true });
-    const target = path.join(dir, new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID() + '.sqlite');
+    const dir = destination ? path.dirname(destination) : path.join(directory, 'backups');
+    fs.mkdirSync(dir, { recursive: true });
+    const target = destination || path.join(dir, new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID() + '.sqlite');
     const temporary = target + '.tmp';
-    const db = new DatabaseSync(source, { readOnly: true });
-    try { await backup(db, temporary); } finally { db.close(); }
-    const verified = verifyDatabase(temporary);
-    fs.renameSync(temporary, target);
-    return { filename: target, ...verified };
+    try {
+        const db = new DatabaseSync(source, { readOnly: true, timeout: 5000 });
+        try { await backup(db, temporary); } finally { db.close(); }
+        const verified = verifyDatabase(temporary);
+        fs.renameSync(temporary, target);
+        return { filename: target, ...verified };
+    } finally { fs.rmSync(temporary, { force: true }); }
 }
 if (require.main === module) {
     const directory = path.resolve(__dirname, '../../data');

@@ -5,6 +5,7 @@ const { assertRuntime } = require('./runtime.cjs');
 const { APP_URL, createAssetHandler } = require('./assets.cjs');
 const { secureSession, secureWindow } = require('./security.cjs');
 const { createDesktopStorage } = require('./storage.cjs');
+const { desktopProfile } = require('./libraryPath.cjs');
 const { registerStorageIpc, registerFileIpc, registerWikiIpc, coordinateClose } = require('./ipc.cjs');
 const { createFileService } = require('./files.cjs');
 
@@ -18,8 +19,7 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
     app.setName('AuraReader');
     // Honor Electron's explicit profile switch for isolated acceptance and user-
     // selected data locations. Renderer cannot change this main-process setting.
-    const profile = profileDirectory || app.commandLine.getSwitchValue('user-data-dir') || path.join(app.getPath('appData'), 'AuraReader');
-    if (!path.isAbsolute(profile)) throw new Error("The user data directory must use an absolute path.");
+    const profile = desktopProfile(app.getPath('appData'), profileDirectory || app.commandLine.getSwitchValue('user-data-dir'));
     if (app.isPackaged) {
         const relative = path.relative(path.dirname(process.execPath), path.resolve(profile));
         const outside = relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative);

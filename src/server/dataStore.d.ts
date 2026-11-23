@@ -20,6 +20,10 @@ export interface DataStore {
     one(sql: string, ...args: SQLInputValue[]): Record<string, unknown> | undefined;
     all(sql: string, ...args: SQLInputValue[]): Record<string, unknown>[];
     run(sql: string, ...args: SQLInputValue[]): unknown;
+    snapshot<T>(fn: (store: DataStore) => T): T;
+    versions(): { books: { id: string; revision: number; generation: string; deleted: number }[];
+        notes: { id: string; bookId: string; revision: number; deleted: number }[]; goalRevision: number };
+    note(id: string): NoteRecord | null;
     books(): BookRecord[];
     book(bookId: string): BookRecord | null;
     bookSummaries(): BookSummaryRecord[];
@@ -36,7 +40,7 @@ export interface DataStore {
     check(): { integrity: string; foreignKeys: number };
     close(): void;
 }
-export function createDataStore(directory: string): DataStore;
+export function createDataStore(directory: string, options?: { attachOnly?: boolean; applicationId?: number }): DataStore;
 export function canonical(value: unknown): string;
 export function digest(value: unknown): string;
 export function bookRecord(value: unknown): Book;

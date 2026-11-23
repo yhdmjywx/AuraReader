@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist/connector/modules"
+  },
+  "include": [
+    "src/connector/modules.ts",
+    "src/client/**/*.d.ts",
+    "src/shared/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

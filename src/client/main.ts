@@ -11,6 +11,7 @@ import { countLabel } from './domain/format.js';
    Does NOT perform direct DOM rendering, pagination, or note persistence itself.
    ========================================================================== */
 
+import { cachedBookVersion, onExternalLibraryChanges } from './infrastructure/storageClient.js';
 import { initDB } from './infrastructure/bookRepository.js';
 import { Session } from './app/session.js';
 import { LayoutController } from './features/layout/layoutController.js';
@@ -357,6 +358,24 @@ export function bootstrapApp() {
         await home?.open();
         appShell.showToast(`Restored from backup: ${countLabel(importedBooksCount, 'book')}, ${countLabel(importedNotesCount, 'annotation')}. Choose a book on the home page.`);
     };
+    const stopExternalUpdates = onExternalLibraryChanges(batch => {
+        const bookId = session.getCurrentBookId();
+        const bookUpdate = batch.books.find(book => book.id === bookId);
+        if (bookUpdate?.deleted && !annotations.inlineEdit && annotations.saveState === 'saved') {
+            coordinator.clearReadingSession();
+        } else if (bookId && batch.notes.some(row => row.bookId === bookId)) {
+            const pages = annotations.applyExternalNotes(batch.notes, cachedBookVersion(bookId)?.generation);
+            if (pages.size) reader.refreshAnnotations(annotations.getRenderingNotes(), pages);
+        }
+        if (batch.books.length || batch.notes.some(note => goals.state.links.some(link => link.annotationId === note.id))) {
+            void goals.refreshMaterials();
+        }
+        if (batch.books.length) {
+            void Promise.all([shelf.refreshShelf(), home?.refresh()]).catch(error =>
+                appShell.showToast(errorMessage(error, 'Could not refresh the library.'), { kind: 'error' }));
+        }
+    });
+    if (stopExternalUpdates) window.addEventListener('pagehide', stopExternalUpdates, { once: true });
     const finishReadingEdits = async () => { await goals.finishInlineEdit(); await annotations.finishInlineEdit(); await annotations.assertInlineWritesSaved(); await goals.assertWritesSaved(); };
     backup.callbacks.beforeRestore = finishReadingEdits;
     backup.callbacks.beforeExport = finishReadingEdits;

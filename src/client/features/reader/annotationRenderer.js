@@ -7,7 +7,25 @@ import { normalizeAnnotation } from '../../domain/annotationEngine.js';
 import { buildSegments, resolveAnnotationRange } from '../../domain/annotationRangeEngine.js';
 
 export function renderAnnotationTokens(root, annotations = [], page = null) {
-    if (!root || typeof document === 'undefined' || !root.ownerDocument) return;
+    if (!root?.ownerDocument) return;
+    const selection = root.ownerDocument.getSelection();
+    const source = node => node?.parentElement?.closest('[data-volume-title-page]') || root;
+    const offsets = selection?.rangeCount && source(selection.anchorNode) === root && source(selection.focusNode) === root
+        ? rangeOffsets(root, selection.getRangeAt(0)) : null;
+    const backwards = offsets && boundaryOffset(root, selection.anchorNode, selection.anchorOffset) === offsets.end;
+    renderTokens(root, annotations, page);
+    if (offsets) {
+        const { nodes } = buildTextIndex(root);
+        const start = nodes.find(item => item.start <= offsets.start && item.end > offsets.start);
+        const end = nodes.find(item => item.start < offsets.end && item.end >= offsets.end);
+        if (start && end) {
+            const from = [start.node, offsets.start - start.start], to = [end.node, offsets.end - end.start];
+            selection.setBaseAndExtent(...(backwards ? [...to, ...from] : [...from, ...to]));
+        }
+    }
+}
+
+function renderTokens(root, annotations, page) {
     if (page != null) root.dataset.annotationPage = String(page);
     // Refresh only our wrappers. Keep the source blocks, typography and link
     // handlers intact; a note edit must never remount or repaginate the chapter.
@@ -117,6 +135,8 @@ function wrapTextNode(textNode, segment, start, end, page) {
     span.appendChild(textNode);
 }
 
+export function readSourceText(root) { return buildTextIndex(root).text; }
+
 function buildTextIndex(root) {
     const nodes = [];
     const walker = sourceTextWalker(root);
@@ -211,10 +231,11 @@ function textBeforeElement(root, element) {
 function sourceTextWalker(root) {
     // The prepended divider has its own original page/offset coordinate space.
     // It must not shift the first chapter's existing or newly selected ranges.
-    return root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    const filter = root.ownerDocument.defaultView?.NodeFilter || globalThis.NodeFilter;
+    return root.ownerDocument.createTreeWalker(root, filter.SHOW_TEXT, {
         acceptNode(node) {
             const divider = node.parentElement?.closest('[data-volume-title-page]');
-            return divider && !divider.contains(root) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+            return divider && !divider.contains(root) ? filter.FILTER_REJECT : filter.FILTER_ACCEPT;
         }
     });
 }

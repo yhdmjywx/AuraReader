@@ -1,6 +1,6 @@
 # AuraReader 本地 Connector MVP
 
-2026-11-23 · 初始产品需求 · 待实现
+2026-11-23 · 产品需求 · 源码已实现，宿主验收见[实现记录](implementation.md)
 
 [本地 Connector 代码架构设计](architecture.md) 描述接入方式、存储与同步边界和回归验收。
 

@@ -95,6 +95,10 @@ verified: 2026-10-30 · owner rules: AGENTS.md
   implemented. The owner authorized ego-browser Web validation on 2026-11-13
   after built-in browser access failed; no desktop execution was tested for this
   feature. Evidence: docs/epub-engine/reading-settings-implementation-2026-11-13.md.
+- The local Connector MVP targets initialized desktop SQLite libraries via a
+  standalone MCP stdio package. Build and acceptance commands, desktop sync,
+  and current host verification are recorded in
+  docs/product/connector/implementation.md.
 - client persistence adapters: src/client/infrastructure/
 - Candidate `22d5785` later passed standalone packaged reading-settings/Paper
   checks and normal close/restart on 2026-11-13. NSIS payload, ASAR and runtime

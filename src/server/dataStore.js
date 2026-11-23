@@ -45,33 +45,44 @@ function goalBackupRecord(value) {
     for (const goal of value.goals) if (goal.parentId !== null) id(goal.parentId, 'parentId');
     return value;
 }
-function createDataStore(directory) {
+const SCHEMA_VERSION = 5;
+function createDataStore(directory, { attachOnly = false, applicationId } = {}) {
     const root = path.resolve(directory);
-    fs.mkdirSync(root, { recursive: true });
+    if (!attachOnly) fs.mkdirSync(root, { recursive: true });
     const filename = path.join(root, 'aurareader.sqlite');
     const installed = path.join(root, 'storage-installed.json');
     if (fs.existsSync(installed) && (!fs.existsSync(filename) || fs.statSync(filename).size === 0)) {
         throw new StorageError("The SQLite file is missing or empty. Preserve the data directory and restore a verified backup. An empty library will not be created automatically.", 500);
     }
-    const db = new DatabaseSync(filename, { timeout: 5000 });
-    if (db.prepare('PRAGMA user_version').get().user_version > 5) {
-        db.close(); throw new StorageError("The database version is newer than this application. Downgrade overwrite is not allowed.", 409);
+    if (attachOnly) {
+        const marker = JSON.parse(fs.readFileSync(installed, 'utf8'));
+        if (marker?.format !== 1 || marker.database !== path.basename(filename)) throw new StorageError('Invalid library marker.', 409);
+        const probe = new DatabaseSync(filename, { readOnly: true, timeout: 5000 });
+        try { assertCompatibleDesktop(probe, applicationId); } finally { probe.close(); }
     }
-    try { db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
+    const db = new DatabaseSync(filename, { timeout: 5000 });
+    try {
+        if (attachOnly) assertCompatibleDesktop(db, applicationId);
+        else if (db.prepare('PRAGMA user_version').get().user_version > SCHEMA_VERSION) {
+            throw new StorageError("The database version is newer than this application. Downgrade overwrite is not allowed.", 409);
+        }
+        db.exec('PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL');
+        if (!attachOnly) db.exec(`PRAGMA journal_mode=WAL;
         BEGIN IMMEDIATE;
         CREATE TABLE IF NOT EXISTS books(id TEXT PRIMARY KEY, payload TEXT, revision INTEGER NOT NULL, generation TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS annotations(id TEXT PRIMARY KEY, book_id TEXT NOT NULL REFERENCES books(id), payload TEXT, revision INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
         CREATE INDEX IF NOT EXISTS annotations_book ON annotations(book_id);
         CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, hash TEXT NOT NULL, result TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS goal_states(book_id TEXT PRIMARY KEY REFERENCES books(id), payload TEXT, revision INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
-        COMMIT;`); }
+        COMMIT;`);
+    }
     catch (error) { if (db.isTransaction) db.exec('ROLLBACK'); db.close(); throw error; }
-    if (!fs.existsSync(installed)) fs.writeFileSync(installed, JSON.stringify({ format: 1, database: 'aurareader.sqlite' }), { flag: 'wx' });
+    if (!attachOnly && !fs.existsSync(installed)) fs.writeFileSync(installed, JSON.stringify({ format: 1, database: 'aurareader.sqlite' }), { flag: 'wx' });
     const one = (sql, ...args) => db.prepare(sql).get(...args);
     const all = (sql, ...args) => db.prepare(sql).all(...args);
     const run = (sql, ...args) => db.prepare(sql).run(...args);
-    function transaction(fn) {
-        db.exec('BEGIN IMMEDIATE');
+    function transaction(fn, readOnly = false) {
+        db.exec(readOnly ? 'BEGIN' : 'BEGIN IMMEDIATE');
         try { const result = fn(); db.exec('COMMIT'); return result; }
         catch (error) {
             // SQLITE_FULL and some I/O errors already roll back the transaction.
@@ -85,15 +96,18 @@ function createDataStore(directory) {
         id(command.opId, 'opId');
         const hash = digest(command);
         return transaction(() => {
-            const prior = one('SELECT * FROM operations WHERE id=?', command.opId);
-            if (prior) {
-                if (prior.hash !== hash) throw new StorageError("The operation ID was reused for different content.", 409);
-                return JSON.parse(prior.result);
-            }
+            const prior = savedResult(command.opId, hash);
+            if (prior !== null) return prior;
             const result = apply();
             run('INSERT INTO operations VALUES(?,?,?)', command.opId, hash, JSON.stringify(result));
             return result;
         });
+    }
+    function savedResult(opId, hash) {
+        const prior = one('SELECT hash, result FROM operations WHERE id=?', opId);
+        if (!prior) return null;
+        if (prior.hash !== hash) throw new StorageError('The operation ID was reused for different content.', 409, { reason: 'operation_id_reused' });
+        return JSON.parse(prior.result);
     }
     function expected(row, revision) {
         if (!Number.isSafeInteger(revision) || revision < 0) throw new StorageError("A valid save version is required.");
@@ -101,7 +115,7 @@ function createDataStore(directory) {
     }
     function activeBook(bookId, generation) {
         const row = one('SELECT * FROM books WHERE id=?', id(bookId, 'bookId'));
-        if (!row || row.deleted || row.generation !== generation) throw new StorageError("The book was deleted or reimported.", 409);
+        if (!row || row.deleted || row.generation !== generation) throw new StorageError("The book was deleted or reimported.", 409, { reason: 'book_changed', generation: row?.generation, bookRevision: row?.revision });
         return row;
     }
     function putBook(book, revision) {
@@ -150,6 +164,48 @@ function createDataStore(directory) {
     const summaryCache = new Map();
     const store = {
         filename, root, db, transaction, one, all, run,
+        snapshot(fn) { return transaction(() => fn(store), true); },
+        versions() {
+            return {
+                books: all('SELECT id, revision, generation, deleted FROM books'),
+                notes: all('SELECT id, book_id AS bookId, revision, deleted FROM annotations'),
+                goalRevision: one('SELECT revision FROM goal_library WHERE id=1').revision
+            };
+        },
+        editGoalLibrary(command, update) {
+            return mutate(command, () => {
+                const current = library.read();
+                const { state, ...result } = update(current, store);
+                const record = state === current.value ? current : library.write(state);
+                return { ...result, revision: record.revision };
+            });
+        },
+        editNote(command, update) {
+            return mutate(command, () => {
+                const book = activeBook(command.bookId, command.generation);
+                if (command.bookRevision !== undefined && book.revision !== command.bookRevision) {
+                    throw new StorageError('The book has changed. Read the passage again.', 409,
+                        { reason: 'book_changed', generation: book.generation, bookRevision: book.revision });
+                }
+                const record = store.note(command.id);
+                expected(record, command.expected);
+                return { id: command.id, bookId: command.bookId, generation: command.generation,
+                    ...putNote(update(record, book), command.expected, command.generation) };
+            });
+        },
+        importBook(command, prepare) {
+            return mutate(command, () => {
+                const previous = store.book(command.id);
+                const book = prepare(previous?.value);
+                return { id: book.id, ...putBook(book, previous?.revision || 0) };
+            });
+        },
+        recordFile(command, result) { return mutate(command, () => result); },
+        replay(command) { return savedResult(id(command.opId, 'opId'), digest(command)); },
+        note(noteId) {
+            const r = one('SELECT * FROM annotations WHERE id=?', id(noteId));
+            return r ? { id: r.id, bookId: r.book_id, revision: r.revision, deleted: !!r.deleted, value: r.deleted ? null : JSON.parse(r.payload) } : null;
+        },
         books() { return all('SELECT * FROM books ORDER BY id').map(r => ({ id: r.id, revision: r.revision, generation: r.generation, deleted: !!r.deleted, value: r.deleted ? null : JSON.parse(r.payload) })); },
         book(bookId) {
             const row = one('SELECT * FROM books WHERE id=?', id(bookId, 'bookId'));
@@ -200,6 +256,7 @@ function createDataStore(directory) {
         deleteBook(c) {
             return mutate(c, () => {
                 id(c.id); const row = one('SELECT * FROM books WHERE id=?', c.id); expected(row, c.expected);
+                if (c.generation !== undefined) activeBook(c.id, c.generation);
                 if (!row) {
                     run('INSERT INTO books VALUES(?,NULL,1,?,1)', c.id, randomUUID());
                     return { revision: 1 };
@@ -274,8 +331,18 @@ function createDataStore(directory) {
         close() { db.close(); }
     };
     const library = createGoalLibrary(store, message => { throw new StorageError(message, 409); }, canonical);
-    try { transaction(() => library.initialize()); }
+    try { if (!attachOnly) transaction(() => library.initialize()); }
     catch (error) { db.close(); throw error; }
     return store;
 }
+function assertCompatibleDesktop(db, applicationId) {
+    const version = db.prepare('PRAGMA user_version').get().user_version;
+    const identity = db.prepare('PRAGMA application_id').get().application_id;
+    const legacy = identity === 0 && db.prepare("SELECT 1 FROM sqlite_schema WHERE name='migrations' AND type='table'").get()
+        && db.prepare("SELECT 1 FROM migrations WHERE source_id='aurareader-desktop-v1'").get();
+    if (version !== SCHEMA_VERSION || (identity !== applicationId && !legacy)) {
+        throw new StorageError('Open an initialized desktop library with a compatible AuraReader version.', 409);
+    }
+}
+
 module.exports = { createDataStore, StorageError, canonical, digest, bookRecord, noteRecord, goalRecord, goalBackupRecord, validateLibrary };

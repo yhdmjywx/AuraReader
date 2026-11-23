@@ -12,12 +12,21 @@ const timer = setTimeout(() => app.exit(1), 45000);
     const profile = path.join(output, 'close-' + mode);
     const window = await startDesktop({ profileDirectory: profile });
     const run = code => window.webContents.executeJavaScript(code, true);
+    const assets = await fs.readdir('dist/renderer/assets');
+    const mainUrl = JSON.stringify('aurareader://app/assets/' + assets.find(file => /^main-.*\.js$/.test(file)));
     await run(`(async()=>{while(document.documentElement.dataset.desktopReady!=='setup') await new Promise(r=>setTimeout(r,20));
         document.getElementById('desktop-create-library').click(); while(document.documentElement.dataset.desktopReady!=='library')await new Promise(r=>setTimeout(r,20));
         const s=auraDesktop.storage;const b=await s.saveBook({opId:crypto.randomUUID(),expected:0,book:{id:'close-path',title:'关闭路径',pages:['<p>关闭原文😀</p>']}});
-        const a=await import('./main.js');await a.coordinator.openBook('close-path'); await a.reader.fonts.prepareForBook();
+        const a=await import(${mainUrl}); const opened=await a.coordinator.openBook('close-path');
+        if (opened.status !== 'opened') throw Error(JSON.stringify(opened));
+        await a.reader.fonts.prepareForBook();
         await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))); a.annotations.setNotesScope('book');
         window.__closePathNote=a.annotations.createNote({quote:'关闭原文😀',page:1,location:{page:1,start:0,end:7}}).id;
+        const deadline=Date.now()+5000;
+        while(!document.querySelector('.note-editor')) {
+            if(Date.now()>deadline) throw Error('The note editor did not mount.');
+            await new Promise(resolve=>requestAnimationFrame(resolve));
+        }
         const editor=document.querySelector('.note-editor');editor.value='Renderer 关闭前最后输入\\n😀\\n';
     })()`);
     const noteId = await run('window.__closePathNote');
@@ -26,7 +35,7 @@ const timer = setTimeout(() => app.exit(1), 45000);
     const hold = event => event.preventDefault(); app.on('before-quit', hold);
     let queryPrevented = false;
     if (mode === 'crashed-close') {
-        await run(`(async()=>{const a=await import('./main.js');document.querySelector('.note-editor').dispatchEvent(new Event('input',{bubbles:true}));await a.annotations.finishInlineEdit();await a.annotations.assertInlineWritesSaved();})()`);
+        await run(`(async()=>{const a=await import(${mainUrl});document.querySelector('.note-editor').dispatchEvent(new Event('input',{bubbles:true}));await a.annotations.finishInlineEdit();await a.annotations.assertInlineWritesSaved();})()`);
         const gone = once(window.webContents, 'render-process-gone'); window.webContents.forcefullyCrashRenderer(); await gone;
         window.close();
     } else if (mode === 'session-end') {
