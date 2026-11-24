@@ -103,11 +103,12 @@ export class AppShell {
     syncWindowControls() {
         const desktop = window.auraDesktop;
         if (desktop?.platform !== 'win32') return;
-        const paper = document.documentElement.dataset.appSurface === 'reader' ? this.elements?.readerPanel : null;
+        const surface = document.documentElement.dataset.appSurface;
+        const paper = surface === 'reader' ? this.elements?.readerPanel : null;
         const dark = paper?.classList.contains('paper-dark') || (
             !paper?.matches('.paper-white, .paper-sepia') && this.appTheme === 'dark'
         );
-        void desktop.window.setControlsTone(dark ? 'light' : 'dark').then(unwrapDesktop)
+        void desktop.window.setControlsTone(dark ? 'light' : 'dark', this.appTheme, surface === 'home').then(unwrapDesktop)
             .catch(error => console.error('Could not update window controls:', error));
     }
 

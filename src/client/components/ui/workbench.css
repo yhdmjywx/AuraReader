@@ -127,6 +127,12 @@ body.theme-dark {
     app-region: drag;
 }
 .app-header :is(.brand, button) { app-region: no-drag; }
+html[data-app-surface="home"] :is(body, .app-header) { background-color: var(--bg-panel); }
+html[data-app-surface="home"] .app-header {
+    /* Center the header actions on the native buttons without moving the content below. */
+    padding-bottom: clamp(0px, calc(var(--header-height) - env(titlebar-area-height, var(--header-height))), 12px);
+}
+html[data-app-surface="home"] .goal-home { border-radius: 0; box-shadow: none; }
 #btn-goal-sidebar { flex: none; width: 36px; height: 36px; padding: 0; border-radius: var(--ui-radius); color: var(--text-primary); }
 #btn-goal-sidebar[aria-expanded="true"], #btn-goal-sidebar:hover { background: var(--goal-hover-bg); color: var(--text-primary); }
 .workspace-settings {

@@ -12,6 +12,8 @@
 
 Windows `BrowserWindow` 启用 Electron Window Controls Overlay，在原生窗口中提供最小化、最大化／还原和关闭。样式使用系统报告的安全区避开窗口按钮，顶部空白用作拖动区。原生关闭事件继续进入 `coordinateClose`，执行现有的保存确认。浏览器模式使用同一短栏，窗口由浏览器管理。参见 [Electron 自定义标题栏](https://www.electronjs.org/docs/latest/tutorial/custom-title-bar)。
 
+Windows 11 的原生边线和窗口底色随应用主题使用相同的背景色。Home 顶栏、页面边缘和内容共用一层底色，浅色主题为白色。Home 的窗口按钮和 Settings 等高，共用 40 px 的按钮区。顶栏仍保留 52 px，内容起点沿用原有位置。窗口按钮前景色根据所在页面的纸面或应用主题选择。
+
 `src/desktop/entry.cjs` 是 Electron 的应用入口，调用 `main.cjs` 的 `startDesktop`。Electron 动态导入入口时直接启动应用。桌面测试仍可单独导入 `startDesktop`，以隔离的书库启动同一窗口。
 
 ## 源码验证

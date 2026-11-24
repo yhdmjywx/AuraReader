@@ -37,7 +37,7 @@ if (process.isMainFrame) {
         },
         window: {
             toggleFullscreen: () => ipcRenderer.invoke('aura:window:fullscreen'),
-            setControlsTone: tone => ipcRenderer.invoke('aura:window:controls-tone', tone)
+            setControlsTone: (tone, theme, isHome) => ipcRenderer.invoke('aura:window:controls-tone', tone, theme, isHome)
         },
         wiki: {
             read: input => ipcRenderer.invoke('aura:wiki:read', input),

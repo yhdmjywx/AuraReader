@@ -5,7 +5,7 @@ const { assertRuntime } = require('./runtime.cjs');
 const { APP_URL, createAssetHandler } = require('./assets.cjs');
 const { secureSession, secureWindow } = require('./security.cjs');
 const { createDesktopStorage } = require('./storage.cjs');
-const { registerStorageIpc, registerFileIpc, registerWikiIpc, coordinateClose } = require('./ipc.cjs');
+const { registerStorageIpc, registerFileIpc, registerWikiIpc, coordinateClose, windowSurfaceColors, workbenchOverlayHeight } = require('./ipc.cjs');
 const { createFileService } = require('./files.cjs');
 
 protocol.registerSchemesAsPrivileged([{
@@ -44,11 +44,12 @@ async function startDesktop({ profileDirectory, dialogs } = {}) {
     secureSession(desktopSession);
     window = new BrowserWindow({
         title: 'AuraReader', width: 1440, height: 960, minWidth: 800, minHeight: 600,
-        backgroundColor: '#f8fafc', show: false,
+        backgroundColor: windowSurfaceColors.light, show: false,
         ...(process.platform === 'win32' ? {
+            accentColor: windowSurfaceColors.light,
             titleBarStyle: 'hidden',
             // Match the midpoint of the gutter and the 52px workbench slot.
-            titleBarOverlay: { height: 68, color: '#00000000', symbolColor: '#767680' }
+            titleBarOverlay: { height: workbenchOverlayHeight, color: '#00000000', symbolColor: '#767680' }
         } : {}),
         webPreferences: {
             preload: path.join(__dirname, 'preload.cjs'), session: desktopSession,

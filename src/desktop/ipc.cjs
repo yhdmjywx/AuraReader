@@ -5,6 +5,11 @@ const { APP_URL } = require('./assets.cjs');
 const { createWikiService, validateWikiRequest } = require('../server/wikiService.js');
 const { wikiExternalUrl } = require('../shared/wikiSites.js');
 
+// Match the app and panel backgrounds in the renderer.
+const windowSurfaceColors = { light: '#f7f7f8', dark: '#18191c' };
+const homeSurfaceColors = { light: '#ffffff', dark: '#202126' };
+const workbenchOverlayHeight = 68;
+
 /** @param {import('electron').BrowserWindow} window */
 function registerWikiIpc(window) {
     const contents = window.webContents;
@@ -88,11 +93,23 @@ function registerFileIpc(window, files) {
             return { ok: true, value: { fullscreen: window.isFullScreen() } };
         } catch (error) { return failure(error, "Could not toggle window fullscreen."); }
     });
-    ipcMain.handle('aura:window:controls-tone', (event, tone) => {
+    ipcMain.handle('aura:window:controls-tone', (event, tone, theme, isHome) => {
         try {
             assertSender(event, window);
             if (tone !== 'light' && tone !== 'dark') throw new StorageError('Invalid window controls tone.');
-            if (process.platform === 'win32') window.setTitleBarOverlay({ symbolColor: tone === 'light' ? '#d1d5db' : '#767680' });
+            if (theme !== 'light' && theme !== 'dark') throw new StorageError('Invalid window theme.');
+            if (typeof isHome !== 'boolean') throw new StorageError('Invalid window surface.');
+            if (process.platform === 'win32') {
+                const colors = isHome ? homeSurfaceColors : windowSurfaceColors;
+                const surfaceColor = theme === 'dark' ? colors.dark : colors.light;
+                window.setTitleBarOverlay({
+                    // Match the 40px Settings button in the Home header.
+                    height: isHome ? 40 : workbenchOverlayHeight,
+                    symbolColor: tone === 'light' ? '#d1d5db' : '#767680'
+                });
+                window.setAccentColor(surfaceColor);
+                window.setBackgroundColor(surfaceColor);
+            }
             return { ok: true, value: undefined };
         } catch (error) { return failure(error, 'Could not update window controls.'); }
     });
@@ -195,4 +212,4 @@ function coordinateClose(window, storage) {
     };
 }
 
-module.exports = { assertSender, registerStorageIpc, registerFileIpc, registerWikiIpc, coordinateClose };
+module.exports = { assertSender, registerStorageIpc, registerFileIpc, registerWikiIpc, coordinateClose, windowSurfaceColors, workbenchOverlayHeight };
