@@ -12,7 +12,13 @@ export interface DesktopFont {
     id: string; type: 'ttf' | 'otf' | 'woff2'; name: string; family: string;
     weight: string; size: number; filename: string; url: string;
 }
+export interface DesktopLibraryChanges {
+    books: BookSummaryRecord[];
+    notes: NoteRecord[];
+    goals: GoalLibraryRecord | null;
+}
 export interface DesktopStorage {
+    onExternalChanges?(listener: (changes: DesktopLibraryChanges) => void): () => void;
     status(): Promise<DesktopResult<DesktopLibraryStatus>>;
     createLibrary(): Promise<DesktopResult<DesktopLibraryStatus>>;
     listBooks(): Promise<DesktopResult<{ records: BookRecord[] }>>;

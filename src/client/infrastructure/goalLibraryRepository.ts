@@ -67,13 +67,19 @@ export function storeInputDraft(draft: GoalInputDraft) {
     if (drafts.length) localStorage.setItem(INPUT_DRAFTS, JSON.stringify(drafts)); else localStorage.removeItem(INPUT_DRAFTS);
 }
 export function discardInputDraft(id: string) { storeInputDraft({ id, goalId: '', text: '' }); }
-export function stageLibrary(state: GoalLibraryState, responseIntents: ResponseWriteIntent[] = []) {
+export function stageLibrary(state: GoalLibraryState, responseIntents: ResponseWriteIntent[] = [], expected = cachedGoalLibrary()?.revision || 0) {
     const entries = pendingLibrary(), last = entries.at(-1);
     if (last && !last.command) entries.pop();
     const intents = new Map((last && !last.command ? last.responseIntents || [] : []).map(i => [responseTargetKey(i.target), i]));
     responseIntents.forEach(i => intents.set(responseTargetKey(i.target), i));
-    entries.push({ version: operationId(), expected: last && !last.command ? last.expected : cachedGoalLibrary()?.revision || 0, state: structuredClone(state), responseIntents: [...intents.values()] });
+    entries.push({ version: operationId(), expected: last && !last.command ? last.expected : expected, state: structuredClone(state), responseIntents: [...intents.values()] });
     writePending(entries);
+}
+export function rebaseUnsentInlineEdit(expected: number, revision: number, state: GoalLibraryState) {
+    const entries = pendingLibrary();
+    if (entries.length !== 1 || entries[0]?.command || entries[0]?.expected !== expected || entries[0]?.responseIntents?.length) return false;
+    writePending([{ ...entries[0], expected: revision, state: structuredClone(state) }]);
+    return true;
 }
 export function flushLibrary(): Promise<void> {
     return enqueue('goal-library', async () => {
@@ -146,7 +152,11 @@ export function assertNoLibraryRecovery() {
 export async function goalGraphsForBooks(bookIds: string[]): Promise<Map<string, GoalGraphBackup>> {
     const loaded = await loadGoalLibrary(); if (loaded.error) throw loaded.error;
     if (loaded.drafts.length || inputDrafts().length || pendingBookIntents().length) throw new Error("Finish goal drafts and pending book links before exporting.");
-    const state = loaded.state, result = new Map<string, GoalGraphBackup>();
+    return buildGoalGraphsForBooks(loaded.state, bookIds);
+}
+
+export function buildGoalGraphsForBooks(state: GoalLibraryState, bookIds: string[]): Map<string, GoalGraphBackup> {
+    const result = new Map<string, GoalGraphBackup>();
     for (const bookId of bookIds) {
         const seeds = new Set([...state.links.filter(l => l.bookId === bookId).map(l => l.goalId), ...(state.bookLinks || []).filter(l => l.bookId === bookId).map(l => l.goalId), ...state.goals.filter(g => g.origin?.bookId === bookId).map(g => g.id)]);
         const roots = new Set<string>();

@@ -7,6 +7,12 @@ if (process.isMainFrame) {
         stage: 4, platform: process.platform,
         versions: { electron: process.versions.electron, node: process.versions.node },
         storage: {
+            onExternalChanges: callback => {
+                /** @param {import('electron').IpcRendererEvent} _event @param {import('../shared/desktop.js').DesktopLibraryChanges} changes */
+                const listener = (_event, changes) => callback(changes);
+                ipcRenderer.on('aura:storage:external-changes', listener);
+                return () => ipcRenderer.removeListener('aura:storage:external-changes', listener);
+            },
             status: () => ipcRenderer.invoke('aura:storage:status', undefined),
             createLibrary: () => ipcRenderer.invoke('aura:storage:createLibrary', undefined),
             listBooks: () => ipcRenderer.invoke('aura:storage:listBooks', undefined),

@@ -142,7 +142,7 @@ export class AppCoordinator {
 
             // No await between installing the complete data and rendering it.
             // Session subscribers see the matching reader and annotations.
-            this.annotations.setNotesForBook(notes);
+            this.annotations.setNotesForBook(notes, bookId);
             this.reader.setBook(bookId, book);
             if (options.goalId !== undefined) {
                 if (options.goalId) this.goals?.selectGoal(options.goalId);

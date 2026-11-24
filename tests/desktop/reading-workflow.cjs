@@ -175,7 +175,11 @@ const watchdog = setTimeout(() => { console.error('React workflow timed out', er
         const overlay = navigator.windowControlsOverlay;
         const rightLimit = overlay?.visible ? overlay.getTitlebarAreaRect().right : innerWidth;
         return title.right <= pagination.left + 1 && pagination.left >= 0 && pagination.right <= rightLimit
-            && ['btn-prev-page', 'btn-next-page'].every(id => { const r = document.getElementById(id).getBoundingClientRect(); return r.left >= pagination.left && r.right <= pagination.right; });
+            && ['btn-prev-page', 'btn-next-page'].every(id => {
+                const button = document.getElementById(id).getBoundingClientRect();
+                const pixel = value => Math.round(value * devicePixelRatio);
+                return pixel(button.left) >= pixel(pagination.left) && pixel(button.right) <= pixel(pagination.right);
+            });
     })()`), true, 'title and pagination remain usable at the minimum supported desktop size');
     await capture('reader-minimum-window');
     window.setBounds(originalBounds);

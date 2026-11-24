@@ -7,6 +7,7 @@ does not override later approved decisions.
 
 | Record | Purpose |
 | --- | --- |
+| [Compact toolbar and Contents popover, 2026-11-19](../reading-toolbar/feature-spec.md) | Approved compact toolbar, Windows window controls and the Contents popover anchored below the toolbar's left edge |
 | [Goal user input and Response MVP, 2026-11-09](../goals/user-input-response/feature-spec.md) | Confirmed requirements and approval sources: unified content below child Goals, newly added content first, retained Highlight/Note Link components, optional Goal-specific Response; detailed interactions and pinning remain open |
 | [Wiki MVP scope, 2026-11-05](2026-11-05-wiki-mvp.md) | Owner-supplied Figma dialog, literal lookup and manual article-language switching; supersedes expanded search/discovery proposals |
 | [Workspace approvals, 2026-10-29 onward](2026-10-29-workspace-ui-decision.md) | Preserved workspace and component approvals, with supersession notes |

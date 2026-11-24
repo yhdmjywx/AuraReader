@@ -10,7 +10,7 @@ const appendix = /^(?:附录|后记|跋|译后记|注释|参考文献|索引)/;
 // A disposable projection, never a replacement for book.pages or note.page.
 // Source documents keep their original text/offset space. Reading and export
 // share the same grouping; a TOC node need not be a separate document/unit.
-export function buildBookStructure(book: Book | null | undefined): BookStructure {
+export function buildBookStructure(book: Book | null | undefined, htmlDocument = globalThis.document): BookStructure {
     const pages = Array.isArray(book?.pages) ? book.pages : [];
     const toc = ensureTocHierarchy(book?.toc);
     const roots: TocNode[] = [], stack: TocNode[] = [];
@@ -23,7 +23,7 @@ export function buildBookStructure(book: Book | null | undefined): BookStructure
     });
     const documents: SourceDocument[] = pages.map((html, index) => {
         const page = index + 1;
-        const template = typeof document === 'undefined' ? null : document.createElement('template');
+        const template = htmlDocument?.createElement('template');
         if (template) template.innerHTML = html;
         const root = template?.content || null;
         const entries = nodes.filter(node => node.page === page);

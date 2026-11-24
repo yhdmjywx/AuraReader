@@ -8,7 +8,7 @@
 | --- | --- |
 | [阅读、Goal 与导出](reading-guide.md) | 基本使用、Goal 导航、按键交互、页边笔记与导出规则 |
 | [安装、开发与桌面验收](development.md) | 安装与源码运行、端口、构建测试、桌面阶段记录 |
-| [数据与备份](data-and-backup.md) | 独立书库、IndexedDB 迁移、SQLite 一致性备份与恢复 |
+| [数据与备份](data-and-backup.md) | 独立 SQLite 书库、一致性备份与恢复 |
 | [当前状态与已知限制](known-limitations.md) | 平台、格式、离线范围、安装包及资源许可边界 |
 | [产品演示](product-demo.md) | README 动画、Goal 跨书叙事、素材与更新方法 |
 
@@ -16,6 +16,7 @@
 
 - [PRD](prd_v0_5.md)：产品定位、功能规格与验收要求。
 - [Goal 定位](goal-positioning-correction-2026-10-27.md)：读者意图与产品原则。
+- [ChatGPT／Codex 本地 Connector MVP](product/connector/feature-spec.md) 记录双向读写、即时同步和保存冲突的初始需求。
 - [Goal 用户自输入与 Response MVP](product/goals/user-input-response/feature-spec.md)：统一内容组织、保留 Link 组件、产品提供的可选 Response 标签；需求已确认，交互待设计，尚未实现。
 - [Wiki 功能](product/wiki/README.md)：原词查询与手动切换词条语言版本的 MVP，含用户指定 Figma 设计、API 范围和验收；尚未实现。
 - [设计系统](design/design-system.md)：唯一现行 UI/UX 规范，包含全局原则、局部约束和待确认问题。

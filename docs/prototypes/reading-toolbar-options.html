@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AuraReader 顶栏交互方案</title>
+<style>
+  :root { color: #24242b; background: #f3f3f5; font: 14px/1.45 system-ui, 'Microsoft YaHei', sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0 auto; max-width: 1600px; padding: 26px clamp(12px, 3vw, 46px) 20px; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  [hidden] { display: none !important; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #6261ce; outline-offset: 2px; }
+  h1, h2, p { margin: 0; }
+  h1 { font-size: 23px; letter-spacing: -.025em; }
+  .review { margin-bottom: 15px; }
+  .choices { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+  .choices button { padding: 6px 12px; border: 1px solid #dedee4; border-radius: 7px; background: #fafafb; }
+  .choices button[aria-pressed="true"] { color: white; background: #2a2a33; border-color: #2a2a33; }
+  #summary { margin-top: 9px; font-size: 13px; color: #62626e; }
+
+  .workspace { position: relative; display: grid; grid-template-columns: clamp(132px, 18vw, 235px) minmax(0, 1fr); height: clamp(390px, 76dvh, 820px); overflow: hidden; border: 1px solid #e3e3e9; border-radius: 12px; background: #f7f7f8; }
+  .sidebar { padding: 17px 15px; border-right: 1px solid #e8e8ed; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+  .brand svg { color: #6261ce; }
+  .goal { margin-top: 31px; padding: 8px; border-radius: 6px; background: #ededf1; font-size: 13px; }
+  .reader { --paper: #fff; --paper-ink: #25252d; --line-width: 540px; --type-size: 17px; --line-height: 1.9; --indent: 0em; --body-font: 'Microsoft YaHei', system-ui, sans-serif; position: relative; min-width: 0; background: var(--paper); }
+  .reader[data-paper="sepia"] { --paper: #fbf0d9; --paper-ink: #453622; }
+  .reader[data-paper="dark"] { --paper: #192032; --paper-ink: #e1e5ee; }
+  .toolbar-slot { height: 54px; display: flex; justify-content: center; align-items: center; padding: 0 8px; }
+  .toolbar, .restore { display: flex; align-items: center; max-width: 100%; min-width: 0; padding: 3px; background: #fafafb; border: 1px solid #e7e7ec; border-radius: 9px; }
+  .toolbar button, .restore, .panel button { border: 0; background: transparent; border-radius: 5px; }
+  .toolbar button { flex: none; display: inline-flex; justify-content: center; align-items: center; gap: 4px; height: 28px; min-width: 28px; padding: 0 5px; }
+  .toolbar button:hover, .toolbar button[aria-expanded="true"], .panel button:hover { background: #ececf0; }
+  .toolbar button:disabled, .panel button:disabled { opacity: .35; cursor: default; }
+  .toolbar .contents-trigger { font-size: 12px; font-weight: 700; }
+  .book-title { min-width: 0; max-width: 144px; margin: 0 9px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; color: #555560; }
+  .pagination { display: flex; align-items: center; flex: none; border-inline: 1px solid #e3e3e9; }
+  #page-count { min-width: 41px; text-align: center; font-size: 11px; color: #555560; font-variant-numeric: tabular-nums; }
+  .toolbar .collapse { margin-left: 3px; border-left: 1px solid #e3e3e9; }
+  .restore { gap: 6px; padding: 4px 9px; border: 1px solid #e3e3ea; font-size: 12px; }
+  .restore:hover { background: #ededf1; }
+  svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  .immersive-tools { position: absolute; z-index: 2; top: 50%; right: var(--tools-inset); transform: translateY(-50%); display: grid; gap: 4px; }
+  .immersive-tools button { display: grid; place-items: center; width: var(--tool-size); height: var(--tool-size); padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--paper-muted); }
+  .reader[data-option="immersive"] {
+    --tools-inset: 10px;
+    --tool-size: 32px;
+    --popover-inset: calc(var(--tools-inset) + var(--tool-size) + 7px);
+    --tool-accent: #6261ce;
+    --paper-rule: color-mix(in srgb, var(--paper-ink) 12%, var(--paper));
+    --paper-hover: color-mix(in srgb, var(--paper-ink) 8%, var(--paper));
+    --paper-muted: color-mix(in srgb, var(--paper-ink) 72%, var(--paper));
+  }
+  .reader[data-option="immersive"][data-paper="dark"] { --tool-accent: #bbb9ff; }
+  .reader[data-option="immersive"] .toolbar { background: transparent; border-color: transparent; color: var(--paper-ink); }
+  .reader[data-option="immersive"] :is(.book-title, #page-count) { color: var(--paper-muted); }
+  .reader[data-option="immersive"] .pagination { border-color: var(--paper-rule); border-right: 0; }
+  .reader[data-option="immersive"] .toolbar button:hover:not(:disabled), .immersive-tools button:hover { background: var(--paper-hover); }
+  .immersive-tools button[aria-expanded="true"] {
+    color: var(--tool-accent);
+    background: color-mix(in srgb, var(--tool-accent) 12%, var(--paper));
+  }
+
+  .paper { position: absolute; inset: 54px 0 0; overflow: auto; scrollbar-width: thin; padding: 26px 22px 36px; color: var(--paper-ink); }
+  .reading-content { max-width: var(--line-width); margin: 0 auto; font-family: var(--body-font); font-size: var(--type-size); line-height: var(--line-height); }
+  .chapter + .chapter { margin-top: 36px; }
+  .chapter h2 { margin-bottom: .9em; font-size: 1.37em; font-weight: 650; }
+  .chapter p { margin-bottom: .85em; text-indent: var(--indent); }
+
+  .panel { position: absolute; z-index: 1; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; max-width: calc(100% - 16px); padding: 7px; border: 1px solid #e5e5eb; border-radius: 10px; background: #fff; box-shadow: 0 7px 20px #25252e1b; }
+  .panel h2 { padding: 3px 5px 6px; font-size: 13px; }
+  .panel--contents { width: 258px; }
+  .panel--appearance { width: 268px; }
+  .panel--library { width: 300px; }
+  .panel--export { width: 186px; }
+  .panel.docked { top: 54px; right: 9px; bottom: 9px; left: auto; width: 264px; padding: 10px; box-shadow: 0 2px 12px #25252e12; }
+  .panel .dock-close { float: right; padding: 3px 6px; }
+  .panel .row-action { display: flex; justify-content: space-between; width: 100%; padding: 8px 7px; gap: 8px; text-align: left; }
+  .panel .row-action[aria-current="page"] { background: #f0f0f4; }
+  .row-action small { color: #62626e; flex: none; }
+  .row-action.is-nested { padding-left: 20px; }
+  .panel input[type="search"] { width: 100%; margin-bottom: 4px; padding: 6px 8px; }
+  .panel input[type="search"], .panel select { border: 1px solid #e5e5eb; border-radius: 5px; background: #fafafb; }
+  .panel select { max-width: 114px; padding: 2px 4px; }
+  .setting { min-height: 33px; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid #f0f0f3; padding: 3px 5px; font-size: 12px; }
+  .stepper, .swatches, .modes { display: flex; gap: 4px; align-items: center; }
+  .panel .stepper button { width: 24px; height: 24px; }
+  .stepper output { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+  .panel .swatch { width: 20px; height: 20px; border: 1px solid #e5e5eb; background: var(--swatch); }
+  .panel .swatch:hover { background: var(--swatch); }
+  .panel .swatch[aria-pressed="true"] { border: 2px solid #6261ce; }
+  .modes button { padding: 4px 5px; }
+  .modes button[aria-pressed="true"] { background: #ececf0; }
+  .panel .more { display: block; width: 100%; padding: 7px 5px; margin-top: 4px; text-align: left; font-size: 12px; }
+  .empty { padding: 7px; color: #62626e; }
+  .status { min-height: 1.4em; padding-top: 7px; color: #62626e; font-size: 12px; }
+  .reader[data-option="immersive"] .paper { padding-inline: 50px; }
+  .reader[data-option="immersive"] .panel {
+    top: 50%; right: var(--popover-inset); transform: translateY(-50%);
+    width: 210px; max-width: calc(100% - var(--popover-inset) - 8px); max-height: calc(100% - 16px);
+    border-color: var(--paper-rule); background: var(--paper); color: var(--paper-ink);
+  }
+  .reader[data-option="immersive"][data-paper="dark"] .panel { color-scheme: dark; }
+  .reader[data-option="immersive"] .panel :is(.setting, input[type="search"], select) { border-color: var(--paper-rule); }
+  .reader[data-option="immersive"] .panel :is(input[type="search"], select) { background: var(--paper); }
+  .reader[data-option="immersive"] .panel button:not(.swatch):is(:hover, [aria-current="page"], [aria-pressed="true"]) { background: var(--paper-hover); }
+  .reader[data-option="immersive"] .panel :is(.row-action small, .empty) { color: var(--paper-muted); }
+  @media (min-width: 1100px) {
+    .reader.has-dock .reading-content { width: min(var(--line-width), calc(100% - 290px)); margin-inline: max(0px, calc((100% - var(--line-width)) / 2 - 92px)) auto; }
+  }
+  @media (max-width: 660px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    .sidebar { display: none; }
+    .paper { padding-inline: 14px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .panel { animation: appear 115ms ease-out; }
+    @keyframes appear { from { opacity: .5; } }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" aria-hidden="true" style="position:absolute;width:0;height:0">
+  <symbol id="icon-book" viewBox="0 0 20 20"><path d="M10 5v11M10 5C8 3 4 3 2 4v11c3-1 6-1 8 1 2-2 5-2 8-1V4c-2-1-6-1-8 1Z"/></symbol>
+  <symbol id="icon-contents" viewBox="0 0 20 20"><path d="M6 5h11M6 10h11M6 15h11M3 5h.2M3 10h.2M3 15h.2"/></symbol>
+  <symbol id="icon-library" viewBox="0 0 20 20"><path d="M3 3h3v14H3zM8 3h3v14H8zM13 5l3-1 3 12-3 1z"/></symbol>
+  <symbol id="icon-palette" viewBox="0 0 20 20"><path d="M10 3a7 7 0 0 0 0 14h1a1.5 1.5 0 0 0 1-2.6 1.2 1.2 0 0 1 .9-2.1H15a2 2 0 0 0 2-2.3 7 7 0 0 0-7-7ZM7 8h.2M10 6h.2M6 11h.2"/></symbol>
+  <symbol id="icon-export" viewBox="0 0 20 20"><path d="M10 3v10m-4-4 4 4 4-4M4 13v4h12v-4"/></symbol>
+</svg>
+
+<header class="review">
+  <h1>AuraReader 顶栏交互方案</h1>
+  <div class="choices" role="group" aria-label="选择对照方案">
+    <button type="button" data-option="compact" aria-pressed="true">紧凑浮层＋手动收起</button>
+    <button type="button" data-option="focus" aria-pressed="false">快速设置＋专注模式</button>
+    <button type="button" data-option="dock" aria-pressed="false">短栏＋右侧工具区</button>
+    <button type="button" data-option="immersive" aria-pressed="false">沉浸式右侧工具</button>
+  </div>
+  <p id="summary">完整设置从外观按钮下方展开。收起顶栏后，在原位置恢复。</p>
+</header>
+
+<main class="workspace" aria-label="交互样稿">
+  <aside class="sidebar"><div class="brand"><svg aria-hidden="true"><use href="#icon-book"/></svg>AuraReader</div><p class="goal">Goal · 梳理可验证的想法</p></aside>
+  <section class="reader" aria-label="阅读工作区" data-paper="white">
+    <div class="toolbar-slot">
+      <div class="toolbar" id="toolbar" role="group" aria-label="书籍工具栏">
+        <button class="contents-trigger" type="button" data-panel="contents" aria-label="Contents" title="Contents" aria-expanded="false" aria-controls="tool-panel"><svg aria-hidden="true"><use href="#icon-contents"/></svg><span>Contents</span></button>
+        <span class="book-title" id="book-title">设计观察笔记</span>
+        <div class="pagination" role="group" aria-label="翻页">
+          <button id="previous" type="button" aria-label="上一页">‹</button><span id="page-count" aria-live="polite">1 / 4</span><button id="next" type="button" aria-label="下一页">›</button>
+        </div>
+        <button type="button" data-panel="library" title="书库" aria-label="书库" aria-expanded="false" aria-controls="tool-panel"><svg aria-hidden="true"><use href="#icon-library"/></svg></button>
+        <button type="button" data-panel="appearance" title="阅读设置" aria-label="阅读设置" aria-expanded="false" aria-controls="tool-panel"><svg aria-hidden="true"><use href="#icon-palette"/></svg></button>
+        <button type="button" data-panel="export" title="导出" aria-label="导出" aria-expanded="false" aria-controls="tool-panel"><svg aria-hidden="true"><use href="#icon-export"/></svg></button>
+        <button class="collapse" id="collapse" type="button" aria-label="收起顶栏" title="收起顶栏">⌃</button>
+      </div>
+      <button class="restore" id="restore" type="button" aria-controls="toolbar" hidden>显示工具栏</button>
+    </div>
+    <div class="immersive-tools" id="immersive-tools" role="group" aria-label="右侧阅读工具" hidden></div>
+    <section class="panel" id="tool-panel" aria-label="工具面板" hidden></section>
+    <div class="paper" tabindex="0" aria-label="示例正文"><article class="reading-content"></article></div>
+  </section>
+</main>
+<p class="status" id="status" role="status">示例书籍与内容用于比较布局。</p>
+
+<script>
+  const byId = id => document.getElementById(id);
+  const reader = document.querySelector('.reader');
+  const paper = document.querySelector('.paper');
+  const article = document.querySelector('.reading-content');
+  const toolbar = byId('toolbar');
+  const immersiveTools = byId('immersive-tools');
+  const panel = byId('tool-panel');
+  const toolButtons = [...toolbar.querySelectorAll('[data-panel]')];
+  const options = [...document.querySelectorAll('.choices [data-option]')];
+  const summaries = {
+    compact: '完整设置从外观按钮下方展开。收起顶栏后，在原位置恢复。',
+    focus: '先显示字号、行宽和纸张。展开更多设置可访问其余选项，也可以进入专注模式。',
+    dock: '设置和书库在阅读区域右侧打开。收起顶栏后，右侧工具区仍可使用。',
+    immersive: '顶部保留书名和翻页。目录、书库、阅读设置和导出位于纸张右侧中部，点击后向左展开。'
+  };
+  const chapters = [
+    { title: '把观察变成问题', text: ['当我们说一个工具「有点难用」时，先回到发生问题的那一刻。用户刚做了什么？接下来期待看到什么？把这两步写下来，比直接列一张功能清单更容易找到原因。', '试着观察同一个动作在不同场景下的表现。打开目录的人可能只想跳到下一章，也可能正在来回查找几段材料。他们使用的是同一个入口，停留时间却不一样。', '把暂时用不到的操作收起来之前，确认用户能从熟悉的位置找回来。每一次收起和展开，都应该让用户接得上刚才的位置。'] },
+    { title: '从两个情境开始', child: true, text: ['先在默认宽度下观察一次，再把阅读区域调宽。试一试面板打开时，当前任务需要同时看多少正文，以及关掉面板后能否回到刚才那一行。', '用两个情境足够看清很多取舍。把相同的任务放进不同的布局里，记录完成它需要多少步。'] },
+    { title: '记录可验证的判断', child: true, text: ['写下能观察到的变化。比如点击一个按钮后，视线自然落到了哪里。再记下能让判断失效的条件，例如窗口收窄或页面正处于不同的阅读模式。', '将观察、解释和待验证的问题放在一起。这样下次比较新方案时，还知道当时为什么做出这个选择。'] },
+    { title: '回看与取舍', text: ['在决定布局之前，回到最常用的路径。清晰的入口、稳定的位置，以及能够快速恢复的界面，都会影响这个路径是否顺畅。', '把不同方案放到同一个任务里比较。优先保留可以小步尝试、容易调整的做法。'] }
+  ];
+  const books = ['设计观察笔记', '阅读与工作记录', '章节导航练习'];
+  const labels = { contents: '目录', appearance: '阅读设置', library: '书库', export: '导出' };
+  const settings = { size: 17, width: 540, spacing: 1.9, indent: '0', font: 'default', paper: 'white', mode: 'page' };
+  let option = 'compact';
+  let activePanel = '';
+  let toolbarVisible = true;
+  let advancedVisible = false;
+  let currentChapter = 0;
+  let currentBook = 0;
+
+  function renderReading(scrollToChapter = false) {
+    reader.style.setProperty('--type-size', `${settings.size}px`);
+    reader.style.setProperty('--line-width', `${settings.width}px`);
+    reader.style.setProperty('--line-height', settings.spacing);
+    reader.style.setProperty('--indent', `${settings.indent}em`);
+    reader.style.setProperty('--body-font', settings.font === 'serif' ? 'Georgia, "Noto Serif CJK SC", SimSun, serif' : '"Microsoft YaHei", system-ui, sans-serif');
+    reader.dataset.paper = settings.paper;
+    byId('book-title').textContent = books[currentBook];
+    byId('book-title').title = books[currentBook];
+    byId('page-count').textContent = `${currentChapter + 1} / ${chapters.length}`;
+    byId('previous').disabled = currentChapter === 0;
+    byId('next').disabled = currentChapter === chapters.length - 1;
+    [...article.children].forEach((chapter, index) => { chapter.hidden = settings.mode === 'page' && index !== currentChapter; });
+    if (scrollToChapter) paper.scrollTop = settings.mode === 'page' ? 0 : byId(`chapter-${currentChapter}`).offsetTop - 24;
+  }
+
+  function stepper(label, key, value) {
+    return `<div class="setting"><span>${label}</span><div class="stepper">
+      <button type="button" data-step="${key}" data-delta="-1" aria-label="减小${label}">−</button>
+      <output data-value="${key}">${value}</output>
+      <button type="button" data-step="${key}" data-delta="1" aria-label="增大${label}">+</button>
+    </div></div>`;
+  }
+  function choice(label, key, choices) {
+    return `<label class="setting">${label}<select data-setting="${key}">${choices.map(([value, text]) => `<option value="${value}"${settings[key] === value ? ' selected' : ''}>${text}</option>`).join('')}</select></label>`;
+  }
+  function renderAppearance() {
+    const font = choice('字体', 'font', [['default', '默认'], ['serif', '衬线']]);
+    const spacing = stepper('行距', 'spacing', `${settings.spacing.toFixed(1)}×`);
+    const indent = choice('段首缩进', 'indent', [['0', '0 em'], ['2', '2 em']]);
+    const modes = `<div class="setting"><span>布局</span><div class="modes">${[['scroll', '滚动'], ['page', '分页']].map(([value, text]) => `<button type="button" data-mode="${value}" aria-pressed="${settings.mode === value}">${text}</button>`).join('')}</div></div>`;
+    const size = stepper('字号', 'size', `${settings.size}px`);
+    const width = stepper('行宽', 'width', `${settings.width}px`);
+    const colors = [['white', '白纸', '#fff'], ['sepia', '米色', '#fbf0d9'], ['dark', '深色', '#192032']];
+    const background = `<div class="setting"><span>纸张</span><div class="swatches">${colors.map(([value, name, color]) => `<button type="button" class="swatch" style="--swatch:${color}" data-paper="${value}" title="${name}" aria-label="${name}" aria-pressed="${settings.paper === value}"></button>`).join('')}</div></div>`;
+    if (option === 'focus') {
+      return `<h2>快速设置</h2>${size}${width}${background}
+        <button type="button" class="more" id="advanced-toggle" aria-expanded="${advancedVisible}" aria-controls="advanced-settings">${advancedVisible ? '收起更多设置' : '更多设置 ›'}</button>
+        <div id="advanced-settings"${advancedVisible ? '' : ' hidden'}>${font}${spacing}${indent}${modes}</div>`;
+    }
+    return `<h2>阅读设置</h2>${font}${size}${spacing}${width}${indent}${background}${modes}`;
+  }
+  function filterBooks(query = '') {
+    const matches = books.map((title, index) => ({ title, index })).filter(({ title }) => title.includes(query.trim()));
+    byId('book-results').innerHTML = matches.map(({ title, index }) => `<button type="button" class="row-action" data-book="${index}"${index === currentBook ? ' aria-current="page"' : ''}>${title}</button>`).join('') || '<p class="empty">没有匹配的书籍</p>';
+  }
+  function isDocked() {
+    return option === 'dock' && ['appearance', 'library'].includes(activePanel);
+  }
+  function placePanel() {
+    if (!activePanel) return;
+    if (isDocked() || option === 'immersive') {
+      panel.style.cssText = '';
+      return;
+    }
+    const frame = reader.getBoundingClientRect();
+    const trigger = toolButtons.find(button => button.dataset.panel === activePanel);
+    const anchor = (activePanel === 'contents' ? toolbar : trigger).getBoundingClientRect();
+    const desiredLeft = anchor.left - frame.left;
+    const top = anchor.bottom - frame.top + 5;
+    panel.style.left = `${Math.max(8, Math.min(desiredLeft, frame.width - panel.offsetWidth - 8))}px`;
+    panel.style.top = `${top}px`;
+    panel.style.maxHeight = `${frame.height - top - 8}px`;
+  }
+  function renderPanel() {
+    const docked = isDocked();
+    reader.classList.toggle('has-dock', docked);
+    panel.hidden = !activePanel;
+    toolButtons.forEach(button => button.setAttribute('aria-expanded', String(button.dataset.panel === activePanel)));
+    if (!activePanel) { panel.replaceChildren(); return; }
+    panel.className = `panel panel--${activePanel}${docked ? ' docked' : ''}`;
+    panel.setAttribute('aria-label', labels[activePanel]);
+    const close = docked ? `<button type="button" class="dock-close" aria-label="收起右侧工具区"${toolbarVisible ? ' hidden' : ''}>×</button>` : '';
+    if (activePanel === 'appearance') panel.innerHTML = close + renderAppearance();
+    if (activePanel === 'contents') panel.innerHTML = chapters.map((chapter, index) => `
+      <button type="button" class="row-action${chapter.child ? ' is-nested' : ''}" data-chapter="${index}"${currentChapter === index ? ' aria-current="page"' : ''}>${chapter.title}<small>P.${index + 1}</small></button>`).join('');
+    if (activePanel === 'library') {
+      panel.innerHTML = `${close}<h2>书库</h2><input type="search" id="book-search" placeholder="搜索书名" aria-label="搜索书名"><div id="book-results"></div>`;
+      filterBooks();
+    }
+    if (activePanel === 'export') panel.innerHTML = '<button type="button" class="row-action" data-export="chapter">导出当前章节 <small>.md</small></button><button type="button" class="row-action" data-export="book">导出全书 <small>.md</small></button>';
+    placePanel();
+  }
+  function closePanel(returnFocus = false) {
+    const trigger = toolButtons.find(button => button.dataset.panel === activePanel);
+    activePanel = '';
+    renderPanel();
+    if (returnFocus) (toolbarVisible ? trigger : byId('restore'))?.focus();
+  }
+  function showToolbar(visible, moveFocus = true) {
+    toolbarVisible = visible;
+    toolbar.hidden = !visible;
+    byId('restore').hidden = visible;
+    if (!visible && !isDocked()) closePanel();
+    else if (isDocked() && panel.querySelector('.dock-close')) panel.querySelector('.dock-close').hidden = visible;
+    if (moveFocus) (visible ? byId('collapse') : byId('restore')).focus();
+  }
+  function changeChapter(index) {
+    currentChapter = Math.max(0, Math.min(chapters.length - 1, index));
+    renderReading(true);
+  }
+
+  function placeToolButtons() {
+    const immersive = option === 'immersive';
+    const [contents, ...otherTools] = toolButtons;
+    reader.dataset.option = option;
+    immersiveTools.hidden = !immersive;
+    byId('collapse').hidden = immersive;
+    contents.querySelector('span').hidden = immersive;
+    if (immersive) immersiveTools.append(...toolButtons);
+    else {
+      toolbar.insertBefore(contents, byId('book-title'));
+      otherTools.forEach(button => toolbar.insertBefore(button, byId('collapse')));
+    }
+  }
+
+  options.forEach(button => button.addEventListener('click', () => {
+    option = button.dataset.option;
+    options.forEach(choice => choice.setAttribute('aria-pressed', String(choice === button)));
+    byId('summary').textContent = summaries[option];
+    byId('status').textContent = '示例书籍与内容用于比较布局。';
+    byId('collapse').title = option === 'focus' ? '进入专注模式' : '收起顶栏';
+    byId('collapse').setAttribute('aria-label', byId('collapse').title);
+    byId('collapse').textContent = option === 'focus' ? '◎' : '⌃';
+    byId('restore').textContent = option === 'focus' ? '退出专注模式' : '显示工具栏';
+    advancedVisible = false;
+    activePanel = option === 'immersive' ? '' : 'appearance';
+    placeToolButtons();
+    showToolbar(true, false);
+    renderPanel();
+  }));
+  toolButtons.forEach(button => button.addEventListener('click', () => {
+    if (activePanel === button.dataset.panel) { closePanel(); return; }
+    activePanel = button.dataset.panel;
+    advancedVisible = false;
+    renderPanel();
+    panel.querySelector('button, input, select')?.focus({ preventScroll: true });
+  }));
+  byId('collapse').addEventListener('click', () => showToolbar(false));
+  byId('restore').addEventListener('click', () => showToolbar(true));
+  byId('previous').addEventListener('click', () => changeChapter(currentChapter - 1));
+  byId('next').addEventListener('click', () => changeChapter(currentChapter + 1));
+  panel.addEventListener('input', event => {
+    if (event.target.id === 'book-search') filterBooks(event.target.value);
+  });
+  panel.addEventListener('change', event => {
+    if (!event.target.dataset.setting) return;
+    settings[event.target.dataset.setting] = event.target.value;
+    renderReading();
+  });
+  panel.addEventListener('click', event => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    const { chapter, book, step, delta, paper: tone, mode, export: exportKind } = button.dataset;
+    if (button.classList.contains('dock-close')) closePanel(true);
+    if (button.id === 'advanced-toggle') {
+      advancedVisible = !advancedVisible;
+      button.setAttribute('aria-expanded', String(advancedVisible));
+      button.textContent = advancedVisible ? '收起更多设置' : '更多设置 ›';
+      byId('advanced-settings').hidden = !advancedVisible;
+    }
+    if (chapter !== undefined) { changeChapter(Number(chapter)); closePanel(true); }
+    if (book !== undefined) { currentBook = Number(book); changeChapter(0); closePanel(true); }
+    if (step) {
+      const limits = { size: [1, 13, 25, 'px'], width: [40, 380, 740, 'px'], spacing: [.1, 1.2, 2.6, '×'] };
+      const [increment, low, high, unit] = limits[step];
+      settings[step] = Math.max(low, Math.min(high, settings[step] + increment * Number(delta)));
+      panel.querySelector(`[data-value="${step}"]`).textContent = `${step === 'spacing' ? settings[step].toFixed(1) : settings[step]}${unit}`;
+      renderReading();
+    }
+    if (tone || mode) {
+      const key = tone ? 'paper' : 'mode';
+      settings[key] = tone || mode;
+      panel.querySelectorAll(`button[data-${key}]`).forEach(control => control.setAttribute('aria-pressed', String(control === button)));
+      renderReading(Boolean(mode));
+    }
+    if (exportKind) {
+      const selected = exportKind === 'chapter' ? [chapters[currentChapter]] : chapters;
+      const markdown = selected.map(chapter => `## ${chapter.title}\n\n${chapter.text.join('\n\n')}`).join('\n\n');
+      const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${exportKind === 'chapter' ? chapters[currentChapter].title : books[currentBook]}.md`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      byId('status').textContent = '示例 Markdown 已生成。';
+      closePanel(true);
+    }
+  });
+  document.addEventListener('click', event => {
+    if (activePanel && !isDocked() && !panel.contains(event.target) && !event.target.closest('.toolbar-slot, .immersive-tools, .choices')) closePanel();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && activePanel) { event.preventDefault(); closePanel(true); }
+  });
+  new ResizeObserver(placePanel).observe(reader);
+  article.innerHTML = chapters.map((chapter, index) => `<section class="chapter" id="chapter-${index}">
+    <h2>${chapter.title}</h2>${chapter.text.map(text => `<p>${text}</p>`).join('')}</section>`).join('');
+  renderReading();
+  activePanel = 'appearance';
+  renderPanel();
+</script>
+</body>
+</html>

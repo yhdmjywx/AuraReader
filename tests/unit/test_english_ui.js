@@ -24,7 +24,7 @@ function isAllowedWikiLanguageName(file, node) {
     function scan(directory) {
         for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
             const file = path.join(directory, entry.name);
-            if (entry.isDirectory()) { if (entry.name !== 'assets') scan(file); continue; }
+            if (entry.isDirectory()) { if (!['assets', 'node_modules'].includes(entry.name)) scan(file); continue; }
             if (!/\.(?:tsx?|jsx?|cjs)$/.test(file) || file === path.join('src', 'client', 'infrastructure', 'demoData.js')) continue;
             const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
             function visit(node) {

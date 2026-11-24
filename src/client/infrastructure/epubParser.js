@@ -315,7 +315,11 @@ export async function extractEpubToc(zip, opfDoc, opfDir, hrefToPageMap) {
 export async function parseEpub(arrayBuffer, fileName, jszipLib, { signal } = {}) {
     const input = arrayBuffer instanceof ArrayBuffer ? arrayBuffer : new Uint8Array(arrayBuffer).buffer;
     const result = await importEpubBytes(input, signal);
-    const parser = new DOMParser();
+    return projectEpubBook(result, fileName, new DOMParser(), signal);
+}
+
+/** @returns {Promise<import('../domain/book.js').Book>} */
+export async function projectEpubBook(result, fileName, parser, signal) {
     // Native HTML normalization preserves the existing annotation text coordinate system.
     // Binary resources stay in the original archive and load on demand.
     const pages = [];

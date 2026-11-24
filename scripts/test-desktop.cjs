@@ -8,9 +8,14 @@ fs.mkdirSync(directory, { recursive: true });
 const output = fs.mkdtempSync(path.join(directory, 'run-'));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
+env.AURAREADER_TEST_NODE = process.execPath;
 async function run(entry, args = []) {
+    const entryPath = path.join(root, 'tests/desktop', entry);
+    if (!fs.statSync(entryPath, { throwIfNoEntry: false })?.isFile()) {
+        throw new Error(`Electron test entry is missing: ${entryPath}`);
+    }
     await new Promise((resolve, reject) => {
-        const child = spawn(require('electron'), [path.join(root, 'tests/desktop', entry), output, ...args], {
+        const child = spawn(require('electron'), [entryPath, output, ...args], {
             cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: false
         });
         let stderr = '';
@@ -32,7 +37,7 @@ async function run(entry, args = []) {
     const selected = process.argv[2];
     if (selected !== '--legacy') {
         const entry = selected || 'reading-workflow.cjs';
-        if (!['main.cjs','restart.cjs','note-interaction.cjs','goal-interaction.cjs','goal-home.cjs','goal-lifecycle.cjs','reading-workflow.cjs'].includes(entry)) throw new Error('Unknown desktop test: ' + entry);
+        if (!['main.cjs','restart.cjs','note-interaction.cjs','goal-interaction.cjs','goal-home.cjs','goal-lifecycle.cjs','reading-workflow.cjs','browser-storage.cjs','connector.cjs'].includes(entry)) throw new Error('Unknown desktop test: ' + entry);
         await run(entry, process.argv.slice(3));
         if (!selected) {
             for (const mode of ['empty', 'save-guard']) {

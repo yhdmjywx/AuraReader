@@ -1,6 +1,8 @@
 import { noteTimestamp } from '../../domain/format.js';
 import { eventElement } from '../../app/dom.js';
-import { pendingNoteWrites } from '../../infrastructure/annotationRecovery.js';
+import { pendingNoteWrites, type NoteEditBaseline } from '../../infrastructure/annotationRecovery.js';
+import { cachedBookVersion, operationId } from '../../infrastructure/storageClient.js';
+import type { NoteRecord } from '../../../shared/storage.js';
 import type { Annotation, AnnotationInput } from '../../domain/annotation.js';
 import type { AnnotationCallbacks, NoteDraft } from '../../app/contracts.js';
 import type { AppElements } from '../../app/elements.js';
@@ -13,7 +15,7 @@ import type { AppElements } from '../../app/elements.js';
 import {
     saveNoteToDB as repoSaveNote,
     deleteNoteFromDB as repoDeleteNote,
-    loadNotesForBook as repoLoadNotesForBook
+    loadNotesForBook as repoLoadNotesForBook, displayedNote, displayedNoteBaseline
 } from '../../infrastructure/annotationRepository.js';
 
 import {
@@ -43,7 +45,10 @@ export class AnnotationController {
     callbacks: AnnotationCallbacks;
     notes: Annotation[];
     editingNoteId: string | null;
-    inlineEdit: { note: Annotation; opening: boolean } | null;
+    inlineEdit: { note: Annotation; opening: boolean; baseline?: NoteEditBaseline; external?: Annotation | null } | null;
+    private noteBaselines = new Map<string, NoteEditBaseline>();
+    private deferredNotes = new Map<string, NoteRecord>();
+    private displayedBookGeneration?: string;
     _inlineWrites: Promise<void>;
     private inlineWriteErrors = new Map<string, { bookId: string; recoveryAvailable: boolean }>();
     showHighlightsInSidebar: boolean;
@@ -76,7 +81,8 @@ export class AnnotationController {
 
     getRenderingNotes() {
         const draft = this.inlineEdit?.note;
-        return draft && !this.notes.some(note => note.id === draft.id) ? [draft, ...this.notes] : this.notes;
+        if (!draft) return this.notes;
+        return this.notes.some(note => note.id === draft.id) ? this.notes.map(note => note.id === draft.id ? draft : note) : [draft, ...this.notes];
     }
 
     // This changes presentation only. getNotes() continues to return the full
@@ -121,19 +127,63 @@ export class AnnotationController {
     async loadNotesForBook(bookId: string) {
         await this.finishInlineEdit();
         const loaded = bookId ? await repoLoadNotesForBook(bookId) : [];
-        this.setNotesForBook(loaded);
+        this.setNotesForBook(loaded, bookId);
         this.renderNotesUI();
         return this.notes;
     }
 
     // Install prepared data synchronously; the coordinator renders only after
     // the reader and session have also switched to this book.
-    setNotesForBook(notes: AnnotationInput[]) {
+    setNotesForBook(notes: AnnotationInput[], bookId?: string) {
+        this.noteBaselines.clear();
+        this.deferredNotes.clear();
+        this.displayedBookGeneration = bookId ? cachedBookVersion(bookId)?.generation : undefined;
         this.notes = normalizeList(notes);
+        for (const note of notes) this.rememberBaseline(note);
         this.notesScope = 'page';
         this.focusedNoteIds = [];
         this.focusedHighlightIds = [];
         this._renderedSidebarIds = null;
+    }
+
+    private rememberBaseline(note: AnnotationInput) {
+        const version = displayedNoteBaseline(note);
+        if (version && note.id) this.noteBaselines.set(note.id, { ...version, chain: operationId() });
+    }
+
+    applyExternalNotes(records: NoteRecord[], generation?: string) {
+        const changedPages = new Set<number>();
+        if (generation && this.displayedBookGeneration && generation !== this.displayedBookGeneration) return changedPages;
+        const pending = new Set(pendingNoteWrites(this.getBookId()).map(entry => entry.id));
+        const notes = new Map(this.notes.map(note => [note.id, note]));
+        let changed = false;
+        for (const row of records) {
+            if (row.bookId !== this.getBookId()) continue;
+            if (pending.has(row.id)) { this.deferredNotes.set(row.id, row); continue; }
+            this.deferredNotes.delete(row.id);
+            const current = notes.get(row.id);
+            const baseline = this.noteBaselines.get(row.id);
+            if (baseline && baseline.expected >= row.revision && baseline.generation === generation) continue;
+            const next = displayedNote(row, generation);
+            if (this.inlineEdit?.note.id === row.id) {
+                // Keep the live editor and its original revision, even if the
+                // committed note is removed or its source changes.
+                this.inlineEdit.external = next;
+            } else {
+                this.noteBaselines.delete(row.id);
+                if (next) this.rememberBaseline(next);
+            }
+            if (next) notes.set(row.id, next); else notes.delete(row.id);
+            if (JSON.stringify(current) === JSON.stringify(next)) continue;
+            changed = true;
+            const geometry = (note?: Annotation | null) => note && [note.kind, note.page, note.quote, note.location];
+            if (JSON.stringify(geometry(current)) !== JSON.stringify(geometry(next))) {
+                if (current) changedPages.add(current.page);
+                if (next) changedPages.add(next.page);
+            }
+        }
+        if (changed) { this.notes = [...notes.values()]; this.renderNotesUI(); }
+        return changedPages;
     }
 
     getBookId() {
@@ -212,7 +262,12 @@ export class AnnotationController {
         if (this.editingNoteId === note.id && this.inlineEdit) return;
         this.finishInlineEdit();
         this.editingNoteId = note.id;
-        this.inlineEdit = { note, opening: true };
+        const generation = this.displayedBookGeneration || cachedBookVersion(note.bookId)?.generation;
+        const baseline = this.noteBaselines.get(note.id) || (generation && !this.notes.some(item => item.id === note.id)
+            ? { chain: operationId(), expected: 0, generation } : undefined);
+        const draft = { ...note };
+        this.inlineEdit = { note: draft, opening: true, baseline };
+        if (baseline) this.noteBaselines.set(note.id, baseline);
         const editSession = this.inlineEdit;
         this.renderNotesUI();
         // Include unsaved drafts only in the reading surface, never in exports
@@ -239,23 +294,24 @@ export class AnnotationController {
         this.changed();
         this.callbacks.onAnnotationContentChanged?.(note);
         note.timestamp = noteTimestamp();
-        const exists = this.notes.some(item => item.id === id);
-        if (!exists && !comment.trim()) return;
-        if (!exists) this.notes.unshift(note);
+        const index = this.notes.findIndex(item => item.id === id);
+        if (index === -1 && !comment.trim()) return;
+        if (index === -1) this.notes.unshift(note);
+        else this.notes[index] = note;
         // Save the raw input, including trailing newlines. No list or body
         // rerender is needed when only a note's own words have changed.
-        this.writeInlineNote(note);
+        this.writeInlineNote(note, false, this.inlineEdit?.baseline);
     }
 
-    writeInlineNote(note: Annotation, remove = false) {
+    writeInlineNote(note: Annotation, remove = false, baseline?: NoteEditBaseline) {
         this.pendingWrites++;
         this.changed();
         const snapshot: Annotation = JSON.parse(JSON.stringify(note));
         // Start transactions immediately, in input order. The repository must
         // not mirror an older completed transaction over newer local input.
         const write = remove
-            ? repoDeleteNote(snapshot.id, snapshot.bookId)
-            : repoSaveNote(snapshot);
+            ? repoDeleteNote(snapshot.id, snapshot.bookId, baseline)
+            : repoSaveNote(snapshot, baseline);
         this._inlineWrites = Promise.all([this._inlineWrites, write]).then(() => {
             this.inlineWriteErrors.delete(snapshot.id);
         }).catch(error => {
@@ -265,7 +321,13 @@ export class AnnotationController {
                 ? "Notes are not confirmed saved. Keep this window open."
                 : error.status === 409 ? "Note save conflict. Your input is preserved locally. Keep this window open."
                     : "Notes are preserved in the local cache. The database is temporarily unavailable for writes.", { kind: 'error' });
-        }).finally(() => { this.pendingWrites--; this.changed(); });
+        }).finally(() => {
+            this.pendingWrites--; this.changed();
+            const remote = this.deferredNotes.get(snapshot.id);
+            if (!remote || pendingNoteWrites(snapshot.bookId).some(entry => entry.id === snapshot.id)) return;
+            const changes = this.applyExternalNotes([remote], this.displayedBookGeneration);
+            if (changes.size) this.callbacks.onNotesChanged?.(this.getRenderingNotes());
+        });
     }
 
     finishInlineEdit() {
@@ -276,12 +338,16 @@ export class AnnotationController {
         this.inlineEdit = null;
         this.editingNoteId = null;
         const note = session.note;
+        if (session.external !== undefined && !pendingNoteWrites(note.bookId).some(entry => entry.id === note.id)) {
+            this.noteBaselines.delete(note.id);
+            if (session.external) this.rememberBaseline(session.external);
+        }
         const blank = !note.comment.trim();
         if (blank) {
             const existed = this.notes.some(item => item.id === note.id);
             this.notes = this.notes.filter(item => item.id !== note.id);
             if (existed) {
-                this.writeInlineNote(note, true);
+                this.writeInlineNote(note, true, session.baseline);
             }
         }
         this.renderNotesUI();

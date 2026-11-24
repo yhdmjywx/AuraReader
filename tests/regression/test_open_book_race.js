@@ -25,9 +25,8 @@ function deferred() {
             id, revision: 1, generation: id,
             value: { id, title: id, pages: [`<p>${id}</p>`], toc: [] }
         }));
-        configureStorage({ sourceId: 'open-book-race-test', fetch: async (url, options = {}) => {
+        configureStorage({ fetch: async (url, options = {}) => {
             if (url.endsWith('/session')) return response({ token: 'test' });
-            if (url.endsWith('/migration/status')) return response({ completed: true });
             const kind = url.endsWith('/books') ? 'books' : url.endsWith('/goals/query') ? 'goals' : 'notes';
             assert.ok(url.endsWith('/books') || url.endsWith('/notes/query') || url.endsWith('/goals/query'), `Unexpected request: ${url}`);
             const bookId = kind !== 'books' ? JSON.parse(options.body).bookIds[0] : null;

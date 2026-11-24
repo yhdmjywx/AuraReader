@@ -31,6 +31,10 @@ export function downloadFile(filename, data, type) {
 }
 
 export function exportMarkdown(bookTitle = "Book notes", notes = []) {
+    return downloadFile(`${bookTitle}_notes.md`, buildNotesMarkdown(bookTitle, notes), 'text/markdown');
+}
+
+export function buildNotesMarkdown(bookTitle, notes) {
     const groups = groupAnnotationsByRange(notes);
     let md = `# Highlights and notes: “${bookTitle}”\n\n`;
     md += `> Exported: ${exportTimestamp()}\n\n`;
@@ -47,15 +51,15 @@ export function exportMarkdown(bookTitle = "Book notes", notes = []) {
         md += `---\n\n`;
     });
 
-    return downloadFile(`${bookTitle}_notes.md`, md, 'text/markdown');
+    return md;
 }
 
-export function buildChapterDocuments(book, notes = [], { selectedUnitIds } = {}) {
+export function buildChapterDocuments(book, notes = [], { selectedUnitIds, htmlDocument = globalThis.document } = {}) {
     if (!book || !Array.isArray(book.pages)) {
         throw new Error("This book has no content to export.");
     }
 
-    const structure = buildBookStructure(book);
+    const structure = buildBookStructure(book, htmlDocument);
     const selection = selectedUnitIds == null ? null : new Set(selectedUnitIds);
     const units = structure.units.filter(unit => !selection || selection.has(unit.id));
     if (!units.length) throw new Error("Select at least one chapter to export.");
@@ -110,7 +114,7 @@ export function buildChapterDocuments(book, notes = [], { selectedUnitIds } = {}
     // rendered Markdown. Joining HTML first would shift existing note offsets.
     function sourceMarkdown(pageNum) {
         const pageNotes = annotations.filter(n => n.page === pageNum);
-        const tempDiv = document.createElement('div');
+        const tempDiv = htmlDocument.createElement('div');
         tempDiv.innerHTML = book.pages[pageNum - 1];
 
         // Offsets are chapter-relative, as in the reader. Saved note ranges
@@ -360,19 +364,19 @@ function chapterBodyMarkdown(root, notes = []) {
     return { markdown: children(root).trim(), unplacedNotes };
 }
 
-export function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStates = [], goalGraphs, includeNotes = true }) {
+export function buildSelectiveBackup({ selectedBooks = [], notes = [], goalStates = [], goalGraphs, includeNotes = true }) {
     const normalizedNotes = (notes || []).map(normalizeAnnotation).filter(Boolean);
     const exportedAt = new Date().toISOString();
     const yyyymmdd = exportedAt.slice(0, 10).replace(/-/g, '');
 
-    const files = selectedBooks.map(book => {
+    return selectedBooks.map(book => {
         const backupPayload = {
             version: goalGraphs ? "1.3" : "1.1",
             // Keep the existing envelope for compatibility with earlier readers.
             type: "aurareader_full_backup",
             exportedAt,
             books: [book],
-            notes: normalizedNotes.filter(note => note.bookId === book.id),
+            notes: includeNotes ? normalizedNotes.filter(note => note.bookId === book.id) : [],
             goalStates: goalStates.filter(state => state.bookId === book.id).map(state => includeNotes
                 ? state : { bookId: state.bookId, goals: state.goals })
         };
@@ -383,6 +387,10 @@ export function exportSelectiveBackup({ selectedBooks = [], notes = [], goalStat
 
         return { filename: fileName, data: JSON.stringify(backupPayload, null, 2) };
     });
+}
+
+export function exportSelectiveBackup(options) {
+    const files = buildSelectiveBackup(options);
     if (typeof window !== 'undefined' && window.auraDesktop) {
         return (async () => {
             const results = []; let stopped = false;

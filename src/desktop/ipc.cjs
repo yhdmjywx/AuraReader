@@ -2,6 +2,7 @@ const { ipcMain, shell } = require('electron');
 const { randomUUID } = require('node:crypto');
 const { StorageError } = require('../server/dataStore.js');
 const { APP_URL } = require('./assets.cjs');
+const { observeLibrary } = require('./libraryObserver.cjs');
 const { createWikiService, validateWikiRequest } = require('../server/wikiService.js');
 const { wikiExternalUrl } = require('../shared/wikiSites.js');
 
@@ -122,17 +123,23 @@ function registerFileIpc(window, files) {
 
 /** @param {import('electron').BrowserWindow} window @param {ReturnType<typeof import('./storage.cjs').createDesktopStorage>} storage */
 function registerStorageIpc(window, storage) {
+    const observer = observeLibrary(window, storage, APP_URL);
     const actions = ['status', 'createLibrary', 'listBooks', 'listBookSummaries', 'getBook', 'saveBook', 'deleteBook', 'queryGoals', 'saveGoals', 'queryGoalLibrary', 'saveGoalLibrary', 'queryNotes', 'saveNote', 'deleteNote', 'restore', 'backup'];
     for (const action of actions) {
         ipcMain.handle('aura:storage:' + action, async (event, ...args) => {
             try {
                 assertSender(event, window);
                 if (args.length !== 1) throw new StorageError("Invalid argument count.");
-                return { ok: true, value: await storage.call(action, args[0]) };
+                const value = await storage.call(action, args[0]);
+                if (action === 'status' || action === 'createLibrary') observer.poll();
+                return { ok: true, value };
             } catch (error) { return failure(error); }
         });
     }
-    return () => actions.forEach(action => ipcMain.removeHandler('aura:storage:' + action));
+    return () => {
+        observer.close();
+        actions.forEach(action => ipcMain.removeHandler('aura:storage:' + action));
+    };
 }
 
 /** @param {import('electron').BrowserWindow} window @param {ReturnType<typeof import('./storage.cjs').createDesktopStorage>} storage */

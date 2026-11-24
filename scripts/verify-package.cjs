@@ -46,16 +46,17 @@ function verifyLocalDependencies(archive, entries, roots) {
     return [...visited].sort();
 }
 async function verifyPackage(directory) {
+    const desktopEntry = 'src/desktop/entry.cjs';
     const archive = path.join(directory, 'resources/app.asar');
     const entries = asar.listPackage(archive).map(file => file.replaceAll('\\', '/').replace(/^\//, ''));
-    const required = ['src/desktop/main.cjs', 'src/desktop/preload.cjs',
+    const required = [desktopEntry, 'src/desktop/preload.cjs',
         'dist/renderer/index.html', 'dist/renderer/fonts/literata.woff2',
         'dist/renderer/fonts/sarasa-regular.woff2', 'dist/renderer/fonts/licenses/Literata-OFL.txt',
-        'src/server/dataStore.js', 'src/server/goalValidation.js', 'src/server/migration.js', 'src/server/storageMaintenance.js', 'src/server/fontStore.js',
+        'src/server/dataStore.js', 'src/server/goalValidation.js', 'src/server/storageMaintenance.js', 'src/server/fontStore.js',
         'node_modules/fontkit/dist/main.cjs', 'node_modules/@zip.js/zip.js/index-native.cjs',
         'src/server/publicationWorker.cjs', 'src/shared/epubPaths.mjs'];
     required.forEach(file => assert.ok(entries.includes(file), 'Missing package resource: ' + file));
-    const localModules = verifyLocalDependencies(archive, entries, ['src/desktop/main.cjs', 'src/desktop/preload.cjs']);
+    const localModules = verifyLocalDependencies(archive, entries, [desktopEntry, 'src/desktop/preload.cjs']);
     const html = asar.extractFile(archive, path.join('dist', 'renderer', 'index.html')).toString('utf8');
     const resources = [...html.matchAll(/(?:src|href)="\.\/([^"?#]+)"/g)].map(match => 'dist/renderer/' + match[1]);
     assert.ok(resources.some(file => file.endsWith('.js')), 'Missing renderer entry');
@@ -78,7 +79,7 @@ async function verifyPackage(directory) {
         assert.ok(!entry.endsWith('.sqlite') && !entry.endsWith('.epub'), 'User data/test fixture in package');
     }
     const pkg = JSON.parse(asar.extractFile(archive, 'package.json'));
-    assert.equal(pkg.main, 'src/desktop/main.cjs');
+    assert.equal(pkg.main, desktopEntry);
     const fuses = await getCurrentFuseWire(path.join(directory, 'AuraReader.exe'));
     for (const name of ['RunAsNode', 'EnableNodeOptionsEnvironmentVariable', 'EnableNodeCliInspectArguments']) assert.equal(fuses[FuseV1Options[name]], 48, name);
     for (const name of ['OnlyLoadAppFromAsar', 'EnableEmbeddedAsarIntegrityValidation']) assert.equal(fuses[FuseV1Options[name]], 49, name);

@@ -3,9 +3,12 @@ export type NoteCommand = SaveNoteCommand | DeleteNoteCommand;
 export type NoteWriteInput = { id: string; bookId: string } & (
     { operation: 'save'; note: StoredAnnotation } | { operation: 'delete' }
 );
+export type NoteEditBaseline = { chain: string; expected: number; generation: string };
+type NotePrerequisite = { version: string; operation: 'save' | 'delete'; command: NoteCommand; chain?: string };
 export type PendingNoteWrite = NoteWriteInput & {
     version: string; durable?: boolean; command?: NoteCommand;
-    prerequisites?: { version: string; operation: 'save' | 'delete'; command: NoteCommand }[];
+    prerequisites?: NotePrerequisite[];
+    baseline?: NoteEditBaseline;
 };
 // A small durable journal distinguishes uncommitted edits from ordinary caches.
 // Entries are removed only after SQLite acknowledges the matching operation.
@@ -38,17 +41,18 @@ function storePending(bookId: string, entries: PendingNoteWrite[]) {
     } catch (_) { return false; }
 }
 
-export function recordNoteWrite(input: NoteWriteInput): PendingNoteWrite {
+export function recordNoteWrite(input: NoteWriteInput, baseline?: NoteEditBaseline): PendingNoteWrite {
     const { id, bookId } = input;
     const entry: PendingNoteWrite = {
         ...input,
+        ...(baseline ? { baseline: { ...baseline } } : {}),
         version: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
     };
     if (input.operation === 'save' && entry.operation === 'save') entry.note = JSON.parse(JSON.stringify(input.note));
     const current = pendingNoteWrites(bookId);
     const previous = current.find(item => item.id === id);
     entry.prerequisites = [...(previous?.prerequisites || [])];
-    if (previous?.command) entry.prerequisites.push({ version: previous.version, operation: previous.operation, command: previous.command });
+    if (previous?.command) entry.prerequisites.push({ version: previous.version, operation: previous.operation, command: previous.command, chain: previous.baseline?.chain });
     const entries = current.filter(item => item.id !== id);
     return { ...entry, durable: storePending(bookId, [...entries, entry]) };
 }
@@ -59,16 +63,26 @@ export function attachNoteCommand(entry: PendingNoteWrite, command: NoteCommand)
     if (!current) return { ...entry, command, durable: false };
     if (current.version === entry.version) current.command = command;
     else if (!(current.prerequisites || []).some(item => item.version === entry.version)) {
-        current.prerequisites = [...(current.prerequisites || []), { version: entry.version, operation: entry.operation, command }];
+        current.prerequisites = [...(current.prerequisites || []), { version: entry.version, operation: entry.operation, command, chain: entry.baseline?.chain }];
     }
     return { ...entry, command, durable: storePending(entry.bookId, entries) };
 }
 
-export function acknowledgeNoteWrite(entry: Pick<PendingNoteWrite, 'bookId' | 'id' | 'version'>) {
+export function acknowledgeNoteWrite(entry: Pick<PendingNoteWrite, 'bookId' | 'id' | 'version'>,
+    acknowledged?: { command: NoteCommand; chain?: string; revision: number }) {
     const entries = pendingNoteWrites(entry.bookId);
     const remaining = entries.filter(item => item.id !== entry.id || item.version !== entry.version);
-    remaining.forEach(item => { item.prerequisites = (item.prerequisites || []).filter(prior => prior.version !== entry.version); });
+    remaining.forEach(item => {
+        item.prerequisites = (item.prerequisites || []).filter(prior => prior.version !== entry.version);
+        if (item.id === entry.id) advanceNoteBaseline(item.baseline, acknowledged);
+    });
     storePending(entry.bookId, remaining);
+}
+
+export function advanceNoteBaseline(baseline: NoteEditBaseline | undefined,
+    acknowledged?: { command: NoteCommand; chain?: string; revision: number }) {
+    if (baseline && acknowledged?.chain === baseline.chain && baseline.generation === acknowledged.command.generation
+        && baseline.expected === acknowledged.command.expected) baseline.expected = acknowledged.revision;
 }
 
 export function pendingNoteBookIds() {

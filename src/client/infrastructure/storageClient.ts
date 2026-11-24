@@ -2,28 +2,27 @@ import type { GoalStateRecord, SaveGoalsCommand, NoteDeleteRevision } from '../.
 import type { GoalLibraryRecord, SaveGoalLibraryCommand } from '../../shared/storage.js';
 import type { GoalBackupState, GoalGraphBackup } from '../domain/goal.js';
 import type { Book } from '../domain/book.js';
-import type { BookRecord, BookRevision, MigrationStatus, NoteRecord, Revision, StorageRoutes, StoredAnnotation } from '../../shared/storage.js';
+import type { BookRecord, BookSummaryRecord, BookRevision, NoteRecord, Revision, StorageRoutes, StoredAnnotation } from '../../shared/storage.js';
 import { StorageClientError } from './storageError.js';
-import type { DesktopResult, DesktopStorage } from '../../shared/desktop.js';
+import type { DesktopLibraryChanges, DesktopResult, DesktopStorage } from '../../shared/desktop.js';
 // The browser remains asynchronous; SQLite is owned exclusively by Node.js.
 let base = '/api/storage';
 let transport: typeof fetch = (...args) => fetch(...args);
 let token: string | null = null;
-let source: string | null = null;
-let ready: Promise<MigrationStatus> | null = null;
+let desktopReady: Promise<void> | null = null;
 let forceHttp = false;
 const bookVersions = new Map<string, BookRevision & { deleted: boolean }>();
 const noteVersions = new Map<string, Revision & { bookId: string; deleted: boolean }>();
 const goalVersions = new Map<string, GoalStateRecord>();
 let libraryVersion: GoalLibraryRecord | undefined;
-const libraryListeners = new Set<(record: GoalLibraryRecord) => void>();
+const libraryListeners = new Set<(record: GoalLibraryRecord, external?: { previous?: GoalLibraryRecord }) => void>();
 const goalListeners = new Set<(record: GoalStateRecord) => void>();
 const queues = new Map<string, Promise<unknown>>();
 export const operationId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 
-export function configureStorage({ baseUrl = '/api/storage', fetch: fetcher = (...args) => fetch(...args), sourceId = null }: { baseUrl?: string; fetch?: typeof fetch; sourceId?: string | null } = {}) {
+export function configureStorage({ baseUrl = '/api/storage', fetch: fetcher = (...args) => fetch(...args) }: { baseUrl?: string; fetch?: typeof fetch } = {}) {
     forceHttp = true;
-    base = baseUrl; transport = fetcher; token = null; source = sourceId; ready = null;
+    base = baseUrl; transport = fetcher; token = null; desktopReady = null;
     bookVersions.clear(); noteVersions.clear(); goalVersions.clear(); queues.clear();
     libraryVersion = undefined;
 }
@@ -56,17 +55,9 @@ async function desktopRequest<R extends keyof StorageRoutes>(bridge: DesktopStor
         case 'notes/save': result = unwrapDesktop(await bridge.saveNote(body as StorageRoutes['notes/save']['request'])); break;
         case 'notes/delete': result = unwrapDesktop(await bridge.deleteNote(body as StorageRoutes['notes/delete']['request'])); break;
         case 'restore': result = unwrapDesktop(await bridge.restore(body as StorageRoutes['restore']['request'])); break;
-        default: throw new StorageClientError("Legacy browser data cannot be migrated through desktop storage.");
+        default: throw new StorageClientError("Unknown desktop storage request.");
     }
     return result as StorageRoutes[R]['response'];
-}
-function sourceId(): string {
-    if (source) return source;
-    try {
-        source = localStorage.getItem('aura_sqlite_source');
-        if (!source) { source = operationId(); localStorage.setItem('aura_sqlite_source', source); }
-    } catch (_) { throw new Error("Could not read the migration identifier. Restore browser local storage access. Legacy data has been preserved."); }
-    return source!;
 }
 async function session() {
     const response = await transport(base + '/session', { signal: globalThis.AbortSignal?.timeout?.(15000) });
@@ -87,7 +78,7 @@ export async function storageRequest<R extends keyof StorageRoutes>(route: R, bo
     try {
         response = await transport(base + '/' + route, {
             method: body === undefined ? 'GET' : 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Aura-Token': token!, 'X-Aura-Source': sourceId() },
+            headers: { 'Content-Type': 'application/json', 'X-Aura-Token': token! },
             signal: globalThis.AbortSignal?.timeout?.(15000),
             body: body === undefined ? undefined : JSON.stringify(body)
         });
@@ -111,18 +102,16 @@ export async function storageRequest<R extends keyof StorageRoutes>(route: R, bo
 }
 export function initializeStorage() {
     const desktop = desktopStorage();
-    if (desktop) {
-        if (!ready) ready = desktop.status().then(result => {
+    if (!desktop) return token ? Promise.resolve() : session();
+    if (!desktopReady) {
+        desktopReady = desktop.status().then(result => {
             if (!unwrapDesktop(result).initialized) {
-                const error = new StorageClientError("Create a local desktop library first. Original browser data has not been migrated.");
+                const error = new StorageClientError("Create a local desktop library first.");
                 error.status = 423; throw error;
             }
-            return { completed: true };
-        }).catch(error => { ready = null; throw error; });
-        return ready;
+        }).catch(error => { desktopReady = null; throw error; });
     }
-    if (!ready) ready = import('./legacyMigration.js').then(module => module.migrateLegacyStorage());
-    return ready;
+    return desktopReady;
 }
 export async function readBooks() {
     await initializeStorage();
@@ -130,15 +119,13 @@ export async function readBooks() {
     records.forEach(rememberBookVersion);
     return records;
 }
-function rememberBookVersion(row: BookRecord) {
+function rememberBookVersion(row: BookRecord | BookSummaryRecord) {
     if ((bookVersions.get(row.id)?.revision || 0) <= row.revision) bookVersions.set(row.id, { revision: row.revision, generation: row.generation, deleted: row.deleted });
 }
 export async function readBookSummaries() {
     await initializeStorage();
     const { records } = await storageRequest('books/summary', undefined);
-    records.forEach(row => {
-        if ((bookVersions.get(row.id)?.revision || 0) <= row.revision) bookVersions.set(row.id, { revision: row.revision, generation: row.generation, deleted: row.deleted });
-    });
+    records.forEach(rememberBookVersion);
     return records;
 }
 export async function readBook(id: string) {
@@ -150,8 +137,24 @@ export async function readBook(id: string) {
 export async function readNotes(bookIds: string[] = []) {
     await initializeStorage();
     const { records } = await storageRequest('notes/query', { bookIds });
-    records.forEach(row => { if ((noteVersions.get(row.id)?.revision || 0) <= row.revision) noteVersions.set(row.id, row); });
+    records.forEach(rememberNoteVersion);
     return records;
+}
+function rememberNoteVersion(row: NoteRecord) {
+    if ((noteVersions.get(row.id)?.revision || 0) <= row.revision) noteVersions.set(row.id, row);
+}
+export function onExternalLibraryChanges(listener: (batch: DesktopLibraryChanges) => void) {
+    return desktopStorage()?.onExternalChanges?.(batch => {
+        batch.books.forEach(rememberBookVersion);
+        batch.notes.forEach(rememberNoteVersion);
+        const previous = libraryVersion;
+        if (batch.goals && batch.goals.revision > (previous?.revision ?? -1)) {
+            const record = batch.goals;
+            acceptGoalLibrary(record);
+            libraryListeners.forEach(callback => callback(record, { previous }));
+        }
+        listener(batch);
+    });
 }
 export function enqueue<T>(bookId: string, task: () => T | PromiseLike<T>): Promise<T> {
     const previous = queues.get(bookId) || Promise.resolve();
@@ -161,6 +164,7 @@ export function enqueue<T>(bookId: string, task: () => T | PromiseLike<T>): Prom
     return next;
 }
 export async function drainStorage() { await Promise.all([...queues.values()]); }
+export const cachedBookVersion = (id: string) => bookVersions.get(id);
 export async function bookVersion(id: string): Promise<BookRevision> {
     if (!bookVersions.has(id)) await readBookSummaries();
     return bookVersions.get(id) || { revision: 0 };
@@ -201,7 +205,7 @@ export function acceptGoalLibrary(record: GoalLibraryRecord, notify = false) {
     if (notify) libraryListeners.forEach(listener => listener(record));
 }
 export const cachedGoalLibrary = () => libraryVersion;
-export function onGoalLibraryChanged(listener: (record: GoalLibraryRecord) => void) { libraryListeners.add(listener); return () => libraryListeners.delete(listener); }
+export function onGoalLibraryChanged(listener: (record: GoalLibraryRecord, external?: { previous?: GoalLibraryRecord }) => void) { libraryListeners.add(listener); return () => libraryListeners.delete(listener); }
 export async function readGoalLibrary() {
     await initializeStorage(); const record = await storageRequest('goals/library', undefined); acceptGoalLibrary(record); return record;
 }

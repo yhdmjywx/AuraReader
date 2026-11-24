@@ -15,6 +15,9 @@ verified: 2026-10-30 · owner rules: AGENTS.md
   Browser mode uses a local HTTP service; desktop mode uses IPC without that
   service. Node.js >= 24.15.0 is required for source development.
   (source: package.json, docs/development.md)
+- SQLite is the only library database in both modes. Browser startup requires
+  a local service session and has no dependency on legacy IndexedDB.
+  (source: docs/data-and-backup.md)
 
 ## Commands
 - development: `npm run dev`
@@ -92,7 +95,15 @@ verified: 2026-10-30 · owner rules: AGENTS.md
   implemented. The owner authorized ego-browser Web validation on 2026-11-13
   after built-in browser access failed; no desktop execution was tested for this
   feature. Evidence: docs/epub-engine/reading-settings-implementation-2026-11-13.md.
+- The local Connector MVP targets initialized desktop SQLite libraries via a
+  standalone MCP stdio package. Build and acceptance commands, desktop sync,
+  and current host verification are recorded in
+  docs/product/connector/implementation.md.
 - client persistence adapters: src/client/infrastructure/
+- Candidate `22d5785` later passed standalone packaged reading-settings/Paper
+  checks and normal close/restart on 2026-11-13. NSIS payload, ASAR and runtime
+  reports belong to this candidate; installation remains unverified. Evidence:
+  docs/archive/verification/electron-candidate-22d5785-2026-11-13.md.
 - local server and data store: src/server/
 - Electron entry and integration: src/desktop/
 - validation scripts and tests: scripts/, tests/
@@ -148,6 +159,9 @@ verified: 2026-10-30 · owner rules: AGENTS.md
   property bindings and closed-menu transitions still need correction; the new
   UX review has not been created. Resume evidence: .local-materials/response-ux-state.json.
   Current partial delivery and limitations: design.md in that feature directory.
+  On 2026-11-11, all six item feedback bindings and closed-menu opacity were
+  confirmed corrected through the Figma Scripter UI. Review `325:2747` is partial;
+  completing its contexts/states and prototype/visual validation remains pending.
   Response source integration is now implemented in the reader sidebar and existing
   full Goal workspace. The owner confirmed that Response follows the current Goal's
   association: restoring the original retains it; a fresh association starts unmarked.
