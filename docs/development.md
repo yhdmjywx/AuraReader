@@ -6,7 +6,7 @@
 
 ## 安装与启动
 
-Windows x64 桌面候选版使用 `AuraReader-Setup-1.0.0-x64.exe` 安装，安装后从桌面或开始菜单的 AuraReader 快捷方式启动。应用自带 Electron、Node.js 与 SQLite，日常使用无需另装 Node.js、打开浏览器或运行终端。首次启动点击“创建独立桌面书库”，随后导入 EPUB/TXT。候选安装包和 SHA256 校验文件由下方 `npm run dist:win` 生成在 `release/`，未发布到在线下载服务。
+Windows x64 桌面版使用 `AuraReader-Setup-<版本>-x64.exe` 安装，安装后从桌面或开始菜单的 AuraReader 快捷方式启动。应用自带 Electron、Node.js 与 SQLite，日常使用无需另装 Node.js、打开浏览器或运行终端。首次启动点击“创建独立桌面书库”，随后导入 EPUB/TXT。GitHub Releases 提供正式版本下载。源码运行时可用 `npm run dist:win` 在 `release/` 生成候选安装包和 SHA256 校验文件。
 
 桌面默认数据位置为 `%APPDATA%\AuraReader`，其中 `data/aurareader.sqlite` 保存书籍及笔记，`data/fonts/` 保存导入字体；正常升级和卸载保留数据。当前只支持现用 SQLite 和当前书籍备份，不提供旧数据库自动迁移。安装包目前**未签名**；实际 NSIS 静默安装、版本升级、卸载和重装已经验证，安装向导逐页操作、纯净 Windows 虚拟机以及签名后的系统信任流程尚未验收。具体证据与限制见 [阶段 5 记录](archive/plans-and-implementation/electron-desktop-stage5.md)。
 
@@ -32,7 +32,7 @@ npm start
 
 ## 开发与测试
 
-Electron Windows 桌面迁移已进入阶段 6 的本地验证，保留 Windows x64 NSIS 候选安装包，暂不发布。运行 `npm run desktop` 也可从源码创建独立桌面书库，通过 Windows 原生对话框导入 EPUB/TXT、阅读并保存高亮和笔记；可读取系统字体、导入 TTF/OTF/WOFF2，以及保存 Markdown、章节文件夹和每书 `.aurabackup`，并恢复当前书籍备份。旧阶段记录中的带标注 HTML 与章节 ZIP 属于历史验收能力，当前菜单不再提供这些导出入口。文件取消与保存失败会明确反馈，多书备份显示实际保存数量。桌面资源与 JSZip 随应用提供，离线运行不使用 localhost 服务。
+Electron Windows 桌面版采用 Windows x64 NSIS 安装包。运行 `npm run desktop` 也可从源码创建独立桌面书库，通过 Windows 原生对话框导入 EPUB/TXT、阅读并保存高亮和笔记；可读取系统字体、导入 TTF/OTF/WOFF2，以及保存 Markdown、章节文件夹和每书 `.aurabackup`，并恢复当前书籍备份。旧阶段记录中的带标注 HTML 与章节 ZIP 属于历史验收能力，当前菜单不再提供这些导出入口。文件取消与保存失败会明确反馈，多书备份显示实际保存数量。桌面资源与 JSZip 随应用提供，离线运行不使用 localhost 服务。
 
 首次创建桌面书库需明确点击。桌面 SQLite 和导入字体位于安装目录之外的 `%APPDATA%\AuraReader\data`。桌面支持 SQLite 读写、版本校验、幂等重试、备份与恢复，未知或缺失的数据库会阻断启动。阶段 6 增加实际 SQLite 容量、只读和锁竞争故障、Renderer/主进程终止恢复、大书与持续读写、打包程序及安装生命周期验证，并修复容量错误掩盖与页面关闭漏保存。发布验收仍有未验证项；最新证据与限制见 [阶段 6 记录](archive/plans-and-implementation/electron-desktop-stage6.md)，安装设计见 [阶段 5](archive/plans-and-implementation/electron-desktop-stage5.md)，文件功能见 [阶段 4](archive/plans-and-implementation/electron-desktop-stage4.md)，历史记录见 [阶段 3](archive/plans-and-implementation/electron-desktop-stage3.md)、[审计](archive/plans-and-implementation/electron-desktop-audit.md)和[外壳记录](archive/plans-and-implementation/electron-desktop-stage2.md)。
 

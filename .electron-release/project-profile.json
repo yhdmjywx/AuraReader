@@ -35,7 +35,7 @@
       }
     ],
     "automaticPublishing": false,
-    "signingConfiguration": "unknown"
+    "signingConfiguration": "unsigned by default; Authenticode status verified per artifact"
   },
   "scripts": {
     "start": "node src/server/server.js",
@@ -90,7 +90,7 @@
       "package-lock.json#version",
       "package-lock.json#packages[\"\"]#version"
     ],
-    "tagConvention": "unknown"
+    "tagConvention": "v${version}"
   },
   "releaseArtifactPatterns": [
     "release/AuraReader-Setup-${version}-x64.exe",
@@ -100,20 +100,20 @@
   "sources": [
     {
       "path": "package.json",
-      "sha256": "865d4fa832f9645a6f8a7bb7cbcc3b0f8df13e7208356c7c3fc9533c7f49140c",
+      "sha256": "422b796ba53cc5c6bfc1bde445c30715c63f56b5a1e186f5fe48d077bb2a1b52",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "865d4fa832f9645a6f8a7bb7cbcc3b0f8df13e7208356c7c3fc9533c7f49140c"
+        "value": "0bef794b6dd7128b89ec11db8b458a701500a216b53f8c68f489aded5a05ec34"
       }
     },
     {
       "path": "package-lock.json",
-      "sha256": "594728a83a1477583b64806355712cd479cd2f697ff6a302caf43d70721813de",
+      "sha256": "5bb7b534c7b74480d21d56a4e439cacfa9485127e5815a6a2b117766a663a4d9",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "40f6faac6971df6ca6fad7b58007b18d1c964322c39fe73b7ff04a53bae14e41"
+        "value": "3ed1524a8e8bdd2a55a5c64e2bfde58e2cac3e94594f121e1799ea764bfb5b8f"
       }
     },
     {
@@ -190,7 +190,7 @@
     },
     {
       "path": "docs/agents/project-profile.md",
-      "sha256": "33d5e117a162d23f0cbb89e7ed78254295203d3ab89a7f44de07094f5cd3cc7a",
+      "sha256": "1c171ed6489ee571b9bc8d1f6af6bb05986c749f9826ae71cb3c2e81745e1fd2",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
@@ -199,11 +199,11 @@
     },
     {
       "path": "docs/development.md",
-      "sha256": "acebc041b74fe62d9ce7e74e4c37d8f7c9f7f946949bc24d7fcb85d639cdbcdc",
+      "sha256": "552a9cb6d433130a1b189b0b090bcfc6886d725ebbf1f18903cb9af56af206b7",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
-        "value": "3eb195d8b7371fb6137ae47350c453368aef2e34a0d70e6bc16826e443650216"
+        "value": "01f6c84e6f384c5cb5c4e041318b39200ea250178a45f107cd2f2b67d7310ddf"
       }
     },
     {
@@ -253,7 +253,7 @@
     },
     {
       "path": "scripts/test-desktop.cjs",
-      "sha256": "c94ae17999e629c0c4c03a09b06db7c71968ce5f3113654bc347815769a6cc43",
+      "sha256": "922e230448921eaf27d6352e73d8233b4db10edd6c301c4015006c61f9e64fc9",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
@@ -289,7 +289,7 @@
     },
     {
       "path": "scripts/build-connector.cjs",
-      "sha256": "deb8819df571393ca66f862b0fe97d643de8a553ada9975437914564dbfd1346",
+      "sha256": "bec284a63e97a777b408eec22aa8b9f75ad6f5c9ef68c97d0dd9c497194b1605",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
@@ -298,7 +298,7 @@
     },
     {
       "path": "src/connector/package-lock.json",
-      "sha256": "b77b45d0111620e2d9552409b93e4a02d02f271091d3d0d9a3cd804532ad1f31",
+      "sha256": "2ba03b4bc8ff720424fd4b8a3032c3ac884c21fb615a7da1a12a98cdb6e2bbcb",
       "fingerprint": {
         "algorithm": "sha256",
         "normalization": "utf8-lf",
